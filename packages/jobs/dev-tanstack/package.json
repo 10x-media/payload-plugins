@@ -1,0 +1,34 @@
+{
+	"name": "@10x-media/jobs-dev-tanstack",
+	"version": "0.0.0",
+	"private": true,
+	"type": "module",
+	"scripts": {
+		"dev": "vite dev",
+		"typecheck": "tsc -p tsconfig.json --noEmit",
+		"generate:importmap": "bash ../../../scripts/payload.sh . generate:importmap"
+	},
+	"dependencies": {
+		"@10x-media/jobs": "workspace:*",
+		"@payloadcms/db-mongodb": "catalog:",
+		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/tanstack-start": "catalog:",
+		"@payloadcms/ui": "catalog:",
+		"@tanstack/react-router": "catalog:",
+		"@tanstack/react-start": "catalog:",
+		"payload": "catalog:",
+		"react": "catalog:",
+		"react-dom": "catalog:",
+		"vite": "catalog:"
+	},
+	"devDependencies": {
+		"@10x-media/tsconfig": "workspace:*",
+		"@types/node": "catalog:",
+		"@types/react": "catalog:",
+		"@types/react-dom": "catalog:",
+		"@vitejs/plugin-react": "catalog:",
+		"@vitejs/plugin-rsc": "catalog:",
+		"mongodb-memory-server": "^10.1.0",
+		"typescript": "catalog:"
+	}
+}

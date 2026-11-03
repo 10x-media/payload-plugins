@@ -8,6 +8,7 @@ This is a Turborepo of public `@10x-media/*` Payload plugins maintained by 10x M
 
 - `packages/<slug>/`: published plugins (`@10x-media/<slug>`)
 - `packages/<slug>/dev/`: nested Next app per plugin (`@10x-media/<slug>-dev`, private)
+- `packages/<slug>/dev-tanstack/`: the same dev app on TanStack Start (`@10x-media/<slug>-dev-tanstack`, private); it serves `dev/payload.config.ts` with its own import map
 - `tooling/<name>/`: private internal packages (test-harness, plugin-template)
 - `config/<name>/`: shared configs (typescript, biome, vitest)
 - `apps/docs/`: fumadocs documentation site
@@ -36,6 +37,7 @@ pnpm build <name>                       # build one plugin (e.g. automations)
 
 # Dev / start
 pnpm dev <name>                         # boot a plugin's dev server (next dev)
+pnpm dev:tanstack <name>                # the same app on TanStack Start (vite dev, :3001)
 pnpm start <name>                       # start a built dev app (next start)
 
 # Tests (tiered, Payload-aligned)
@@ -56,6 +58,7 @@ pnpm videos <name>                      # render packages/<name>/videos/*.video.
 pnpm generate <name>                         # regenerate types + importmap for one plugin
 pnpm generate:types <name>
 pnpm generate:importmap <name>
+pnpm generate:importmap:tanstack <name>  # the TanStack dev app's import map
 
 # Migrations (Payload's standard CLI, routed through scripts/payload.sh)
 pnpm migrate <name>                              # apply pending migrations
@@ -183,7 +186,7 @@ The docs site serves them: `apps/docs/scripts/collect-registry.ts` copies each `
 
 ### Template parity
 
-Most of `tooling/plugin-template` is a starting point each plugin rewrites, but a few files are meant to stay byte-identical everywhere: the Payload route and layout boilerplate, `dev/next.config.ts`, `dev/helpers/memoryDb.ts`, `src/plugin/registerTranslations.ts` and `src/translations/useTranslation.ts`. `pnpm check:template` enforces that list (`TRACKED` in `scripts/check-template.ts`) and runs in the `lint` job.
+Most of `tooling/plugin-template` is a starting point each plugin rewrites, but a few files are meant to stay byte-identical everywhere: the Payload route and layout boilerplate, `dev/next.config.ts`, `dev/helpers/memoryDb.ts`, everything in `dev-tanstack/` except `package.json` and the generated `importMap.js`, `src/plugin/registerTranslations.ts` and `src/translations/useTranslation.ts`. `pnpm check:template` enforces that list (`TRACKED` in `scripts/check-template.ts`) and runs in the `lint` job.
 
 The template is copied once at `pnpm new` and never consulted again, so a fix applied only to the generated packages never reaches it. That is how the `memoryDb.ts` production-build guard diverged for six weeks while four plugins were scaffolded without it. **Edit the template first, then copy it over the packages.** A long-lived branch that scaffolds a new plugin will go red here after any tracked file changes on `main`; rebasing and recopying the template is the fix.
 

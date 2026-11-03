@@ -11,7 +11,8 @@
  * A target can be a plugin under `packages/` (e.g. automations) or an app
  * under `apps/` (e.g. docs). Plugins route their dev, start, gen, and migrate
  * tasks to a `-dev` companion package; apps have no companion and do not
- * support gen or migrate tasks.
+ * support gen or migrate tasks. `dev:tanstack` and `generate:importmap:tanstack`
+ * go to the plugin's second dev app, the TanStack Start `-dev-tanstack` package.
  *
  * Examples:
  *   pnpm test                                 → turbo run test
@@ -19,6 +20,7 @@
  *   pnpm build docs                           → turbo run build --filter @10x-media/docs
  *   pnpm dev automations                      → pnpm --filter @10x-media/automations-dev run dev
  *   pnpm dev docs                             → pnpm --filter @10x-media/docs run dev
+ *   pnpm dev:tanstack automations             → pnpm --filter @10x-media/automations-dev-tanstack run dev
  *   pnpm migrate:create automations add-x     → pnpm --filter @10x-media/automations-dev run migrate:create add-x
  */
 
@@ -45,10 +47,16 @@ const PLUGIN_ONLY_TASKS = new Set([
 	'migrate:fresh',
 ])
 const SERVER_TASKS = ['dev', 'start']
+/** Tasks of the TanStack Start dev app, mapped to the script they run in `-dev-tanstack`. */
+const TANSTACK_TASKS: Record<string, string> = {
+	'dev:tanstack': 'dev',
+	'generate:importmap:tanstack': 'generate:importmap',
+}
 const DEV_PACKAGE_TASKS = new Set([...SERVER_TASKS, ...PLUGIN_ONLY_TASKS])
 const REQUIRE_TARGET = new Set([
 	...SERVER_TASKS,
 	...PLUGIN_ONLY_TASKS,
+	...Object.keys(TANSTACK_TASKS),
 	'test:e2e',
 	'test:upgrade',
 	'videos',
@@ -170,8 +178,8 @@ const main = (): void => {
 
 	// Resolve target. Accept short names (automations, docs) or the full scope.
 	const bare = target.startsWith(`${SCOPE}/`)
-		? target.slice(SCOPE.length + 1).replace(/-dev$/, '')
-		: target.replace(/-dev$/, '')
+		? target.slice(SCOPE.length + 1).replace(/-dev(-tanstack)?$/, '')
+		: target.replace(/-dev(-tanstack)?$/, '')
 
 	const isPlugin = plugins.includes(bare)
 	const isApp = apps.includes(bare)
@@ -184,7 +192,7 @@ const main = (): void => {
 		process.exit(2)
 	}
 
-	if (isApp && PLUGIN_ONLY_TASKS.has(task)) {
+	if (isApp && (PLUGIN_ONLY_TASKS.has(task) || task in TANSTACK_TASKS)) {
 		console.error(
 			`Task "${task}" is not available for the ${bare} app (apps have no dev companion package).`
 		)
@@ -193,6 +201,17 @@ const main = (): void => {
 
 	if (TURBO_TASKS.has(task)) {
 		run('pnpm', ['exec', 'turbo', 'run', task, '--filter', `${SCOPE}/${bare}`, ...forwarded])
+		return
+	}
+
+	const tanstackScript = TANSTACK_TASKS[task]
+	if (tanstackScript) {
+		const env = tanstackScript === 'dev' ? serverEnv(`${bare}-tanstack`) : undefined
+		run(
+			'pnpm',
+			['--filter', `${SCOPE}/${bare}-dev-tanstack`, 'run', tanstackScript, ...passThrough],
+			env
+		)
 		return
 	}
 

@@ -51,8 +51,8 @@
 	],
 	"scripts": {
 		"build": "tsdown",
-		"lint": "biome check src tests dev",
-		"lint:fix": "biome check --write src tests dev",
+		"lint": "biome check src tests dev dev-tanstack",
+		"lint:fix": "biome check --write src tests dev dev-tanstack",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"test": "vitest run",
 		"test:unit": "vitest run src",

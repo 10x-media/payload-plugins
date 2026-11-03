@@ -18,6 +18,9 @@ apps/docs/.contentlayer/
 apps/docs/.source/
 next-env.d.ts
 
+# TanStack Start dev apps (router plugin state)
+packages/*/dev-tanstack/.tanstack/
+
 # test artifacts
 coverage/
 playwright-report/

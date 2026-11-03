@@ -20,6 +20,8 @@
 			"!.claude/settings.local.json",
 			"!.changeset/*.md",
 			"!packages/*/dev/app/(payload)/admin/importMap.js",
+			"!packages/*/dev-tanstack/src/app/_payload/importMap.js",
+			"!packages/*/dev-tanstack/src/routeTree.gen.ts",
 			"!packages/*/registry/r",
 			"!**/dev/migrations/*.json"
 		]
