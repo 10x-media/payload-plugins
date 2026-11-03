@@ -1,6 +1,6 @@
 # 10x-media Payload plugins, Claude Code guide
 
-This is a Turborepo of public `@10x-media/*` Payload v3 plugins maintained by 10x Media GmbH. See `CONTRIBUTING.md` for the contributor workflow, plugin anatomy, and release flow.
+This is a Turborepo of public `@10x-media/*` Payload plugins maintained by 10x Media GmbH. This is the `v4` branch, the Payload 4 line: forked once from `main` (Payload 3), never merged with it; fixes are ported between them by hand (see Release flow). See `CONTRIBUTING.md` for the contributor workflow, plugin anatomy, and release flow.
 
 **Toolchain:** Node 22.18+ and pnpm 10 for development; every package declares `engines.node >=22.18.0` (22.18 is the floor for Node's native `.ts` support, which the vitest configs rely on). Docker is required for the Postgres, container, and e2e test tiers. Shared dependency versions are centralized in a pnpm `catalog:` in `pnpm-workspace.yaml`, so a Payload or React bump is a one-line change. Cacheable tasks (build, lint, typecheck, test) run through Turborepo.
 
@@ -191,13 +191,15 @@ Tracked files are compared byte for byte, so they cannot contain `{{placeholder}
 
 ## Release flow
 
-The repo is in beta pre-mode. The flow is currently split, because the npm account is `auth-and-writes` 2FA and pnpm 10 has no OIDC, so CI cannot publish:
+This branch is the Payload 4 line, in alpha pre-mode: every package is `4.0.0-alpha.N` on the `alpha` dist-tag (plugin major = Payload major). `main` is the Payload 3 line, on `beta`, and owns `latest`. The branches never merge, because merging would collide on every changeset, `pre.json`, changelog and version. Fixes land on `main` and are ported here by hand; `main` pull requests that need it carry the `port-to-v4` label and a `v4: ported in #N` / `v4: not needed` line.
 
-1. `release.yml` opens or updates a "Version Packages" PR aggregating queued changesets. It no longer publishes.
-2. Merge that PR, then publish each bumped package from `main` with `pnpm publish:plugin <name>` (interactive passkey). The script publishes to npm and pushes the `@10x-media/<name>@<version>` tag.
+The flow is split, because the npm account is `auth-and-writes` 2FA and pnpm 10 has no OIDC, so CI cannot publish:
+
+1. `release.yml` opens or updates a "Version Packages" PR into `v4` aggregating queued changesets. It does not publish.
+2. Merge that PR, then publish each bumped package from `v4` with `pnpm publish:plugin <name>` (interactive passkey). The script publishes to npm under the dist-tag named by the version's prerelease id and pushes the `@10x-media/<name>@<version>` tag.
 3. The tag push triggers `release-notes.yml`, which creates the per-package GitHub release from its `CHANGELOG.md`.
 
-Planned: move to pnpm 11 + npm OIDC trusted publishing so CI publishes and releases again (restore the `publish:` step in `release.yml`). To exit beta: `pnpm changeset pre exit` and add a major-bump changeset for each package going stable.
+Planned: npm OIDC trusted publishing so CI publishes and releases again (restore the `publish:` step in `release.yml`). When Payload 4 is stable: branch `v3` from `main`, merge `v4` into `main`, `pnpm changeset pre exit` cuts `4.0.0` on `latest`, and the Payload 3 line moves to the `payload-v3` dist-tag.
 
 ## Process hygiene
 

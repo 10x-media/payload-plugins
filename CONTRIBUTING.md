@@ -137,9 +137,11 @@ Pick the bump by what a consumer experiences:
 - **minor**: new feature, option, or export
 - **patch**: bug fix or internal change with no public API change
 
-The repo is in beta pre-mode (`.changeset/pre.json`, tag `beta`). While in pre-mode every release publishes as `0.x.y-beta.N` regardless of bump type, but the bump you choose is still recorded and determines the version when the project later exits pre-mode and cuts a stable release. Choose the correct bump even during beta.
+This is the `v4` branch: the Payload 4 line, forked once from `main` (the Payload 3 line) and never merged with it. A plugin's major version follows Payload's, so every package here is `4.x`. The branch is in alpha pre-mode (`.changeset/pre.json`, tag `alpha`): every release publishes as `4.0.0-alpha.N` under the `alpha` dist-tag, whatever the bump, and exiting pre-mode cuts `4.0.0`. Choose the correct bump anyway; it is what the changelog records. After `4.0.0`, breaking changes ship only alongside a Payload major, so deprecate in between.
 
-A release of one plugin does not release the plugins that list it in `peerDependencies` while the new version still satisfies their range (`onlyUpdatePeerDependentsWhenOutOfRange` in `.changeset/config.json`). Without it, changesets gives every peer dependent a major bump on any minor of its peer, so a `fields` feature alone would push `webhooks` from `0.1.0-beta.5` to `1.0.0-beta.6`. A plugin that needs the newer version raises its own peer range in `package.json` and ships a changeset for that, which releases it as usual. A version that leaves a dependent's range still bumps that dependent to major.
+Fixes land on `main` first while Payload 4 is in beta, then get ported here by hand. A `main` pull request whose fix matters for v4 carries the `port-to-v4` label and a `v4: ported in #N` or `v4: not needed` line; `gh pr list --label port-to-v4 --state merged` is the backlog, and the label comes off once ported.
+
+A release of one plugin does not release the plugins that list it in `peerDependencies` while the new version still satisfies their range (`onlyUpdatePeerDependentsWhenOutOfRange` in `.changeset/config.json`). Without it, changesets gives every peer dependent a major bump on any minor of its peer, so a `fields` feature alone would push `webhooks` from `4.0.0` to `5.0.0`. A plugin that needs the newer version raises its own peer range in `package.json` and ships a changeset for that, which releases it as usual. A version that leaves a dependent's range still bumps that dependent to major.
 
 ## Comment and style policy
 
@@ -195,11 +197,11 @@ For questions, open a [GitHub Discussion](https://github.com/10x-media/payload-p
 
 Releases are automated with Changesets and GitHub Actions:
 
-1. When PRs carrying changesets land on `main`, `release.yml` opens or updates a **"Version Packages"** pull request that consumes the queued changesets, bumps each affected package, and updates its `CHANGELOG.md`.
-2. Merge the Version Packages PR to cut a release, then publish each bumped package from `main` with `pnpm publish:plugin <name>`. The npm account is `auth-and-writes` 2FA, so publishing uses an interactive browser passkey (CI cannot publish yet: pnpm 10 has no OIDC trusted publishing). The script publishes to npm, then creates and pushes the `@10x-media/<name>@<version>` git tag.
+1. When PRs carrying changesets land on `v4`, `release.yml` opens or updates a **"Version Packages"** pull request that consumes the queued changesets, bumps each affected package, and updates its `CHANGELOG.md`.
+2. Merge the Version Packages PR to cut a release, then publish each bumped package from `v4` with `pnpm publish:plugin <name>`. It derives the dist-tag from the version, so `4.0.0-alpha.N` goes to `alpha` and never touches `latest`, which stays on the Payload 3 line. The npm account is `auth-and-writes` 2FA, so publishing uses an interactive browser passkey (CI cannot publish yet: pnpm 10 has no OIDC trusted publishing). The script publishes to npm, then creates and pushes the `@10x-media/<name>@<version>` git tag.
 3. Pushing that tag triggers `release-notes.yml`, which creates the per-package GitHub release from the package's `CHANGELOG.md`.
 
-Versioning is independent per package: only packages with queued changesets are bumped, published, and released. **Planned:** after the monorepo moves to pnpm 11, switch to npm OIDC trusted publishing (a per-package Trusted Publisher on npmjs.com, no `NPM_TOKEN`) so CI publishes and creates releases directly again; the `snapshot` label (throwaway `pr-<number>` prereleases) is blocked on the same migration. To leave beta, run `pnpm changeset pre exit`, add a major changeset per package going stable, and merge the resulting Version Packages PR.
+Versioning is independent per package: only packages with queued changesets are bumped, published, and released. **Planned:** after the monorepo moves to pnpm 11, switch to npm OIDC trusted publishing (a per-package Trusted Publisher on npmjs.com, no `NPM_TOKEN`) so CI publishes and creates releases directly again; the `snapshot` label (throwaway `pr-<number>` prereleases) is blocked on the same migration. To leave alpha once Payload 4 is stable, run `pnpm changeset pre exit` and merge the resulting Version Packages PR, which cuts `4.0.0`.
 
 ## Documentation
 

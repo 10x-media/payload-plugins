@@ -11,8 +11,9 @@ set -euo pipefail
 #
 #   Usage: bash scripts/bootstrap-publish.sh <plugin>     (e.g. jobs)
 #
-# Prereqs: run `npm login` as the account that owns @10x-media (2FA set up), and run from
-# main with the merged Version Packages commit checked out so the tag lands on it.
+# Prereqs: run `npm login` as the account that owns @10x-media (2FA set up), and run from the
+# release branch (main for v3, v4 for v4) with its merged Version Packages commit checked
+# out so the tag lands on it. v4 publishes `4.0.0-alpha.N` under the `alpha` dist-tag.
 
 plugin="${1:?usage: bash scripts/bootstrap-publish.sh <plugin>}"
 root="$(cd "$(dirname "$0")/.." && pwd)"

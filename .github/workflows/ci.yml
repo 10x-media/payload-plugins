@@ -2,9 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, v4]
   pull_request:
-    branches: [main]
+    branches: [main, v4]
   workflow_dispatch:
 
 concurrency:
@@ -309,9 +309,9 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - name: Verify changeset exists when packages changed
         run: |
-          CHANGED=$(git diff --name-only origin/main...HEAD | grep -E '^packages/[^/]+/src/' || true)
+          CHANGED=$(git diff --name-only origin/${{ github.base_ref }}...HEAD | grep -E '^packages/[^/]+/src/' || true)
           if [ -n "$CHANGED" ]; then
-            CHANGES=$(pnpm changeset status --since=origin/main --output=/dev/stdout 2>/dev/null | grep -c 'releases:' || echo 0)
+            CHANGES=$(pnpm changeset status --since=origin/${{ github.base_ref }} --output=/dev/stdout 2>/dev/null | grep -c 'releases:' || echo 0)
             if [ "$CHANGES" -eq 0 ]; then
               echo "::error::Packages changed but no changeset present. Run 'pnpm changeset' or apply 'no-release' label."
               exit 1

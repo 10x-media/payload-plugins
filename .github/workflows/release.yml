@@ -8,9 +8,9 @@ name: Release
 
 on:
   push:
-    branches: [main]
+    branches: [main, v4]
   # A push whose workflows GitHub never started leaves the Version Packages PR without that
-  # merge's changesets; dispatching from main regenerates it.
+  # merge's changesets; dispatching from the branch (main or v4) regenerates its PR.
   workflow_dispatch:
 
 concurrency:
