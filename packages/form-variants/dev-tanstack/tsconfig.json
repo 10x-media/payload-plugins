@@ -3,6 +3,7 @@
 	"compilerOptions": {
 		"noEmit": true,
 		"allowJs": true,
+		"types": ["node", "vite/client"],
 		"paths": {
 			"@/*": ["./src/*"],
 			"@payload-config": ["./src/payload.config.ts"]
