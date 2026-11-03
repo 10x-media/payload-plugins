@@ -4,6 +4,7 @@ import {
 	FieldError,
 	FieldLabel,
 	fieldBaseClass,
+	MoreIcon,
 	Popup,
 	RenderCustomComponent,
 } from '@payloadcms/ui'
@@ -35,19 +36,8 @@ const draftWidth = (draft: string): React.CSSProperties => ({
 	width: `${Math.min(Math.max(draft.length, 2), 12) + 0.5}ch`,
 })
 
-const unitKebab = (
-	<svg
-		aria-hidden="true"
-		className={`${baseClass}__kebab`}
-		focusable="false"
-		viewBox="0 0 4 16"
-		xmlns="http://www.w3.org/2000/svg"
-	>
-		<circle cx="2" cy="2" fill="currentColor" r="1.6" />
-		<circle cx="2" cy="8" fill="currentColor" r="1.6" />
-		<circle cx="2" cy="14" fill="currentColor" r="1.6" />
-	</svg>
-)
+/** Payload's own "more" glyph, turned upright: a vertical kebab reads as the row's menu. */
+const unitKebab = <MoreIcon className={`${baseClass}__kebab`} size={24} />
 
 /**
  * Props for the form-free measurement input. `value` is the number in

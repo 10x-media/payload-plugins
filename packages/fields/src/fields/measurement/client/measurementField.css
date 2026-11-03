@@ -110,10 +110,11 @@
 	outline: var(--accessibility-outline);
 }
 
+/* MoreIcon's three dots sit symmetric about the centre of its box, so a quarter turn makes an
+   upright kebab without moving it. */
 .fields-measurement__kebab {
 	flex-shrink: 0;
-	width: 4px;
-	height: 14px;
+	transform: rotate(90deg);
 }
 
 .fields-measurement__sr-only {
