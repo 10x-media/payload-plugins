@@ -39,6 +39,7 @@ pnpm test:matrix [name]
 pnpm test:container [name]
 pnpm test:e2e <name>
 E2E_DBS=postgres pnpm test:e2e analytics   # analytics e2e on some databases (default: mongo postgres sqlite)
+E2E_FRAMEWORK=tanstack pnpm test:e2e <name>  # the same suite on the TanStack Start dev app (vite dev)
 pnpm test:upgrade analytics                # upgrade 1.0.0-beta.11 installs (UPGRADE_DBS, UPGRADE_VARIANTS select)
 
 # Docs showcase clips (needs `pnpm dev <name>` already running)
@@ -89,7 +90,7 @@ A separate workflow (`.github/workflows/payload-latest.yml`) runs the analytics 
 Everything is safe to run in parallel across multiple git worktrees, with no per-worktree setup:
 
 - **Tests** (unit, int, matrix, container) bind ephemeral ports: testcontainers let the OS assign a free host port per container, and in-memory Mongo picks a random port. Each worktree has its own `node_modules`, and the turbo cache is content-hashed, so concurrent runs never collide.
-- **e2e self-isolates.** `scripts/e2e.sh` derives both its `COMPOSE_PROJECT_NAME` and its host ports (Mongo/Postgres/Next) from the worktree, so two worktrees can run e2e at once untouched. Pin them with `MONGO_E2E_PORT` / `PG_E2E_PORT` / `E2E_NEXT_PORT` if you ever need fixed ports. The analytics upgrade test takes a compose project and ports of its own the same way (`MONGO_UPGRADE_PORT` / `PG_UPGRADE_PORT`), so it can run beside an e2e run of the same worktree.
+- **e2e self-isolates.** `scripts/e2e.sh` derives both its `COMPOSE_PROJECT_NAME` and its host ports (Mongo/Postgres/Next) from the worktree, so two worktrees can run e2e at once untouched. Pin them with `MONGO_E2E_PORT` / `PG_E2E_PORT` / `E2E_NEXT_PORT` if you ever need fixed ports (`E2E_NEXT_PORT` is the app's port on either framework). The analytics upgrade test takes a compose project and ports of its own the same way (`MONGO_UPGRADE_PORT` / `PG_UPGRADE_PORT`), so it can run beside an e2e run of the same worktree.
 - **Dev server.** `pnpm dev <name>` defaults to port 3000 (`${PORT:-3000}`); set `PORT` to run a second dev server from another worktree.
 
 ## Writing tests

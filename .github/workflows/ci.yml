@@ -206,6 +206,8 @@ jobs:
     if: github.event_name != 'push' && !contains(github.event.pull_request.labels.*.name, 'no_e2e')
     env:
       E2E_DATABASES: '{"analytics": ["mongo", "postgres", "sqlite"]}'
+      # Plugins ported to Payload 4 run their suite on both frameworks; the rest stay on Next only.
+      E2E_FRAMEWORKS: '{"undo-redo": ["next", "tanstack"]}'
     outputs:
       plugins: ${{ steps.plugins.outputs.plugins }}
       legs: ${{ steps.plugins.outputs.legs }}
@@ -226,8 +228,8 @@ jobs:
         run: |
           e2e=$(jq -cn '[inputs | select(.scripts["test:e2e"]) | .name]' packages/*/package.json)
           plugins=$(pnpm exec turbo ls ${{ steps.scope.outputs.flag }} --output=json |
-            jq -c --argjson e2e "$e2e" '[.packages.items[].name | rtrimstr("-dev") | select(IN($e2e[])) | ltrimstr("@10x-media/")] | unique')
-          legs=$(jq -c --argjson dbs "$E2E_DATABASES" '[.[] as $p | ($dbs[$p] // [""])[] | {plugin: $p, dbs: .}]' <<<"$plugins")
+            jq -c --argjson e2e "$e2e" '[.packages.items[].name | sub("-dev(-tanstack)?$"; "") | select(IN($e2e[])) | ltrimstr("@10x-media/")] | unique')
+          legs=$(jq -c --argjson dbs "$E2E_DATABASES" --argjson fws "$E2E_FRAMEWORKS"             '[.[] as $p | ($dbs[$p] // [""])[] as $d | ($fws[$p] // [""])[] | {plugin: $p, dbs: $d, framework: .}]' <<<"$plugins")
           echo "e2e: ${plugins}"
           echo "legs: ${legs}"
           echo "plugins=${plugins}" >>"$GITHUB_OUTPUT"
@@ -236,7 +238,7 @@ jobs:
   e2e:
     needs: e2e-scope
     if: needs.e2e-scope.outputs.plugins != '[]'
-    name: e2e (${{ matrix.plugin }}${{ matrix.dbs && format(', {0}', matrix.dbs) || '' }})
+    name: e2e (${{ matrix.plugin }}${{ matrix.dbs && format(', {0}', matrix.dbs) || '' }}${{ matrix.framework && format(', {0}', matrix.framework) || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
@@ -255,12 +257,13 @@ jobs:
       - run: pnpm test:e2e ${{ matrix.plugin }}
         env:
           E2E_DBS: ${{ matrix.dbs }}
+          E2E_FRAMEWORK: ${{ matrix.framework }}
       # Traces of the failed tests' retries, and the HTML report where the plugin writes one. A
       # failing pass stops e2e.sh, so the next pass never clears its folders first.
       - if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: e2e-${{ matrix.plugin }}${{ matrix.dbs && format('-{0}', matrix.dbs) || '' }}
+          name: e2e-${{ matrix.plugin }}${{ matrix.dbs && format('-{0}', matrix.dbs) || '' }}${{ matrix.framework && format('-{0}', matrix.framework) || '' }}
           path: |
             packages/${{ matrix.plugin }}/test-results/
             packages/${{ matrix.plugin }}/playwright-report/

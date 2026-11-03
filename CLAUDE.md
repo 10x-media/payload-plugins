@@ -49,6 +49,7 @@ pnpm test:matrix [name]                 # cross-DB run; Mongo in-memory + Postgr
 pnpm test:container [name]              # both DBs via testcontainers (Mongo container + Postgres container)
 pnpm test:e2e <name>                    # docker compose + build + Playwright
 E2E_DBS=postgres pnpm test:e2e analytics  # analytics e2e on some databases (default: mongo postgres sqlite)
+E2E_FRAMEWORK=tanstack pnpm test:e2e <name>  # the same suite on the TanStack Start dev app (vite dev)
 pnpm test:upgrade analytics             # upgrade beta.11 installs per the upgrading page (UPGRADE_DBS, UPGRADE_VARIANTS select)
 
 # Docs showcase clips (clipwright; needs `pnpm dev <name>` running on :3000)
@@ -139,14 +140,14 @@ The base comes from the workflow-level `AFFECTED_BASE_SHA`: a pull request's bas
 
 Scoping is by **package graph**, never by directory. A change to `jobs` also selects `automations`, because `automations` depends on it. `--filter` and `--affected` intersect rather than union, so `build` stays `--filter='./packages/*'` and simply narrows within it.
 
-`e2e` reuses the same scope step in its own `e2e-scope` job, which turns `turbo ls` into a matrix with one `pnpm test:e2e <plugin>` leg per plugin, except that a plugin listed in the job's `E2E_DATABASES` (analytics) gets one leg per database, passed as `E2E_DBS`. A plugin is picked when it *or its dev app* is affected, because the dev app is what Playwright drives and it can import other plugins: a `fields` change selects `admin-wiki-dev` rather than `admin-wiki`, and still runs admin-wiki's e2e. It runs on pull requests and `workflow_dispatch`, not on pushes to `main`, and the `no_e2e` label opts a pull request out of these legs. Labels are read from the triggering event, so adding one takes effect on the next push, the same as `no-release`.
+`e2e` reuses the same scope step in its own `e2e-scope` job, which turns `turbo ls` into a matrix with one `pnpm test:e2e <plugin>` leg per plugin, except that a plugin listed in the job's `E2E_DATABASES` (analytics) gets one leg per database, passed as `E2E_DBS`, and a plugin listed in `E2E_FRAMEWORKS` (the ones ported to Payload 4) gets one leg per framework, passed as `E2E_FRAMEWORK`: `next` serves the Next dev app's production build, `tanstack` runs the TanStack Start dev app under `vite dev`, which has no production build yet. Add a plugin to `E2E_FRAMEWORKS` as part of its port, after its `playwright.config.ts` and `scripts/e2e.sh` take the `E2E_FRAMEWORK` switch from the template. A plugin is picked when it *or one of its dev apps* is affected, because the dev app is what Playwright drives and it can import other plugins: a `fields` change selects `admin-wiki-dev` rather than `admin-wiki`, and still runs admin-wiki's e2e. It runs on pull requests and `workflow_dispatch`, not on pushes to `main`, and the `no_e2e` label opts a pull request out of these legs. Labels are read from the triggering event, so adding one takes effect on the next push, the same as `no-release`.
 
 `analytics-upgrade` (`pnpm test:upgrade analytics`, every database) runs on pull requests and `workflow_dispatch` too. It has its own scope step and runs the test only when `turbo ls` with that flag still lists `@10x-media/analytics`, so the fallback always runs it; its full-history checkout also brings the `@10x-media/analytics@1.0.0-beta.11` tag it checks out. `no_e2e` does not skip it: it drives no browser, and it is the only check of the upgrading page's migration edits.
 
 **What forces the whole workspace**, and this is the part to keep intact when editing any of it:
 
 - A path in `globalDependencies` (`config/**`, `tsconfig.json`, `biome.json`, `.npmrc`, the root `package.json`, `pnpm-workspace.yaml`). Turbo fans those out to all 29 packages. The root manifest and the catalog are in that list *specifically* for this: without them a Payload bump in `pnpm-workspace.yaml`'s `catalog:` selects no packages at all and CI passes having tested nothing.
-- A change under `.github/` or `scripts/`, which `ci-affected.sh` special-cases. Those are not a build input of any package, so turbo cannot see them, and a pull request that rewrites CI would otherwise go green having run nothing.
+- A change under `.github/` or `scripts/`, which `ci-affected.sh` special-cases. Those are not a build input of any package, so turbo cannot see them, and a pull request that rewrites CI would otherwise go green having run nothing. On this branch a pull request into `v4` is scoped anyway, because the unported plugins make a full run red regardless; a CI change there has to bring along (or touch) a ported plugin that exercises it.
 - `workflow_dispatch`, a first push to a branch, or a base commit that force-push removed.
 
 Verify a scoping change with `turbo ls`, which applies the filter without hashing (`--dry=json` also works but re-hashes the workspace, which is slow on Windows when a global dependency changed):

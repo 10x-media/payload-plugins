@@ -21,13 +21,23 @@ trap cleanup EXIT
 echo "Starting e2e DBs (mongo:8.2.12 replSet + postgres:16)..."
 docker compose -f docker-compose.test.yml up -d --wait
 
+# E2E_FRAMEWORK=tanstack runs the suite on the TanStack Start dev app, served by vite dev with
+# no build of its own (see playwright.config.ts); anything else on the Next dev app's build.
+if [[ "${E2E_FRAMEWORK:-next}" == tanstack ]]; then
+	app=@10x-media/undo-redo-dev-tanstack
+else
+	app=@10x-media/undo-redo-dev
+fi
+
 # Everything the dev app imports from the workspace, not just this plugin: a fresh
 # checkout has no dist/ for any of it.
 echo "Building the dev app's workspace dependencies..."
-pnpm --filter '@10x-media/undo-redo-dev^...' build
+pnpm --filter "${app}^..." build
 
-echo "Building dev app..."
-pnpm --filter @10x-media/undo-redo-dev build
+if [[ "$app" == *-dev ]]; then
+	echo "Building dev app..."
+	pnpm --filter "$app" build
+fi
 
 echo "Running Playwright e2e..."
 pnpm --filter @10x-media/undo-redo exec playwright test "$@"
