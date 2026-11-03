@@ -58,9 +58,11 @@ jobs:
             jq '.packages.items | length > 0')
           echo "docs affected: ${reached}"
           echo "reached=${reached}" >>"$GITHUB_OUTPUT"
+      # On v4 the examples wait for the analytics port: until then they type-check v3 code
+      # against Payload 4 and fail whatever the change. Drop the flag with that port.
       - if: steps.docs-reach.outputs.reached == 'true'
         name: Docs links and analytics examples
-        run: pnpm docs:check
+        run: pnpm docs:check ${{ github.base_ref == 'v4' && '--links-only' || '' }}
 
   typecheck:
     runs-on: ubuntu-latest
