@@ -17,10 +17,7 @@ import { adminWiki } from '@10x-media/admin-wiki'
 
 export default buildConfig({
   // ...
-  plugins: [
-    // Field-adding plugins first, so the wiki walker sees their fields.
-    adminWiki({}),
-  ],
+  plugins: [adminWiki({})],
 })
 ```
 
@@ -30,8 +27,8 @@ Then regenerate the import map, which is how Payload resolves the plugin's clien
 payload generate:importmap
 ```
 
-<Callout type="warn">
-Order matters. `adminWiki()` documents the config as it stands when it runs, so it belongs after every plugin that adds collections or fields. If the walk finds no fields at all, the plugin logs a warning on boot rather than failing silently.
+<Callout>
+`adminWiki()` documents the config as it stands when it runs. It declares `order: 1000`, so Payload runs it after every plugin on the default order wherever it sits in `plugins`; see [Plugin order](/admin-wiki/configuration#plugin-order). If the walk finds no fields at all, the plugin logs a warning on boot rather than failing silently.
 </Callout>
 
 ## What appeared
