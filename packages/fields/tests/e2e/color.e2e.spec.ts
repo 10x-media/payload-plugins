@@ -31,6 +31,15 @@ const openShowcaseDoc = async (page: Page): Promise<void> => {
 	if (!doc) throw new Error(`no ${FIXTURES.collection} doc titled ${FIXTURES.docTitle}`)
 	await page.goto(`/admin/collections/${FIXTURES.collection}/${doc.id}`)
 	await expect(page.locator(`#field-${FIXTURES.basic}`)).toBeVisible()
+	// The fields are server-rendered, so they are visible before React has attached a single
+	// handler; a key pressed in that window does nothing, which a slow CI runner hits every time.
+	await expect
+		.poll(() =>
+			swatchButton(page, FIXTURES.basic).evaluate((el) =>
+				Object.keys(el).some((key) => key.startsWith('__reactProps$'))
+			)
+		)
+		.toBe(true)
 }
 
 const swatchButton = (page: Page, name: string): Locator =>
