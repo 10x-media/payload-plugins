@@ -11,6 +11,7 @@ import {
 	makeRichTextValidate,
 	makeSetIndicatorHook,
 } from './hooks'
+import { jsonSchemaFor } from './jsonSchema'
 import { clampMaskDots } from './maskDots'
 import {
 	type EncryptedFieldMarker,
@@ -21,8 +22,13 @@ import {
 	type EncryptedSourceType,
 	FIELDS_CUSTOM_KEY,
 } from './types'
-import { typescriptSchemaFor } from './typescriptSchema'
 import { makeComposedValidate, makeEffectiveValidator } from './validators'
+
+/** Adds `filter` to a field's `admin.disabled`, keeping whatever the source already disabled. */
+const withFilterDisabled = (
+	disabled: NonNullable<TextField['admin']>['disabled']
+): NonNullable<TextField['admin']>['disabled'] =>
+	disabled === true ? true : { ...(disabled || {}), filter: true }
 
 /** Admin keys forwarded to the client patch so native components render correctly. */
 const PATCH_ADMIN_KEYS = [
@@ -128,7 +134,7 @@ const buildRichTextFields = (args: {
 		// admin.hidden (not top-level hidden) keeps the value readable by the virtual
 		// field's decrypt hook; top-level hidden strips it early in afterRead and
 		// races the decrypt read.
-		admin: { disableListColumn: true, disableListFilter: true, hidden: true },
+		admin: { disabled: { column: true, filter: true }, hidden: true },
 		custom: { [FIELDS_CUSTOM_KEY]: { encrypted: marker } },
 		hooks: { beforeChange: [makeRichTextCiphertextHook(marker)] },
 		...(marker.localized ? { localized: true } : {}),
@@ -263,7 +269,7 @@ export const encryptedField = (
 
 	// Spread keeps admin passthrough (description, width, condition, readOnly,
 	// position, custom labels) and access control on the stored field. Stripped:
-	// hooks/validate/typescriptSchema/index/unique/editor (rebuilt or moved to the
+	// hooks/validate/jsonSchema/index/unique/editor (rebuilt or moved to the
 	// bidx sibling); defaultValue (a static default emits a PLAINTEXT column
 	// default in drizzle, i.e. plaintext at rest on an INSERT that omits the
 	// column); and source-type-only constraints (options/min/max/min-maxLength)
@@ -279,7 +285,7 @@ export const encryptedField = (
 		min: _min,
 		minLength: _minLength,
 		options: _options,
-		typescriptSchema: _ts,
+		jsonSchema: _jsonSchema,
 		unique: _unique,
 		validate: _validate,
 		...rest
@@ -295,7 +301,7 @@ export const encryptedField = (
 			// column (matching nothing), so keep it out of the list filter UI. A
 			// queryable field stays filterable; the where-rewrite maps it to the
 			// blind index.
-			...(queryable ? {} : { disableListFilter: true }),
+			...(queryable ? {} : { disabled: withFilterDisabled(sourceAdmin?.disabled) }),
 			components: {
 				...(sourceAdmin?.components ?? {}),
 				Field: {
@@ -333,7 +339,7 @@ export const encryptedField = (
 			afterRead: [makeAfterReadHook(marker), ...(sourceHooks?.afterRead ?? [])],
 			beforeChange: [...(sourceHooks?.beforeChange ?? []), makeBeforeChangeHook(marker)],
 		},
-		typescriptSchema: typescriptSchemaFor(source),
+		jsonSchema: jsonSchemaFor(source),
 		validate: makeComposedValidate(effective),
 	}
 
@@ -350,7 +356,7 @@ export const encryptedField = (
 		const setField: CheckboxField = {
 			name: marker.setName as string,
 			type: 'checkbox',
-			admin: { disableListColumn: true, disableListFilter: true, hidden: true },
+			admin: { disabled: { column: true, filter: true }, hidden: true },
 			hooks: { afterRead: [makeSetIndicatorHook(marker.fieldName)] },
 			virtual: true,
 		}
@@ -364,7 +370,7 @@ export const encryptedField = (
 		const hintField: TextField = {
 			name: marker.hintName,
 			type: 'text',
-			admin: { disableListColumn: true, disableListFilter: true, hidden: true },
+			admin: { disabled: { column: true, filter: true }, hidden: true },
 			...(marker.localized ? { localized: true } : {}),
 		}
 		return [stored, setField, hintField]
@@ -384,7 +390,7 @@ export const encryptedField = (
 	const bidx: TextField = {
 		name: marker.bidxName as string,
 		type: 'text',
-		admin: { disableListColumn: true, disableListFilter: true, hidden: true },
+		admin: { disabled: { column: true, filter: true }, hidden: true },
 		index: true,
 		...(marker.localized ? { localized: true } : {}),
 		...(unique ? { unique: true } : {}),

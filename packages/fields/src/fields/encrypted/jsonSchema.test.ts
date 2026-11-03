@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
-import { typescriptSchemaFor } from './typescriptSchema'
+import { jsonSchemaFor } from './jsonSchema'
 
-const run = (source: Parameters<typeof typescriptSchemaFor>[0]) => {
-	const [fn] = typescriptSchemaFor(source)
-	return (fn as NonNullable<typeof fn>)({ jsonSchema: {} })
+const run = (source: Parameters<typeof jsonSchemaFor>[0]) => {
+	const [fn] = jsonSchemaFor(source)
+	return (fn as NonNullable<typeof fn>)({ jsonSchema: {}, variant: 'output' })
 }
 
-describe('typescriptSchemaFor keeps original type shapes in generated types', () => {
+describe('jsonSchemaFor keeps original type shapes in generated types', () => {
 	it('string-backed types', () => {
 		expect(run({ name: 'a', type: 'text' })).toEqual({ type: 'string' })
 		expect(run({ name: 'a', type: 'email' })).toEqual({ type: 'string' })

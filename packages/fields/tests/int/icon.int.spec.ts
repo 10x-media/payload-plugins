@@ -45,28 +45,42 @@ describeForDb('icon field', {}, (db) => {
 
 	it('persists a prefixed value and reads it back unchanged', async () => {
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'icons',
 			data: { icon: 'lucide:house' },
 		})
 		expect(doc.icon).toBe('lucide:house')
-		const read = await booted.payload.findByID({ collection: 'icons', id: doc.id })
+		const read = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'icons',
+			id: doc.id,
+		})
 		expect(read.icon).toBe('lucide:house')
 	})
 
 	it('accepts bare legacy values against the default library and stores them bare', async () => {
-		const doc = await booted.payload.create({ collection: 'icons', data: { icon: 'heart' } })
+		const doc = await booted.payload.create({
+			overrideAccess: true,
+			collection: 'icons',
+			data: { icon: 'heart' },
+		})
 		expect(doc.icon).toBe('heart')
 	})
 
 	it('rejects an unregistered library', async () => {
 		await expect(
-			booted.payload.create({ collection: 'icons', data: { icon: 'bogus:house' } })
+			booted.payload.create({
+				overrideAccess: true,
+				collection: 'icons',
+				data: { icon: 'bogus:house' },
+			})
 		).rejects.toThrow()
 	})
 
 	it('rejects an unknown icon name in a known library (real committed manifest)', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'icons',
 				data: { icon: 'lucide:definitely-not-an-icon' },
 			})
@@ -75,6 +89,7 @@ describeForDb('icon field', {}, (db) => {
 
 	it('keeps an unknown stored name saveable when unchanged, but rejects changing it (deviation 11)', async () => {
 		const seeded = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'icons',
 			data: { icon: 'lucide:house' },
 		})
@@ -89,6 +104,7 @@ describeForDb('icon field', {}, (db) => {
 		// Re-saving the unchanged value succeeds only if the real update pipeline threads the
 		// stored value through as previousValue, which is the load-bearing assumption of the leniency.
 		const unchanged = await booted.payload.update({
+			overrideAccess: true,
 			collection: 'icons',
 			data: { icon: 'lucide:dropped-in-upgrade' },
 			id: seeded.id,
@@ -96,6 +112,7 @@ describeForDb('icon field', {}, (db) => {
 		expect(unchanged.icon).toBe('lucide:dropped-in-upgrade')
 		await expect(
 			booted.payload.update({
+				overrideAccess: true,
 				collection: 'icons',
 				data: { icon: 'lucide:still-not-a-real-icon' },
 				id: seeded.id,
@@ -105,6 +122,7 @@ describeForDb('icon field', {}, (db) => {
 
 	it('keeps a stored value saveable after its library is unregistered, but rejects changing to one', async () => {
 		const seeded = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'icons',
 			data: { icon: 'lucide:house' },
 		})
@@ -116,6 +134,7 @@ describeForDb('icon field', {}, (db) => {
 			id: seeded.id,
 		})
 		const unchanged = await booted.payload.update({
+			overrideAccess: true,
 			collection: 'icons',
 			data: { icon: 'tabler:home' },
 			id: seeded.id,
@@ -123,6 +142,7 @@ describeForDb('icon field', {}, (db) => {
 		expect(unchanged.icon).toBe('tabler:home')
 		await expect(
 			booted.payload.update({
+				overrideAccess: true,
 				collection: 'icons',
 				data: { icon: 'tabler:settings' },
 				id: seeded.id,
@@ -133,11 +153,13 @@ describeForDb('icon field', {}, (db) => {
 	it('respects a per-field defaultLibrary for bare values', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'icons',
 				data: { restricted: 'house' },
 			})
 		).rejects.toThrow()
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'icons',
 			data: { restricted: 'cube' },
 		})
@@ -146,12 +168,17 @@ describeForDb('icon field', {}, (db) => {
 
 	it('iconLibraryField stores registered slugs and rejects unknown ones', async () => {
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'icons',
 			data: { libraries: ['lucide', 'radix'] },
 		})
 		expect(doc.libraries).toEqual(['lucide', 'radix'])
 		await expect(
-			booted.payload.create({ collection: 'icons', data: { libraries: ['tabler'] } })
+			booted.payload.create({
+				overrideAccess: true,
+				collection: 'icons',
+				data: { libraries: ['tabler'] },
+			})
 		).rejects.toThrow()
 	})
 
@@ -163,8 +190,13 @@ describeForDb('icon field', {}, (db) => {
 	})
 
 	it('is queryable by exact value', async () => {
-		await booted.payload.create({ collection: 'icons', data: { icon: 'lucide:anchor' } })
+		await booted.payload.create({
+			overrideAccess: true,
+			collection: 'icons',
+			data: { icon: 'lucide:anchor' },
+		})
 		const result = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'icons',
 			where: { icon: { equals: 'lucide:anchor' } },
 		})
@@ -207,11 +239,16 @@ describeForDb('icon field', {}, (db) => {
 		// The tenant enables only lucide; radix is forced through alwaysAvailable, so the
 		// resolved set is the tenant's library plus the forced one, in registration order.
 		const tenant = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'tenants',
 			data: { enabledLibraries: ['lucide'], name: 'acme' },
 		})
 		const resolver: IconAvailabilityResolver = async ({ req: resolverReq }) => {
-			const doc = await resolverReq.payload.findByID({ collection: 'tenants', id: tenant.id })
+			const doc = await resolverReq.payload.findByID({
+				overrideAccess: true,
+				collection: 'tenants',
+				id: tenant.id,
+			})
 			return Array.isArray(doc.enabledLibraries) ? (doc.enabledLibraries as string[]) : []
 		}
 		const req = { payload: booted.payload } as PayloadRequest

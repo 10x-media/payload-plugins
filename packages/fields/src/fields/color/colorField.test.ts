@@ -70,7 +70,7 @@ describe('colorField', () => {
 		expect(resolved.name).toBe('brandResolved')
 		expect(resolved.virtual).toBe(true)
 		expect(resolved.admin?.hidden).toBe(true)
-		expect(resolved.admin?.disableListColumn).toBe(true)
+		expect(resolved.admin?.disabled).toMatchObject({ column: true })
 		expect(resolved.hooks?.afterRead).toHaveLength(1)
 	})
 
@@ -226,7 +226,7 @@ describe('colorField linked.resolve', () => {
 		expect(resolved.virtual).toBe(true)
 		expect(resolved.name).toBe('brandResolved')
 		expect(resolved.admin?.hidden).toBe(true)
-		expect(resolved.admin?.disableListColumn).toBe(true)
+		expect(resolved.admin?.disabled).toMatchObject({ column: true })
 		expect(await runResolve(resolved, '')).toBeNull()
 		expect(await runResolve(resolved, '#123456')).toEqual({ dark: '#123456', light: '#123456' })
 		expect(await runResolve(resolved, 'preset:flat')).toEqual({ dark: '#ffffff', light: '#ffffff' })

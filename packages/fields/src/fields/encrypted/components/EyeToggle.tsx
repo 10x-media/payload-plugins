@@ -49,7 +49,7 @@ export const EyeToggle: React.FC<{
 	return (
 		<Button
 			aria-label={label}
-			buttonStyle="none"
+			buttonStyle="ghost"
 			className={['tenx-protected-field__eye', className].filter(Boolean).join(' ')}
 			extraButtonProps={{ 'aria-pressed': revealed }}
 			icon={<EyeGlyph active={revealed} />}

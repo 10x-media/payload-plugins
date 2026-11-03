@@ -53,10 +53,15 @@ describeForDb('encrypted aadScope', {}, (db) => {
 
 	it('seals and reads back under a pinned scope, masked and write-only alike', async () => {
 		const created = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'vault',
 			data: { apiKey: 'sk-pinned', pinnedMasked: 'visible-on-read', title: 'roundtrip' },
 		})
-		const read = await booted.payload.findByID({ collection: 'vault', id: created.id })
+		const read = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'vault',
+			id: created.id,
+		})
 		expect(read.pinnedMasked).toBe('visible-on-read')
 
 		const handle = await readEncryptedField(booted.payload, {
@@ -69,11 +74,13 @@ describeForDb('encrypted aadScope', {}, (db) => {
 
 	it('keeps the locale component of the binding under a pinned scope', async () => {
 		const created = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'vault',
 			data: { localSecret: 'english', title: 'localized' },
 			locale: 'en',
 		})
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'vault',
 			data: { localSecret: 'deutsch' },
 			id: created.id,
@@ -102,6 +109,7 @@ describeForDb('encrypted aadScope', {}, (db) => {
 	 */
 	it('is part of the AAD: a config without the scope cannot open the value', async () => {
 		const created = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'vault',
 			data: { apiKey: 'sk-bound', title: 'bound' },
 		})
@@ -144,6 +152,7 @@ describeForDb('encrypted aadScope', {}, (db) => {
 		})
 		try {
 			const created = await bootedK1.payload.create({
+				overrideAccess: true,
 				collection: 'vault',
 				data: { apiKey: 'sk-rotates', title: 'rotates' },
 			})
@@ -210,6 +219,7 @@ describe('encrypted aadScope survives a slug rename (mongo)', () => {
 
 	it('keeps pinned values readable and shows the unpinned ones failing', async () => {
 		const created = await bootedA.payload.create({
+			overrideAccess: true,
 			collection: 'vault-a',
 			data: { apiKey: 'sk-survives', title: 'renamed', unpinned: 'sk-lost' },
 		})

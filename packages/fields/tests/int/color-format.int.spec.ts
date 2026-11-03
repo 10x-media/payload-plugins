@@ -26,6 +26,7 @@ describeForDb('fields color plugin-level format default', {}, (db) => {
 
 	it('stores the plugin default for a formatless field while a field-level format wins', async () => {
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'colorFormats',
 			data: { inherited: 'red', pinnedHex: 'red' },
 		})

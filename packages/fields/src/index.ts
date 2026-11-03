@@ -112,7 +112,7 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
 }
 
 /**
- * Fields plugin for Payload v3. Registers translations and writes global field
+ * Fields plugin for Payload. Registers translations and writes global field
  * defaults to `config.custom['@10x-media/fields']` for factories, hooks, and
  * server components to read at runtime via `getFieldsRegistry`. Every field
  * factory also works without this plugin; per-field options always override
@@ -121,7 +121,8 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
  */
 export const fields = definePlugin<FieldsPluginOptions>({
 	slug: '@10x-media/fields',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	// Payload passes `options` as undefined when the plugin is registered without any.
+	plugin: ({ config, options = {} }): Config => {
 		if (options.disabled === true) {
 			return config
 		}

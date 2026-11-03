@@ -5,20 +5,22 @@ const DEV_PASSWORD = 'password'
 
 /** Seed the dev Payload app: an admin user plus the color and icon showcase docs. Idempotent. */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ overrideAccess: true, collection: 'users' })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const tenantCount = await payload.count({ collection: 'tenants' })
+	const tenantCount = await payload.count({ overrideAccess: true, collection: 'tenants' })
 	if (tenantCount.totalDocs === 0) {
 		// acme/primary comes from the individual field, not an array row, so the
 		// seeded 'preset:acme/primary' ref exercises the presetsFromDoc path
 		await payload.create({
+			overrideAccess: true,
 			collection: 'tenants',
 			data: {
 				name: 'acme',
@@ -31,6 +33,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			},
 		})
 		await payload.create({
+			overrideAccess: true,
 			collection: 'tenants',
 			data: {
 				name: 'globex',
@@ -39,6 +42,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			},
 		})
 		await payload.create({
+			overrideAccess: true,
 			collection: 'colors',
 			data: {
 				title: 'Showcase',
@@ -58,15 +62,20 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info('Seeded color showcase: tenants + colors')
 	}
 
-	const iconCount = await payload.count({ collection: 'icons' })
+	const iconCount = await payload.count({ overrideAccess: true, collection: 'icons' })
 	if (iconCount.totalDocs === 0) {
-		const tenantDocs = await payload.find({ collection: 'tenants', limit: 100 })
+		const tenantDocs = await payload.find({
+			overrideAccess: true,
+			collection: 'tenants',
+			limit: 100,
+		})
 		const acme = tenantDocs.docs.find((doc) => doc.name === 'acme')
 		const globex = tenantDocs.docs.find((doc) => doc.name === 'globex')
 		if (acme && globex) {
 			// acme enables lucide+radix, so Tenant-scoped shows a switcher for those
 			// two and its stored lucide value renders normally.
 			await payload.create({
+				overrideAccess: true,
 				collection: 'icons',
 				data: {
 					iconMulti: 'radix:cube',
@@ -84,6 +93,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			// degradation. iconMulti uses a bare legacy name that reads as the default
 			// library (lucide).
 			await payload.create({
+				overrideAccess: true,
 				collection: 'icons',
 				data: {
 					iconMulti: 'house',
@@ -99,9 +109,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		}
 	}
 
-	const measurementCount = await payload.count({ collection: 'measurements' })
+	const measurementCount = await payload.count({ overrideAccess: true, collection: 'measurements' })
 	if (measurementCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'measurements',
 			data: {
 				title: 'Showcase',
@@ -127,9 +138,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info('Seeded measurement showcase document')
 	}
 
-	const phoneCount = await payload.count({ collection: 'phone-numbers' })
+	const phoneCount = await payload.count({ overrideAccess: true, collection: 'phone-numbers' })
 	if (phoneCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'phone-numbers',
 			data: {
 				title: 'Showcase',
@@ -169,9 +181,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info('Seeded phone number showcase document')
 	}
 
-	const encryptedCount = await payload.count({ collection: 'encrypted' })
+	const encryptedCount = await payload.count({ overrideAccess: true, collection: 'encrypted' })
 	if (encryptedCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'encrypted',
 			data: {
 				apiKey: '0123456789abcdef0123456789abcdef',
@@ -237,13 +250,17 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info('Seeded encrypted showcase document')
 	}
 
-	const storiesCount = await payload.count({ collection: 'write-only-stories' })
+	const storiesCount = await payload.count({
+		overrideAccess: true,
+		collection: 'write-only-stories',
+	})
 	if (storiesCount.totalDocs === 0) {
 		// Every credential set, so each story's SET state renders: hint or dots
 		// placeholder plus the inline actions. Values are realistic shapes (the
 		// stripe key deliberately avoids the sk_live_ pattern, which GitHub push
 		// protection blocks even as a fixture) so hints like sk_d····9d3f render.
 		await payload.create({
+			overrideAccess: true,
 			collection: 'write-only-stories',
 			data: {
 				dbPassword: 'correct-horse-battery-staple',
@@ -259,6 +276,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		// cannot exist unset), so each optional story's UNSET state renders: the
 		// plain native input, no dots, no actions, an em dash in the list cell.
 		await payload.create({
+			overrideAccess: true,
 			collection: 'write-only-stories',
 			data: {
 				label: 'Fresh tenant (nothing configured yet)',

@@ -199,7 +199,7 @@ export function colorField(
 		}
 	}
 
-	const resolvedAdmin = { disableListColumn: true, hidden: true } as const
+	const resolvedAdmin = { disabled: { column: true }, hidden: true } as const
 
 	const resolvedField: JSONField | TextField =
 		resolveMode === 'schemes'

@@ -50,7 +50,7 @@ export const ActionButton: React.FC<{
 }> = ({ attached, kind, label, onClick, pressed }) => (
 	<Button
 		aria-label={label}
-		buttonStyle="none"
+		buttonStyle="ghost"
 		className={[
 			'tenx-protected-field__eye',
 			attached ? 'tenx-protected-field__eye--attached' : 'tenx-protected-field__eye--floating',

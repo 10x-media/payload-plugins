@@ -14,7 +14,7 @@ describe('encryptedField factory shape', () => {
 		expect(stored.hooks?.beforeChange).toHaveLength(1)
 		expect(stored.hooks?.afterRead).toHaveLength(1)
 		expect(typeof stored.validate).toBe('function')
-		expect(stored.typescriptSchema).toHaveLength(1)
+		expect(stored.jsonSchema).toHaveLength(1)
 		expect(getEncryptedMarker(stored)?.sourceType).toBe('text')
 	})
 
@@ -27,8 +27,8 @@ describe('encryptedField factory shape', () => {
 		// schema so a rewritten `equals` query passes Payload's query-path validation.
 		expect(bidx.hidden).toBeUndefined()
 		expect(bidx.admin?.hidden).toBe(true)
-		expect(bidx.admin?.disableListFilter).toBe(true)
-		expect(bidx.admin?.disableListColumn).toBe(true)
+		expect(bidx.admin?.disabled).toMatchObject({ filter: true })
+		expect(bidx.admin?.disabled).toMatchObject({ column: true })
 		// The keyed hash is stripped from responses by the plugin's collection
 		// afterRead (withEncryptedQueryRewrite), not a field hook, so the bidx
 		// stays queryable and carries no hooks of its own.

@@ -1,6 +1,6 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, GlobalConfig } from 'payload'
-import { createLocalReq, initTransaction, killTransaction } from 'payload'
+import { createPayloadRequest, initTransaction, killTransaction } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import {
 	decryptFieldValue,
@@ -104,13 +104,18 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 	describe('read results never carry the field', () => {
 		it('strips the value from create and findByID results, exposing set-ness only', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { apiKey: 'sk-live-123', title: 'stripped', visible: 'plain' },
 			})
 			expect(created.apiKey).toBeUndefined()
 			expect(created.apiKey_set).toBe(true)
 
-			const read = await booted.payload.findByID({ collection: 'credentials', id: created.id })
+			const read = await booted.payload.findByID({
+				overrideAccess: true,
+				collection: 'credentials',
+				id: created.id,
+			})
 			expect(read.apiKey).toBeUndefined()
 			expect(read.apiKey_set).toBe(true)
 			// A sibling masked field still decrypts: writeOnly is per-field.
@@ -119,10 +124,12 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('strips across list reads and reports unset docs as such', async () => {
 			const unset = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { title: 'unset' },
 			})
 			const list = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'credentials',
 				where: { title: { in: ['stripped', 'unset'] } },
 			})
@@ -135,10 +142,11 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('strips write-only and richText ciphertext paths from global reads', async () => {
 			await booted.payload.updateGlobal({
+				overrideAccess: true,
 				slug: 'smtp',
 				data: { auth: { password: 'hunter2' }, host: 'mail.example.com', notes: LEXICAL },
 			})
-			const settings = await booted.payload.findGlobal({ slug: 'smtp' })
+			const settings = await booted.payload.findGlobal({ overrideAccess: true, slug: 'smtp' })
 			expect(settings.host).toBe('mail.example.com')
 			expect(settings.auth?.password).toBeUndefined()
 			expect(settings.auth?.password_set).toBe(true)
@@ -151,10 +159,12 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 	describe('write semantics', () => {
 		it('an untouched update preserves the stored secret', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { apiKey: 'keep-me', title: 'untouched' },
 			})
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { title: 'renamed' },
 				id: created.id,
@@ -169,10 +179,12 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('a new value replaces the secret; an explicit null clears it', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { apiKey: 'first', title: 'replace-clear' },
 			})
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { apiKey: 'second' },
 				id: created.id,
@@ -185,6 +197,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			expect(await replaced?.decrypt()).toBe('second')
 
 			const cleared = await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { apiKey: null },
 				id: created.id,
@@ -200,6 +213,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('maintains the identification hint through set, replace, and clear', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { hintedKey: 'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f', title: 'hinted' },
 			})
@@ -208,6 +222,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			expect(created.hintedKey_hint).toBe('sk_d····9d3f')
 
 			const replaced = await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { hintedKey: 'sk_next_00000000000000000000000000ffff' },
 				id: created.id,
@@ -216,6 +231,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 			// An untouched update leaves the hint (and the value) alone.
 			const untouched = await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { title: 'renamed' },
 				id: created.id,
@@ -223,6 +239,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			expect(untouched.hintedKey_hint).toBe('sk_n····ffff')
 
 			const cleared = await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { hintedKey: null },
 				id: created.id,
@@ -233,6 +250,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('stores no hint for a value too short to hint safely', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { hintedKey: 'tiny-secret', title: 'short-hint' },
 			})
@@ -245,10 +263,12 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			// covers direct API writers: '' must not become a sealed empty secret
 			// that reads as set but can never be diagnosed.
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { hintedKey: 'sk_demo_a1b2c3d4e5f6a7b8c9d0e1f2a3b49d3f', title: 'empty-string' },
 			})
 			const emptied = await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { hintedKey: '' },
 				id: created.id,
@@ -268,6 +288,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			// ValidationError's per-field errors, not the generic top-level message.
 			await expect(
 				booted.payload.create({
+					overrideAccess: true,
 					collection: 'credentials',
 					data: { guardedSecret: 'forbidden', title: 'guarded' },
 				})
@@ -284,6 +305,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 	describe('deliberate server-side reads', () => {
 		it('readEncryptedField hands out cacheable ciphertext and on-demand decrypt', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { apiKey: 'sk-cache', title: 'handle' },
 			})
@@ -306,6 +328,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 		it('round-trips non-string plaintext (json) through decrypt', async () => {
 			const config = { retries: 3, urls: ['https://a', 'https://b'] }
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { config, title: 'json' },
 			})
@@ -319,6 +342,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('hasMany fields decrypt item-wise', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { title: 'many', tokens: ['tok-1', 'tok-2'] },
 			})
@@ -333,11 +357,13 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('localized values decrypt per locale', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { localSecret: 'english', title: 'localized' },
 				locale: 'en',
 			})
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { localSecret: 'deutsch' },
 				id: created.id,
@@ -393,11 +419,12 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 	})
 	describe("reads that join the caller's request", () => {
 		it('sees a secret written in the same open transaction', async () => {
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			const opened = await initTransaction(req)
 			expect(opened).toBe(true)
 			try {
 				const created = await booted.payload.create({
+					overrideAccess: true,
 					collection: 'credentials',
 					data: { apiKey: 'sk-in-flight', title: 'in-flight' },
 					req,
@@ -421,11 +448,12 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 		 * quietly converging.
 		 */
 		it('cannot see that same secret without the request', async () => {
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			const opened = await initTransaction(req)
 			expect(opened).toBe(true)
 			try {
 				const created = await booted.payload.create({
+					overrideAccess: true,
 					collection: 'credentials',
 					data: { apiKey: 'sk-invisible', title: 'invisible' },
 					req,
@@ -454,18 +482,20 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 		 */
 		it('resolves a localized field at the default locale when the request reads all of them', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { localSecret: 'english', title: 'all-locales' },
 				locale: 'en',
 			})
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { localSecret: 'deutsch' },
 				id: created.id,
 				locale: 'de',
 			})
 
-			const req = await createLocalReq({ locale: 'all' }, booted.payload)
+			const req = await createPayloadRequest({ locale: 'all', payload: booted.payload })
 			const handle = await readEncryptedField(booted.payload, {
 				collection: 'credentials',
 				id: created.id,
@@ -477,18 +507,20 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it("still honours an explicit locale over the request's", async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { localSecret: 'english', title: 'explicit-locale' },
 				locale: 'en',
 			})
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { localSecret: 'deutsch' },
 				id: created.id,
 				locale: 'de',
 			})
 
-			const req = await createLocalReq({ locale: 'en' }, booted.payload)
+			const req = await createPayloadRequest({ locale: 'en', payload: booted.payload })
 			const handle = await readEncryptedField(booted.payload, {
 				collection: 'credentials',
 				id: created.id,
@@ -501,10 +533,11 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('leaves the request able to read normally afterwards', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { apiKey: 'sk-restored', title: 'restored', visible: 'plain' },
 			})
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			await readEncryptedField(booted.payload, {
 				collection: 'credentials',
 				id: created.id,
@@ -513,6 +546,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			})
 
 			const after = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'credentials',
 				id: created.id,
 				req,
@@ -527,6 +561,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 		const seed = async (titles: string[]) => {
 			for (const title of titles) {
 				await booted.payload.create({
+					overrideAccess: true,
 					collection: 'credentials',
 					data: { apiKey: `sk-${title}`, title, visible: `v-${title}` },
 				})
@@ -536,7 +571,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 		it('recovers a write-only field across many rows in one query', async () => {
 			const titles = ['batch-a', 'batch-b', 'batch-c']
 			await seed(titles)
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 
 			const found = await withRawEncrypted(req, () =>
 				booted.payload.find({
@@ -573,7 +608,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 		 */
 		it('leaves masked fields sealed inside the window too', async () => {
 			await seed(['batch-masked-inside'])
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			const found = await withRawEncrypted(req, () =>
 				booted.payload.find({
 					collection: 'credentials',
@@ -595,7 +630,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('hands back wire strings, not plaintext, inside the window', async () => {
 			await seed(['batch-wire'])
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			const found = await withRawEncrypted(req, () =>
 				booted.payload.find({
 					collection: 'credentials',
@@ -610,7 +645,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('strips the field again on the same request once the window closes', async () => {
 			await seed(['batch-closed'])
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			await withRawEncrypted(req, () =>
 				booted.payload.find({
 					collection: 'credentials',
@@ -622,6 +657,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			)
 
 			const after = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'credentials',
 				req,
 				where: { title: { equals: 'batch-closed' } },
@@ -640,16 +676,19 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 		 */
 		it('isolates relationship population from the request dataloader', async () => {
 			const cred = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'credentials',
 				data: { apiKey: 'sk-rel', title: 'rel', visible: 'v-rel' },
 			})
 			const service = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'services',
 				data: { credential: cred.id, name: 'rel-svc' },
 			})
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 
 			const before = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'services',
 				depth: 1,
 				id: service.id,
@@ -673,6 +712,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			expect(sealedShape(populatedDuring.apiKey)).toBe(true)
 
 			const after = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'services',
 				depth: 1,
 				id: service.id,
@@ -686,7 +726,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 
 		it('leaves a masked field decrypting normally after the window', async () => {
 			await seed(['batch-masked'])
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			await withRawEncrypted(req, () =>
 				booted.payload.find({
 					collection: 'credentials',
@@ -698,6 +738,7 @@ describeForDb('encrypted write-only protection', {}, (db) => {
 			)
 
 			const after = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'credentials',
 				req,
 				where: { title: { equals: 'batch-masked' } },
