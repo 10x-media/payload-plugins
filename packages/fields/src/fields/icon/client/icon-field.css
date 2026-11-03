@@ -322,8 +322,11 @@
 }
 
 /* Payload Buttons: ghost, pill for the active category. Layout only here: full-width rows with
-   the label at the start; category keys come lowercase from the libraries, hence capitalize. */
+   the label at the start; category keys come lowercase from the libraries, hence capitalize.
+   The Button's height is fixed rather than its content's, so a long rail would squeeze the
+   rows instead of scrolling without flex-shrink: 0. */
 .tenx-icon-drawer__rail-item {
+	flex-shrink: 0;
 	justify-content: flex-start;
 	text-transform: capitalize;
 }
