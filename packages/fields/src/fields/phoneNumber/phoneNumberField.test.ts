@@ -83,7 +83,7 @@ describe('phoneNumberField, object storage', () => {
 
 	it('keeps subfields out of the list so the group is one column', () => {
 		for (const sub of group({ name: 'phone' }).fields) {
-			expect(sub.admin?.disableListColumn).toBe(true)
+			expect(sub.admin?.disabled).toMatchObject({ column: true })
 		}
 	})
 

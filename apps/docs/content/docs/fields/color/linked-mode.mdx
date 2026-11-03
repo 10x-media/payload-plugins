@@ -17,6 +17,8 @@ fields: [
 
 Linked mode returns a tuple, the stored field plus its resolved virtual sibling, so spread it into `fields`.
 
+The list view reads only its visible columns, and the cell renders a linked value from the sibling, so the `fields()` plugin selects the sibling whenever the field is selected. Using `colorField()` without the plugin, wrap the collection yourself with `withCompanionSelect` from `@10x-media/fields`, or linked cells render as missing presets.
+
 ## What gets stored
 
 - Picking a preset stores `preset:<key>` (for example `preset:brand`).

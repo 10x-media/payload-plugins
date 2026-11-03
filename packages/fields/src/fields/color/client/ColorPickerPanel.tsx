@@ -1,4 +1,5 @@
 'use client'
+import { Button } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { keys } from '../../../translations/keys'
@@ -196,8 +197,13 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 		draggingRef.current = false
 	}, [])
 
+	// Detected after mount: the panel is server-rendered inside the closed Popup,
+	// and the server never has window.EyeDropper, so reading it during render
+	// makes the hydrated button tree differ from the server HTML
+	const [eyeDropperSupported, setEyeDropperSupported] = useState(false)
+	useEffect(() => setEyeDropperSupported(getEyeDropper() !== null), [])
+
 	const opaqueCss = formatColor(hsvToRgb({ h: hsva.h, s: hsva.s, v: hsva.v }, 1), 'rgb')
-	const eyeDropperCtor = enableEyedropper ? getEyeDropper() : null
 
 	return (
 		<div className={`${baseClass}__panel`} data-popup-prevent-close>
@@ -258,7 +264,7 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 					onLostPointerCapture={endDrag}
 					step={1}
 					style={{
-						backgroundImage: `linear-gradient(to right, transparent, ${opaqueCss}), conic-gradient(var(--theme-elevation-150) 0 25%, transparent 0 50%, var(--theme-elevation-150) 0 75%, transparent 0)`,
+						backgroundImage: `linear-gradient(to right, transparent, ${opaqueCss}), conic-gradient(var(--color-bg-tertiary) 0 25%, transparent 0 50%, var(--color-bg-tertiary) 0 75%, transparent 0)`,
 						backgroundSize: '100% 100%, 8px 8px',
 					}}
 					type="range"
@@ -270,32 +276,35 @@ export const ColorPickerPanel: React.FC<ColorPickerPanelProps> = (props) => {
 				{/* biome-ignore lint/a11y/useSemanticElements: fieldset breaks flex layout in Safari; this is a toggle-button group, not a form fieldset */}
 				<div aria-label={t(keys.format)} className={`${baseClass}__formats`} role="group">
 					{FORMATS.map((entry) => (
-						<button
+						<Button
 							aria-pressed={entry === displayFormat}
+							buttonStyle={entry === displayFormat ? 'pill' : 'ghost'}
 							className={`${baseClass}__format`}
 							key={entry}
+							margin={false}
 							onClick={() => setDisplayFormat(entry)}
-							type="button"
 						>
-							{entry}
-						</button>
+							{entry.toUpperCase()}
+						</Button>
 					))}
 				</div>
-				{eyeDropperCtor ? (
-					<button
+				{enableEyedropper && eyeDropperSupported ? (
+					<Button
 						aria-label={t(keys.eyedropperPick)}
+						buttonStyle="ghost"
 						className={`${baseClass}__eyedropper`}
+						icon={<EyedropperIcon />}
+						margin={false}
 						onClick={() => {
-							void new eyeDropperCtor().open().then(
+							const EyeDropper = getEyeDropper()
+							if (!EyeDropper) return
+							void new EyeDropper().open().then(
 								(result) => onPickCss(result.sRGBHex),
 								// open() rejects when the user presses Escape; nothing to do
 								() => undefined
 							)
 						}}
-						type="button"
-					>
-						<EyedropperIcon />
-					</button>
+					/>
 				) : null}
 			</div>
 

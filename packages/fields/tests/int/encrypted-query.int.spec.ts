@@ -20,10 +20,12 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 	beforeAll(async () => {
 		booted = await bootPayload({ collections: [members], db, plugin: fields({}) })
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'members',
 			data: { contact: 'Jane.Doe@Example.com', handle: 'Jane', ssn: 's-1', title: 'jane' },
 		})
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'members',
 			data: { contact: 'bob@x.com', handle: 'bob', ssn: 's-2', title: 'bob' },
 		})
@@ -35,6 +37,7 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 
 	it('equals matches with trim + case-fold normalization for email', async () => {
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'members',
 			where: { contact: { equals: '  jane.doe@EXAMPLE.com ' } },
 		})
@@ -44,11 +47,13 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 
 	it('standard normalization trims but keeps case', async () => {
 		const exact = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'members',
 			where: { handle: { equals: ' Jane ' } },
 		})
 		expect(exact.totalDocs).toBe(1)
 		const wrongCase = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'members',
 			where: { handle: { equals: 'jane' } },
 		})
@@ -57,6 +62,7 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 
 	it('in matches any listed value', async () => {
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'members',
 			where: { contact: { in: ['jane.doe@example.com', 'nobody@x.com'] } },
 		})
@@ -65,6 +71,7 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 
 	it('misses cleanly on unknown values', async () => {
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'members',
 			where: { contact: { equals: 'ghost@x.com' } },
 		})
@@ -73,6 +80,7 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 
 	it('recurses and/or combinations', async () => {
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'members',
 			where: {
 				or: [
@@ -86,16 +94,19 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 
 	it('rewrites count and bulk delete wheres', async () => {
 		const counted = await booted.payload.count({
+			overrideAccess: true,
 			collection: 'members',
 			where: { contact: { equals: 'jane.doe@example.com' } },
 		})
 		expect(counted.totalDocs).toBe(1)
 
 		const victim = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'members',
 			data: { contact: 'delete-me@x.com', handle: 'del', ssn: 's-3', title: 'del' },
 		})
 		const deleted = await booted.payload.delete({
+			overrideAccess: true,
 			collection: 'members',
 			where: { contact: { equals: 'delete-me@x.com' } },
 		})
@@ -105,6 +116,7 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 
 	it('non-queryable encrypted fields match nothing by plaintext equals', async () => {
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'members',
 			where: { ssn: { equals: 's-1' } },
 		})
@@ -114,6 +126,7 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 	it('enforces unique through the blind index on both DBs', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'members',
 				data: { contact: 'JANE.DOE@example.com', handle: 'imposter', ssn: 'x', title: 'dup' },
 			})
@@ -121,7 +134,11 @@ describeForDb('encrypted queryability (plugin-registered rewrite)', {}, (db) => 
 	})
 
 	it('hides the bidx sibling from reads (hidden field strip)', async () => {
-		const found = await booted.payload.find({ collection: 'members', where: {} })
+		const found = await booted.payload.find({
+			overrideAccess: true,
+			collection: 'members',
+			where: {},
+		})
 		const doc = found.docs[0] as Record<string, unknown>
 		expect('contact_bidx' in doc).toBe(false)
 		expect('handle_bidx' in doc).toBe(false)
@@ -154,10 +171,12 @@ describeForDb('encrypted queryability (standalone, no plugin)', { dbs: ['mongo']
 
 	it('rewrites queries and derives default keys from the config secret without the plugin', async () => {
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'standalone',
 			data: { contact: 'solo@x.com', title: 'solo' },
 		})
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'standalone',
 			where: { contact: { equals: 'solo@x.com' } },
 		})
@@ -182,7 +201,7 @@ const people: CollectionConfig = {
 // authenticated user, mirroring how the admin panel queries.
 describeForDb('encrypted filtering under access control (overrideAccess:false)', {}, (db) => {
 	let booted: BootedPayload
-	let user: Awaited<ReturnType<Payload['login']>>['user']
+	let user: NonNullable<Parameters<Payload['find']>[0]['user']>
 
 	const titlesOf = (result: { docs: Record<string, unknown>[] }): string[] =>
 		result.docs.map((doc) => doc.title as string).sort()
@@ -190,16 +209,20 @@ describeForDb('encrypted filtering under access control (overrideAccess:false)',
 	beforeAll(async () => {
 		booted = await bootPayload({ collections: [people, filterUsers], db, plugin: fields({}) })
 		const credentials = { email: 'admin@x.com', password: 'test-pass-1234' }
-		await booted.payload.create({ collection: 'filter-users', data: credentials })
+		await booted.payload.create({
+			overrideAccess: true,
+			collection: 'filter-users',
+			data: credentials,
+		})
 		const login = await booted.payload.login({ collection: 'filter-users', data: credentials })
-		user = login.user
+		user = { ...(login.user as object), collection: 'filter-users' } as typeof user
 		for (const row of [
 			{ contact: 'jane@x.com', ssn: 's-1', title: 'jane' },
 			{ contact: 'bob@x.com', ssn: 's-2', title: 'bob' },
 			{ contact: 'carol@x.com', ssn: 's-3', title: 'carol' },
 			{ title: 'nobody' },
 		]) {
-			await booted.payload.create({ collection: 'people', data: row })
+			await booted.payload.create({ overrideAccess: true, collection: 'people', data: row })
 		}
 	}, 240_000)
 
@@ -322,9 +345,9 @@ describeForDb('encrypted filtering under access control (overrideAccess:false)',
 
 	it('disables the list filter on a non-queryable field and matches nothing by plaintext', async () => {
 		const [ssnStored] = encryptedField({ name: 'ssn', type: 'text' })
-		expect((ssnStored as TextField).admin?.disableListFilter).toBe(true)
+		expect((ssnStored as TextField).admin?.disabled).toMatchObject({ filter: true })
 		const [contactStored] = encryptedField({ name: 'contact', type: 'email' }, { queryable: true })
-		expect((contactStored as TextField).admin?.disableListFilter).not.toBe(true)
+		expect((contactStored as TextField).admin?.disabled).toBeUndefined()
 
 		const found = await booted.payload.find({
 			collection: 'people',

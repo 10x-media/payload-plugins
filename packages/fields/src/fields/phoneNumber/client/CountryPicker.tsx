@@ -15,13 +15,14 @@ import './phoneNumberField.css'
 const baseClass = 'fields-phone'
 
 // Headings, the divider, and options share one height, so the virtualizer's estimate is
-// exact and the rows it positions can never drift from what the CSS paints.
-const ROW_HEIGHT = 34
+// exact and the rows it positions can never drift from what the CSS paints. 24px is
+// Payload's popup list item: 4px of padding around the 16px body line.
+const ROW_HEIGHT = 24
 const estimateRow = () => ROW_HEIGHT
 
 // The cap is published from here rather than written into the stylesheet: a fractional one
 // clips the last row against the panel edge, which reads as tighter padding at the bottom.
-const VISIBLE_ROWS = 8
+const VISIBLE_ROWS = 10
 const LIST_MAX_HEIGHT = ROW_HEIGHT * VISIBLE_ROWS
 
 export type CountryOptionGroups = {
@@ -91,9 +92,12 @@ const CountryPanel: React.FC<CountryPanelProps> = ({
 	const listId = useId()
 
 	// The panel is portalled to the body and absolutely positioned, so a plain focus scrolls
-	// the page to it and drags the row the viewer is reading out from under them.
+	// the page to it and drags the row the viewer is reading out from under them. Deferred a
+	// frame: this effect runs before Popup's own, which is what shows the popover, and an
+	// element in a hidden popover cannot take focus.
 	useEffect(() => {
-		searchRef.current?.focus({ preventScroll: true })
+		const frame = requestAnimationFrame(() => searchRef.current?.focus({ preventScroll: true }))
+		return () => cancelAnimationFrame(frame)
 	}, [])
 
 	const rows = useMemo(
@@ -173,7 +177,7 @@ const CountryPanel: React.FC<CountryPanelProps> = ({
 		<div className={`${baseClass}__panel`} data-popup-prevent-close>
 			<div className={`${baseClass}__search`}>
 				<span aria-hidden="true" className={`${baseClass}__search-icon`}>
-					<SearchIcon />
+					<SearchIcon size={24} />
 				</span>
 				<input
 					aria-activedescendant={
@@ -194,7 +198,7 @@ const CountryPanel: React.FC<CountryPanelProps> = ({
 				/>
 			</div>
 			<div
-				className={`${baseClass}__list`}
+				className={`${baseClass}__list popup-button-list`}
 				id={listId}
 				ref={listRef}
 				style={{ maxHeight: LIST_MAX_HEIGHT }}
@@ -245,7 +249,13 @@ const CountryPanel: React.FC<CountryPanelProps> = ({
 									aria-posinset={optionRows.indexOf(item.index) + 1}
 									aria-selected={row.option.code === value}
 									aria-setsize={optionRows.length}
-									className={`${baseClass}__option`}
+									className={[
+										`${baseClass}__option`,
+										'popup-button-list__button',
+										row.option.code === value && 'popup-button-list__button--selected',
+									]
+										.filter(Boolean)
+										.join(' ')}
 									data-active={item.index === activeRow || undefined}
 									id={optionId(item.index)}
 									key={row.option.code}
@@ -310,14 +320,15 @@ export const CountryPicker: React.FC<CountryPickerProps> = ({
 	}
 
 	return (
+		// @todo Payload 4's Popup pins its panel to the viewport edge once the field scrolls out of
+		// view (v3 let it scroll away with the field). Adopt the option if Payload adds one.
 		<Popup
 			button={
 				<>
 					{renderFace()}
 					<span className={`${baseClass}__sr-only`}>{label}</span>
 					<span aria-hidden="true" className={`${baseClass}__caret`}>
-						{/* Unsized, the icon is --base tall and overflows its 12px box downwards */}
-						<ChevronIcon size="small" />
+						<ChevronIcon size={16} />
 					</span>
 				</>
 			}

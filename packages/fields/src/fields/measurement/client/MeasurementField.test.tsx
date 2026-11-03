@@ -21,6 +21,7 @@ vi.mock('@payloadcms/ui', () => ({
 	FieldDescription: () => null,
 	FieldError: () => null,
 	FieldLabel: () => null,
+	MoreIcon: () => null,
 	Popup: () => null,
 	// biome-ignore lint/suspicious/noExplicitAny: test double over Payload's RenderCustomComponent surface
 	RenderCustomComponent: ({ CustomComponent, Fallback }: any) => CustomComponent ?? Fallback,

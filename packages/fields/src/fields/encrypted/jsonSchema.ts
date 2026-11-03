@@ -1,4 +1,5 @@
 import type { JSONSchema4 } from 'json-schema'
+import type { TextField } from 'payload'
 import type { EncryptedSourceField } from './types'
 
 const optionValues = (source: EncryptedSourceField): string[] =>
@@ -29,9 +30,9 @@ const baseSchema = (source: EncryptedSourceField): JSONSchema4 => {
  * The stored field is text, but generated TypeScript must keep the source
  * type's shape (number stays number, checkbox stays boolean, ...).
  */
-export const typescriptSchemaFor = (
+export const jsonSchemaFor = (
 	source: EncryptedSourceField
-): Array<(args: { jsonSchema: JSONSchema4 }) => JSONSchema4> => {
+): NonNullable<TextField['jsonSchema']> => {
 	const single = baseSchema(source)
 	const schema: JSONSchema4 =
 		'hasMany' in source && source.hasMany === true ? { items: single, type: 'array' } : single

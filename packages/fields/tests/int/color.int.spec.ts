@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { type CollectionConfig, createLocalReq } from 'payload'
+import { type CollectionConfig, createPayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { colorField, presetsFromDoc } from '../../src/exports/color'
 import { fields } from '../../src/index'
@@ -39,7 +39,12 @@ type TenantDoc = {
 }
 
 const tenantPresets = async ({ req }: FieldsResolverArgs): Promise<ColorPreset[]> => {
-	const result = await req.payload.find({ collection: 'tenants', depth: 0, limit: 25 })
+	const result = await req.payload.find({
+		overrideAccess: true,
+		collection: 'tenants',
+		depth: 0,
+		limit: 25,
+	})
 	return result.docs.flatMap((doc) => {
 		const tenant = doc as unknown as TenantDoc
 		return [
@@ -97,11 +102,12 @@ describeForDb('fields color', {}, (db) => {
 	let booted: BootedPayload
 
 	const create = (data: Record<string, unknown>) =>
-		booted.payload.create({ collection: 'swatches', data })
+		booted.payload.create({ overrideAccess: true, collection: 'swatches', data })
 
 	beforeAll(async () => {
 		booted = await bootPayload({ collections: [swatches, tenants], db, plugin: fields({}) })
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'tenants',
 			data: {
 				name: 'acme',
@@ -135,6 +141,20 @@ describeForDb('fields color', {}, (db) => {
 		expect(doc.opaque).toBe('#ff0000')
 	})
 
+	it('selecting a linked field also returns its resolved sibling (list view columns)', async () => {
+		const doc = await create({ linkedStatic: 'preset:brand' })
+		const found = await booted.payload.find({
+			overrideAccess: true,
+			collection: 'swatches',
+			select: { linkedStatic: true },
+			where: { id: { equals: doc.id } },
+		})
+		const [row] = found.docs as Array<Record<string, unknown>>
+		expect(row?.linkedStatic).toBe('preset:brand')
+		expect(row?.linkedStaticResolved).toBe('#7c3aed')
+		expect(row?.linkedBrandResolved).toBeUndefined()
+	})
+
 	it('rejects unparseable values', async () => {
 		await expect(create({ hex: 'not-a-color' })).rejects.toThrow()
 	})
@@ -143,7 +163,11 @@ describeForDb('fields color', {}, (db) => {
 		const doc = await create({ linkedStatic: 'preset:brand' })
 		expect(doc.linkedStatic).toBe('preset:brand')
 		expect(doc.linkedStaticResolved).toBe('#7c3aed')
-		const fetched = await booted.payload.findByID({ collection: 'swatches', id: doc.id })
+		const fetched = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'swatches',
+			id: doc.id,
+		})
 		// Round-trip safety: the stored reference survives reads; only the sibling resolves
 		expect(fetched.linkedStatic).toBe('preset:brand')
 		expect(fetched.linkedStaticResolved).toBe('#7c3aed')
@@ -180,6 +204,7 @@ describeForDb('fields color', {}, (db) => {
 		}
 		resolverSpy.mockClear()
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'swatches',
 			limit: 100,
 			where: { linkedAsync: { equals: 'preset:brand' } },
@@ -195,10 +220,15 @@ describeForDb('fields color', {}, (db) => {
 		const doc = await create({ linkedThrowing: 'preset:brand' })
 		expect(doc.linkedThrowing).toBe('preset:brand')
 		expect(doc.linkedThrowingResolved).toBe('#fa11ba')
-		const fetched = await booted.payload.findByID({ collection: 'swatches', id: doc.id })
+		const fetched = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'swatches',
+			id: doc.id,
+		})
 		expect(fetched.linkedThrowing).toBe('preset:brand')
 		expect(fetched.linkedThrowingResolved).toBe('#fa11ba')
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'swatches',
 			where: { linkedThrowing: { equals: 'preset:brand' } },
 		})
@@ -212,7 +242,11 @@ describeForDb('fields color', {}, (db) => {
 		const doc = await create({ linkedStatic: 'preset:brand/40' })
 		expect(doc.linkedStatic).toBe('preset:brand/40')
 		expect(doc.linkedStaticResolved).toBe('#7c3aed66')
-		const fetched = await booted.payload.findByID({ collection: 'swatches', id: doc.id })
+		const fetched = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'swatches',
+			id: doc.id,
+		})
 		expect(fetched.linkedStatic).toBe('preset:brand/40')
 		expect(fetched.linkedStaticResolved).toBe('#7c3aed66')
 	})
@@ -250,6 +284,7 @@ describeForDb('fields color', {}, (db) => {
 
 	it('supports querying by preset reference', async () => {
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'swatches',
 			where: { linkedStatic: { equals: 'preset:brand' } },
 		})
@@ -260,7 +295,11 @@ describeForDb('fields color', {}, (db) => {
 		const doc = await create({ linkedBrand: 'preset:acme/primary' })
 		expect(doc.linkedBrand).toBe('preset:acme/primary')
 		expect(doc.linkedBrandResolved).toBe('#7c3aed')
-		const fetched = await booted.payload.findByID({ collection: 'swatches', id: doc.id })
+		const fetched = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'swatches',
+			id: doc.id,
+		})
 		expect(fetched.linkedBrandResolved).toBe('#7c3aed')
 	})
 
@@ -272,8 +311,9 @@ describeForDb('fields color', {}, (db) => {
 	})
 
 	it('passes localized record labels through presetsFromDoc untouched', async () => {
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'tenants',
 			limit: 1,
 			where: { name: { equals: 'acme' } },

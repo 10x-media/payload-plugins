@@ -1,12 +1,12 @@
 'use client'
 import {
+	CircledXIcon,
 	FieldDescription,
 	FieldError,
 	FieldLabel,
 	fieldBaseClass,
 	Popup,
 	RenderCustomComponent,
-	XIcon,
 } from '@payloadcms/ui'
 import type { StaticDescription, StaticLabel } from 'payload'
 import type React from 'react'
@@ -367,6 +367,7 @@ export const ColorInput: React.FC<ColorInputProps> = (props) => {
 				CustomComponent={Label}
 				Fallback={
 					<FieldLabel
+						hasRequiredAccessibleState
 						htmlFor={path ? undefined : inputId}
 						label={label}
 						localized={localized}
@@ -381,15 +382,28 @@ export const ColorInput: React.FC<ColorInputProps> = (props) => {
 					Fallback={<FieldError message={errorMessage} path={path} showError={showError} />}
 				/>
 				{BeforeInput}
-				<div className={`${baseClass}__container`}>
+				<div
+					className={[
+						'form-input-group',
+						`${baseClass}__container`,
+						showError && 'form-input-group-error',
+					]
+						.filter(Boolean)
+						.join(' ')}
+				>
 					{isReadOnly ? (
 						<span className={`${baseClass}__swatch-button ${baseClass}__swatch-button--static`}>
 							{swatch}
 						</span>
 					) : (
+						// @todo Payload 4's Popup pins its panel to the viewport edge once the field scrolls out
+						// of view (v3 let it scroll away with the field). Adopt the option if Payload adds one.
 						<Popup
-							button={swatch}
-							buttonClassName={`${baseClass}__swatch-button`}
+							button={
+								<button className={`${baseClass}__swatch-button`} type="button">
+									{swatch}
+								</button>
+							}
 							buttonType="custom"
 							caret={false}
 							className={`${baseClass}__popup`}
@@ -419,6 +433,7 @@ export const ColorInput: React.FC<ColorInputProps> = (props) => {
 								/>
 							)}
 							size="fit-content"
+							theme="auto"
 							verticalAlign="bottom"
 						/>
 					)}
@@ -448,7 +463,9 @@ export const ColorInput: React.FC<ColorInputProps> = (props) => {
 							</span>
 						) : null}
 						<input
-							className={`${baseClass}__input`}
+							aria-invalid={showError || undefined}
+							aria-required={required || undefined}
+							className={`form-input ${baseClass}__input`}
 							id={inputId}
 							name={path}
 							onBlur={onTextBlur}
@@ -473,7 +490,7 @@ export const ColorInput: React.FC<ColorInputProps> = (props) => {
 							}}
 							type="button"
 						>
-							<XIcon />
+							<CircledXIcon size={24} />
 						</button>
 					) : null}
 				</div>

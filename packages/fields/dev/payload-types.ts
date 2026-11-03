@@ -60,6 +60,59 @@ export type SupportedTimezones =
   | 'Pacific/Noumea'
   | 'Pacific/Auckland'
   | 'Pacific/Fiji';
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "LexicalNodes_B890AAB9".
+ */
+export type LexicalNodes_B890AAB9 =
+  | SerializedTextNode
+  | SerializedTabNode
+  | SerializedLineBreakNode
+  | SerializedParagraphNode<LexicalNodes_B890AAB9>
+  | SerializedBlockNode<Callout>
+  | SerializedHorizontalRuleNode
+  | {
+      type: 'upload';
+      /**
+       * @deprecated
+       * Lexical's internal serialization version for this node type.
+       */
+      version?: number;
+      [k: string]: unknown;
+    }
+  | SerializedQuoteNode<LexicalNodes_B890AAB9>
+  | SerializedRelationshipNode<
+      | 'colors'
+      | 'encrypted'
+      | 'icons'
+      | 'measurements'
+      | 'phone-numbers'
+      | 'write-only-stories'
+      | 'reference'
+      | 'tenants'
+      | 'users'
+      | 'payload-kv'
+      | 'payload-locked-documents'
+      | 'payload-preferences'
+      | 'payload-migrations'
+    >
+  | SerializedAutoLinkNode<LexicalNodes_B890AAB9, LexicalLinkFields>
+  | SerializedLinkNode<LexicalNodes_B890AAB9, LexicalLinkFields>
+  | SerializedListNode<LexicalNodes_B890AAB9>
+  | SerializedListItemNode<LexicalNodes_B890AAB9>
+  | SerializedHeadingNode<LexicalNodes_B890AAB9>;
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "LexicalNodes_3DE324E4".
+ */
+export type LexicalNodes_3DE324E4 =
+  | SerializedTextNode
+  | SerializedTabNode
+  | SerializedLineBreakNode
+  | SerializedParagraphNode<LexicalNodes_3DE324E4>
+  | SerializedListNode<LexicalNodes_3DE324E4>
+  | SerializedListItemNode<LexicalNodes_3DE324E4>
+  | SerializedHeadingNode<LexicalNodes_3DE324E4, 'h2' | 'h3' | 'h4'>;
 
 export interface Config {
   auth: {
@@ -73,12 +126,14 @@ export interface Config {
     measurements: Measurement;
     'phone-numbers': PhoneNumber;
     'write-only-stories': WriteOnlyStory;
+    reference: Reference;
     tenants: Tenant;
     users: User;
     'payload-kv': PayloadKv;
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
+    'payload-llm-instructions': PayloadLlmInstruction;
   };
   collectionsJoins: {};
   collectionsSelect: {
@@ -88,12 +143,14 @@ export interface Config {
     measurements: MeasurementsSelect<false> | MeasurementsSelect<true>;
     'phone-numbers': PhoneNumbersSelect<false> | PhoneNumbersSelect<true>;
     'write-only-stories': WriteOnlyStoriesSelect<false> | WriteOnlyStoriesSelect<true>;
+    reference: ReferenceSelect<false> | ReferenceSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     'payload-kv': PayloadKvSelect<false> | PayloadKvSelect<true>;
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
+    'payload-llm-instructions': PayloadLlmInstructionsSelect<false> | PayloadLlmInstructionsSelect<true>;
   };
   db: {
     defaultIDType: string;
@@ -107,7 +164,10 @@ export interface Config {
   };
   locale: 'en' | 'de';
   widgets: {
+    welcome: WelcomeWidget;
     collections: CollectionsWidget;
+    'collection-query': CollectionQueryWidget;
+    activity: ActivityWidget;
   };
   user: User;
   jobs: {
@@ -170,8 +230,50 @@ export interface Color {
     | boolean
     | null;
   schemePresetsFlat?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "users".
+ */
+export interface User {
+  id: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+  email: string;
+  resetPasswordToken?: string | null;
+  resetPasswordExpiration?: string | null;
+  salt?: string | null;
+  hash?: string | null;
+  resetPasswordRequestedAt?: string | null;
+  loginAttempts?: number | null;
+  lockUntil?: string | null;
+  sessions?:
+    | {
+        id: string;
+        createdAt?: string | null;
+        expiresAt: string;
+      }[]
+    | null;
+  password?: string | null;
+  collection: 'users';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -205,41 +307,21 @@ export interface Encrypted {
   /**
    * richText field. Masked, the full editor mounts on reveal (blocks included).
    */
-  privateNotes?: {
-    root: {
-      type: string;
-      children: {
-        type: any;
-        version: number;
-        [k: string]: unknown;
-      }[];
-      direction: ('ltr' | 'rtl') | null;
-      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-      indent: number;
-      version: number;
-    };
-    [k: string]: unknown;
-  } | null;
+  privateNotes?: LexicalRichText<LexicalNodes_B890AAB9> | null;
   privateNotes_encrypted?: string | null;
   /**
    * richText field. protection 'none': the full editor renders directly, encrypted at rest.
    */
-  draftBody?: {
-    root: {
-      type: string;
-      children: {
-        type: any;
-        version: number;
-        [k: string]: unknown;
-      }[];
-      direction: ('ltr' | 'rtl') | null;
-      format: 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
-      indent: number;
-      version: number;
-    };
-    [k: string]: unknown;
-  } | null;
+  draftBody?: LexicalRichText<LexicalNodes_B890AAB9> | null;
   draftBody_encrypted?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -278,6 +360,14 @@ export interface Icon {
    * The Social library is forced-available in every tenant via alwaysAvailable; other libraries are gated by the tenant's enabledLibraries. Both Acme and Globex show Social in the switcher even though neither enables it.
    */
   iconWithForced?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -300,6 +390,14 @@ export interface Tenant {
         id?: string | null;
       }[]
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -343,6 +441,14 @@ export interface Measurement {
    * Readable mode with storage rounded to whole grams: the granularity contract runs on every write, regardless of what produced the number
    */
   shippingWeight?: number | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -619,6 +725,14 @@ export interface PhoneNumber {
     uri?: string | null;
     type?: string | null;
   };
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -655,33 +769,158 @@ export interface WriteOnlyStory {
   longLivedToken?: string;
   longLivedToken_set?: boolean | null;
   longLivedToken_hint?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * Native Payload fields, as a design reference for the custom fields.
+ *
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reference".
+ */
+export interface Reference {
+  id: string;
+  title: string;
+  /**
+   * Plain text with a description and placeholder.
+   */
+  text?: string | null;
+  textRequired: string;
+  textReadOnly?: string | null;
+  textLocalized?: string | null;
+  textHasMany?: string[] | null;
+  textHalf?: string | null;
+  emailHalf?: string | null;
+  email?: string | null;
+  textarea?: string | null;
+  textareaReadOnly?: string | null;
+  code?: string | null;
+  json?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
+  richText?: LexicalRichText<LexicalNodes_B890AAB9> | null;
+  number?: number | null;
+  numberHasMany?: number[] | null;
+  numberReadOnly?: number | null;
+  numberMin?: number | null;
+  numberStep?: number | null;
+  date?: string | null;
+  dateTime?: string | null;
+  timeOnly?: string | null;
+  monthOnly?: string | null;
+  dateTimezone?: string | null;
+  dateTimezone_tz?: SupportedTimezones;
+  /**
+   * @minItems 2
+   * @maxItems 2
+   */
+  point?: [number, number] | null;
+  select?: ('alpha' | 'beta' | 'gamma') | null;
+  selectHasMany?: ('alpha' | 'beta' | 'gamma')[] | null;
+  selectRequired: 'alpha' | 'beta' | 'gamma';
+  selectReadOnly?: ('alpha' | 'beta' | 'gamma') | null;
+  radio?: ('alpha' | 'beta' | 'gamma') | null;
+  radioHorizontal?: ('alpha' | 'beta' | 'gamma') | null;
+  /**
+   * A radio group with a description.
+   */
+  radioDescribed?: ('alpha' | 'beta' | 'gamma') | null;
+  /**
+   * A horizontal radio group with a description.
+   */
+  radioHorizontalDescribed?: ('alpha' | 'beta' | 'gamma') | null;
+  radioRequired: 'alpha' | 'beta' | 'gamma';
+  checkbox?: boolean | null;
+  /**
+   * A checkbox with a description.
+   */
+  checkboxDescribed?: boolean | null;
+  /**
+   * A longer description that also wraps, to see how it lines up with the label and the box.
+   */
+  checkboxLongDescribed?: boolean | null;
+  checkboxRequired: boolean;
+  checkboxReadOnly?: boolean | null;
+  relationship?: (string | null) | Tenant;
+  relationshipHasMany?: (string | Tenant)[] | null;
+  relationshipPolymorphic?:
+    | (
+        | {
+            relationTo: 'tenants';
+            value: string | Tenant;
+          }
+        | {
+            relationTo: 'users';
+            value: string | User;
+          }
+      )[]
+    | null;
+  /**
+   * A named group.
+   */
+  group?: {
+    groupText?: string | null;
+    groupSelect?: ('alpha' | 'beta' | 'gamma') | null;
+  };
+  collapsibleText?: string | null;
+  collapsibleNumber?: number | null;
+  array?:
+    | {
+        label?: string | null;
+        value?: number | null;
+        id?: string | null;
+      }[]
+    | null;
+  blocks?: (Quote | Cta)[] | null;
+  sidebarText?: string | null;
+  sidebarSelect?: ('alpha' | 'beta' | 'gamma') | null;
+  sidebarCheckbox?: boolean | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "users".
+ * via the `definition` "Quote".
  */
-export interface User {
-  id: string;
-  updatedAt: string;
-  createdAt: string;
-  email: string;
-  resetPasswordToken?: string | null;
-  resetPasswordExpiration?: string | null;
-  salt?: string | null;
-  hash?: string | null;
-  loginAttempts?: number | null;
-  lockUntil?: string | null;
-  sessions?:
-    | {
-        id: string;
-        createdAt?: string | null;
-        expiresAt: string;
-      }[]
-    | null;
-  password?: string | null;
-  collection: 'users';
+export interface Quote {
+  quote?: string | null;
+  author?: string | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'quote';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Cta".
+ */
+export interface Cta {
+  label?: string | null;
+  style?: ('alpha' | 'beta' | 'gamma') | null;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'cta';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -730,6 +969,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'write-only-stories';
         value: string | WriteOnlyStory;
+      } | null)
+    | ({
+        relationTo: 'reference';
+        value: string | Reference;
       } | null)
     | ({
         relationTo: 'tenants';
@@ -783,6 +1026,28 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions".
+ */
+export interface PayloadLlmInstruction {
+  id: string;
+  entitySlug: string;
+  title?: string | null;
+  entityType: 'collection' | 'global';
+  additionalInstructions?: LexicalRichText<LexicalNodes_3DE324E4> | null;
+  systemInstructions?: LexicalRichText<LexicalNodes_3DE324E4> | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "colors_select".
  */
 export interface ColorsSelect<T extends boolean = true> {
@@ -809,6 +1074,8 @@ export interface ColorsSelect<T extends boolean = true> {
   linkedSchemes?: T;
   linkedSchemesResolved?: T;
   schemePresetsFlat?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -838,6 +1105,8 @@ export interface EncryptedSelect<T extends boolean = true> {
   privateNotes_encrypted?: T;
   draftBody?: T;
   draftBody_encrypted?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -854,6 +1123,8 @@ export interface IconsSelect<T extends boolean = true> {
   iconRequired?: T;
   iconTenantRestricted?: T;
   iconWithForced?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -881,6 +1152,8 @@ export interface MeasurementsSelect<T extends boolean = true> {
   sailing?: T;
   labSample?: T;
   shippingWeight?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1132,6 +1405,8 @@ export interface PhoneNumbersSelect<T extends boolean = true> {
         uri?: T;
         type?: T;
       };
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1162,6 +1437,99 @@ export interface WriteOnlyStoriesSelect<T extends boolean = true> {
   longLivedToken?: T;
   longLivedToken_set?: T;
   longLivedToken_hint?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reference_select".
+ */
+export interface ReferenceSelect<T extends boolean = true> {
+  title?: T;
+  text?: T;
+  textRequired?: T;
+  textReadOnly?: T;
+  textLocalized?: T;
+  textHasMany?: T;
+  textHalf?: T;
+  emailHalf?: T;
+  email?: T;
+  textarea?: T;
+  textareaReadOnly?: T;
+  code?: T;
+  json?: T;
+  richText?: T;
+  number?: T;
+  numberHasMany?: T;
+  numberReadOnly?: T;
+  numberMin?: T;
+  numberStep?: T;
+  date?: T;
+  dateTime?: T;
+  timeOnly?: T;
+  monthOnly?: T;
+  dateTimezone?: T;
+  dateTimezone_tz?: T;
+  point?: T;
+  select?: T;
+  selectHasMany?: T;
+  selectRequired?: T;
+  selectReadOnly?: T;
+  radio?: T;
+  radioHorizontal?: T;
+  radioDescribed?: T;
+  radioHorizontalDescribed?: T;
+  radioRequired?: T;
+  checkbox?: T;
+  checkboxDescribed?: T;
+  checkboxLongDescribed?: T;
+  checkboxRequired?: T;
+  checkboxReadOnly?: T;
+  relationship?: T;
+  relationshipHasMany?: T;
+  relationshipPolymorphic?: T;
+  group?:
+    | T
+    | {
+        groupText?: T;
+        groupSelect?: T;
+      };
+  collapsibleText?: T;
+  collapsibleNumber?: T;
+  array?:
+    | T
+    | {
+        label?: T;
+        value?: T;
+        id?: T;
+      };
+  blocks?:
+    | T
+    | {
+        quote?:
+          | T
+          | {
+              quote?: T;
+              author?: T;
+              id?: T;
+              blockName?: T;
+            };
+        cta?:
+          | T
+          | {
+              label?: T;
+              style?: T;
+              id?: T;
+              blockName?: T;
+            };
+      };
+  sidebarText?: T;
+  sidebarSelect?: T;
+  sidebarCheckbox?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1183,6 +1551,8 @@ export interface TenantsSelect<T extends boolean = true> {
         valueDark?: T;
         id?: T;
       };
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1191,6 +1561,8 @@ export interface TenantsSelect<T extends boolean = true> {
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -1198,6 +1570,7 @@ export interface UsersSelect<T extends boolean = true> {
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  resetPasswordRequestedAt?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -1250,6 +1623,22 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions_select".
+ */
+export interface PayloadLlmInstructionsSelect<T extends boolean = true> {
+  id?: T;
+  entitySlug?: T;
+  title?: T;
+  entityType?: T;
+  additionalInstructions?: T;
+  systemInstructions?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "smtp-settings".
  */
 export interface SmtpSetting {
@@ -1258,6 +1647,14 @@ export interface SmtpSetting {
   user?: string | null;
   password?: string;
   password_set?: boolean | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt?: string | null;
   createdAt?: string | null;
 }
@@ -1270,9 +1667,21 @@ export interface SmtpSettingsSelect<T extends boolean = true> {
   user?: T;
   password?: T;
   password_set?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "welcome_widget".
+ */
+export interface WelcomeWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1286,10 +1695,231 @@ export interface CollectionsWidget {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-query_widget".
+ */
+export interface CollectionQueryWidget {
+  data?: {
+    title?: string | null;
+    relatedCollection:
+      | 'colors'
+      | 'encrypted'
+      | 'icons'
+      | 'measurements'
+      | 'phone-numbers'
+      | 'write-only-stories'
+      | 'reference'
+      | 'tenants'
+      | 'users';
+    where?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    sortField?: string | null;
+    sortDirection?: ('asc' | 'desc') | null;
+    limit?: number | null;
+  };
+  width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activity_widget".
+ */
+export interface ActivityWidget {
+  data?: {
+    excludedCollections?:
+      | (
+          | 'colors'
+          | 'encrypted'
+          | 'icons'
+          | 'measurements'
+          | 'phone-numbers'
+          | 'write-only-stories'
+          | 'reference'
+          | 'tenants'
+          | 'users'
+        )[]
+      | null;
+  };
+  width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Callout".
+ */
+export interface Callout {
+  id: string;
+  blockType: 'callout';
+  tone?: ('info' | 'warning') | null;
+  body?: string | null;
+  blockName?: string | null;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "auth".
  */
 export interface Auth {
   [k: string]: unknown;
+}
+
+/** @internal Core Lexical types — see @payloadcms/richtext-lexical. */
+export type LexicalElementFormat = 'left' | 'start' | 'center' | 'right' | 'end' | 'justify' | '';
+export type LexicalElementDirection = ('ltr' | 'rtl') | null;
+
+export interface SerializedLexicalElementBase<TChildren> {
+  children: TChildren[];
+  direction: LexicalElementDirection;
+  format: LexicalElementFormat;
+  indent: number;
+  textFormat?: number;
+  textStyle?: string;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export type LexicalTextMode = 'normal' | 'token' | 'segmented';
+
+export interface SerializedTextNode {
+  type: 'text';
+  detail: number;
+  format: number;
+  mode: LexicalTextMode;
+  style: string;
+  text: string;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export interface SerializedTabNode {
+  type: 'tab';
+  detail: number;
+  format: number;
+  mode: LexicalTextMode;
+  style: string;
+  text: string;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export interface SerializedLineBreakNode {
+  type: 'linebreak';
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export interface SerializedParagraphNode<TChildren> extends SerializedLexicalElementBase<TChildren> {
+  type: 'paragraph';
+  textFormat: number;
+  textStyle: string;
+}
+
+export type SerializedBlockNode<TFields extends { blockType: string }> = TFields extends unknown ? {
+  type: 'block';
+  format: LexicalElementFormat;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+  fields: { id: string; blockName?: string | null } & Omit<TFields, 'id' | 'blockName'>;
+} : never;
+export type SerializedInlineBlockNode<TFields extends { blockType: string }> = TFields extends unknown ? {
+  type: 'inlineBlock';
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+  fields: { id: string } & Omit<TFields, 'id'>;
+} : never;
+
+export interface SerializedHorizontalRuleNode {
+  type: 'horizontalrule';
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+}
+
+export type SerializedUploadNode<TSlugs extends keyof Config['collections'], TFields = { [k: string]: unknown }> = {
+  type: 'upload';
+  format: LexicalElementFormat;
+  id: string;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+  fields: TFields;
+} & {
+  [TSlug in TSlugs]: {
+    relationTo: TSlug;
+    value: Config['collections'][TSlug]['id'] | Config['collections'][TSlug];
+  };
+}[TSlugs];
+
+export interface SerializedQuoteNode<TChildren> extends SerializedLexicalElementBase<TChildren> {
+  type: 'quote';
+}
+
+export type SerializedRelationshipNode<TSlugs extends keyof Config['collections']> = {
+  type: 'relationship';
+  format: LexicalElementFormat;
+  /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+  version: number;
+} & {
+  [TSlug in TSlugs]: {
+    relationTo: TSlug;
+    value: Config['collections'][TSlug]['id'] | Config['collections'][TSlug];
+  };
+}[TSlugs];
+
+export interface LexicalLinkFields {
+  [k: string]: unknown;
+  doc?: {
+    relationTo: string;
+    value: Config['db']['defaultIDType'] | { [k: string]: unknown; id: Config['db']['defaultIDType'] };
+  } | null;
+  linkType: 'custom' | 'internal';
+  newTab: boolean;
+  url?: string;
+}
+export interface SerializedLinkNode<TChildren, TFields = LexicalLinkFields> extends SerializedLexicalElementBase<TChildren> {
+  type: 'link';
+  fields: TFields;
+  id?: string;
+}
+export interface SerializedAutoLinkNode<TChildren, TFields = LexicalLinkFields> extends SerializedLexicalElementBase<TChildren> {
+  type: 'autolink';
+  fields: TFields;
+}
+
+export interface SerializedListNode<TChildren> extends SerializedLexicalElementBase<TChildren> {
+  type: 'list';
+  checked?: boolean;
+  listType: 'number' | 'bullet' | 'check';
+  start: number;
+  tag: 'ul' | 'ol';
+}
+
+export interface SerializedListItemNode<TChildren> extends SerializedLexicalElementBase<TChildren> {
+  type: 'listitem';
+  checked?: boolean;
+  value: number;
+}
+
+export interface SerializedHeadingNode<
+  TChildren,
+  TTag extends 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6' = 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'h6',
+> extends SerializedLexicalElementBase<TChildren> {
+  type: 'heading';
+  tag: TTag;
+}
+
+/** Shape of a Lexical `richText` field. */
+export interface LexicalRichText<TNode> {
+  root: {
+    children: TNode[];
+    direction: LexicalElementDirection;
+    format: LexicalElementFormat;
+    indent: number;
+    type: 'root';
+    /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
+    version: number;
+  };
 }
 
 

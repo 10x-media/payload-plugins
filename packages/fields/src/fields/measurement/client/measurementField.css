@@ -2,61 +2,36 @@
 	position: relative;
 }
 
-/* Mirrors Payload's formInput mixin (packages/ui/src/scss/vars.scss) so the composite
-   container reads as one native text input; focus rides :focus-within.
-   Dimensions are static px on purpose: Payload compiles scss base() to literal px
-   (native inputs stay 40px tall at every breakpoint), while the runtime --base var
-   is rem-based and shrinks with the responsive html font-size. Deriving from
-   var(--base) made this container 3px shorter than native inputs at <=1024px. */
-.fields-measurement__container {
+.fields-measurement > .field-type__wrap {
 	display: flex;
+	flex-direction: column;
+	gap: var(--spacer-2);
+}
+
+/* Payload's .form-input-group (on the same element) owns the border, background, radius,
+   height and the hover, focus, error and disabled states; this only lays out the row. */
+.fields-measurement__container {
 	align-items: center;
-	gap: 3px;
-	width: 100%;
-	height: 40px;
-	padding: 0 8px 0 6px;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-input-bg);
-	color: var(--theme-elevation-800);
+	gap: var(--spacer-1);
+	padding-inline: var(--field-padding-inline) var(--spacer-1);
+	color: var(--field-color-text);
 	font-family: var(--font-body);
-	font-size: 1rem;
-	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
-	transition-property: border, box-shadow, background-color;
-	transition-duration: 100ms, 100ms, 500ms;
-	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	line-height: var(--text-body-medium-line-height);
 }
 
-.fields-measurement__container:hover {
-	border-color: var(--theme-elevation-250);
-	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.2);
+/* Native read-only inputs are disabled inputs on v4, so the row takes the disabled look.
+   A read-only input still takes focus here; Payload's .form-input:read-only:focus answers
+   that with the hover border, and so does this. */
+.fields-measurement.read-only .fields-measurement__container {
+	border-color: var(--field-color-border-disabled);
+	background: var(--field-color-bg-disabled);
+	color: var(--field-color-text-disabled);
 }
 
-.fields-measurement__container:focus-within {
-	border-color: var(--theme-elevation-400);
-	outline: 0;
-}
-
-html[data-theme="light"] .fields-measurement.error .fields-measurement__container {
-	background-color: var(--theme-error-50);
-	border-color: var(--theme-error-500);
-}
-
-html[data-theme="dark"] .fields-measurement.error .fields-measurement__container {
-	background-color: var(--theme-error-100);
-	border-color: var(--theme-error-400);
-}
-
-html[data-theme="dark"] .fields-measurement.error .fields-measurement__container:hover {
-	border-color: var(--theme-error-500);
-}
-
-.fields-measurement.read-only .fields-measurement__container,
-.fields-measurement.read-only .fields-measurement__container:hover {
-	border-color: var(--theme-elevation-150);
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-400);
-	box-shadow: none;
+.fields-measurement.read-only .fields-measurement__container:focus-within {
+	border-color: var(--field-color-border-hover);
 }
 
 /* Each value hugs its unit; the wider gap separates the pairs, so the row
@@ -64,32 +39,27 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 .fields-measurement__compound {
 	display: flex;
 	flex: 1 1 auto;
+	align-self: stretch;
 	min-width: 0;
 	align-items: center;
-	gap: 12px;
-	height: 100%;
+	gap: var(--spacer-2-5);
 }
 
 .fields-measurement__part {
 	display: flex;
+	align-self: stretch;
 	align-items: center;
-	gap: 3px;
-	height: 100%;
+	gap: var(--spacer-1);
 }
 
 /* Width comes from an inline style tracking the draft's length, so every value
    (scalar or compound part) hugs its digits instead of stretching the row */
 .fields-measurement__input {
 	flex: 0 1 auto;
+	align-self: stretch;
 	min-width: 2ch;
-	height: 100%;
-	padding: 0;
-	border: 0;
-	background: transparent;
 	color: inherit;
-	font-family: inherit;
-	font-size: inherit;
-	appearance: none;
+	appearance: textfield;
 	-webkit-appearance: none;
 	-moz-appearance: textfield;
 }
@@ -105,13 +75,13 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 }
 
 .fields-measurement__input::placeholder {
-	color: var(--theme-elevation-400);
+	color: var(--field-color-placeholder);
 }
 
-/* margin-left auto pins the kebab to the row's right edge, away from the
-   value-unit phrase on the left */
+/* margin-inline-start auto pins the kebab to the row's end, away from the
+   value-unit phrase */
 .fields-measurement__popup {
-	margin-left: auto;
+	margin-inline-start: auto;
 }
 
 .fields-measurement__popup,
@@ -121,35 +91,30 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 }
 
 /* The trigger is a real button so it keeps native focus/keyboard semantics; the
-   kebab is aria-hidden and a sr-only span next to it carries the name */
+   kebab is aria-hidden and a sr-only span next to it carries the name. Payload's
+   .popup-button paints its hover and pressed fills. */
 .fields-measurement__unit-trigger {
-	display: inline-flex;
 	flex-shrink: 0;
 	align-items: center;
 	justify-content: center;
-	width: 24px;
-	height: 24px;
-	padding: 0;
-	border: 0;
-	border-radius: var(--style-radius-s);
-	background: transparent;
-	color: var(--theme-elevation-500);
-	cursor: pointer;
+	width: var(--spacer-4);
+	height: var(--spacer-4);
+	color: var(--color-icon-secondary);
 }
 
 .fields-measurement__unit-trigger:hover {
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-800);
+	color: var(--color-icon);
 }
 
 .fields-measurement__unit-trigger:focus-visible {
 	outline: var(--accessibility-outline);
 }
 
+/* MoreIcon's three dots sit symmetric about the centre of its box, so a quarter turn makes an
+   upright kebab without moving it. */
 .fields-measurement__kebab {
 	flex-shrink: 0;
-	width: 4px;
-	height: 14px;
+	transform: rotate(90deg);
 }
 
 .fields-measurement__sr-only {
@@ -164,52 +129,40 @@ html[data-theme="dark"] .fields-measurement.error .fields-measurement__container
 	border-width: 0;
 }
 
-/* The unit is always a passive suffix hugging its value; interactivity lives
-   on the kebab at the row's right edge (absent when there is nothing to open) */
+/* The unit is always a passive suffix hugging its value, styled as the native number
+   field's suffix; interactivity lives on the kebab at the row's end (absent when there
+   is nothing to open) */
 .fields-measurement__unit-static {
 	flex-shrink: 0;
-	color: var(--theme-elevation-500);
-	font-size: 0.85rem;
+	color: var(--color-text-secondary);
 	white-space: nowrap;
 	cursor: default;
+	user-select: none;
 }
 
-.popup__scroll-container:has(> .fields-measurement__unit-panel) {
-	max-height: none;
+.fields-measurement.read-only .fields-measurement__unit-static {
+	color: inherit;
 }
 
+/* Payload's .popup-button-list (on the same element) supplies the list padding, and
+   .popup-button-list__button the item type, radius, hover and selected fills. */
 .fields-measurement__unit-panel {
-	display: flex;
-	flex-direction: column;
-	gap: 2px;
 	min-width: 180px;
-	padding: 4px;
 }
 
 .fields-measurement__unit-option {
-	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 12px;
-	padding: 6px 8px;
-	border: 0;
-	border-radius: var(--style-radius-s);
-	background: transparent;
-	color: var(--theme-elevation-800);
-	font-size: 1rem;
+	gap: var(--spacer-2-5);
+	padding: var(--spacer-1) var(--spacer-2);
 	text-align: start;
-	cursor: pointer;
-}
-
-.fields-measurement__unit-option:hover {
-	background: var(--theme-elevation-100);
-}
-
-.fields-measurement__unit-option[aria-selected="true"] {
-	background: var(--theme-elevation-150);
 }
 
 .fields-measurement__unit-symbol {
-	color: var(--theme-elevation-800);
-	font-size: 0.75rem;
+	color: var(--color-text-secondary);
+}
+
+.fields-measurement__unit-option:is(:hover, [aria-selected="true"])
+	.fields-measurement__unit-symbol {
+	color: inherit;
 }

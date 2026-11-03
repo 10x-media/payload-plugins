@@ -7,6 +7,7 @@ import type {
 	PayloadRequest,
 	Where,
 } from 'payload'
+import { type CompanionEntry, companionSelect, siblingPath } from '../../plugin/companionSelect'
 import { computeBidx } from './crypto/bidx'
 import type { KeyRing } from './crypto/keys'
 import { contextMode, ringForRequest } from './hooks'
@@ -192,6 +193,21 @@ const stripPathsFor = (markers: ReadonlyMap<string, EncryptedFieldMarker>): stri
 	return paths
 }
 
+/** Each stored write-only field with the virtual siblings that report on it. */
+const writeOnlySiblingsFor = (
+	markers: ReadonlyMap<string, EncryptedFieldMarker>
+): CompanionEntry[] => {
+	const out: CompanionEntry[] = []
+	for (const [path, marker] of markers) {
+		if (!marker.writeOnly) continue
+		const siblings = [marker.setName, marker.hintName]
+			.filter((name): name is string => Boolean(name))
+			.map((name) => siblingPath(path, name))
+		if (siblings.length > 0) out.push({ path, siblings })
+	}
+	return out
+}
+
 /**
  * Attaches the blind-index where-rewrite and response stripper to a collection.
  * The fields() plugin applies this to every collection automatically; call it
@@ -213,6 +229,12 @@ export const withEncryptedQueryRewrite = (collection: CollectionConfig): Collect
 			makeHook(queryableMarkers),
 			...(collection.hooks?.beforeOperation ?? []),
 		]
+	}
+	const writeOnly = writeOnlySiblingsFor(allMarkers)
+	if (writeOnly.length > 0) {
+		// The list view selects only visible columns; the write-only cell reads set-ness and
+		// the hint from these siblings, since the stored value never leaves the server.
+		return { ...collection, hooks, select: companionSelect(writeOnly, collection.select) }
 	}
 	return { ...collection, hooks }
 }

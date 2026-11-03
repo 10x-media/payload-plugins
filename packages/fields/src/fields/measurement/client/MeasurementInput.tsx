@@ -4,6 +4,7 @@ import {
 	FieldError,
 	FieldLabel,
 	fieldBaseClass,
+	MoreIcon,
 	Popup,
 	RenderCustomComponent,
 } from '@payloadcms/ui'
@@ -35,19 +36,8 @@ const draftWidth = (draft: string): React.CSSProperties => ({
 	width: `${Math.min(Math.max(draft.length, 2), 12) + 0.5}ch`,
 })
 
-const unitKebab = (
-	<svg
-		aria-hidden="true"
-		className={`${baseClass}__kebab`}
-		focusable="false"
-		viewBox="0 0 4 16"
-		xmlns="http://www.w3.org/2000/svg"
-	>
-		<circle cx="2" cy="2" fill="currentColor" r="1.6" />
-		<circle cx="2" cy="8" fill="currentColor" r="1.6" />
-		<circle cx="2" cy="14" fill="currentColor" r="1.6" />
-	</svg>
-)
+/** Payload's own "more" glyph, turned upright: a vertical kebab reads as the row's menu. */
+const unitKebab = <MoreIcon className={`${baseClass}__kebab`} size={24} />
 
 /**
  * Props for the form-free measurement input. `value` is the number in
@@ -269,11 +259,21 @@ export const MeasurementInputView: React.FC<MeasurementInputViewProps> = (props)
 	const isUnitInteractive = units.length > 1 && !isReadOnly
 
 	const renderUnitPanel = ({ close }: { close: () => void }) => (
-		<div aria-label={t(keys.selectUnit)} className={`${baseClass}__unit-panel`} role="listbox">
+		<div
+			aria-label={t(keys.selectUnit)}
+			className={`${baseClass}__unit-panel popup-button-list`}
+			role="listbox"
+		>
 			{units.map((unit) => (
 				<button
 					aria-selected={unit === displayUnit}
-					className={`${baseClass}__unit-option`}
+					className={[
+						`${baseClass}__unit-option`,
+						'popup-button-list__button',
+						unit === displayUnit && 'popup-button-list__button--selected',
+					]
+						.filter(Boolean)
+						.join(' ')}
 					key={unit}
 					onClick={() => {
 						selectUnit(unit)
@@ -301,6 +301,8 @@ export const MeasurementInputView: React.FC<MeasurementInputViewProps> = (props)
 		if (!isUnitInteractive) return null
 		const shortLabel = engine.unitLabel(displayUnit, locale, 'short')
 		return (
+			// @todo Payload 4's Popup pins its panel to the viewport edge once the field scrolls out of
+			// view (v3 let it scroll away with the field). Adopt the option if Payload adds one.
 			<Popup
 				button={
 					<>
@@ -354,7 +356,16 @@ export const MeasurementInputView: React.FC<MeasurementInputViewProps> = (props)
 				/>
 				{BeforeInput}
 				{/* biome-ignore lint/a11y/noStaticElementInteractions: mousedown only refocuses an inner input, it adds no control and changes no semantics */}
-				<div className={`${baseClass}__container`} onMouseDown={focusNearestInput}>
+				<div
+					className={[
+						`${baseClass}__container`,
+						'form-input-group',
+						showError && 'form-input-group-error',
+					]
+						.filter(Boolean)
+						.join(' ')}
+					onMouseDown={focusNearestInput}
+				>
 					{isCompound && compoundDef ? (
 						// biome-ignore lint/a11y/noStaticElementInteractions: same as the container, refocuses whichever inner input is nearest
 						<span className={`${baseClass}__compound`} onMouseDown={focusNearestInput}>

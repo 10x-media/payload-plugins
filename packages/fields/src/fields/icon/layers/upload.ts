@@ -91,6 +91,9 @@ const findDocs = async (args: {
 		collection: args.collection,
 		depth: 0,
 		limit: 0,
+		// Icon metadata is library data, not the viewer's: lookups ran unrestricted on
+		// Payload 3, and validation depends on them for any editor.
+		overrideAccess: true,
 		pagination: false,
 		...(args.ctx.req ? { req: args.ctx.req } : {}),
 		...(args.where ? { where: args.where } : {}),
@@ -157,6 +160,7 @@ export const uploadIconLayer = (options: UploadIconLayerOptions): IconLayer => {
 				collection: options.collection,
 				depth: 0,
 				limit: 1,
+				overrideAccess: true,
 				...(ctx.req ? { req: ctx.req } : {}),
 				where,
 			})
@@ -174,6 +178,7 @@ export const uploadIconLayer = (options: UploadIconLayerOptions): IconLayer => {
 				collection: options.collection,
 				depth: 0,
 				limit: 0,
+				overrideAccess: true,
 				pagination: false,
 				...(ctx.req ? { req: ctx.req } : {}),
 				where,

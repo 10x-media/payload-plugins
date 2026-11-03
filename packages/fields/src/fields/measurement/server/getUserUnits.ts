@@ -10,7 +10,7 @@ const isPreference = (value: unknown): value is MeasurementUnitsPreference =>
 /**
  * The viewer's saved unit map, one query per request however many measurement
  * fields the document renders. Mirrors Payload's own server-side preference
- * lookup (packages/next getPreferences): find on payload-preferences by key
+ * lookup (getPreferences): find on payload-preferences by key
  * and polymorphic user.
  */
 export const getUserMeasurementUnits = (
@@ -24,6 +24,8 @@ export const getUserMeasurementUnits = (
 				collection: 'payload-preferences',
 				depth: 0,
 				limit: 1,
+				// Scoped to req.user by the where below, as Payload's own preference reads are.
+				overrideAccess: true,
 				pagination: false,
 				sort: '-updatedAt',
 				where: {

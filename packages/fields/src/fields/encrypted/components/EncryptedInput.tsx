@@ -3,6 +3,7 @@ import {
 	FieldDescription,
 	FieldError,
 	FieldLabel,
+	InputStepper,
 	useField,
 	useFormFields,
 	useFormSubmitted,
@@ -21,6 +22,7 @@ interface EncryptedInputProps {
 	kind: InputKind
 	maskDots: number
 	path: string
+	readOnly?: boolean
 }
 
 /**
@@ -31,9 +33,16 @@ interface EncryptedInputProps {
  * Concealed, the input is readOnly and its value is the dot run, so the decrypted
  * plaintext (already in form state from afterRead) never reaches the DOM and
  * masking cannot mutate form state; setValue only runs while revealed. The eye is
- * a sibling flex segment that stays put across toggles.
+ * a sibling flex segment that stays put across toggles. Read-only still reveals
+ * (that is reading), but the input is disabled, as on a native field.
  */
-export const EncryptedInput: React.FC<EncryptedInputProps> = ({ field, kind, maskDots, path }) => {
+export const EncryptedInput: React.FC<EncryptedInputProps> = ({
+	field,
+	kind,
+	maskDots,
+	path,
+	readOnly,
+}) => {
 	const [revealed, setRevealed] = useState(false)
 	const { setValue, showError, value } = useField<number | string>({ path })
 	const submitted = useFormSubmitted()
@@ -50,6 +59,13 @@ export const EncryptedInput: React.FC<EncryptedInputProps> = ({ field, kind, mas
 			return
 		}
 		setValue(event.target.value)
+	}
+
+	// Native number fields carry Payload's stepper inside the input group; it
+	// stays mounted while concealed (disabled) so revealing never shifts layout.
+	const handleStep = (direction: 1 | -1) => {
+		const current = typeof value === 'number' ? value : 0
+		setValue(current + direction * (field.admin?.step ?? 1))
 	}
 
 	const revealedValue = isNumber
@@ -72,6 +88,7 @@ export const EncryptedInput: React.FC<EncryptedInputProps> = ({ field, kind, mas
 				showFieldError && 'error',
 				'tenx-protected-field',
 				'tenx-protected-field--attached',
+				readOnly && 'read-only',
 			]
 				.filter(Boolean)
 				.join(' ')}
@@ -85,15 +102,25 @@ export const EncryptedInput: React.FC<EncryptedInputProps> = ({ field, kind, mas
 			/>
 			<div className="field-type__wrap">
 				<FieldError path={path} />
-				<div className="tenx-protected-field__attached-row">
+				<div
+					className={[
+						'form-input-group',
+						showFieldError && 'form-input-group-error',
+						'tenx-protected-field__attached-row',
+					]
+						.filter(Boolean)
+						.join(' ')}
+				>
 					<input
 						aria-invalid={revealed ? showError : undefined}
 						autoComplete={revealed && !isNumber ? field.admin?.autoComplete : undefined}
-						className={
+						className={[
+							'form-input',
 							revealed
 								? 'tenx-protected-field__revealed-input'
-								: 'tenx-protected-field__masked-input'
-						}
+								: 'tenx-protected-field__masked-input',
+						].join(' ')}
+						disabled={readOnly}
 						id={inputId}
 						inputMode={revealed && isNumber ? 'decimal' : undefined}
 						name={path}
@@ -109,6 +136,13 @@ export const EncryptedInput: React.FC<EncryptedInputProps> = ({ field, kind, mas
 						type={revealed ? (isNumber ? 'number' : kind === 'email' ? 'email' : 'text') : 'text'}
 						value={revealed ? revealedValue : dotString(maskDots)}
 					/>
+					{isNumber ? (
+						<InputStepper
+							disabled={!revealed || readOnly}
+							onDecrement={() => handleStep(-1)}
+							onIncrement={() => handleStep(1)}
+						/>
+					) : null}
 					<div className="tenx-protected-field__eye-wrap tenx-protected-field__eye-wrap--attached">
 						<EyeToggle
 							className="tenx-protected-field__eye--attached"

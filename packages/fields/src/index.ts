@@ -10,6 +10,7 @@ import { resolvePrecision } from './fields/measurement/engine/precision'
 import { isKnownCountry } from './fields/phoneNumber/engine/countries'
 import { isMetadataSet } from './fields/phoneNumber/engine/metadata'
 import { FLAGS_ENDPOINT_PATH, makeFlagsHandler } from './fields/phoneNumber/server/flagsEndpoint'
+import { withCompanionSelect } from './plugin/companionSelect'
 import { registerTranslations } from './plugin/registerTranslations'
 import { setFieldsRegistry } from './plugin/registry'
 import type { TranslationsOption } from './translations'
@@ -112,7 +113,7 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
 }
 
 /**
- * Fields plugin for Payload v3. Registers translations and writes global field
+ * Fields plugin for Payload. Registers translations and writes global field
  * defaults to `config.custom['@10x-media/fields']` for factories, hooks, and
  * server components to read at runtime via `getFieldsRegistry`. Every field
  * factory also works without this plugin; per-field options always override
@@ -121,7 +122,8 @@ const normalizeRegistry = (options: FieldsPluginOptions): FieldsPluginRegistry =
  */
 export const fields = definePlugin<FieldsPluginOptions>({
 	slug: '@10x-media/fields',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	// Payload passes `options` as undefined when the plugin is registered without any.
+	plugin: ({ config, options = {} }): Config => {
 		if (options.disabled === true) {
 			return config
 		}
@@ -149,7 +151,9 @@ export const fields = definePlugin<FieldsPluginOptions>({
 		// Transparently rewrite equals/in on queryable encrypted fields to their
 		// blind-index siblings; a no-op for collections that have none. Globals
 		// take no where, so they get the response strip alone.
-		config.collections = (config.collections ?? []).map(withEncryptedQueryRewrite)
+		config.collections = (config.collections ?? []).map((collection) =>
+			withCompanionSelect(withEncryptedQueryRewrite(collection))
+		)
 		config.globals = (config.globals ?? []).map(withEncryptedResponseStrip)
 		// Validate encrypted key material at boot, before any prior onInit runs, so
 		// missing secrets or broken providers fail fast instead of on first write.
@@ -162,6 +166,7 @@ export const fields = definePlugin<FieldsPluginOptions>({
 	},
 })
 
+export { withCompanionSelect } from './plugin/companionSelect'
 export { getFieldsRegistry } from './plugin/registry'
 export type {
 	ColorFormat,

@@ -59,7 +59,7 @@ const derivedFrom = (parsed: ParsedPhone): DerivedPhone =>
 
 /** Stored and derived alike stay out of the list, so the group reads as one column. */
 const subfield = (name: string, extra: { virtual?: true } = {}): TextField => ({
-	admin: { disableListColumn: true },
+	admin: { disabled: { column: true } },
 	name,
 	type: 'text',
 	...extra,

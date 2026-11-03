@@ -129,4 +129,18 @@ describe('makeEffectiveValidator selects the plaintext validator by source', () 
 		// validator rather than throwing or returning the source unchanged.
 		expect(typeof effective).toBe('function')
 	})
+
+	it("keeps the stored field's jsonSchema transforms away from the stock json validator", async () => {
+		const source = { name: 'x', type: 'json' } as unknown as EncryptedSourceField
+		const effective = makeEffectiveValidator(source)
+		const fetchSpy = vi.spyOn(globalThis, 'fetch')
+		try {
+			const storedJsonSchema = [() => ({ type: 'object' as const })]
+			const result = await effective({ a: 1 }, { jsonSchema: storedJsonSchema, req } as never)
+			expect(result).toBe(true)
+			expect(fetchSpy).not.toHaveBeenCalled()
+		} finally {
+			fetchSpy.mockRestore()
+		}
+	})
 })

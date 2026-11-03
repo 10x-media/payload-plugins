@@ -29,7 +29,12 @@ const palettes: CollectionConfig = {
 
 /** Exercises presetsFromArray against real stored docs, not a hand-built fixture. */
 const paletteRowPresets = async ({ req }: FieldsResolverArgs): Promise<ColorPreset[]> => {
-	const result = await req.payload.find({ collection: 'palettes', depth: 0, limit: 25 })
+	const result = await req.payload.find({
+		overrideAccess: true,
+		collection: 'palettes',
+		depth: 0,
+		limit: 25,
+	})
 	return result.docs.flatMap((doc) =>
 		presetsFromArray({
 			doc: doc as unknown as Record<string, unknown>,
@@ -64,11 +69,12 @@ describeForDb('fields color schemes', {}, (db) => {
 	let booted: BootedPayload
 
 	const create = (data: Record<string, unknown>) =>
-		booted.payload.create({ collection: 'themes', data })
+		booted.payload.create({ overrideAccess: true, collection: 'themes', data })
 
 	beforeAll(async () => {
 		booted = await bootPayload({ collections: [themes, palettes], db, plugin: fields({}) })
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'palettes',
 			data: {
 				name: 'acme',
@@ -127,6 +133,7 @@ describeForDb('fields color schemes', {}, (db) => {
 	it('leaves the stored reference untouched through an update round trip', async () => {
 		const doc = await create({ surface: 'preset:brand', title: 'Round trip' })
 		const updated = await booted.payload.update({
+			overrideAccess: true,
 			collection: 'themes',
 			id: doc.id,
 			data: { title: 'Round trip 2' },

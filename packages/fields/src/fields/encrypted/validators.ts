@@ -62,7 +62,11 @@ export const makeEffectiveValidator = (source: EncryptedSourceField): PlaintextV
 		}
 	}
 	const stock = stockValidators[source.type] as PlaintextValidator
-	return (value, options) => stock(value, { ...options, ...(source as Record<string, unknown>) })
+	// `options` carries the stored text field's `jsonSchema`, an array of type
+	// transforms; the stock json validator reads the same key as `{ schema, uri }`
+	// and fetches `uri`. Drop it so only the source's own (json) schema applies.
+	return (value, { jsonSchema: _storedJsonSchema, ...options }) =>
+		stock(value, { ...options, ...(source as Record<string, unknown>) } as typeof options)
 }
 
 const WIRE_PREFIX = 'pfe1'

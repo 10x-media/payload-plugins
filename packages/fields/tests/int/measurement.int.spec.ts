@@ -54,6 +54,7 @@ describeForDb('measurement field integration', {}, (db) => {
 
 	it('stores plain numbers rounded to storage precision', async () => {
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'athletes',
 			data: { height: 180.34, title: 'a', weight: 81.6466266 },
 		})
@@ -63,13 +64,18 @@ describeForDb('measurement field integration', {}, (db) => {
 
 	it('enforces min/max in storage units via native number validation', async () => {
 		await expect(
-			booted.payload.create({ collection: 'athletes', data: { bounded: 200, title: 'b' } })
+			booted.payload.create({
+				overrideAccess: true,
+				collection: 'athletes',
+				data: { bounded: 200, title: 'b' },
+			})
 		).rejects.toThrow()
 	})
 
 	it('rejects non-numeric input via native validation', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'athletes',
 				data: { title: 'c', weight: 'heavy' as never },
 			})
@@ -79,6 +85,7 @@ describeForDb('measurement field integration', {}, (db) => {
 	it('rejects NaN, which native validation would let through to the column', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'athletes',
 				data: { title: 'nan', weight: Number.NaN },
 			})
@@ -88,9 +95,18 @@ describeForDb('measurement field integration', {}, (db) => {
 	it('sorts and filters on the canonical number', async () => {
 		// Weights above 200 are unique to this test, so filter and descending
 		// order stay deterministic whatever else the suite created.
-		await booted.payload.create({ collection: 'athletes', data: { title: 'silver', weight: 250 } })
-		await booted.payload.create({ collection: 'athletes', data: { title: 'gold', weight: 300 } })
+		await booted.payload.create({
+			overrideAccess: true,
+			collection: 'athletes',
+			data: { title: 'silver', weight: 250 },
+		})
+		await booted.payload.create({
+			overrideAccess: true,
+			collection: 'athletes',
+			data: { title: 'gold', weight: 300 },
+		})
 		const result = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'athletes',
 			sort: '-weight',
 			where: { weight: { greater_than: 200 } },
@@ -99,11 +115,16 @@ describeForDb('measurement field integration', {}, (db) => {
 	})
 
 	it('round-trips a preference doc under the plugin key', async () => {
-		const user = await booted.payload.create({
+		const user = {
+			...(await booted.payload.create({
+				overrideAccess: true,
+				collection: 'users',
+				data: { email: 'units@test.dev', password: 'password' },
+			})),
 			collection: 'users',
-			data: { email: 'units@test.dev', password: 'password' },
-		})
+		}
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'payload-preferences',
 			data: {
 				key: MEASUREMENT_PREFERENCE_KEY,
@@ -113,6 +134,7 @@ describeForDb('measurement field integration', {}, (db) => {
 			user,
 		})
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'payload-preferences',
 			where: {
 				and: [
@@ -126,6 +148,7 @@ describeForDb('measurement field integration', {}, (db) => {
 
 	it('rounds a write to a field-declared storage granularity through the real API', async () => {
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'athletes',
 			data: { shippingWeight: 3400.7, title: 'storage-zero' },
 		})
@@ -134,6 +157,7 @@ describeForDb('measurement field integration', {}, (db) => {
 
 	it('stores a free-form field canonically in its declared storage unit', async () => {
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'athletes',
 			data: { cutout: 500.12345678, title: 'cutout-storage' },
 		})
@@ -141,11 +165,16 @@ describeForDb('measurement field integration', {}, (db) => {
 	})
 
 	it('round-trips a free-form preferenceKey bucket independent of bodyWeight', async () => {
-		const user = await booted.payload.create({
+		const user = {
+			...(await booted.payload.create({
+				overrideAccess: true,
+				collection: 'users',
+				data: { email: 'cutout-units@test.dev', password: 'password' },
+			})),
 			collection: 'users',
-			data: { email: 'cutout-units@test.dev', password: 'password' },
-		})
+		}
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'payload-preferences',
 			data: {
 				key: MEASUREMENT_PREFERENCE_KEY,
@@ -155,6 +184,7 @@ describeForDb('measurement field integration', {}, (db) => {
 			user,
 		})
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'payload-preferences',
 			where: {
 				and: [

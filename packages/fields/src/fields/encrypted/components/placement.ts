@@ -43,6 +43,7 @@ export interface EncryptedFieldConfig {
 		autoComplete?: string
 		description?: StaticDescription
 		placeholder?: unknown
+		readOnly?: boolean
 		rows?: number
 		step?: number
 	}

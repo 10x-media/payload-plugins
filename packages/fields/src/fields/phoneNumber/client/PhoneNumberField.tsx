@@ -1,6 +1,7 @@
 'use client'
 
 import {
+	CircledXIcon,
 	FieldDescription,
 	FieldError,
 	FieldLabel,
@@ -9,7 +10,6 @@ import {
 	useField,
 	useForm,
 	useFormFields,
-	XIcon,
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type { GroupFieldClientProps, StaticLabel, TextFieldClientProps } from 'payload'
@@ -62,7 +62,7 @@ export type PhoneNumberFieldProps = {
 } & Omit<GroupFieldClientProps, 'field'>
 
 /**
- * One 40px row holding the country trigger, the calling-code prefix, a borderless entry and
+ * One native-height row holding the country trigger, the calling-code prefix, a borderless entry and
  * a clear affordance. `phoneOptions` must already be resolved through `resolvePhoneOptionsSafe`:
  * the field's own stamped layer carries no defaults and would render the wrong chrome.
  */
@@ -229,6 +229,24 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 	}, [])
 	useEffect(() => cancelPending, [cancelPending])
 
+	// Typed or pasted before the lazy metadata landed, the draft went in unformatted; format it
+	// once on arrival, but only with the caret at the end, so the reformat cannot move it.
+	// biome-ignore lint/correctness/useExhaustiveDependencies: the metadata arrival is the trigger, not every keystroke
+	useEffect(() => {
+		const input = inputRef.current
+		if (!metadata || !editingRef.current || !input || draft === '') return
+		if (input.selectionStart !== null && input.selectionStart !== draft.length) return
+		const formatted = formatDraft({
+			atEnd: true,
+			callingCode,
+			country,
+			metadata,
+			previous: '',
+			raw: draft,
+		})
+		if (formatted !== null && formatted !== draft) setDraft(formatted)
+	}, [metadata])
+
 	const onChange = useCallback(
 		(event: React.ChangeEvent<HTMLInputElement>) => {
 			const input = event.target
@@ -322,7 +340,15 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 					Fallback={<FieldError path={path} showError={hasError} />}
 				/>
 				{BeforeInput}
-				<div className={`${baseClass}__container`}>
+				<div
+					className={[
+						`${baseClass}__container`,
+						'form-input-group',
+						hasError && 'form-input-group-error',
+					]
+						.filter(Boolean)
+						.join(' ')}
+				>
 					<CountryPicker
 						disabled={isReadOnly || metadata === null}
 						flags={flags}
@@ -352,7 +378,7 @@ export const PhoneNumberField: React.FC<PhoneNumberFieldProps> = (props) => {
 							onClick={onClear}
 							type="button"
 						>
-							<XIcon />
+							<CircledXIcon size={24} />
 						</button>
 					) : null}
 				</div>

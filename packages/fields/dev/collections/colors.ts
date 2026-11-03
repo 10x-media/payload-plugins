@@ -14,7 +14,12 @@ type TenantDoc = {
 
 /** req-only on purpose: linked resolvers are memoized per request (see plan deviation 6). */
 const tenantBrandPresets = async ({ req }: FieldsResolverArgs): Promise<ColorPreset[]> => {
-	const result = await req.payload.find({ collection: 'tenants', depth: 0, limit: 25 })
+	const result = await req.payload.find({
+		overrideAccess: true,
+		collection: 'tenants',
+		depth: 0,
+		limit: 25,
+	})
 	return result.docs.flatMap((doc) => {
 		const tenant = doc as unknown as TenantDoc
 		return [
@@ -36,7 +41,12 @@ const tenantBrandPresets = async ({ req }: FieldsResolverArgs): Promise<ColorPre
 
 /** Scheme-aware palette lifted straight off each tenant's brandColors rows. */
 const tenantSchemePresets = async ({ req }: FieldsResolverArgs): Promise<ColorPreset[]> => {
-	const result = await req.payload.find({ collection: 'tenants', depth: 0, limit: 25 })
+	const result = await req.payload.find({
+		overrideAccess: true,
+		collection: 'tenants',
+		depth: 0,
+		limit: 25,
+	})
 	return result.docs.flatMap((doc) =>
 		presetsFromArray({
 			doc: doc as unknown as Record<string, unknown>,

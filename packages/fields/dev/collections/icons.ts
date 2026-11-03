@@ -23,7 +23,11 @@ const resolveTenantLibraries: IconAvailabilityResolver = async ({ req, siblingDa
 	if (tenantId == null) {
 		return ALL_DEV_LIBRARIES
 	}
-	const tenant = await req.payload.findByID({ collection: 'tenants', id: tenantId })
+	const tenant = await req.payload.findByID({
+		overrideAccess: true,
+		collection: 'tenants',
+		id: tenantId,
+	})
 	const enabled = tenant.enabledLibraries
 	return Array.isArray(enabled) ? (enabled as string[]) : []
 }

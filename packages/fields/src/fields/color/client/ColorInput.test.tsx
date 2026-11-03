@@ -13,7 +13,7 @@ vi.mock('@payloadcms/ui', () => ({
 	Popup: () => null,
 	// biome-ignore lint/suspicious/noExplicitAny: test double over Payload's RenderCustomComponent surface
 	RenderCustomComponent: ({ CustomComponent, Fallback }: any) => CustomComponent ?? Fallback,
-	XIcon: () => null,
+	CircledXIcon: () => null,
 	fieldBaseClass: 'field-type',
 }))
 vi.mock('../../../translations/useTranslation', () => ({

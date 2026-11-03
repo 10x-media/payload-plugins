@@ -81,7 +81,7 @@ vi.mock('@payloadcms/ui', () => ({
 	FieldError: FieldErrorDouble,
 	FieldLabel: FieldLabelDouble,
 	RenderCustomComponent: RenderCustomComponentDouble,
-	XIcon: () => <svg data-testid="x-icon" />,
+	CircledXIcon: () => <svg data-testid="x-icon" />,
 	fieldBaseClass: 'field-type',
 	useField: () => fieldStub.current,
 	useForm: () => ({ dispatchFields, setModified }),
@@ -939,16 +939,27 @@ describe('PhoneNumberField', () => {
 		rendered.unmount()
 	})
 
-	it('activates formatting once the metadata lands, without losing the draft', async () => {
+	it('formats a draft typed before the metadata lands, once it arrives', async () => {
 		const rendered = render(element({ phoneOptions: { defaultCountry: 'DE' } }))
 		type('1511234')
 		await act(async () => {
 			await loadMetadata('max')
 		})
-		expect(input().value).toBe('1511234')
+		expect(input().value).toBe('1511 234')
 		expect(picker().dataset.disabled).toBe('false')
 		type('15112345678')
 		expect(input().value).toBe('1511 2345678')
+		rendered.unmount()
+	})
+
+	it('leaves a pre-metadata draft alone when the caret is not at its end', async () => {
+		const rendered = render(element({ phoneOptions: { defaultCountry: 'DE' } }))
+		type('1511234', 2)
+		input().setSelectionRange(2, 2)
+		await act(async () => {
+			await loadMetadata('max')
+		})
+		expect(input().value).toBe('1511234')
 		rendered.unmount()
 	})
 

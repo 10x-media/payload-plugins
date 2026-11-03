@@ -68,10 +68,15 @@ describeForDb('phone number field integration', {}, (db) => {
 			// National-format input on purpose: its parsed e164 differs from the stored
 			// string, so a hook that overwrote `number` (instead of enriching it) would fail.
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: { phone: { country: 'DE', number: '0151 12345678' }, title: 'derived' },
 			})
-			const found = await booted.payload.findByID({ collection: 'phoneRecords', id: created.id })
+			const found = await booted.payload.findByID({
+				overrideAccess: true,
+				collection: 'phoneRecords',
+				id: created.id,
+			})
 			expect(found.phone).toMatchObject({
 				callingCode: '49',
 				country: 'DE',
@@ -87,6 +92,7 @@ describeForDb('phone number field integration', {}, (db) => {
 	describe('raw storage', () => {
 		it('keeps the five virtual subfields out of the raw stored row, not merely the API response', async () => {
 			await booted.payload.create({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: { phone: { country: 'DE', number: '+4915112345678' }, title: 'raw-row-check' },
 			})
@@ -129,6 +135,7 @@ describeForDb('phone number field integration', {}, (db) => {
 		it('rejects a malformed number under the default valid mode', async () => {
 			await expect(
 				booted.payload.create({
+					overrideAccess: true,
 					collection: 'phoneRecords',
 					data: { phone: { country: 'DE', number: 'not a phone number' }, title: 'invalid-valid' },
 				})
@@ -143,6 +150,7 @@ describeForDb('phone number field integration', {}, (db) => {
 
 		it('accepts a number that only passes possible-length checks, which valid mode would reject', async () => {
 			const doc = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: {
 					possiblePhone: { country: 'DE', number: '+49151123456781234' },
@@ -155,6 +163,7 @@ describeForDb('phone number field integration', {}, (db) => {
 		it('still rejects unparseable input under possible mode', async () => {
 			await expect(
 				booted.payload.create({
+					overrideAccess: true,
 					collection: 'phoneRecords',
 					data: { possiblePhone: { country: 'DE', number: '+4915' }, title: 'possible-short' },
 				})
@@ -172,6 +181,7 @@ describeForDb('phone number field integration', {}, (db) => {
 
 		it('accepts a genuine mobile number under mobile-only validation', async () => {
 			const doc = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: {
 					mobilePhone: { country: 'DE', number: '+4915112345678' },
@@ -184,6 +194,7 @@ describeForDb('phone number field integration', {}, (db) => {
 		it('rejects a landline as not-mobile under mobile-only validation', async () => {
 			await expect(
 				booted.payload.create({
+					overrideAccess: true,
 					collection: 'phoneRecords',
 					data: {
 						mobilePhone: { country: 'DE', number: '+49301234567' },
@@ -209,6 +220,7 @@ describeForDb('phone number field integration', {}, (db) => {
 			// factory's own validate, which inspects `number`, can reject this.
 			await expect(
 				booted.payload.create({
+					overrideAccess: true,
 					collection: 'requiredPhones',
 					data: { phone: {}, title: 'required-empty' },
 				})
@@ -221,6 +233,7 @@ describeForDb('phone number field integration', {}, (db) => {
 			})
 
 			const ok = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'requiredPhones',
 				data: { phone: { country: 'DE', number: '+4915112345678' }, title: 'required-ok' },
 			})
@@ -233,16 +246,22 @@ describeForDb('phone number field integration', {}, (db) => {
 			// Deliberately not canonical e164 (has spaces): its own parsed e164 is
 			// '+4915112345678', so a normalizing hook would silently rewrite this.
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: { phoneE164: '+49 1511 2345678', title: 'e164-round-trip' },
 			})
-			const found = await booted.payload.findByID({ collection: 'phoneRecords', id: created.id })
+			const found = await booted.payload.findByID({
+				overrideAccess: true,
+				collection: 'phoneRecords',
+				id: created.id,
+			})
 			expect(found.phoneE164).toBe('+49 1511 2345678')
 		})
 
 		it('rejects malformed input the same way as object storage', async () => {
 			await expect(
 				booted.payload.create({
+					overrideAccess: true,
 					collection: 'phoneRecords',
 					data: { phoneE164: 'not a phone number', title: 'e164-invalid' },
 				})
@@ -261,21 +280,25 @@ describeForDb('phone number field integration', {}, (db) => {
 			// FR and CH are reserved to this test so the filter and sort order stay
 			// deterministic whatever else the suite created.
 			await booted.payload.create({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: { phone: { country: 'FR', number: '+33612345678' }, title: 'query-fr' },
 			})
 			await booted.payload.create({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: { phone: { country: 'CH', number: '+41446681800' }, title: 'query-ch' },
 			})
 
 			const filtered = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				where: { 'phone.country': { equals: 'CH' } },
 			})
 			expect(filtered.docs.map((doc) => doc.title)).toEqual(['query-ch'])
 
 			const sorted = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				sort: 'phone.number',
 				where: { 'phone.country': { in: ['CH', 'FR'] } },
@@ -287,6 +310,7 @@ describeForDb('phone number field integration', {}, (db) => {
 	describe('localized', () => {
 		it('stores localizedPhone independently per locale and merges under locale all', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: {
 					localizedPhone: { country: 'DE', number: '+4915112345678' },
@@ -295,6 +319,7 @@ describeForDb('phone number field integration', {}, (db) => {
 				locale: 'en',
 			})
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: { localizedPhone: { country: 'US', number: '+12015550123' } },
 				id: created.id,
@@ -302,11 +327,13 @@ describeForDb('phone number field integration', {}, (db) => {
 			})
 
 			const en = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				id: created.id,
 				locale: 'en',
 			})
 			const de = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				id: created.id,
 				locale: 'de',
@@ -315,6 +342,7 @@ describeForDb('phone number field integration', {}, (db) => {
 			expect(de.localizedPhone).toMatchObject({ country: 'US', number: '+12015550123' })
 
 			const all = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				id: created.id,
 				locale: 'all',
@@ -329,6 +357,7 @@ describeForDb('phone number field integration', {}, (db) => {
 	describe('array nesting', () => {
 		it('round-trips a phone field nested in an array independently per row', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: {
 					contacts: [
@@ -353,6 +382,7 @@ describeForDb('phone number field integration', {}, (db) => {
 			// Only row 1 changes; row 0 must survive untouched, proving the rows are not
 			// cross-scoped through shared sibling data.
 			const updated = await booted.payload.update({
+				overrideAccess: true,
 				collection: 'phoneRecords',
 				data: {
 					contacts: [
@@ -392,6 +422,7 @@ describeForDb('phone number field registry defaults', {}, (db) => {
 
 	it("resolves the registry's defaultCountry and validation when the field sets neither", async () => {
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'registryPhones',
 			data: { inherited: '0151 12345678', title: 'inherit-ok' },
 		})
@@ -403,6 +434,7 @@ describeForDb('phone number field registry defaults', {}, (db) => {
 		// only fails this specific way if both registry defaults actually reached checkPhone.
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'registryPhones',
 				data: { inherited: '030 1234567', title: 'inherit-landline' },
 			})
@@ -417,6 +449,7 @@ describeForDb('phone number field registry defaults', {}, (db) => {
 
 	it("lets a field's own validation win over the registry default", async () => {
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'registryPhones',
 			data: { pinnedValid: '030 1234567', title: 'override-ok' },
 		})

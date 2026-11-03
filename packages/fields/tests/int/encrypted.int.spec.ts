@@ -124,8 +124,16 @@ describeForDb('encrypted fields', {}, (db) => {
 
 	describe('per-type round-trip with ciphertext at rest', () => {
 		it('round-trips every supported type through the local API', async () => {
-			const created = await booted.payload.create({ collection: 'vault', data: FULL_DATA })
-			const read = await booted.payload.findByID({ collection: 'vault', id: created.id })
+			const created = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'vault',
+				data: FULL_DATA,
+			})
+			const read = await booted.payload.findByID({
+				overrideAccess: true,
+				collection: 'vault',
+				id: created.id,
+			})
 			expect(read.ssn).toBe(FULL_DATA.ssn)
 			expect(read.bio).toBe(FULL_DATA.bio)
 			expect(read.contact).toBe(FULL_DATA.contact)
@@ -143,7 +151,11 @@ describeForDb('encrypted fields', {}, (db) => {
 		})
 
 		it('stores sealed text at rest for every encrypted field (adapter-agnostic)', async () => {
-			const created = await booted.payload.create({ collection: 'vault', data: FULL_DATA })
+			const created = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'vault',
+				data: FULL_DATA,
+			})
 			const raw = await booted.payload.db.findOne<
 				{ id: number | string } & Record<string, unknown>
 			>({
@@ -182,22 +194,26 @@ describeForDb('encrypted fields', {}, (db) => {
 	describe('localized fields', () => {
 		it('seals per locale and reads each locale plus all', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'vault',
 				data: { ...FULL_DATA, localNote: 'english note' },
 				locale: 'en',
 			})
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'vault',
 				data: { localNote: 'deutsche notiz' },
 				id: created.id,
 				locale: 'de',
 			})
 			const en = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'vault',
 				id: created.id,
 				locale: 'en',
 			})
 			const de = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'vault',
 				id: created.id,
 				locale: 'de',
@@ -206,6 +222,7 @@ describeForDb('encrypted fields', {}, (db) => {
 			expect(de.localNote).toBe('deutsche notiz')
 
 			const all = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'vault',
 				id: created.id,
 				locale: 'all',
@@ -226,11 +243,13 @@ describeForDb('encrypted fields', {}, (db) => {
 
 		it('serves the fallback locale value through fallback hoisting', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'vault',
 				data: { ...FULL_DATA, localNote: 'only english' },
 				locale: 'en',
 			})
 			const de = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'vault',
 				fallbackLocale: 'en',
 				id: created.id,
@@ -243,11 +262,13 @@ describeForDb('encrypted fields', {}, (db) => {
 	describe('drafts and versions read paths', () => {
 		it('decrypts drafts and version snapshots', async () => {
 			const draft = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'vault-drafts',
 				data: { secret: 'draft secret', title: 'd1' },
 				draft: true,
 			})
 			const readDraft = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'vault-drafts',
 				draft: true,
 				id: draft.id,
@@ -255,11 +276,13 @@ describeForDb('encrypted fields', {}, (db) => {
 			expect(readDraft.secret).toBe('draft secret')
 
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'vault-drafts',
 				data: { _status: 'published', secret: 'published secret' },
 				id: draft.id,
 			})
 			const versions = await booted.payload.findVersions({
+				overrideAccess: true,
 				collection: 'vault-drafts',
 				where: { parent: { equals: draft.id } },
 			})
@@ -276,10 +299,12 @@ describeForDb('encrypted fields', {}, (db) => {
 	describe('null and undefined semantics', () => {
 		it('null clears the value; undefined leaves it unchanged', async () => {
 			const created = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'vault',
 				data: { ...FULL_DATA, bio: 'to be cleared' },
 			})
 			const untouched = await booted.payload.update({
+				overrideAccess: true,
 				collection: 'vault',
 				data: { title: 'renamed' },
 				id: created.id,
@@ -287,6 +312,7 @@ describeForDb('encrypted fields', {}, (db) => {
 			expect(untouched.bio).toBe('to be cleared')
 
 			const cleared = await booted.payload.update({
+				overrideAccess: true,
 				collection: 'vault',
 				data: { bio: null },
 				id: created.id,
@@ -305,13 +331,18 @@ describeForDb('encrypted fields', {}, (db) => {
 	describe('validation runs on plaintext', () => {
 		it('enforces required', async () => {
 			await expect(
-				booted.payload.create({ collection: 'vault', data: { title: 'no ssn' } })
+				booted.payload.create({
+					overrideAccess: true,
+					collection: 'vault',
+					data: { title: 'no ssn' },
+				})
 			).rejects.toThrow()
 		})
 
 		it('enforces the stock email format on the incoming plaintext', async () => {
 			await expect(
 				booted.payload.create({
+					overrideAccess: true,
 					collection: 'vault',
 					data: { ...FULL_DATA, contact: 'not-an-email' },
 				})
@@ -323,6 +354,7 @@ describeForDb('encrypted fields', {}, (db) => {
 			// ValidationError's per-field errors, not the generic top-level message.
 			await expect(
 				booted.payload.create({
+					overrideAccess: true,
 					collection: 'vault',
 					data: { ...FULL_DATA, guarded: 'forbidden' },
 				})
@@ -334,6 +366,7 @@ describeForDb('encrypted fields', {}, (db) => {
 				},
 			})
 			const ok = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'vault',
 				data: { ...FULL_DATA, guarded: 'allowed' },
 			})
@@ -362,18 +395,23 @@ describeForDb('encrypted fields', {}, (db) => {
 		}
 
 		it("default 'throw' names collection.field and keyId, never plaintext", async () => {
-			const doc = await booted.payload.create({ collection: 'vault', data: FULL_DATA })
+			const doc = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'vault',
+				data: FULL_DATA,
+			})
 			await corrupt(doc.id, 'ssn')
-			await expect(booted.payload.findByID({ collection: 'vault', id: doc.id })).rejects.toThrow(
-				/vault\.ssn.*keyId/
-			)
 			await expect(
-				booted.payload.findByID({ collection: 'vault', id: doc.id })
+				booted.payload.findByID({ overrideAccess: true, collection: 'vault', id: doc.id })
+			).rejects.toThrow(/vault\.ssn.*keyId/)
+			await expect(
+				booted.payload.findByID({ overrideAccess: true, collection: 'vault', id: doc.id })
 			).rejects.not.toThrow(/123-45-6789/)
 		})
 
 		it("'null', 'passthrough', and function policies apply per field", async () => {
 			const doc = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'vault',
 				data: {
 					...FULL_DATA,
@@ -385,7 +423,11 @@ describeForDb('encrypted fields', {}, (db) => {
 			await corrupt(doc.id, 'fragileNull')
 			await corrupt(doc.id, 'fragilePass')
 			await corrupt(doc.id, 'fragileFn')
-			const read = await booted.payload.findByID({ collection: 'vault', id: doc.id })
+			const read = await booted.payload.findByID({
+				overrideAccess: true,
+				collection: 'vault',
+				id: doc.id,
+			})
 			expect(read.fragileNull).toBeNull()
 			expect(sealedShape(read.fragilePass)).toBe(true)
 			expect(read.fragileFn).toBe('[unavailable]')
@@ -412,6 +454,7 @@ describeForDb('encrypted fields', {}, (db) => {
 			const id = (seeded as { id: number | string }).id
 			// Passthrough returns the legacy plaintext untouched.
 			const read = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'vault',
 				select: { fragilePass: true, title: true },
 				where: { id: { equals: id } },
@@ -419,6 +462,7 @@ describeForDb('encrypted fields', {}, (db) => {
 			expect(read.docs[0]?.fragilePass).toBe('legacy plaintext')
 
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'vault',
 				data: { fragilePass: 'legacy plaintext', ssn: 'now-sealed' },
 				id,
@@ -472,10 +516,12 @@ describeForDb('encrypted key rotation', {}, (db) => {
 		})
 		try {
 			const a = await bootedK1.payload.create({
+				overrideAccess: true,
 				collection: 'rotatable',
 				data: { lookup: 'a@x.com', secret: 'alpha', title: 'a' },
 			})
 			await bootedK1.payload.create({
+				overrideAccess: true,
 				collection: 'rotatable',
 				data: { lookup: 'b@x.com', secret: 'beta', title: 'b' },
 			})
@@ -492,7 +538,11 @@ describeForDb('encrypted key rotation', {}, (db) => {
 			})
 			try {
 				// Old ciphertext still opens (k1 remains in the ring).
-				const before = await bootedK2.payload.findByID({ collection: 'rotatable', id: a.id })
+				const before = await bootedK2.payload.findByID({
+					overrideAccess: true,
+					collection: 'rotatable',
+					id: a.id,
+				})
 				expect(before.secret).toBe('alpha')
 
 				const dry = await rotateEncryptedFields(bootedK2.payload, { dryRun: true })
@@ -511,11 +561,16 @@ describeForDb('encrypted key rotation', {}, (db) => {
 				expect((rawRow.secret as string).split('.')[1]).toBe('k2')
 				expect((rawRow.lookup as string).split('.')[1]).toBe('k2')
 
-				const after = await bootedK2.payload.findByID({ collection: 'rotatable', id: a.id })
+				const after = await bootedK2.payload.findByID({
+					overrideAccess: true,
+					collection: 'rotatable',
+					id: a.id,
+				})
 				expect(after.secret).toBe('alpha')
 
 				// Blind index realigned to the k2-derived index key.
 				const found = await bootedK2.payload.find({
+					overrideAccess: true,
 					collection: 'rotatable',
 					where: { lookup: { equals: 'a@x.com' } },
 				})
@@ -618,10 +673,16 @@ describeForDb('encrypted richText (two-field design)', {}, (db) => {
 
 	it('round-trips full node parity (paragraph + block sub-fields) and strips the ciphertext sibling', async () => {
 		const created = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'richdocs',
 			data: { body: RICH_DOC, plainBody: RICH_DOC, title: 'doc-1' },
 		})
-		const read = await booted.payload.findByID({ collection: 'richdocs', depth: 0, id: created.id })
+		const read = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'richdocs',
+			depth: 0,
+			id: created.id,
+		})
 
 		const children = (read.body as RichValue).root.children
 		expect(children).toHaveLength(2)
@@ -642,6 +703,7 @@ describeForDb('encrypted richText (two-field design)', {}, (db) => {
 
 	it('stores the richText as sealed ciphertext at rest, never plaintext', async () => {
 		const created = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'richdocs',
 			data: { body: RICH_DOC, plainBody: RICH_DOC, title: 'doc-2' },
 		})
@@ -661,11 +723,13 @@ describeForDb('encrypted richText (two-field design)', {}, (db) => {
 
 	it('preserves the encrypted richText when an update omits the field (absent-value guard)', async () => {
 		const created = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'richdocs',
 			data: { body: RICH_DOC, title: 'doc-3' },
 		})
 
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'richdocs',
 			data: { title: 'renamed' },
 			id: created.id,
@@ -679,7 +743,12 @@ describeForDb('encrypted richText (two-field design)', {}, (db) => {
 		>({ collection: 'richdocs', where: { id: { equals: created.id } } })
 		expect(sealedShape((after as Record<string, unknown>).body_encrypted)).toBe(true)
 
-		const read = await booted.payload.findByID({ collection: 'richdocs', depth: 0, id: created.id })
+		const read = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'richdocs',
+			depth: 0,
+			id: created.id,
+		})
 		expect(read.title).toBe('renamed')
 		expect((read.body as RichValue).root.children).toHaveLength(2)
 		const block = childOfType(read.body, 'block')
@@ -706,6 +775,7 @@ describeForDb('encrypted richText (two-field design)', {}, (db) => {
 		})
 		try {
 			const created = await bootedK1.payload.create({
+				overrideAccess: true,
 				collection: 'richdocs',
 				data: { body: RICH_DOC, title: 'rot' },
 			})
@@ -728,6 +798,7 @@ describeForDb('encrypted richText (two-field design)', {}, (db) => {
 				>({ collection: 'richdocs', where: { id: { equals: created.id } } })
 				expect(((raw as Record<string, unknown>).body_encrypted as string).split('.')[1]).toBe('k2')
 				const after = await bootedK2.payload.findByID({
+					overrideAccess: true,
 					collection: 'richdocs',
 					depth: 0,
 					id: created.id,
