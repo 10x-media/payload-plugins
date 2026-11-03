@@ -12,14 +12,14 @@
 	width: min(560px, calc(100vw - 2rem));
 	max-height: min(60vh, 640px);
 	overflow: hidden;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m);
-	background: var(--theme-elevation-0);
-	color: var(--theme-elevation-800);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg);
+	color: var(--color-text);
 	font-family: var(--font-mono);
 	font-size: 12px;
 	line-height: 1.5;
-	box-shadow: 0 8px 24px -8px rgba(0, 0, 0, 0.35);
+	box-shadow: var(--elevation-400-menu-panel);
 	resize: both;
 }
 
@@ -29,8 +29,8 @@
 	align-items: center;
 	gap: 8px;
 	padding: 8px 10px;
-	border-bottom: 1px solid var(--theme-elevation-150);
-	background: var(--theme-elevation-50);
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-bg-secondary);
 }
 
 .undo-redo-debug__title {
@@ -39,14 +39,14 @@
 
 .undo-redo-debug__meta {
 	margin-right: auto;
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .undo-redo-debug__action {
 	padding: 2px 8px;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-elevation-0);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-small);
+	background: var(--color-bg);
 	color: inherit;
 	font-family: inherit;
 	font-size: inherit;
@@ -54,8 +54,7 @@
 }
 
 .undo-redo-debug__action:hover {
-	border-color: var(--theme-elevation-250);
-	background: var(--theme-elevation-100);
+	background: var(--color-bg-hover);
 }
 
 .undo-redo-debug__body {
@@ -67,22 +66,22 @@
 .undo-redo-debug__empty {
 	margin: 0;
 	padding: 12px 10px;
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .undo-redo-debug__entry {
-	border-bottom: 1px solid var(--theme-elevation-100);
+	border-bottom: 1px solid var(--color-border);
 }
 
 /* The entry matching the form state on screen right now. */
 .undo-redo-debug__entry--current {
-	background: var(--theme-elevation-50);
-	box-shadow: inset 3px 0 0 var(--theme-success-500);
+	background: var(--color-bg-secondary);
+	box-shadow: inset 3px 0 0 var(--color-icon-success);
 }
 
 /* Edits made but still inside the capture debounce, so not an entry yet. */
 .undo-redo-debug__entry--pending {
-	box-shadow: inset 3px 0 0 var(--theme-warning-500);
+	box-shadow: inset 3px 0 0 var(--color-icon-warning);
 }
 
 .undo-redo-debug__entryHead {
@@ -110,12 +109,12 @@
 
 .undo-redo-debug__caret {
 	width: 10px;
-	color: var(--theme-elevation-400);
+	color: var(--color-icon-secondary);
 }
 
 .undo-redo-debug__index {
 	flex-shrink: 0;
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .undo-redo-debug__summary {
@@ -128,17 +127,17 @@
 	flex-shrink: 0;
 	margin-left: auto;
 	padding: 0 6px;
-	border-radius: var(--style-radius-s);
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-600);
+	border-radius: var(--radius-small);
+	background: var(--color-bg-tertiary);
+	color: var(--color-text-secondary);
 }
 
 .undo-redo-debug__jump {
 	flex-shrink: 0;
 	padding: 2px 6px;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-elevation-0);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-small);
+	background: var(--color-bg);
 	color: inherit;
 	font-family: inherit;
 	font-size: 11px;
@@ -168,39 +167,39 @@
 
 .undo-redo-debug__path {
 	width: 34%;
-	color: var(--theme-elevation-700);
+	color: var(--color-text);
 }
 
 .undo-redo-debug__presence {
 	margin-left: 4px;
 	padding: 0 4px;
-	border-radius: var(--style-radius-s);
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-500);
+	border-radius: var(--radius-small);
+	background: var(--color-bg-tertiary);
+	color: var(--color-text-secondary);
 	font-size: 10px;
 }
 
 .undo-redo-debug__from {
 	width: 29%;
-	color: var(--theme-error-500);
+	color: var(--color-text-danger);
 }
 
 .undo-redo-debug__arrow {
 	width: 16px;
-	color: var(--theme-elevation-400);
+	color: var(--color-icon-secondary);
 }
 
 .undo-redo-debug__to {
 	width: 29%;
-	color: var(--theme-success-500);
+	color: var(--color-text-success);
 }
 
 /* The entry that matches the persisted document. */
 .undo-redo-debug__saved {
 	flex-shrink: 0;
 	padding: 0 4px;
-	border-radius: var(--style-radius-s);
-	background: var(--theme-success-100);
-	color: var(--theme-success-600);
+	border-radius: var(--radius-small);
+	background: var(--color-bg-success-tertiary);
+	color: var(--color-text-success);
 	font-size: 10px;
 }

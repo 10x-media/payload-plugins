@@ -62,9 +62,9 @@ describe('undoRedo factory', () => {
 		expect(mounted?.[0]).toBe('app/Existing#Existing')
 	})
 
-	it('adds the controls to globals via the elements slot', () => {
+	it('adds the controls to globals through the edit slot', () => {
 		const out = apply(fakeConfig({ globals: [global()] }))
-		const mounted = out.globals?.[0]?.admin?.components?.elements?.beforeDocumentControls
+		const mounted = out.globals?.[0]?.admin?.components?.edit?.beforeDocumentControls
 		expect(pathOf(mounted?.[0])).toBe(UNDO_REDO_COMPONENT_PATH)
 	})
 
@@ -117,7 +117,7 @@ describe('undoRedo mounting', () => {
 	it('leaves globals alone when only collections are disabled', () => {
 		const out = apply(fakeConfig({ globals: [global()] }), { collections: false })
 		expect(out.collections?.[0]?.admin?.components?.edit?.beforeDocumentControls).toBeUndefined()
-		const mounted = out.globals?.[0]?.admin?.components?.elements?.beforeDocumentControls
+		const mounted = out.globals?.[0]?.admin?.components?.edit?.beforeDocumentControls
 		expect(pathOf(mounted?.[0])).toBe(UNDO_REDO_COMPONENT_PATH)
 	})
 })

@@ -69,4 +69,4 @@ Three things account for almost every case.
 
 **The collection or global is opted out**, through `collections`/`globals` or through `autoMount: false`, which leaves the mounting to you.
 
-**Something else owns the slot.** The plugin appends to `admin.components.edit.beforeDocumentControls` (collections) and `admin.components.elements.beforeDocumentControls` (globals), preserving whatever is already there. A config that overwrites those arrays after the plugin runs wins.
+**Something else owns the slot.** The plugin appends to `admin.components.edit.beforeDocumentControls` on collections and globals alike, preserving whatever is already there. A config that overwrites that array after the plugin runs wins.

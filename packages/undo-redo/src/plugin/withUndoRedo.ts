@@ -19,18 +19,18 @@ export const undoRedoComponent = (options: ResolvedDocOptions): PayloadComponent
 })
 
 /**
- * Add the undo/redo controls to a collection's edit view by appending to
- * `admin.components.edit.beforeDocumentControls`, preserving any components
- * the config already declares.
+ * Append the controls to an entity's `admin.components.edit.beforeDocumentControls`,
+ * preserving any components the config already declares. Collections and globals
+ * share that slot.
  *
- * A `null` options object means undo/redo is off for this collection, and
+ * A `null` options object means undo/redo is off for this entity, and
  * `autoMount: false` means the host mounts the controls itself; both return the
  * config untouched.
  */
-export const withUndoRedo = (
-	config: CollectionConfig,
+const withControls = <T extends CollectionConfig | GlobalConfig>(
+	config: T,
 	options: ResolvedDocOptions | null
-): CollectionConfig => {
+): T => {
 	if (!options?.autoMount) return config
 	const admin = config.admin ?? {}
 	const components = admin.components ?? {}
@@ -53,33 +53,14 @@ export const withUndoRedo = (
 	}
 }
 
-/**
- * Global variant: globals declare the same slot under
- * `admin.components.elements.beforeDocumentControls` (see
- * @payloadcms/next renderDocumentSlots).
- */
+/** Add the undo/redo controls to a collection's edit view. */
+export const withUndoRedo = (
+	config: CollectionConfig,
+	options: ResolvedDocOptions | null
+): CollectionConfig => withControls(config, options)
+
+/** Add the undo/redo controls to a global's edit view. */
 export const withUndoRedoGlobal = (
 	config: GlobalConfig,
 	options: ResolvedDocOptions | null
-): GlobalConfig => {
-	if (!options?.autoMount) return config
-	const admin = config.admin ?? {}
-	const components = admin.components ?? {}
-	const elements = components.elements ?? {}
-	return {
-		...config,
-		admin: {
-			...admin,
-			components: {
-				...components,
-				elements: {
-					...elements,
-					beforeDocumentControls: [
-						...(elements.beforeDocumentControls ?? []),
-						undoRedoComponent(options),
-					],
-				},
-			},
-		},
-	}
-}
+): GlobalConfig => withControls(config, options)

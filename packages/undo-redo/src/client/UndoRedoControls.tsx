@@ -25,56 +25,52 @@ const useIsMac = (): boolean => {
 	return isMac
 }
 
-const UndoIcon: React.FC = () => (
+/**
+ * Lucide's undo, redo and history glyphs at the scale of Payload's own icon
+ * buttons: Lucide `size={16}` with `absoluteStrokeWidth` and a 1px stroke, which
+ * puts a 12px glyph drawn in 1px lines inside the button, like the document
+ * menu's icon next to it.
+ */
+const ICON_SIZE = 16
+const ICON_STROKE = (24 / ICON_SIZE) * 1
+
+const LucideIcon: React.FC<{ children: React.ReactNode; name: string }> = ({ children, name }) => (
 	<svg
-		width="18"
-		height="18"
-		viewBox="0 0 24 24"
+		aria-hidden="true"
+		className={`icon icon--${name}`}
 		fill="none"
+		height={ICON_SIZE}
 		stroke="currentColor"
-		strokeWidth="2"
 		strokeLinecap="round"
 		strokeLinejoin="round"
-		aria-hidden="true"
+		strokeWidth={ICON_STROKE}
+		viewBox="0 0 24 24"
+		width={ICON_SIZE}
 	>
+		{children}
+	</svg>
+)
+
+const UndoIcon: React.FC = () => (
+	<LucideIcon name="undo">
 		<path d="M3 7v6h6" />
 		<path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13" />
-	</svg>
+	</LucideIcon>
 )
 
 const RedoIcon: React.FC = () => (
-	<svg
-		width="18"
-		height="18"
-		viewBox="0 0 24 24"
-		fill="none"
-		stroke="currentColor"
-		strokeWidth="2"
-		strokeLinecap="round"
-		strokeLinejoin="round"
-		aria-hidden="true"
-	>
+	<LucideIcon name="redo">
 		<path d="M21 7v6h-6" />
-		<path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3L21 13" />
-	</svg>
+		<path d="M3 17a9 9 0 0 1 9-9 9 9 0 0 1 6 2.3l3 2.7" />
+	</LucideIcon>
 )
 
 const HistoryIcon: React.FC = () => (
-	<svg
-		width="18"
-		height="18"
-		viewBox="0 0 24 24"
-		fill="none"
-		stroke="currentColor"
-		strokeWidth="2"
-		strokeLinecap="round"
-		strokeLinejoin="round"
-		aria-hidden="true"
-	>
-		<path d="M3 12a9 9 0 1 0 3-6.7L3 8" />
+	<LucideIcon name="history">
+		<path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
 		<path d="M3 3v5h5" />
-		<path d="M12 7v5l3 2" />
-	</svg>
+		<path d="M12 7v5l4 2" />
+	</LucideIcon>
 )
 
 /**
@@ -134,48 +130,40 @@ export const UndoRedoControls: React.FC<UndoRedoControlsProps> = (props) => {
 	return (
 		<div className={baseClass}>
 			<Button
-				buttonStyle="subtle"
+				aria-label={labels.undo}
+				buttonStyle="ghost"
 				className={`${baseClass}__button ${baseClass}__undo`}
 				disabled={!canUndo || processing}
-				// Button's own `aria-label` prop is also written to `title`, and the
-				// native title tooltip then covers Payload's. Going through
-				// `extraButtonProps`, which is spread last, sets the accessible name
-				// without the title.
-				extraButtonProps={{ 'aria-label': labels.undo }}
+				icon={<UndoIcon />}
 				margin={false}
 				onClick={undo}
+				size="medium"
 				tooltip={labels.undoTooltip}
-			>
-				<UndoIcon />
-			</Button>
+			/>
 			<Button
-				buttonStyle="subtle"
+				aria-label={labels.redo}
+				buttonStyle="ghost"
 				className={`${baseClass}__button ${baseClass}__redo`}
 				disabled={!canRedo || processing}
-				extraButtonProps={{ 'aria-label': labels.redo }}
+				icon={<RedoIcon />}
 				margin={false}
 				onClick={redo}
+				size="medium"
 				tooltip={labels.redoTooltip}
-			>
-				<RedoIcon />
-			</Button>
+			/>
 			{debug ? (
 				<Button
-					buttonStyle="subtle"
-					className={[
-						`${baseClass}__button`,
-						`${baseClass}__debug`,
-						overlayOpen ? `${baseClass}__button--active` : '',
-					]
-						.filter(Boolean)
-						.join(' ')}
-					extraButtonProps={{ 'aria-expanded': overlayOpen, 'aria-label': t(keys.debug) }}
+					aria-expanded={overlayOpen}
+					aria-label={t(keys.debug)}
+					buttonStyle="ghost"
+					className={`${baseClass}__button ${baseClass}__debug`}
+					icon={<HistoryIcon />}
 					margin={false}
 					onClick={() => setOverlayOpen((open) => !open)}
+					selected={overlayOpen}
+					size="medium"
 					tooltip={t(keys.debugTooltip)}
-				>
-					<HistoryIcon />
-				</Button>
+				/>
 			) : null}
 			{debug && overlayOpen ? (
 				<HistoryDebugOverlay
