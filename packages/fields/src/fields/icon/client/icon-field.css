@@ -179,8 +179,9 @@
 	display: flex;
 	flex-direction: column;
 	min-height: 0;
-	padding: var(--spacer-2-5);
-	padding-bottom: 0;
+	/* No block padding: the rail's divider runs from the drawer header to the footer, so the
+	   top inset lives on the rail and the main column instead. */
+	padding: 0 var(--spacer-2-5);
 	/* Cell geometry in one place. The cell box is a fixed square that must equal CELL_SIZE in
 	   IconDrawerContent (it drives the column count and the virtualizer row height); the outlined
 	   button is smaller and centered, so cell-inset is the gap from each cell-box edge to the
@@ -240,6 +241,7 @@
 	flex-grow: 1;
 	min-width: 0;
 	min-height: 0;
+	padding-block-start: var(--spacer-2-5);
 	--tenx-icon-aligned-width: calc(var(--tenx-icon-grid-width) - 2 * var(--tenx-icon-cell-inset));
 }
 
@@ -309,8 +311,9 @@
 	min-height: 0;
 }
 
-/* Category rail, styled after the admin nav: plain rows, secondary hover, selected fill. */
+/* Category rail: a column of category buttons with a divider down to the footer. */
 .tenx-icon-drawer__rail {
+	padding-block-start: var(--spacer-2-5);
 	display: flex;
 	flex-direction: column;
 	flex-shrink: 0;
