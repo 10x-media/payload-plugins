@@ -21,13 +21,15 @@ concurrency:
 
 env:
   PAYLOAD_SKIP_AUTOGEN: '1'
-  NODE_VERSION: '22'
+  NODE_VERSION: '24'
 
 # Build and deploy are separate jobs so a failed Pages deployment can be
 # retried with "re-run failed jobs": rerunning a combined job uploads a second
 # github-pages artifact into the same run, which deploy-pages rejects.
 jobs:
   build:
+    # The site documents the Payload 3 line on main. A dispatch from v4 must not replace it.
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

@@ -1,8 +1,10 @@
 name: CI
 
 on:
+  # Not on pushes to v4: plugins move to Payload 4 one at a time, so a push-wide run stays red
+  # until all are ported. Pull requests into v4 still run, scoped to what they affect.
   push:
-    branches: [main, v4]
+    branches: [main]
   pull_request:
     branches: [main, v4]
   workflow_dispatch:
@@ -15,7 +17,7 @@ env:
   PAYLOAD_SKIP_AUTOGEN: '1'
   # Primary Node version for single-version jobs. The test matrix below pins the
   # versions to forward-test. Bump both together when moving to the next LTS.
-  NODE_VERSION: '22'
+  NODE_VERSION: '24'
   # The commit each job's affected scope diffs HEAD against: a pull request's base, a
   # push's previous tip, and empty for anything else (workflow_dispatch), which
   # scripts/ci-affected.sh turns into a whole-workspace run. Resolved once here because a
@@ -126,9 +128,9 @@ jobs:
     timeout-minutes: 30
     strategy:
       matrix:
-        # Current and next Node LTS. Floor is 22.18 (native .ts config support,
-        # see engines); 24 is forward-coverage for the next LTS.
-        node: [22, 24]
+        # Current and next Node LTS. Floor is 24.22.1 (Payload 4's engines);
+        # 26 is forward-coverage for the next LTS.
+        node: [24, 26]
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 0 }
