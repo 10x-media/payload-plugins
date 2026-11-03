@@ -1,12 +1,10 @@
+import { LLMInstructionsMenuItem as LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { ConsentRetentionNotice as ConsentRetentionNotice_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { RuleDescription as RuleDescription_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FieldNameSelect as FieldNameSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FormConditionField as FormConditionField_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FieldBlockLabel as FieldBlockLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { CalcExpressionBuilder as CalcExpressionBuilder_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
-import { EndpointOptionsSelect as EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
-import { ConsentBlockLabel as ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
-import { ByteSizeField as ByteSizeField_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { LexicalDiffComponent as LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -34,23 +32,33 @@ import { FieldCountCell as FieldCountCell_bf8585411c882b493b730d03575f3f2f } fro
 import { FlowStepsCell as FlowStepsCell_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FlowBuilder as FlowBuilder_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { ClosePollButton as ClosePollButton_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
+import { EndpointOptionsSelect as EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { RecipientsSelect as RecipientsSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { SubmissionAnswers as SubmissionAnswers_1bd79870ef6e5eeafe3661c2cad4b1f5 } from '@10x-media/form-builder/rsc'
+import { LLMInstructionsDescription as LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { FixedToolbarFeatureClient as FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { LLMInstructionsCell as LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { ConsentSourceRowLabel as ConsentSourceRowLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { CondensedArray as CondensedArray_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
-import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+import { WelcomeWidget as WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { CollectionCards as CollectionCards_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { CollectionQueryWidget as CollectionQueryWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { QueryPresetsWhereField as QueryPresetsWhereField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { CollectionQuerySortField as CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { ActivityWidget as ActivityWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { CollectionFilter as CollectionFilter_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { UploadDropzoneWidget as UploadDropzoneWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { UploadDropzoneCollectionsField as UploadDropzoneCollectionsField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "@payloadcms/ui#LLMInstructionsMenuItem": LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de,
   "@10x-media/form-builder/client#ConsentRetentionNotice": ConsentRetentionNotice_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#RuleDescription": RuleDescription_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FieldNameSelect": FieldNameSelect_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FormConditionField": FormConditionField_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FieldBlockLabel": FieldBlockLabel_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#CalcExpressionBuilder": CalcExpressionBuilder_bf8585411c882b493b730d03575f3f2f,
-  "@10x-media/form-builder/client#EndpointOptionsSelect": EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f,
-  "@10x-media/form-builder/client#ConsentBlockLabel": ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f,
-  "@10x-media/form-builder/client#ByteSizeField": ByteSizeField_bf8585411c882b493b730d03575f3f2f,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -78,9 +86,21 @@ export const importMap = {
   "@10x-media/form-builder/client#FlowStepsCell": FlowStepsCell_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FlowBuilder": FlowBuilder_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#ClosePollButton": ClosePollButton_bf8585411c882b493b730d03575f3f2f,
+  "@10x-media/form-builder/client#EndpointOptionsSelect": EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#RecipientsSelect": RecipientsSelect_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/rsc#SubmissionAnswers": SubmissionAnswers_1bd79870ef6e5eeafe3661c2cad4b1f5,
+  "@payloadcms/ui#LLMInstructionsDescription": LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/richtext-lexical/client#FixedToolbarFeatureClient": FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/ui/rsc#LLMInstructionsCell": LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a,
   "@10x-media/form-builder/client#ConsentSourceRowLabel": ConsentSourceRowLabel_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#CondensedArray": CondensedArray_bf8585411c882b493b730d03575f3f2f,
-  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1
+  "@payloadcms/ui/rsc#WelcomeWidget": WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui/rsc#CollectionCards": CollectionCards_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui/rsc#CollectionQueryWidget": CollectionQueryWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui#QueryPresetsWhereField": QueryPresetsWhereField_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/ui#CollectionQuerySortField": CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/ui/rsc#ActivityWidget": ActivityWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui#CollectionFilter": CollectionFilter_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/ui/rsc#UploadDropzoneWidget": UploadDropzoneWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui#UploadDropzoneCollectionsField": UploadDropzoneCollectionsField_3817bf644402e67bfe6577f60ef982de
 }

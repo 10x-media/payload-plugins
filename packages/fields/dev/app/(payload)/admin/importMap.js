@@ -1,6 +1,7 @@
 import { ColorCell as ColorCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ColorFieldServer as ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ColorInputShowcase as ColorInputShowcase_6ffc54a163ba5ae3367ff84f3e67cc9a } from '../../../components/standaloneShowcase'
+import { LLMInstructionsMenuItem as LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { ProtectedCell as ProtectedCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ProtectedField as ProtectedField_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -41,26 +42,24 @@ import { PhoneShowcaseBeforeInput as PhoneShowcaseBeforeInput_c7aad2540de198ec05
 import { PhoneShowcaseLabel as PhoneShowcaseLabel_c7aad2540de198ec058d3310920738ea } from '../../../components/phoneShowcase'
 import { PhoneShowcaseDescription as PhoneShowcaseDescription_c7aad2540de198ec058d3310920738ea } from '../../../components/phoneShowcase'
 import { IconLibrarySelectServer as IconLibrarySelectServer_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
+import { LLMInstructionsDescription as LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { FixedToolbarFeatureClient as FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { LLMInstructionsCell as LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { MeasurementUnitsProvider as MeasurementUnitsProvider_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
-import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
-import { LucideAdapterIcon as LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
-import { LucideAdapterAssets as LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
-import { LucideAdapterNodes as LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
-import { RadixAdapterIcon as RadixAdapterIcon_623eadea8fd172c162e441429619d241 } from '@10x-media/fields/icon/adapters/radix'
-import { RadixAdapterAssets as RadixAdapterAssets_623eadea8fd172c162e441429619d241 } from '@10x-media/fields/icon/adapters/radix'
-import { RadixAdapterNodes as RadixAdapterNodes_623eadea8fd172c162e441429619d241 } from '@10x-media/fields/icon/adapters/radix'
-import { TablerAdapterIcon as TablerAdapterIcon_06944727e7d257f3bfff2c407b2bc913 } from '@10x-media/fields/icon/adapters/tabler'
-import { TablerAdapterAssets as TablerAdapterAssets_06944727e7d257f3bfff2c407b2bc913 } from '@10x-media/fields/icon/adapters/tabler'
-import { TablerAdapterNodes as TablerAdapterNodes_06944727e7d257f3bfff2c407b2bc913 } from '@10x-media/fields/icon/adapters/tabler'
-import { SocialAdapterIcon as SocialAdapterIcon_1d64e85d6e2d4c232079878ca5845e09 } from '../../../icon-adapters/social/client'
-import { SocialAdapterAssets as SocialAdapterAssets_1d64e85d6e2d4c232079878ca5845e09 } from '../../../icon-adapters/social/client'
-import { SocialAdapterNodes as SocialAdapterNodes_1d64e85d6e2d4c232079878ca5845e09 } from '../../../icon-adapters/social/client'
+import { WelcomeWidget as WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { CollectionCards as CollectionCards_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { CollectionQueryWidget as CollectionQueryWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { QueryPresetsWhereField as QueryPresetsWhereField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { CollectionQuerySortField as CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { ActivityWidget as ActivityWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { CollectionFilter as CollectionFilter_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
   "@10x-media/fields/rsc#ColorCell": ColorCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/rsc#ColorFieldServer": ColorFieldServer_cf1583332d9c5fb967cd4249af29ce12,
   "/components/standaloneShowcase#ColorInputShowcase": ColorInputShowcase_6ffc54a163ba5ae3367ff84f3e67cc9a,
+  "@payloadcms/ui#LLMInstructionsMenuItem": LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de,
   "@10x-media/fields/rsc#ProtectedCell": ProtectedCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/client#ProtectedField": ProtectedField_02043ee4f38853ef8c4ef9fd50352514,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -101,18 +100,15 @@ export const importMap = {
   "/components/phoneShowcase#PhoneShowcaseLabel": PhoneShowcaseLabel_c7aad2540de198ec058d3310920738ea,
   "/components/phoneShowcase#PhoneShowcaseDescription": PhoneShowcaseDescription_c7aad2540de198ec058d3310920738ea,
   "@10x-media/fields/rsc#IconLibrarySelectServer": IconLibrarySelectServer_cf1583332d9c5fb967cd4249af29ce12,
+  "@payloadcms/ui#LLMInstructionsDescription": LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/richtext-lexical/client#FixedToolbarFeatureClient": FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/ui/rsc#LLMInstructionsCell": LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a,
   "@10x-media/fields/client#MeasurementUnitsProvider": MeasurementUnitsProvider_02043ee4f38853ef8c4ef9fd50352514,
-  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
-  "@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon": LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087,
-  "@10x-media/fields/icon/adapters/lucide#LucideAdapterAssets": LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087,
-  "@10x-media/fields/icon/adapters/lucide#LucideAdapterNodes": LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087,
-  "@10x-media/fields/icon/adapters/radix#RadixAdapterIcon": RadixAdapterIcon_623eadea8fd172c162e441429619d241,
-  "@10x-media/fields/icon/adapters/radix#RadixAdapterAssets": RadixAdapterAssets_623eadea8fd172c162e441429619d241,
-  "@10x-media/fields/icon/adapters/radix#RadixAdapterNodes": RadixAdapterNodes_623eadea8fd172c162e441429619d241,
-  "@10x-media/fields/icon/adapters/tabler#TablerAdapterIcon": TablerAdapterIcon_06944727e7d257f3bfff2c407b2bc913,
-  "@10x-media/fields/icon/adapters/tabler#TablerAdapterAssets": TablerAdapterAssets_06944727e7d257f3bfff2c407b2bc913,
-  "@10x-media/fields/icon/adapters/tabler#TablerAdapterNodes": TablerAdapterNodes_06944727e7d257f3bfff2c407b2bc913,
-  "/icon-adapters/social/client#SocialAdapterIcon": SocialAdapterIcon_1d64e85d6e2d4c232079878ca5845e09,
-  "/icon-adapters/social/client#SocialAdapterAssets": SocialAdapterAssets_1d64e85d6e2d4c232079878ca5845e09,
-  "/icon-adapters/social/client#SocialAdapterNodes": SocialAdapterNodes_1d64e85d6e2d4c232079878ca5845e09
+  "@payloadcms/ui/rsc#WelcomeWidget": WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui/rsc#CollectionCards": CollectionCards_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui/rsc#CollectionQueryWidget": CollectionQueryWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui#QueryPresetsWhereField": QueryPresetsWhereField_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/ui#CollectionQuerySortField": CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/ui/rsc#ActivityWidget": ActivityWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui#CollectionFilter": CollectionFilter_3817bf644402e67bfe6577f60ef982de
 }

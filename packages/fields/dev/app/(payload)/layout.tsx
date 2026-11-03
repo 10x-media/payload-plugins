@@ -2,11 +2,17 @@
 /* DO NOT MODIFY IT BECAUSE IT COULD BE REWRITTEN AT ANY TIME. */
 import config from '@payload-config'
 import '@payloadcms/next/css'
-import { handleServerFunctions, RootLayout } from '@payloadcms/next/layouts'
+import {
+	generatePayloadViewport,
+	handleServerFunctions,
+	RootLayout,
+} from '@payloadcms/next/layouts'
 import type { ServerFunctionClient } from 'payload'
 import type React from 'react'
 
 import { importMap } from './admin/importMap.js'
+
+export const generateViewport = generatePayloadViewport
 
 type Args = {
 	children: React.ReactNode
