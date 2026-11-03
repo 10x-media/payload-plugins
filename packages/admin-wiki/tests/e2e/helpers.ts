@@ -130,6 +130,13 @@ export const pickerReady = async (page: Page): Promise<void> => {
 const fieldId = (path: string): string => `#field-${path.replace(/\./g, '__')}`
 
 /**
+ * A field's id inside the picker. Inside a drawer Payload suffixes some field
+ * ids with the edit depth (the picker sits one level below the guide) and not
+ * others, so the selector takes either.
+ */
+export const pickerFieldId = (path: string): string => `:is(${fieldId(path)}, ${fieldId(path)}-2)`
+
+/**
  * The row holding one field's control and, after it, the description slot the
  * plugin renders into. Payload puts the field id on the control itself, so the
  * slot is a sibling of it rather than a descendant, and the nearest wrap above
@@ -142,7 +149,7 @@ export const fieldWrap = (page: Page, path: string): Locator => wrapOf(page.loca
 
 /** The select plate on one field, addressed by its path inside the picked form. */
 export const plate = (page: Page, path: string): Locator =>
-	wrapOf(picker(page).locator(fieldId(path))).locator('.wiki-field-pick')
+	wrapOf(picker(page).locator(pickerFieldId(path))).locator('.wiki-field-pick')
 
 /**
  * Click one field's select plate.
@@ -179,9 +186,12 @@ export const chooseEntity = async (page: Page, label: string): Promise<void> => 
 	await page.locator('.rs__option', { hasText: label }).click()
 }
 
-/** The nested block grid, which the block picker opens on its own when empty. */
+/**
+ * The nested block grid, which the block picker opens on its own when empty.
+ * A click only selects a block there; a double click inserts it.
+ */
 export const chooseBlock = async (page: Page, label: string): Promise<void> => {
-	await page.locator('.blocks-drawer__block', { hasText: label }).click()
+	await page.locator('.blocks-drawer__block', { hasText: label }).dblclick()
 }
 
 export const applyPicker = async (page: Page): Promise<void> => {

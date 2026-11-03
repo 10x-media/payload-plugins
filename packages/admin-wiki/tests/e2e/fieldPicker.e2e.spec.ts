@@ -17,6 +17,7 @@ import {
 	PAGES,
 	pathsOfGroup,
 	picker,
+	pickerFieldId,
 	pickerReady,
 	pickerSelect,
 	pickField,
@@ -171,8 +172,9 @@ test.describe('field target picker', () => {
 		// `slug` is the collection's one sidebar field. It belongs in the sidebar
 		// column here exactly as it does on the document, and it is a target like
 		// any other once it is there.
-		await expect(picker(page).locator('.document-fields__sidebar #field-slug')).toBeVisible()
-		await expect(picker(page).locator('.document-fields__main #field-slug')).toHaveCount(0)
+		const slug = pickerFieldId('slug')
+		await expect(picker(page).locator(`.document-fields__sidebar ${slug}`)).toBeVisible()
+		await expect(picker(page).locator(`.document-fields__main ${slug}`)).toHaveCount(0)
 
 		await pickField(page, 'slug')
 		await applyPicker(page)
