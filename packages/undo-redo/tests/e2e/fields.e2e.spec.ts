@@ -206,7 +206,9 @@ test.describe('field coverage', () => {
 		await openTab(page, 'Blocks')
 
 		await field(page, 'layout').locator('.blocks-field__drawer-toggler').click()
+		// Payload 4's drawer selects on click and adds on "Insert" (or a double-click).
 		await page.locator('.blocks-drawer__block', { hasText: 'Hero' }).first().click()
+		await page.getByRole('button', { name: 'Insert', exact: true }).click()
 		await expect(blockRows(page, 'layout')).toHaveCount(1)
 		await waitForEntries(page, 2)
 

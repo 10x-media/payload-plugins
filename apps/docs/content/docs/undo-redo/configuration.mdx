@@ -163,13 +163,12 @@ Each call to `useUndoRedo` creates its own history. Two of them on the same form
 
 ## Styling
 
-The controls carry stable class names and size themselves from one custom property, so matching another toolbar takes one rule:
+The controls are Payload's own ghost icon buttons, the same as the document menu next to them, so they follow the admin theme with no styles of their own. They carry stable class names for anything a host wants to change:
 
 ```css
 .undo-redo-controls {
-  --undo-redo-control-size: calc(var(--base) * 2);
-  --undo-redo-icon-size: calc(var(--base) * 1);
+  gap: var(--spacer-2);
 }
 ```
 
-The root is `.undo-redo-controls`; each button is `.undo-redo-controls__button` plus one of `__undo`, `__redo`, `__debug`; the open debug button also carries `--active`.
+The root is `.undo-redo-controls`; each button is `.undo-redo-controls__button` plus one of `__undo`, `__redo`, `__debug`, and the open debug button carries Payload's `btn--selected`.

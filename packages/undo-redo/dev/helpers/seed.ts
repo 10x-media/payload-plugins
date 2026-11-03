@@ -12,25 +12,27 @@ const TAG_NAMES = ['alpha', 'beta', 'gamma']
  * Idempotent.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ overrideAccess: true, collection: 'users' })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const tagCount = await payload.count({ collection: 'tags' })
+	const tagCount = await payload.count({ overrideAccess: true, collection: 'tags' })
 	if (tagCount.totalDocs === 0) {
 		for (const name of TAG_NAMES) {
-			await payload.create({ collection: 'tags', data: { name } })
+			await payload.create({ overrideAccess: true, collection: 'tags', data: { name } })
 		}
 	}
 
-	const postCount = await payload.count({ collection: 'posts' })
+	const postCount = await payload.count({ overrideAccess: true, collection: 'posts' })
 	if (postCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'posts',
 			data: {
 				title: 'Undo/redo playground',
@@ -53,9 +55,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 	}
 
-	const nestingCount = await payload.count({ collection: 'nesting' })
+	const nestingCount = await payload.count({ overrideAccess: true, collection: 'nesting' })
 	if (nestingCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'nesting',
 			data: {
 				label: 'Nesting playground',
@@ -75,9 +78,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 	}
 
-	const localizedCount = await payload.count({ collection: 'localized-docs' })
+	const localizedCount = await payload.count({ overrideAccess: true, collection: 'localized-docs' })
 	if (localizedCount.totalDocs === 0) {
 		const doc = await payload.create({
+			overrideAccess: true,
 			collection: 'localized-docs',
 			locale: 'en',
 			data: {
@@ -89,6 +93,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			},
 		})
 		await payload.update({
+			overrideAccess: true,
 			collection: 'localized-docs',
 			id: doc.id,
 			locale: 'de',

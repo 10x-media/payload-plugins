@@ -18,7 +18,8 @@ declare module 'payload' {
  */
 export const undoRedo = definePlugin<UndoRedoPluginOptions>({
 	slug: '@10x-media/undo-redo',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	// Payload passes `options` as undefined when the plugin is registered without any.
+	plugin: ({ config, options = {} }): Config => {
 		if (options.disabled === true) {
 			return config
 		}
