@@ -19,7 +19,7 @@ Values are encrypted with AES-256-GCM before they reach the database and decrypt
 
 ## Supported field types
 
-`text`, `textarea`, `email`, `number`, `checkbox`, `date`, `select` and `radio` (including `hasMany`), `code`, `json`, `point`, and `richText` (Lexical). Values round-trip through JSON before encryption, so numbers stay numbers and dates stay dates in your API responses, and generated TypeScript types keep their real shapes via an emitted `typescriptSchema`.
+`text`, `textarea`, `email`, `number`, `checkbox`, `date`, `select` and `radio` (including `hasMany`), `code`, `json`, `point`, and `richText` (Lexical). Values round-trip through JSON before encryption, so numbers stay numbers and dates stay dates in your API responses, and generated TypeScript types keep their real shapes via an emitted `jsonSchema`.
 
 Some types trade queryability for confidentiality (encrypted `point` loses geo queries, encrypted `richText` loses sub-field queries); read [Limitations](/fields/encrypted/limitations) before choosing what to encrypt, and [Design rationale](/fields/encrypted/design-rationale) for when not to encrypt at all.
 

@@ -3,13 +3,15 @@
 # @10x-media/fields
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/fields` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/fields` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/fields).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/fields@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/fields) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
-Reusable fields for Payload v3 that look and behave native: a full color picker in a constant-height row, a searchable icon picker over pluggable icon libraries, encrypted fields with key rotation and opt-in exact-match querying, and a unit-aware measurement field. Built from `@payloadcms/ui` primitives on Payload design tokens, indistinguishable from Payload's own fields.
+Reusable fields for Payload that look and behave native: a full color picker in a constant-height row, a searchable icon picker over pluggable icon libraries, encrypted fields with key rotation and opt-in exact-match querying, and a unit-aware measurement field. Built from `@payloadcms/ui` primitives on Payload design tokens, indistinguishable from Payload's own fields.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/fields?style=flat-square)](https://www.npmjs.com/package/@10x-media/fields)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 ## Features
 
@@ -17,7 +19,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **Icon field**: drawer browser with search, category rail, and keyboard navigation; Lucide, Radix, and Tabler adapters first-party; `defineIconAdapter()` plus codegen for any other library; per-icon lazy loading so no icon dataset ever enters an eager bundle; client and RSC frontend renderers; library-supplied labels for sets keyed by code; and layered libraries composing a package with a Payload upload collection editors can add to, each layer declaring its own render strategy and caching.
 - **Encrypted fields**: AES-256-GCM with authenticated field binding, for twelve field types including `richText` and `point`; zero-config keys derived from `PAYLOAD_SECRET` or explicit multi-key config with async providers and online rotation; opt-in blind-index querying (`equals`/`in`/`unique`); masked admin UX with reveal toggle.
 - **Measurement field**: a plain `number` column storing one canonical unit while each viewer edits and reads in their own preferred unit; eight ready-made presets (body weight, height, distance, mass, length, volume, temperature, speed) or free-form `storageUnit`/`units`/`preferenceKey` for anything else, plus serializable custom units and dimensions; per-bucket preference follows the viewer across devices, falls back through field and plugin defaults to browser-locale detection, then metric; compound entry for feet-and-inches and stone-and-pounds; zero-migration adoption on existing numeric columns.
-- **Native by construction**: 40px rows, Payload tokens, full `admin` prop contract, typed translations, function-form `overrides` on every factory.
+- **Native by construction**: native-height rows, Payload tokens, full `admin` prop contract, typed translations, function-form `overrides` on every factory.
 - **Isolated bundles**: each family behind its own subpath export, isolation asserted on the built output in CI.
 - **Plugin optional**: every factory works standalone; the `fields()` plugin adds app-wide defaults that per-field options override.
 

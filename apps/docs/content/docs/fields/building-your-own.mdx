@@ -33,8 +33,8 @@ admin: {
 
 - Build from `@payloadcms/ui` primitives: `useField`, `FieldLabel`, `FieldError`, `FieldDescription` rendered through `RenderCustomComponent` so server-provided overrides win.
 - Reproduce the native wrapper structure: outer `div` with `fieldBaseClass`, your `field-type <name>` class, `.error` and `.read-only` state classes; inner `field-type__wrap`.
-- Input rows are exactly 40px. If your UI needs more room, put it in a popover or drawer; the row never grows.
-- Style with Payload tokens only: `--theme-elevation-*`, `--theme-error-*`, `--theme-input-bg`, `--style-radius-*`, `--base`. Dark mode then works for free. No `!important`, no z-index beyond Payload's scale.
+- Input rows are exactly as tall as a native input (`--field-min-height-large`). If your UI needs more room, put it in a popover or drawer; the row never grows.
+- Style with Payload tokens only: the `--field-*` family for input chrome (or Payload's own `form-input` and `form-input-group` classes), `--color-*` for everything else, `--radius-*` and `--spacer-*` for shape and spacing. Dark mode then works for free. No `!important`, no z-index beyond Payload's scale.
 - Respect the standard admin props by default: `description`, `placeholder`, `className`, `readOnly`, `condition`, `width` (via `mergeFieldStyles`), `beforeInput`/`afterInput`, RTL. Combine `readOnly || disabled` at the leaf like native fields do.
 
 ## Overrides: function and spread, never deepMerge

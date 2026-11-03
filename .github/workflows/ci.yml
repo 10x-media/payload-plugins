@@ -207,7 +207,7 @@ jobs:
     env:
       E2E_DATABASES: '{"analytics": ["mongo", "postgres", "sqlite"]}'
       # Plugins ported to Payload 4 run their suite on both frameworks; the rest stay on Next only.
-      E2E_FRAMEWORKS: '{"undo-redo": ["next", "tanstack"]}'
+      E2E_FRAMEWORKS: '{"fields": ["next", "tanstack"], "undo-redo": ["next", "tanstack"]}'
     outputs:
       plugins: ${{ steps.plugins.outputs.plugins }}
       legs: ${{ steps.plugins.outputs.legs }}
