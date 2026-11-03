@@ -32,7 +32,11 @@ describe('bootPayload [db=sqlite]', () => {
 	})
 
 	it('lets a second instance attached to the same file read and write it', async () => {
-		const created = await booted.payload.create({ collection: 'notes', data: { title: 'first' } })
+		const created = await booted.payload.create({
+			collection: 'notes',
+			overrideAccess: true,
+			data: { title: 'first' },
+		})
 		const attached = await bootPayload({
 			plugin: passthroughPlugin,
 			db: 'sqlite',
@@ -41,16 +45,28 @@ describe('bootPayload [db=sqlite]', () => {
 		})
 		try {
 			expect(attached.connectionString).toBe(booted.connectionString)
-			const found = await attached.payload.findByID({ collection: 'notes', id: created.id })
+			const found = await attached.payload.findByID({
+				collection: 'notes',
+				overrideAccess: true,
+				id: created.id,
+			})
 			expect(found.title).toBe('first')
-			await attached.payload.create({ collection: 'notes', data: { title: 'second' } })
-			expect((await booted.payload.count({ collection: 'notes' })).totalDocs).toBe(2)
+			await attached.payload.create({
+				collection: 'notes',
+				overrideAccess: true,
+				data: { title: 'second' },
+			})
+			expect(
+				(await booted.payload.count({ collection: 'notes', overrideAccess: true })).totalDocs
+			).toBe(2)
 		} finally {
 			await attached.stop()
 		}
 		// Stopping the attached instance leaves the owner's file in place.
 		expect(existsSync(fileOf(booted))).toBe(true)
-		expect((await booted.payload.count({ collection: 'notes' })).totalDocs).toBe(2)
+		expect(
+			(await booted.payload.count({ collection: 'notes', overrideAccess: true })).totalDocs
+		).toBe(2)
 	})
 
 	it('refuses to attach a boot to another kind of database', async () => {
