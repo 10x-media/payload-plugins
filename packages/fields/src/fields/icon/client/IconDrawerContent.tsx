@@ -1,6 +1,6 @@
 'use client'
 
-import { ReactSelect, SearchIcon } from '@payloadcms/ui'
+import { Button, ReactSelect, SearchIcon } from '@payloadcms/ui'
 import { useVirtualizer } from '@tanstack/react-virtual'
 import type React from 'react'
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
@@ -209,18 +209,16 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 			<div className="tenx-icon-drawer__body">
 				<nav aria-label={t(keys.iconCategories)} className="tenx-icon-drawer__rail">
 					{railItems.map((item) => (
-						<button
-							className={
-								category === item.key
-									? 'tenx-icon-drawer__rail-item tenx-icon-drawer__rail-item--active'
-									: 'tenx-icon-drawer__rail-item'
-							}
+						<Button
+							aria-pressed={category === item.key}
+							buttonStyle={category === item.key ? 'pill' : 'ghost'}
+							className="tenx-icon-drawer__rail-item"
 							key={item.key}
+							margin={false}
 							onClick={() => setCategory(item.key)}
-							type="button"
 						>
 							{item.label}
-						</button>
+						</Button>
 					))}
 				</nav>
 				<div className="tenx-icon-drawer__main" style={mainStyle}>

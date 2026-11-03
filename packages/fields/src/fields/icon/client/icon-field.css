@@ -321,34 +321,11 @@
 	border-inline-end: var(--stroke-width-small) solid var(--color-border);
 }
 
+/* Payload Buttons: ghost, pill for the active category. Layout only here: full-width rows with
+   the label at the start; category keys come lowercase from the libraries, hence capitalize. */
 .tenx-icon-drawer__rail-item {
-	padding: var(--spacer-1-5) var(--spacer-2);
-	background: transparent;
-	border: none;
-	border-radius: var(--button-radius);
-	color: var(--color-text);
-	font-family: inherit;
-	font-size: var(--text-body-medium-font-size);
-	font-weight: var(--text-body-medium-font-weight);
-	line-height: var(--text-body-medium-line-height);
-	text-align: start;
+	justify-content: flex-start;
 	text-transform: capitalize;
-	cursor: pointer;
-}
-
-.tenx-icon-drawer__rail-item:hover {
-	background: var(--color-bg-secondary);
-}
-
-.tenx-icon-drawer__rail-item:focus-visible {
-	outline: var(--accessibility-outline);
-	outline-offset: var(--accessibility-outline-inset);
-}
-
-.tenx-icon-drawer__rail-item--active,
-.tenx-icon-drawer__rail-item--active:hover {
-	background: var(--color-bg-selected);
-	font-weight: var(--text-body-medium-bold-font-weight);
 }
 
 .tenx-icon-drawer__grid {

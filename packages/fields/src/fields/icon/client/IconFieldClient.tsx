@@ -12,6 +12,7 @@ import {
 	useEditDepth,
 	useField,
 	useModal,
+	WarningIcon,
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
 import type { TextFieldClientProps } from 'payload'
@@ -34,14 +35,6 @@ const PlaceholderGlyph: React.FC = () => (
 		<rect height="6" rx="1.5" width="6" x="11" y="3" />
 		<rect height="6" rx="1.5" width="6" x="3" y="11" />
 		<rect height="6" rx="1.5" width="6" x="11" y="11" />
-	</svg>
-)
-
-const WarningIcon: React.FC = () => (
-	<svg aria-hidden="true" fill="none" height={16} viewBox="0 0 16 16" width={16}>
-		<path d="M8 1.75 15 14H1z" stroke="currentColor" strokeLinejoin="round" strokeWidth="1.4" />
-		<path d="M8 6.25v3.5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.4" />
-		<circle cx="8" cy="11.75" fill="currentColor" r="0.85" />
 	</svg>
 )
 
@@ -234,7 +227,7 @@ export const IconField: React.FC<IconFieldClientProps> = (props) => {
 					)}
 					{isUnavailable ? (
 						<span className="tenx-icon-field__marker" title={t(keys.iconUnavailable)}>
-							<WarningIcon />
+							<WarningIcon size={16} />
 							<span className="tenx-icon-field__sr-only">{t(keys.iconUnavailable)}</span>
 						</span>
 					) : null}
