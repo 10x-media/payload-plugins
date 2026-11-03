@@ -95,6 +95,8 @@ A per-item lazy-imported component is right for a production frontend (a page sh
 
 Guarantee grid alignment structurally: fixed square cells (fixed px, `flex: 0 0 <size>`, `justify-content: flex-start`) whose height equals the virtualizer's `estimateSize`, so full and partial rows tile at identical column positions. In-flow labels of variable height break this; put the label on hover (Payload `Tooltip`) instead. Align a header/search/banner to the visible grid edge by deriving its width from the cell geometry (`columns * cellSize - 2 * cellInset`), not the raw container width, since the outlined button is inset within its cell box.
 
+Payload 4 drawers are much narrower: `.drawer__content` is `width: clamp(600px, 40vw, 1080px)` (about 770px on a 1920px screen), where Payload 3 sized them in JS to nearly the full viewport less a gutter. When porting a drawer, decide whether its layout was meant for the full width. A picker that only lists items (the icon drawer) reads fine at the native width; one built around wide content (tables, side-by-side editors, previews) may need its own width on the drawer's content class, set deliberately rather than inherited. Keep the native width unless the content needs more.
+
 Payload `Drawer`, like `Popup`, portals its content. On Payload 4 the drawer grows with its content (`min-height: 100%` inside a scrolling modal container) and has no Gutter: bound it (`.my-drawer-modal.drawer { height: 100% }`) and size the body with a `min-height: 0` flex chain, or a virtualized grid renders every row with no scroller.
 
 ## Verification step (before declaring a field done)
