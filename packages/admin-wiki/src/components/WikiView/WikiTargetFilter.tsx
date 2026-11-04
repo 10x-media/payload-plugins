@@ -116,6 +116,7 @@ export const WikiTargetFilter = ({ onToggle, options, selected }: WikiTargetFilt
 					{t(keys.wikiFilterLabel)}
 				</Button>
 			)}
+			theme="auto"
 			verticalAlign="bottom"
 		/>
 	)
