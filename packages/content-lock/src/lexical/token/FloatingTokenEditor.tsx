@@ -86,6 +86,13 @@ const TokenPanel = ({
 	const isEditable = useLexicalEditable()
 	const { problem } = useTokenPreview(data)
 	const KindIcon = tokenIcons[data.token]
+	// In the strip, after a divider, as the link editor shows its URL: why the value is empty.
+	const problemNote = problem ? (
+		<>
+			<span aria-hidden className={`${baseClass}__divider`} />
+			<span className={`${baseClass}__problem`}>{t(problem)}</span>
+		</>
+	) : null
 
 	return (
 		<div className={`${baseClass}__content`}>
@@ -123,6 +130,7 @@ const TokenPanel = ({
 							/>
 						</div>
 					)}
+					{problemNote}
 					<Button
 						aria-label={t(keys.tokenRemove)}
 						buttonStyle="ghost"
@@ -133,8 +141,9 @@ const TokenPanel = ({
 						size="medium"
 					/>
 				</>
-			) : null}
-			{problem ? <p className={`${baseClass}__problem`}>{t(problem)}</p> : null}
+			) : (
+				problemNote
+			)}
 		</div>
 	)
 }
@@ -238,8 +247,8 @@ const TokenEditor = ({ anchorElem }: { anchorElem: HTMLElement }) => {
 /**
  * The panel that appears while a token is selected, modelled on the stock link
  * editor: which value the token is (switching kinds is a matter of inserting
- * another), a dropdown for how a date is formatted, one for how a
- * date is formatted, the date itself when it is fixed, and remove.
+ * another), a dropdown for how a date is formatted, the date itself when it
+ * is fixed, and remove.
  */
 export const FloatingTokenEditorPlugin: PluginComponentWithAnchor<ContentLockTokenClientProps> = ({
 	anchorElem = document.body,

@@ -101,4 +101,43 @@ describeForDb('content-lock with localization', {}, (db) => {
 		})
 		expect(await lockedFresh()).toBe(true)
 	})
+
+	it('publishes every locale even when the caller asks for one', async () => {
+		const window = await payload().create({
+			collection: LOCKS,
+			data: { title: 'Upgrade' },
+			draft: true,
+			overrideAccess: true,
+		})
+		await payload().update({
+			collection: LOCKS,
+			data: { _status: 'published' },
+			id: window.id,
+			locale: 'de',
+			overrideAccess: true,
+			publishAllLocales: false,
+		})
+		expect(await statusInAllLocales(window.id)).toEqual({ de: 'published', en: 'published' })
+		expect(await lockedFresh()).toBe(true)
+	})
+
+	it.each([
+		'de',
+		'en',
+	] as const)('unpublishes every locale when unpublished in %s', async (locale) => {
+		const window = await payload().create({
+			collection: LOCKS,
+			data: { title: 'Upgrade' },
+			overrideAccess: true,
+		})
+		await payload().update({
+			collection: LOCKS,
+			data: { _status: 'draft' },
+			id: window.id,
+			locale,
+			overrideAccess: true,
+		})
+		expect(await statusInAllLocales(window.id)).toEqual({ de: 'draft', en: 'draft' })
+		expect(await lockedFresh()).toBe(false)
+	})
 })

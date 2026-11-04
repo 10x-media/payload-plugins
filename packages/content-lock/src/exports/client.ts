@@ -11,6 +11,7 @@ export {
 } from '../banner/ContentLockProvider'
 export { LocalDate } from '../banner/LocalDate'
 export { EntitySelect, type EntitySelectProps } from '../collection/components/EntitySelect'
+export { StageAllChip } from '../collection/components/StageAllChip'
 export {
 	StatusCell,
 	StatusField,

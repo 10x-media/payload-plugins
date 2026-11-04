@@ -5,14 +5,16 @@ import * as qs from 'qs-esm'
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
 import { LOCK_STAGES, stageLabel, stagePillStyle, stageWhere } from '../stage'
+import { StageAllChip } from './StageAllChip'
 import './stageFilterBar.css'
 
 type Props = Pick<ServerProps, 'i18n' | 'payload'> & { slug: string }
 
 /**
  * Quick filters above the lock windows list: one pill per stage with its
- * count, linking to the list filtered to that stage, plus "All". The stage is
- * derived from dates, so each pill carries the query for it at render time.
+ * count, linking to the list filtered to that stage, plus "All", which clears
+ * the filter. The stage is derived from dates, so each pill carries the query
+ * for it at render time.
  * Stages with nothing in them are left out.
  */
 export const StageFilterBar = async ({ i18n, payload, slug }: Props) => {
@@ -39,11 +41,11 @@ export const StageFilterBar = async ({ i18n, payload, slug }: Props) => {
 	const base = `${payload.config.routes.admin}/collections/${slug}`
 	return (
 		<Gutter className="content-lock-stage-filter-bar">
-			<Link className="content-lock-plain-link" href={base} prefetch={false}>
+			<StageAllChip href={base}>
 				<Pill pillStyle="light" size="small">
 					{t(keys.filterAll)} <strong>{total}</strong>
 				</Pill>
-			</Link>
+			</StageAllChip>
 			{counts.map(({ stage, count }) =>
 				count === 0 ? null : (
 					<Link
