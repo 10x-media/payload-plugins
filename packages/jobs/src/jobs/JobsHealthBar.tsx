@@ -67,7 +67,11 @@ export const JobsHealthBar = async ({ cap = DEFAULT_CAP, i18n, payload }: Props)
 						prefetch={false}
 						className="jobs-plain-link"
 					>
-						<Pill pillStyle={jobStatusMeta[status].pillStyle} size="small">
+						<Pill
+							className={jobStatusMeta[status].className}
+							pillStyle={jobStatusMeta[status].pillStyle}
+							size="small"
+						>
 							{show(count)} {t(jobStatusMeta[status].labelKey)}
 						</Pill>
 					</Link>

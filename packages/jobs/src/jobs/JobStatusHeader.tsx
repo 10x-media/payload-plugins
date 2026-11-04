@@ -86,7 +86,7 @@ export const JobStatusHeader: FC<
 
 	return (
 		<div className="jobs-status-header">
-			<Pill pillStyle={meta.pillStyle} size="medium">
+			<Pill className={meta.className} pillStyle={meta.pillStyle} size="medium">
 				{t(meta.labelKey)}
 			</Pill>
 			<Fact label={runsLabel} tooltip={runsFriendly ? runsSlug : undefined} value={runsValue} />

@@ -1,12 +1,16 @@
 /* Shared styles for the jobs dashboard: list cells, the health bar, the
    document header, the error panel and the attempt timeline. */
 
-/* Small uppercase caption over a value (header facts, panel and block titles). */
+/* Caption over a value (header facts, panel and block titles): body size in the
+   secondary color, as Payload 4 sets field descriptions and the "Updated" line. */
 .jobs-caption {
 	color: var(--color-text-secondary);
-	font-size: var(--text-caption-font-size);
-	letter-spacing: 0.04em;
-	text-transform: uppercase;
+}
+
+/* Emphasis at the weight Payload 4 gives field labels, not the browser's bold. */
+.jobs-health-bar strong,
+.jobs-log__summary strong {
+	font-weight: var(--text-body-medium-bold-font-weight);
 }
 
 .jobs-muted {
@@ -55,27 +59,30 @@
 	align-items: center;
 	color: var(--color-text-secondary);
 	display: flex;
-	font-size: var(--text-body-small-font-size);
-	gap: var(--spacer-1-5);
+	gap: var(--spacer-1);
 }
 
 .jobs-doc-id code {
 	font-family: var(--font-mono, monospace);
+	font-size: var(--text-mono-medium-font-size);
 }
 
-.jobs-doc-id .jobs-reset-button {
-	color: var(--color-text-tertiary);
-	text-decoration: underline;
+.jobs-doc-id .copy-to-clipboard {
+	color: var(--color-icon-secondary);
 }
 
 .jobs-status-header {
+	/* The rule under the facts spans the main column edge to edge, as Payload's own
+	   tabs rule does: bleed out by the gutter, pad back in by the same amount. */
 	align-items: flex-end;
 	border-bottom: 1px solid var(--color-border);
 	column-gap: var(--spacer-5);
 	display: flex;
 	flex-wrap: wrap;
-	margin-bottom: var(--spacer-4);
+	margin-bottom: var(--spacer-5);
+	margin-inline: calc(var(--gutter-h) * -1 * var(--field-border-bleed, 1));
 	padding-bottom: var(--spacer-4);
+	padding-inline: calc(var(--gutter-h) * var(--field-border-bleed, 1));
 	row-gap: var(--spacer-3);
 }
 
@@ -86,7 +93,7 @@
 }
 
 .jobs-fact__value {
-	font-weight: 600;
+	font-weight: var(--text-body-medium-bold-font-weight);
 	position: relative;
 	width: fit-content;
 }
@@ -101,17 +108,9 @@
 	margin-bottom: var(--spacer-1);
 }
 
-.jobs-error-panel__message {
-	background-color: var(--color-bg-secondary);
-	border-inline-start: 3px solid var(--color-border-danger-strong, var(--color-bg-danger));
-	border-radius: 0 var(--radius-medium) var(--radius-medium) 0;
-	color: var(--color-text);
-	padding: var(--spacer-2-5);
+.jobs-error-panel .banner {
+	font-weight: var(--text-body-medium-font-weight);
 	word-break: break-word;
-}
-
-.jobs-error-panel--cancelled .jobs-error-panel__message {
-	border-inline-start-color: var(--color-border-strong);
 }
 
 /* Read-only date field ------------------------------------------------------------ */
@@ -128,10 +127,12 @@
 	gap: var(--spacer-2);
 }
 
+/* Rounded all round, the attempt's outcome kept as a colored start edge. */
 .jobs-log__row {
 	background-color: var(--color-bg-secondary);
+	border: 1px solid var(--color-border);
 	border-inline-start: 3px solid var(--color-bg-success);
-	border-radius: 0 var(--radius-medium) var(--radius-medium) 0;
+	border-radius: var(--radius-medium);
 }
 
 .jobs-log__row--failed {
@@ -220,11 +221,16 @@
 	background-color: var(--color-bg-tertiary);
 	border-radius: var(--radius-medium);
 	font-family: var(--font-mono, monospace);
-	font-size: var(--text-mono-small-font-size, var(--text-body-small-font-size));
+	font-size: var(--text-mono-medium-font-size);
 	margin: 0;
 	max-height: 220px;
 	overflow: auto;
 	padding: var(--spacer-2);
 	white-space: pre-wrap;
 	word-break: break-word;
+}
+
+.pill.jobs-pill--success {
+	background: var(--color-bg-success-tertiary);
+	color: var(--color-text-success);
 }

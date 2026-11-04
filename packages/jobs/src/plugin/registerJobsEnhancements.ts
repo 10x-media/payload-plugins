@@ -15,6 +15,7 @@ import { collectLogDependencies } from '../jobs/logSlotComponents'
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import { castCancelledQuery } from './castCancelledQuery'
 import { withJobsAccess } from './jobsAccess'
 import { collectJobLabels, type JobLabelMaps } from './labelMaps'
 import { resolve } from './resolve'
@@ -411,6 +412,7 @@ export const registerJobsEnhancements = (
 			select: withCellInputs(base.select),
 			hooks: {
 				...base.hooks,
+				beforeOperation: [...(base.hooks?.beforeOperation ?? []), castCancelledQuery],
 				beforeChange: [...(base.hooks?.beforeChange ?? []), setJobTitle],
 				beforeValidate: [...(base.hooks?.beforeValidate ?? []), rejectWorkflowAndTask],
 			},

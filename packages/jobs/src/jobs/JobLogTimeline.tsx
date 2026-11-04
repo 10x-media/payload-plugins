@@ -12,6 +12,7 @@ import { extractErrorMessage } from './extractErrorMessage'
 import { formatDuration } from './formatDuration'
 import { formatRelativeTime } from './formatRelativeTime'
 import { hasKeys } from './hasKeys'
+import { SUCCESS_PILL_CLASS } from './jobStatusMeta'
 import type { JobLogEntry, JobLogRenderedEntries, JobLogRenderedSlots } from './logSlotComponents'
 import { logRowKey } from './logSlotComponents'
 import './jobs.css'
@@ -84,7 +85,11 @@ const LogRow = ({
 			>
 				<Chevron open={open} />
 				<span className="jobs-log__index">#{index + 1}</span>
-				<Pill pillStyle={failed ? 'error' : 'success'} size="small">
+				<Pill
+					className={failed ? undefined : SUCCESS_PILL_CLASS}
+					pillStyle={failed ? 'error' : 'light'}
+					size="small"
+				>
 					{failed ? t(keys.statusFailed) : t(keys.statusSucceeded)}
 				</Pill>
 				<strong>

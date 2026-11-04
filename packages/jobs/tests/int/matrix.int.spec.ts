@@ -1,5 +1,6 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { TaskConfig } from 'payload'
+import type { TaskConfig, Where } from 'payload'
+import * as qs from 'qs-esm'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { jobs } from '../../src/index'
 import {
@@ -8,6 +9,7 @@ import {
 	type JobStatusInput,
 	statusWhere,
 } from '../../src/jobs/deriveJobStatus'
+import { jobsListURL } from '../../src/jobs/jobsListURL'
 
 const STATUSES: JobStatus[] = [
 	'queued',
@@ -62,6 +64,8 @@ describeForDb('jobs cross-db', {}, (db) => {
 			{ processingUntil: past, totalTried: 1 },
 			{ completedAt: past, totalTried: 1 },
 			{ hasError: true, error: { message: 'boom' }, totalTried: 3 },
+			// What Payload writes for a handler error.
+			{ hasError: true, error: { cancelled: false, message: 'boom' }, totalTried: 1 },
 			{ hasError: true, error: { cancelled: true } },
 		]
 
@@ -92,6 +96,16 @@ describeForDb('jobs cross-db', {}, (db) => {
 			})
 			expect(totalDocs, `status ${status}`).toBe(expected[status])
 			counted += totalDocs
+
+			// The health bar's link, read back as the list view reads it: every value a string.
+			const query = jobsListURL('/admin', status, now).split('?')[1] ?? ''
+			const { where } = qs.parse(query, { depth: 10 }) as { where: Where }
+			const fromURL = await payload.count({
+				collection: 'payload-jobs',
+				overrideAccess: true,
+				where,
+			})
+			expect(fromURL.totalDocs, `status ${status} from its URL`).toBe(expected[status])
 		}
 
 		// The seven clauses partition the collection: every job counted exactly once.

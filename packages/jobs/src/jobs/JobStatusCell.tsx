@@ -27,9 +27,9 @@ export const JobStatusCell = ({
 	const { config } = useConfig()
 	const { i18n, t } = useTranslation()
 	const status = deriveJobStatus(rowData ?? {})
-	const { labelKey, pillStyle } = jobStatusMeta[status]
+	const { className, labelKey, pillStyle } = jobStatusMeta[status]
 	const pill = (
-		<Pill pillStyle={pillStyle} size="small">
+		<Pill className={className} pillStyle={pillStyle} size="small">
 			{t(labelKey)}
 		</Pill>
 	)

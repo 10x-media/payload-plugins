@@ -1,6 +1,7 @@
+import { validateWhereQuery } from 'payload/shared'
 import { describe, expect, it } from 'vitest'
 
-import { deriveJobStatus } from './deriveJobStatus'
+import { deriveJobStatus, type JobStatus, statusWhere } from './deriveJobStatus'
 
 const NOW = Date.parse('2026-05-30T12:00:00.000Z')
 const future = new Date(NOW + 60_000).toISOString()
@@ -55,5 +56,21 @@ describe('deriveJobStatus', () => {
 
 	it('prioritises a terminal error over completion', () => {
 		expect(deriveJobStatus({ hasError: true, completedAt: past }, NOW)).toBe('failed')
+	})
+})
+
+describe('statusWhere', () => {
+	const statuses: JobStatus[] = [
+		'cancelled',
+		'failed',
+		'queued',
+		'retrying',
+		'running',
+		'scheduled',
+		'succeeded',
+	]
+
+	it.each(statuses)('%s is in the filter builder shape', (status) => {
+		expect(validateWhereQuery(statusWhere(status, NOW))).toBe(true)
 	})
 })

@@ -1,6 +1,6 @@
 'use client'
 
-import { useField } from '@payloadcms/ui'
+import { Banner, useField } from '@payloadcms/ui'
 import type { JSONFieldClientProps } from 'payload'
 import type { FC } from 'react'
 
@@ -29,9 +29,9 @@ export const JobErrorPanel: FC<JSONFieldClientProps> = ({ path }) => {
 	const cancelled = isCancelled(value)
 
 	return (
-		<div className={`jobs-error-panel${cancelled ? ' jobs-error-panel--cancelled' : ''}`}>
+		<div className="jobs-error-panel">
 			<div className="jobs-caption">{cancelled ? t(keys.outcome) : t(keys.fieldError)}</div>
-			<div className="jobs-error-panel__message">{message}</div>
+			<Banner type={cancelled ? 'default' : 'danger'}>{message}</Banner>
 		</div>
 	)
 }
