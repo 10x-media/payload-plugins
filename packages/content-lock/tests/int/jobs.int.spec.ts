@@ -28,7 +28,12 @@ const writePost: TaskConfig<'writePost'> = {
 	slug: 'writePost',
 	retries: 2,
 	handler: async ({ req }) => {
-		await req.payload.create({ collection: 'posts', data: { title: 'from a job' }, req })
+		await req.payload.create({
+			collection: 'posts',
+			data: { title: 'from a job' },
+			overrideAccess: true,
+			req,
+		})
 		return { output: {} }
 	},
 }
@@ -36,7 +41,12 @@ const writePost: TaskConfig<'writePost'> = {
 const rewritePost = deferOnInterrupt<TaskConfig<'rewritePost'>>({
 	slug: 'rewritePost',
 	handler: async ({ req }) => {
-		await req.payload.create({ collection: 'posts', data: { title: 'from a job' }, req })
+		await req.payload.create({
+			collection: 'posts',
+			data: { title: 'from a job' },
+			overrideAccess: true,
+			req,
+		})
 		return { output: {} }
 	},
 })
@@ -44,7 +54,12 @@ const rewritePost = deferOnInterrupt<TaskConfig<'rewritePost'>>({
 const rewriteNote = deferOnInterrupt<TaskConfig<'rewriteNote'>>({
 	slug: 'rewriteNote',
 	handler: async ({ req }) => {
-		await req.payload.create({ collection: 'notes', data: { body: 'from a job' }, req })
+		await req.payload.create({
+			collection: 'notes',
+			data: { body: 'from a job' },
+			overrideAccess: true,
+			req,
+		})
 		return { output: {} }
 	},
 })
@@ -57,7 +72,12 @@ const translatePost = deferOnInterrupt<TaskConfig<'translatePost'>>({
 	handler: async ({ req }) => {
 		await assertContentUnlocked(req, { collection: 'posts' })
 		paidCalls += 1
-		await req.payload.create({ collection: 'posts', data: { title: 'translated' }, req })
+		await req.payload.create({
+			collection: 'posts',
+			data: { title: 'translated' },
+			overrideAccess: true,
+			req,
+		})
 		return { output: {} }
 	},
 })
@@ -97,7 +117,7 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 		})) as unknown as JobRow
 
 	const runOnce = async () => {
-		await payload().jobs.run({ allQueues: true, silent: true })
+		await payload().jobs.run({ allQueues: true, overrideAccess: true, silent: true })
 		await applyJobInterruptions(payload())
 	}
 
@@ -150,7 +170,7 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 
 	it('fails a job the lock interrupts, without retries', async () => {
 		const window = await lock()
-		const job = await payload().jobs.queue({ input: {}, task: 'writePost' })
+		const job = await payload().jobs.queue({ input: {}, overrideAccess: true, task: 'writePost' })
 		await runOnce()
 		const row = await read(job.id)
 		expect(row.hasError).toBe(true)
@@ -159,7 +179,7 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 
 	it('defers an opted-in job to the end, and "End now" releases it', async () => {
 		const window = await lock({ endAtTime: true, endsAt: ENDS_AT })
-		const job = await payload().jobs.queue({ input: {}, task: 'rewritePost' })
+		const job = await payload().jobs.queue({ input: {}, overrideAccess: true, task: 'rewritePost' })
 		await runOnce()
 		const deferred = await read(job.id)
 		expect(deferred.hasError).toBe(false)
@@ -183,7 +203,11 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 	it('stops a job before its paid work when it asserts the lock up front', async () => {
 		const window = await lock({ endAtTime: true, endsAt: ENDS_AT })
 		paidCalls = 0
-		const job = await payload().jobs.queue({ input: {}, task: 'translatePost' })
+		const job = await payload().jobs.queue({
+			input: {},
+			overrideAccess: true,
+			task: 'translatePost',
+		})
 		await runOnce()
 		expect(paidCalls).toBe(0)
 		expect((await read(job.id)).deferredBy).toBe(`content-lock:${window.id}`)
@@ -198,8 +222,16 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 	it('releases only the jobs of the window that ended', async () => {
 		const postsLock = await lock()
 		await lock({ collections: ['notes'] })
-		const postJob = await payload().jobs.queue({ input: {}, task: 'rewritePost' })
-		const noteJob = await payload().jobs.queue({ input: {}, task: 'rewriteNote' })
+		const postJob = await payload().jobs.queue({
+			input: {},
+			overrideAccess: true,
+			task: 'rewritePost',
+		})
+		const noteJob = await payload().jobs.queue({
+			input: {},
+			overrideAccess: true,
+			task: 'rewriteNote',
+		})
 		await runOnce()
 
 		await payload().update({
@@ -214,7 +246,7 @@ describeForDb('content-lock with @10x-media/jobs', {}, (db) => {
 
 	it('releases the jobs of a window removed behind the hooks', async () => {
 		const window = await lock()
-		const job = await payload().jobs.queue({ input: {}, task: 'rewritePost' })
+		const job = await payload().jobs.queue({ input: {}, overrideAccess: true, task: 'rewritePost' })
 		await runOnce()
 		expect((await read(job.id)).deferredBy).toBe(`content-lock:${window.id}`)
 

@@ -2,7 +2,7 @@ import {
 	BoldFeature,
 	FixedToolbarFeature,
 	ItalicFeature,
-	type LexicalEditorProps,
+	type LexicalEditorArgs,
 	LinkFeature,
 	lexicalEditor,
 } from '@payloadcms/richtext-lexical'
@@ -16,7 +16,7 @@ import { ContentLockTokenFeature, type TokenCustomTarget, type TokenGroup } from
  * has no business naming.
  */
 export type ContentLockEditorFeature = Extract<
-	NonNullable<LexicalEditorProps['features']>,
+	NonNullable<LexicalEditorArgs['features']>,
 	readonly unknown[]
 >[number]
 

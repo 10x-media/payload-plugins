@@ -59,6 +59,7 @@ import { withoutContentLock } from '@10x-media/content-lock'
 const window = await payload.create({
   collection: 'content-locks',
   data: { title: 'Nightly import', lockEverything: false, groups: ['catalog'] },
+  overrideAccess: true,
 })
 
 await withoutContentLock(async () => {
@@ -69,6 +70,7 @@ await payload.update({
   collection: 'content-locks',
   id: window.id,
   data: { endedAt: new Date().toISOString() },
+  overrideAccess: true,
 })
 ```
 

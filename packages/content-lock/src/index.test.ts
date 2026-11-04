@@ -25,14 +25,13 @@ describe('contentLock factory', () => {
 		expect(i18n.en?.contentLock?.pluginName).toBe('Content Lock')
 	})
 
-	it('lets a group name the folders collection only when a collection uses folders', () => {
-		const plugin = contentLock({
-			groups: [{ key: 'library', label: 'Library', collections: ['payload-folders'] }],
-		})
-		expect(() => plugin(fakeConfig())).toThrow('unknown collection "payload-folders"')
-		const withFolders = {
-			collections: [{ slug: 'documents', fields: [], folders: true }],
-		} as unknown as Config
-		expect(() => plugin(withFolders)).not.toThrow()
+	it('freezes a folders collection like any other', () => {
+		const out = contentLock({
+			groups: [{ key: 'library', label: 'Library', collections: ['folders'] }],
+		})({
+			collections: [{ slug: 'folders', fields: [], folders: true }],
+		} as unknown as Config) as Config
+		const folders = out.collections?.find((collection) => collection.slug === 'folders')
+		expect(folders?.hooks?.beforeOperation).toHaveLength(1)
 	})
 })

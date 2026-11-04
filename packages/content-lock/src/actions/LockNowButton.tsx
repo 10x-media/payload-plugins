@@ -30,11 +30,11 @@ export const LockNowButton = ({ collectionSlug }: { collectionSlug: string }) =>
 	return (
 		<>
 			<Button
-				buttonStyle="subtle"
+				buttonStyle="pill"
 				disabled={busy}
 				margin={false}
 				onClick={() => openModal(MODAL_SLUG)}
-				size="small"
+				size="medium"
 			>
 				{t(keys.actionLockNow)}
 			</Button>

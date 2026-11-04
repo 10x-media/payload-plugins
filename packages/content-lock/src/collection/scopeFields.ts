@@ -1,7 +1,6 @@
 import type { Config, Field, FieldAccess } from 'payload'
 
 import type { ContentLockPluginOptions, ResolvedOptions } from '../options'
-import { foldersSlugOf } from '../plugin/foldersSlug'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 
@@ -74,11 +73,9 @@ export const buildScopeFields = (
 				? individualSelection.access
 				: undefined
 		const access: FieldAccess | undefined = gate ? ({ req }) => gate({ req }) : undefined
-		const folders = foldersSlugOf(config)
-		const collections = [
-			...(config.collections ?? []).map((collection) => collection.slug),
-			...(folders ? [folders] : []),
-		].filter((slug) => !exempt.has(slug))
+		const collections = (config.collections ?? [])
+			.map((collection) => collection.slug)
+			.filter((slug) => !exempt.has(slug))
 		const globals = (config.globals ?? [])
 			.map((global) => global.slug)
 			.filter((slug) => !exempt.has(slug))

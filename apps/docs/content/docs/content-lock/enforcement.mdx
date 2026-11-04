@@ -69,7 +69,7 @@ import { assertContentUnlocked } from '@10x-media/content-lock'
 // inside a task handler
 await assertContentUnlocked(req, { collection: 'products' })
 const body = await translate(input.body) // only paid for while products is writable
-await req.payload.update({ collection: 'products', id: input.id, data: { body }, req })
+await req.payload.update({ collection: 'products', id: input.id, data: { body }, overrideAccess: true, req })
 ```
 
 In custom admin components, `useContentLock()` from `@10x-media/content-lock/client` returns `{ state, locked, isLocked(entity), endsAt, activeWindow }`. Exempt collections and globals never count as locked, on the server or in the admin.
@@ -94,6 +94,7 @@ await withoutContentLock(async () => {
     collection: 'products',
     where: { legacySku: { exists: true } },
     data: { legacySku: null },
+    overrideAccess: true,
   })
 })
 ```

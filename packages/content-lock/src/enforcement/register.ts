@@ -1,7 +1,6 @@
 import type { CollectionConfig, Config, GlobalConfig } from 'payload'
 
 import type { ResolvedOptions } from '../options'
-import { foldersSlugOf } from '../plugin/foldersSlug'
 import { collectionGuard, globalGuard } from './guard'
 import { retryAfterHook } from './retryAfter'
 import { wrapAccess } from './wrapAccess'
@@ -49,9 +48,9 @@ export const lockGlobal = (global: GlobalConfig): GlobalConfig => {
 }
 
 /**
- * Freeze every non-exempt collection and global, including the folders
- * collection Payload adds after plugins run, and add `Retry-After` to lock
- * rejections.
+ * Freeze every non-exempt collection and global, and add `Retry-After` to lock
+ * rejections. Folder and tag collections are the project's own on Payload 4,
+ * so they are frozen like any other.
  */
 export const registerEnforcement = (config: Config, options: ResolvedOptions): void => {
 	const exempt = new Set(options.exempt)
@@ -61,18 +60,6 @@ export const registerEnforcement = (config: Config, options: ResolvedOptions): v
 	config.globals = (config.globals ?? []).map((global) =>
 		exempt.has(global.slug) ? global : lockGlobal(global)
 	)
-	if (config.folders !== false && foldersSlugOf(config)) {
-		config.folders = {
-			...config.folders,
-			collectionOverrides: [
-				...(config.folders?.collectionOverrides ?? []),
-				({ collection }) =>
-					exempt.has(collection.slug) || isMarkedExempt(collection)
-						? collection
-						: lockCollection(collection),
-			],
-		}
-	}
 	config.hooks = {
 		...config.hooks,
 		afterError: [...(config.hooks?.afterError ?? []), retryAfterHook(options.retryAfter)],

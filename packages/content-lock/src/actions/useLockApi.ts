@@ -1,7 +1,6 @@
 'use client'
 
-import { toast, useConfig } from '@payloadcms/ui'
-import { useRouter } from 'next/navigation'
+import { toast, useConfig, useRouter } from '@payloadcms/ui'
 import { useCallback, useState } from 'react'
 
 import { keys } from '../translations/keys'

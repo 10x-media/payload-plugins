@@ -57,9 +57,14 @@ const readCollection = async (payload: Payload, req?: PayloadRequest): Promise<S
 	const { slug } = optionsFromConfig(payload.config)
 	// Straight from the adapter: collection hooks (the live status field reads
 	// this snapshot) must not run while it is being built.
+	// With localization `_status` is per locale, and the adapter matches it in
+	// one locale only. Windows publish in every locale at once, so the default
+	// locale answers for all of them.
+	const { localization } = payload.config
 	const { docs } = await payload.db.find({
 		collection: slug as CollectionSlug,
 		limit: 0,
+		...(localization ? { locale: localization.defaultLocale } : {}),
 		pagination: false,
 		req,
 		where: { and: [{ _status: { equals: 'published' } }, { endedAt: { exists: false } }] },

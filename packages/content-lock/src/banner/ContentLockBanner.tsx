@@ -2,8 +2,7 @@
 
 import './banner.css'
 
-import { ChevronIcon, usePreferences } from '@payloadcms/ui'
-import { useRouter } from 'next/navigation'
+import { Button, ChevronIcon, usePreferences, useRouter, XIcon } from '@payloadcms/ui'
 import { type ReactNode, useEffect, useState } from 'react'
 
 import { keys } from '../translations/keys'
@@ -154,15 +153,15 @@ export const ContentLockBanner = ({ items }: ContentLockBannerProps) => {
 				<span className={`${baseClass}__controls`}>
 					{visible.length > 1 && (
 						<span className={`${baseClass}__pager`}>
-							<button
+							<Button
 								aria-label={t(keys.bannerPrevious)}
-								className={`${baseClass}__button`}
+								buttonStyle="ghost"
 								disabled={index === 0}
+								icon={<ChevronIcon direction="up" />}
+								margin={false}
 								onClick={() => setSelectedId(visible[index - 1]?.id ?? null)}
-								type="button"
-							>
-								<ChevronIcon direction="up" />
-							</button>
+								size="medium"
+							/>
 							<span
 								title={t(keys.bannerPosition, {
 									current: index + 1,
@@ -172,26 +171,27 @@ export const ContentLockBanner = ({ items }: ContentLockBannerProps) => {
 							>
 								{index + 1}/{visible.length}
 							</span>
-							<button
+							<Button
 								aria-label={t(keys.bannerNext)}
-								className={`${baseClass}__button`}
+								buttonStyle="ghost"
 								disabled={index === visible.length - 1}
+								icon={<ChevronIcon direction="down" />}
+								margin={false}
 								onClick={() => setSelectedId(visible[index + 1]?.id ?? null)}
-								type="button"
-							>
-								<ChevronIcon direction="down" />
-							</button>
+								size="medium"
+							/>
 						</span>
 					)}
 					{!active && (
-						<button
+						<Button
 							aria-label={t(keys.bannerDismiss)}
-							className={`${baseClass}__button ${baseClass}__dismiss`}
+							buttonStyle="ghost"
+							className={`${baseClass}__dismiss`}
+							icon={<XIcon />}
+							margin={false}
 							onClick={() => void dismiss()}
-							type="button"
-						>
-							×
-						</button>
+							size="medium"
+						/>
 					)}
 				</span>
 			</div>

@@ -12,7 +12,7 @@ import {
 import { useLexicalComposerContext } from '@payloadcms/richtext-lexical/lexical/react/LexicalComposerContext'
 import { useLexicalEditable } from '@payloadcms/richtext-lexical/lexical/react/useLexicalEditable'
 import { mergeRegister } from '@payloadcms/richtext-lexical/lexical/utils'
-import { ChevronIcon, CloseMenuIcon, DatePicker, Popup, PopupList } from '@payloadcms/ui'
+import { Button, ChevronIcon, DatePicker, Popup, PopupList, XIcon } from '@payloadcms/ui'
 import { type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
@@ -49,16 +49,25 @@ const Dropdown = ({
 	children: (close: () => void) => ReactNode
 }) => (
 	<Popup
-		button={
-			<span className={`${baseClass}__trigger`}>
-				{label}
-				<ChevronIcon direction="down" />
-			</span>
-		}
-		buttonType="custom"
 		className={`${baseClass}__dropdown`}
 		horizontalAlign="left"
+		popupType="menu"
 		render={({ close }) => <PopupList.ButtonGroup>{children(close)}</PopupList.ButtonGroup>}
+		renderButton={({ active, onKeyDown, ...buttonProps }) => (
+			<Button
+				{...buttonProps}
+				buttonStyle="ghost"
+				className={`${baseClass}__trigger`}
+				extraButtonProps={{ onKeyDown }}
+				icon={<ChevronIcon direction="down" />}
+				iconPosition="right"
+				margin={false}
+				selected={active}
+				size="medium"
+			>
+				{label}
+			</Button>
+		)}
 		size="fit-content"
 		verticalAlign="bottom"
 	/>
@@ -114,15 +123,15 @@ const TokenPanel = ({
 							/>
 						</div>
 					)}
-					<button
+					<Button
 						aria-label={t(keys.tokenRemove)}
-						className={`${baseClass}__remove`}
+						buttonStyle="ghost"
+						icon={<XIcon />}
+						margin={false}
 						onClick={onRemove}
 						onMouseDown={preventDefault}
-						type="button"
-					>
-						<CloseMenuIcon />
-					</button>
+						size="medium"
+					/>
 				</>
 			) : null}
 			{problem ? <p className={`${baseClass}__problem`}>{t(problem)}</p> : null}

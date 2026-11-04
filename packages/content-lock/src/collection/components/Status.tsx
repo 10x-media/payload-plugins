@@ -1,7 +1,7 @@
 'use client'
 
 import { FieldLabel, Pill, useField } from '@payloadcms/ui'
-import type { DefaultCellComponentProps, SelectFieldClientComponent } from 'payload'
+import type { DefaultCellComponentProps, SelectFieldClientProps } from 'payload'
 
 import { useTranslation } from '../../translations/useTranslation'
 import { isLockStage, stageLabel, stagePillStyle } from '../stage'
@@ -25,7 +25,7 @@ export const StatusCell = ({ cellData }: DefaultCellComponentProps) => (
 )
 
 /** Sidebar field for the stage: the label and the pill, nothing to edit. */
-export const StatusField: SelectFieldClientComponent = ({ field, path }) => {
+export const StatusField = ({ field, path }: SelectFieldClientProps) => {
 	const { value } = useField<string>({ path: path ?? field.name })
 	return (
 		<div className="field-type content-lock-status-field">

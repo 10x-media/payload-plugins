@@ -1,5 +1,5 @@
-import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps } from 'payload'
 
 import { ReportsStatus } from './ReportsStatus'
@@ -9,20 +9,33 @@ import { ReportsStatus } from './ReportsStatus'
  * target: the banner here shows only windows covering it, and the page asks
  * the lock itself before offering to run anything.
  */
-export const ReportsView = ({ initPageResult, params, searchParams }: AdminViewServerProps) => (
-	<DefaultTemplate
-		i18n={initPageResult.req.i18n}
-		locale={initPageResult.locale}
-		params={params}
-		payload={initPageResult.req.payload}
-		permissions={initPageResult.permissions}
-		searchParams={searchParams}
-		user={initPageResult.req.user ?? undefined}
-		visibleEntities={initPageResult.visibleEntities}
-	>
-		<Gutter>
-			<h1>Reports</h1>
-			<ReportsStatus />
-		</Gutter>
-	</DefaultTemplate>
-)
+export const ReportsView = (props: AdminViewServerProps) => {
+	const { initPageResult, params, searchParams } = props
+	return (
+		<DefaultTemplate
+			i18n={initPageResult.req.i18n}
+			locale={initPageResult.locale}
+			params={params}
+			payload={initPageResult.req.payload}
+			permissions={initPageResult.permissions}
+			req={initPageResult.req}
+			searchParams={searchParams}
+			user={props.user}
+			viewActions={props.viewActions}
+			visibleEntities={initPageResult.visibleEntities}
+		>
+			<Gutter className="dev-reports-view">
+				<h1
+					style={{
+						fontSize: 'var(--text-heading-xl-font-size)',
+						fontWeight: 'var(--text-heading-xl-font-weight)',
+						lineHeight: 'var(--text-heading-xl-line-height)',
+					}}
+				>
+					Reports
+				</h1>
+				<ReportsStatus />
+			</Gutter>
+		</DefaultTemplate>
+	)
+}

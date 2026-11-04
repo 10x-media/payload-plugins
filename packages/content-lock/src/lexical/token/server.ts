@@ -1,6 +1,7 @@
 import { createNode, createServerFeature } from '@payloadcms/richtext-lexical'
 
 import { ContentLockTokenServerNode } from './node'
+import { tokenNodeJSONSchema } from './schema'
 import { TOKEN_FEATURE_KEY } from './types'
 
 /** A group as the scope token's preview labels it, with what it covers. */
@@ -37,7 +38,7 @@ export const ContentLockTokenFeature = createServerFeature<
 	feature: ({ props }) => ({
 		ClientFeature: '@10x-media/content-lock/client#ContentLockTokenFeatureClient',
 		clientFeatureProps: { customTargets: props.customTargets ?? [], groups: props.groups },
-		nodes: [createNode({ node: ContentLockTokenServerNode })],
+		nodes: [createNode({ jsonSchema: tokenNodeJSONSchema, node: ContentLockTokenServerNode })],
 		sanitizedServerFeatureProps: props,
 	}),
 	key: TOKEN_FEATURE_KEY,

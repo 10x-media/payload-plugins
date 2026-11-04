@@ -53,7 +53,7 @@ export const EndNowButton = () => {
 	return (
 		<>
 			<Button
-				buttonStyle="subtle"
+				buttonStyle="pill"
 				disabled={busy}
 				margin={false}
 				onClick={() => openModal(MODAL_SLUG)}

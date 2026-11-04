@@ -37,7 +37,7 @@ The stage is the **Lock status** field: a virtual field, not stored in the datab
 
 ## Drafts
 
-The collection has drafts: prepare a window, translate its messages into every locale, then publish it. Only published windows lock or announce.
+The collection has drafts: prepare a window, translate its messages into every locale, then publish it. Only published windows lock or announce. Publishing covers every locale at once, from the admin and from the API alike, so a window locks whatever language it was published in; saving a draft in one locale leaves a published window locking.
 
 A published window with unpublished changes keeps its live stage; publishing applies the latest draft, including when **End now** publishes the window.
 

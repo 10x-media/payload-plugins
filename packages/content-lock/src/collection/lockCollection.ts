@@ -28,12 +28,17 @@ const RSC = '@10x-media/content-lock/rsc'
 /**
  * A write that is not an explicit draft publishes. Payload would otherwise
  * default `_status` to draft, and a lock created through the Local API or REST
- * would silently lock nothing.
+ * would silently lock nothing. With localization the messages are localized,
+ * so Payload 4 keeps `_status` per locale; a window locks or does not whatever
+ * the editor's locale, so publishing always covers every locale.
  */
-const publishUnlessDraft: CollectionBeforeOperationHook = ({ args, operation }) => {
+const publishUnlessDraft: CollectionBeforeOperationHook = ({ args, operation, req }) => {
 	if ((operation === 'create' || operation === 'update') && !args.draft && args.data) {
 		const data = args.data as { _status?: string }
 		data._status ??= 'published'
+		if (data._status === 'published' && req.payload.config.localization) {
+			args.publishAllLocales = true
+		}
 	}
 	return args
 }

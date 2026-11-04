@@ -23,7 +23,9 @@
 		"node": ">=24.22.1"
 	},
 	"type": "module",
-	"sideEffects": false,
+	"sideEffects": [
+		"*.css"
+	],
 	"exports": {
 		".": {
 			"development": "./src/index.ts",
@@ -66,8 +68,8 @@
 		"test": "vitest run",
 		"test:unit": "vitest run src",
 		"test:int": "vitest run tests/int",
-		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts",
-		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts",
+		"test:matrix": "DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts tests/int/localization.int.spec.ts && DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts tests/int/localization.int.spec.ts",
+		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts tests/int/localization.int.spec.ts && TEST_DB=container DB_MATRIX=postgres vitest run tests/int/matrix.int.spec.ts tests/int/enforcement.int.spec.ts tests/int/jobs.int.spec.ts tests/int/stages.int.spec.ts tests/int/folders.int.spec.ts tests/int/localization.int.spec.ts",
 		"test:e2e": "bash scripts/e2e.sh",
 		"dev": "pnpm --filter @10x-media/content-lock-dev dev",
 		"start": "pnpm --filter @10x-media/content-lock-dev start",
@@ -87,7 +89,6 @@
 		"@payloadcms/richtext-lexical": "^4.0.0-beta.6",
 		"@payloadcms/translations": "^4.0.0-beta.6",
 		"@payloadcms/ui": "^4.0.0-beta.6",
-		"next": "^16.4.0",
 		"payload": "^4.0.0-beta.6",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"

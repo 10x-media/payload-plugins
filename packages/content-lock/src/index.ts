@@ -12,7 +12,6 @@ import {
 	resolveOptions,
 	SYSTEM_EXEMPT,
 } from './options'
-import { foldersSlugOf } from './plugin/foldersSlug'
 import { registerTranslations } from './plugin/registerTranslations'
 import { healSnapshot, readStoredWindows } from './state/store'
 
@@ -41,14 +40,10 @@ const PLUGIN_SLUG = '@10x-media/content-lock'
 /** Fail the build on a group, custom target or exemption the config does not back. */
 const assertKnownSlugs = (config: Config, options: ResolvedOptions): void => {
 	const collections = new Set((config.collections ?? []).map((collection) => collection.slug))
-	const folders = foldersSlugOf(config)
-	if (folders) {
-		collections.add(folders)
-	}
 	const globals = new Set((config.globals ?? []).map((global) => global.slug))
 	const custom = new Set(options.customTargets.map((target) => target.key))
 	const exempt = new Set(options.exempt)
-	const builtIn = new Set<string>([options.slug, ...SYSTEM_EXEMPT, 'payload-folders'])
+	const builtIn = new Set<string>([options.slug, ...SYSTEM_EXEMPT])
 	for (const slug of exempt) {
 		if (!builtIn.has(slug) && !collections.has(slug) && !globals.has(slug)) {
 			throw new Error(`[content-lock] exempt names unknown collection or global "${slug}"`)
@@ -96,7 +91,7 @@ const markedExempt = (config: Config): string[] =>
 const definition = definePlugin<ContentLockPluginOptions>({
 	slug: PLUGIN_SLUG,
 	order: DEFAULT_ORDER,
-	plugin: ({ config, plugins, ...options }): Config => {
+	plugin: ({ config, options, plugins }): Config => {
 		if (options.disabled === true) {
 			return config
 		}

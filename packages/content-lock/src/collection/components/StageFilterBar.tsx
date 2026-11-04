@@ -1,10 +1,11 @@
-import { Link, Pill } from '@payloadcms/ui'
+import { Gutter, Link, Pill } from '@payloadcms/ui'
 import { type CollectionSlug, getCurrentDate, type ServerProps } from 'payload'
 import * as qs from 'qs-esm'
 
 import { keys } from '../../translations/keys'
 import { asTranslate } from '../../translations/server'
 import { LOCK_STAGES, stageLabel, stagePillStyle, stageWhere } from '../stage'
+import './stageFilterBar.css'
 
 type Props = Pick<ServerProps, 'i18n' | 'payload'> & { slug: string }
 
@@ -21,8 +22,10 @@ export const StageFilterBar = async ({ i18n, payload, slug }: Props) => {
 	const now = getCurrentDate()
 	const counts = await Promise.all(
 		LOCK_STAGES.map(async (stage) => {
+			// Only rendered inside the windows list, which read access already gates.
 			const { totalDocs } = await payload.count({
 				collection: slug as CollectionSlug,
+				overrideAccess: true,
 				where: stageWhere(stage, now),
 			})
 			return { stage, count: totalDocs }
@@ -35,16 +38,8 @@ export const StageFilterBar = async ({ i18n, payload, slug }: Props) => {
 	const t = asTranslate(i18n.t)
 	const base = `${payload.config.routes.admin}/collections/${slug}`
 	return (
-		<div
-			style={{
-				alignItems: 'center',
-				display: 'flex',
-				flexWrap: 'wrap',
-				gap: 'calc(var(--base) / 2)',
-				marginBottom: 'var(--base)',
-			}}
-		>
-			<Link href={base} prefetch={false} style={{ textDecoration: 'none' }}>
+		<Gutter className="content-lock-stage-filter-bar">
+			<Link className="content-lock-plain-link" href={base} prefetch={false}>
 				<Pill pillStyle="light" size="small">
 					{t(keys.filterAll)} <strong>{total}</strong>
 				</Pill>
@@ -54,8 +49,8 @@ export const StageFilterBar = async ({ i18n, payload, slug }: Props) => {
 					<Link
 						href={`${base}${qs.stringify({ where: stageWhere(stage, now) }, { addQueryPrefix: true })}`}
 						key={stage}
+						className="content-lock-plain-link"
 						prefetch={false}
-						style={{ textDecoration: 'none' }}
 					>
 						<Pill pillStyle={stagePillStyle[stage]} size="small">
 							{t(stageLabel[stage])} <strong>{count}</strong>
@@ -63,6 +58,6 @@ export const StageFilterBar = async ({ i18n, payload, slug }: Props) => {
 					</Link>
 				)
 			)}
-		</div>
+		</Gutter>
 	)
 }

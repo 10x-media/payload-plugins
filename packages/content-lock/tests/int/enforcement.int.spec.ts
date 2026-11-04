@@ -8,7 +8,7 @@ import {
 import {
 	type AccessArgs,
 	type CollectionConfig,
-	createLocalReq,
+	createPayloadRequest,
 	type GlobalConfig,
 	handleEndpoints,
 } from 'payload'
@@ -102,6 +102,7 @@ describeForDb('content-lock enforcement', {}, (db) => {
 		user = await payload().create({
 			collection: 'users',
 			data: { email: 'dev@10xmedia.de', password: 'password' },
+			overrideAccess: true,
 		})
 	})
 
@@ -334,7 +335,7 @@ describeForDb('content-lock enforcement', {}, (db) => {
 	})
 
 	it('asserts a target up front the way a blocked write would', async () => {
-		const req = await createLocalReq({}, payload())
+		const req = await createPayloadRequest({ payload: payload() })
 		await expect(assertContentUnlocked(req, { collection: 'posts' })).resolves.toBeUndefined()
 		await lock()
 		const attempt = assertContentUnlocked(req, { collection: 'posts' })

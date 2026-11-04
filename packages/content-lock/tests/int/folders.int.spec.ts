@@ -1,19 +1,25 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig } from 'payload'
+import { type CollectionConfig, createFolderField } from 'payload'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 
 import { ContentLockedError, contentLock, isContentLocked } from '../../src/index'
 
 const LOCKS = 'content-locks'
-const FOLDERS = 'payload-folders'
+const FOLDERS = 'folders'
+
+/** On Payload 4 `folders: true` makes a collection the folder tree itself. */
+const folders: CollectionConfig = {
+	slug: FOLDERS,
+	folders: true,
+	fields: [{ name: 'name', type: 'text' }],
+}
 
 const documents: CollectionConfig = {
 	slug: 'documents',
-	folders: true,
-	fields: [{ name: 'title', type: 'text' }],
+	fields: [{ name: 'title', type: 'text' }, createFolderField({ relationTo: FOLDERS })],
 }
 
-describeForDb('content-lock and the folders collection', {}, (db) => {
+describeForDb('content-lock and a folders collection', {}, (db) => {
 	let booted: BootedPayload
 
 	const payload = () => booted.payload
@@ -21,7 +27,7 @@ describeForDb('content-lock and the folders collection', {}, (db) => {
 	beforeAll(async () => {
 		booted = await bootPayload({
 			db,
-			collections: [documents],
+			collections: [folders, documents],
 			plugin: contentLock({
 				groups: [{ key: 'library', label: 'Library', collections: ['documents', FOLDERS] }],
 				individualSelection: true,

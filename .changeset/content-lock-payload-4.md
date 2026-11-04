@@ -1,0 +1,5 @@
+---
+'@10x-media/content-lock': major
+---
+
+Payload 4 support, on Next.js and TanStack Start. With localization, Payload 4 keeps a window's `_status` per locale; a window now publishes in every locale at once and the lock reads it in the default locale, so it locks whatever language it was published in. Existing localized installs need Payload's `localize-status` migration before any window locks again. Folder collections are the project's own on Payload 4 and are frozen like any other: the `payload-folders` special case is gone, so groups and `exempt` name the folder collection by its slug. The lock value token node declares its JSON schema, so generated types keep it in the message fields' node union. The admin takes the Payload 4 look: the banner, the stage filter bar and the token chips and panel use Payload 4 tokens and Payload's buttons, Lock now and End now are pill buttons, and the stage filter bar's links open in Filters. `next` is no longer a peer dependency. See Upgrading to Payload 4 in the docs.

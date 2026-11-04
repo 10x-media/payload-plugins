@@ -5,7 +5,10 @@ const DEV_PASSWORD = 'password'
 
 const HOUR = 60 * 60 * 1000
 
-type Token = { token: 'startsAt' | 'endsAt' | 'announceAt' | 'scope'; format?: string }
+type Token = {
+	token: 'startsAt' | 'endsAt' | 'announceAt' | 'scope'
+	format?: 'datetime' | 'date' | 'time' | 'relative'
+}
 
 /** The dev app's `swatch` inline block, added to the editor through `editor.features`. */
 type Swatch = { swatch: 'black' | 'red' | 'amber' | 'green' }
@@ -15,11 +18,11 @@ let swatchId = 0
 const node = (part: string | Token | Swatch) => {
 	if (typeof part === 'string') {
 		return {
-			type: 'text',
+			type: 'text' as const,
 			text: part,
 			detail: 0,
 			format: 0,
-			mode: 'normal',
+			mode: 'normal' as const,
 			style: '',
 			version: 1,
 		}
@@ -27,30 +30,31 @@ const node = (part: string | Token | Swatch) => {
 	if ('swatch' in part) {
 		swatchId += 1
 		return {
-			type: 'inlineBlock',
+			type: 'inlineBlock' as const,
 			version: 1,
-			fields: { id: `seed-swatch-${swatchId}`, blockType: 'swatch', color: part.swatch },
+			fields: { id: `seed-swatch-${swatchId}`, blockType: 'swatch' as const, color: part.swatch },
 		}
 	}
-	return { type: 'contentLockToken', version: 1, format: 'datetime', ...part }
+	return { type: 'contentLockToken' as const, version: 1, format: 'datetime' as const, ...part }
 }
 
 /** A one-paragraph Lexical message from text runs, lock value tokens and swatches. */
 const message = (...parts: Array<string | Token | Swatch>) => ({
 	root: {
-		type: 'root',
+		type: 'root' as const,
 		direction: 'ltr' as const,
 		format: '' as const,
 		indent: 0,
 		version: 1,
 		children: [
 			{
-				type: 'paragraph',
+				type: 'paragraph' as const,
 				direction: 'ltr' as const,
 				format: '' as const,
 				indent: 0,
 				version: 1,
 				textFormat: 0,
+				textStyle: '',
 				children: parts.map(node),
 			},
 		],
@@ -65,30 +69,32 @@ const message = (...parts: Array<string | Token | Swatch>) => ({
  * editable, and one unpublished draft that locks nothing. Idempotent.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ collection: 'users', overrideAccess: true })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
+			overrideAccess: true,
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const lockCount = await payload.count({ collection: 'content-locks' })
+	const lockCount = await payload.count({ collection: 'content-locks', overrideAccess: true })
 	if (lockCount.totalDocs > 0) {
 		return
 	}
 	for (const title of ['Home', 'About']) {
-		await payload.create({ collection: 'pages', data: { title } })
+		await payload.create({ collection: 'pages', data: { title }, overrideAccess: true })
 	}
 	for (const title of ['Desk lamp', 'Office chair']) {
-		await payload.create({ collection: 'products', data: { title } })
+		await payload.create({ collection: 'products', data: { title }, overrideAccess: true })
 	}
 
 	const now = Date.now()
 	const at = (offset: number) => new Date(now + offset).toISOString()
 	const upgrade = await payload.create({
 		collection: 'content-locks',
+		overrideAccess: true,
 		data: {
 			title: 'Database upgrade',
 			announce: true,
@@ -108,6 +114,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 	await payload.update({
 		collection: 'content-locks',
+		overrideAccess: true,
 		id: upgrade.id,
 		locale: 'de',
 		data: {
@@ -122,6 +129,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 	await payload.create({
 		collection: 'content-locks',
+		overrideAccess: true,
 		data: {
 			title: 'Website relaunch',
 			announce: true,
@@ -140,6 +148,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 	await payload.create({
 		collection: 'content-locks',
+		overrideAccess: true,
 		data: {
 			title: 'Quarterly cleanup',
 			announce: true,
@@ -149,6 +158,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 	await payload.create({
 		collection: 'content-locks',
+		overrideAccess: true,
 		data: {
 			title: 'Catalog import',
 			startsAt: at(-HOUR),
@@ -160,6 +170,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 	await payload.create({
 		collection: 'content-locks',
+		overrideAccess: true,
 		draft: true,
 		data: { title: 'Search reindex', startsAt: at(2 * HOUR) },
 	})

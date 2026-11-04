@@ -1,0 +1,51 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x, including the publication status migration localized projects need.
+---
+
+`@10x-media/content-lock` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin's options are unchanged, and it runs on Next.js and TanStack Start. This page covers what Payload 4 changes around it.
+
+## Checklist
+
+1. Upgrade `@10x-media/content-lock` with Payload: its peers are `payload`, `@payloadcms/ui`, `@payloadcms/richtext-lexical` and `@payloadcms/translations` at `^4.0.0-beta.6`. `next` is no longer a peer.
+2. With `localization` in your config, migrate the windows' publication status **before** you rely on a lock (see [Localized projects](#localized-projects)).
+3. If a group or `exempt` names `payload-folders`, name your folder collection instead (see [Folders](#folders)).
+4. Pass `overrideAccess: true` where your own code writes windows without a user (see [Local API access](#local-api-access)).
+5. On Postgres or SQLite, create and run a migration: `pnpm payload migrate:create` then `pnpm payload migrate`.
+6. Regenerate types and the import map (`pnpm payload generate:types`, `pnpm payload generate:importmap`).
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## Localized projects
+
+With `localization` configured, the window messages are localized fields, and Payload 4 then keeps a drafts collection's `_status` per locale. Payload 3 stored one `_status` per window. Until that data is migrated, Payload 4 reads every existing window as having no status: on MongoDB no window counts as published, so **no lock applies and no banner shows**; on Postgres reading the collection fails.
+
+Run Payload's own migration for it, which covers every drafts collection with localized fields in the project, the lock windows included:
+
+```bash
+pnpm payload migrate:create --file @payloadcms/db-mongodb/localize-status
+# or @payloadcms/db-postgres/localize-status, @payloadcms/db-sqlite/localize-status
+pnpm payload migrate
+```
+
+Two things to check afterwards:
+
+- The migration takes a document's status from its latest version, so a published window whose latest version is an unpublished draft comes out unpublished and stops locking. Open the windows list after migrating and publish any window that should still lock.
+- On Postgres the generated file passes the migration's Drizzle `db`; change it to `db: payload.db` if it fails.
+
+From then on a window is published in every locale at once, whatever locale the editor or the API call uses: a lock does not depend on the language it was published in. Saving a draft in one locale leaves the published window locking.
+
+## Folders
+
+On Payload 3, `folders: true` on a collection let its documents go into folders, and Payload added a `payload-folders` collection after every plugin had run; content-lock froze it and let groups and `exempt` name it. On Payload 4, `folders: true` makes a collection the folder tree itself, so your folder collection is your own and is frozen like any other. A group or `exempt` entry that names `payload-folders` now fails the build as an unknown collection: name your folder collection's slug instead.
+
+## Local API access
+
+Payload 4 applies access control in the Local API by default. A lock still blocks every write either way, `overrideAccess` included. What changes is your own code that opens or ends windows without a user, such as a deploy script or a seed: pass `overrideAccess: true`, or a `user` allowed by the lock collection's access. The same goes for writes in your job handlers, which run without a user.
+
+## Admin
+
+- The banner, the stage filter bar, the token chips and their panel use the Payload 4 tokens and Payload's own buttons. Styles of your own that target the banner with Payload 3 tokens (`--theme-*`, `--base`) resolve to nothing on Payload 4.
+- The stage filter bar's links are in the filter builder's shape, so a stage picked there opens in **Filters**.
+- **Lock now** and **End now** are pill buttons.
+- Generated types now include the lock value token node in the message fields' node union, so typed code that builds a message with a token compiles.

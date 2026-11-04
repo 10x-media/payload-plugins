@@ -2,7 +2,6 @@ import type { Where } from 'payload'
 
 import type { WindowStatus } from '../state/types'
 import { keys, type TranslationKey } from '../translations/keys'
-import { notEndedWhere } from './access'
 
 /** A window's stage as the list and the sidebar show it. */
 export type LockStage = WindowStatus | 'draft'
@@ -39,53 +38,66 @@ export const isLockStage = (value: unknown): value is LockStage =>
 const PUBLISHED: Where = { _status: { equals: 'published' } }
 
 /**
+ * Expand a conjunction into the `{ or: [{ and: [...] }] }` shape the admin's
+ * filter builder edits; it shows nothing for a nested `or`. A term that is an
+ * array is a set of alternatives, so the result has one `and` group per
+ * combination of them.
+ */
+const anyOfAll = (...terms: Array<Where | Where[]>): Where => {
+	let groups: Where[][] = [[]]
+	for (const term of terms) {
+		const alternatives = Array.isArray(term) ? term : [term]
+		groups = groups.flatMap((group) => alternatives.map((alternative) => [...group, alternative]))
+	}
+	return { or: groups.map((and) => ({ and })) }
+}
+
+/**
  * Windows in `stage` at `now`, as a query. The stage is derived, never stored,
  * so this spells out `statusOf` over the stored fields for list filters and
  * counts. A window stored without the `announce` toggle announces when it has
- * a date, as its field does.
+ * a date, as its field does. The result is in the filter builder's shape, so a
+ * stage picked in the filter bar stays editable in Filters.
  */
 export const stageWhere = (stage: LockStage, now: Date): Where => {
 	const at = now.toISOString()
-	const announcing: Where = {
-		and: [
-			{ announceAt: { less_than_equal: at } },
-			{ or: [{ announce: { equals: true } }, { announce: { exists: false } }] },
+	const notEnded: Array<Where | Where[]> = [
+		{ endedAt: { exists: false } },
+		[
+			{ endAtTime: { equals: false } },
+			{ endAtTime: { exists: false } },
+			{ endsAt: { greater_than: at } },
 		],
-	}
-	const upcoming: Where = {
-		and: [PUBLISHED, notEndedWhere(now), { startsAt: { greater_than: at } }],
-	}
+	]
+	const upcoming: Array<Where | Where[]> = [
+		PUBLISHED,
+		...notEnded,
+		{ startsAt: { greater_than: at } },
+	]
 	switch (stage) {
 		case 'draft':
-			return { _status: { equals: 'draft' } }
+			return anyOfAll({ _status: { equals: 'draft' } })
 		case 'ended':
 			return {
-				and: [
-					PUBLISHED,
+				or: [
+					{ and: [PUBLISHED, { endedAt: { exists: true } }] },
 					{
-						or: [
-							{ endedAt: { exists: true } },
-							{ and: [{ endAtTime: { equals: true } }, { endsAt: { less_than_equal: at } }] },
-						],
+						and: [PUBLISHED, { endAtTime: { equals: true } }, { endsAt: { less_than_equal: at } }],
 					},
 				],
 			}
 		case 'active':
-			return { and: [PUBLISHED, notEndedWhere(now), { startsAt: { less_than_equal: at } }] }
+			return anyOfAll(PUBLISHED, ...notEnded, { startsAt: { less_than_equal: at } })
 		case 'announced':
-			return { and: [upcoming, announcing] }
+			return anyOfAll(...upcoming, { announceAt: { less_than_equal: at } }, [
+				{ announce: { equals: true } },
+				{ announce: { exists: false } },
+			])
 		case 'pending':
-			return {
-				and: [
-					upcoming,
-					{
-						or: [
-							{ announceAt: { exists: false } },
-							{ announceAt: { greater_than: at } },
-							{ announce: { equals: false } },
-						],
-					},
-				],
-			}
+			return anyOfAll(...upcoming, [
+				{ announceAt: { exists: false } },
+				{ announceAt: { greater_than: at } },
+				{ announce: { equals: false } },
+			])
 	}
 }

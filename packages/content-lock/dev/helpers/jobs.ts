@@ -16,6 +16,7 @@ const writeOnce = async ({ input, req }: WriteArgs) => {
 	await req.payload.create({
 		collection: input.slug as CollectionSlug,
 		data: sampleData('collection', input.slug),
+		overrideAccess: true,
 		req,
 	})
 	return { output: {} }
@@ -45,7 +46,7 @@ export const playgroundTasks: TaskConfig[] = [
 			return { output: {} }
 		},
 	},
-] as TaskConfig[]
+] as unknown as TaskConfig[]
 
 const WORKER_KEY = Symbol.for('content-lock-dev:worker')
 
