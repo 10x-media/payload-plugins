@@ -33,7 +33,7 @@ Two things to check afterwards:
 - The migration takes a document's status from its latest version, so a published window whose latest version is an unpublished draft comes out unpublished and stops locking. Open the windows list after migrating and publish any window that should still lock.
 - On Postgres the generated file passes the migration's Drizzle `db`; change it to `db: payload.db` if it fails.
 
-From then on a window is published in every locale at once, whatever locale the editor or the API call uses: a lock does not depend on the language it was published in. Saving a draft in one locale leaves the published window locking.
+From then on a window is published and unpublished in every locale at once, whatever locale the editor or the API call uses, including the admin's **Publish in** and **Unpublish in** entries for one locale: a lock never depends on the language. Saving a draft in one locale leaves the published window locking.
 
 ## Folders
 

@@ -50,30 +50,35 @@
 	color: var(--color-text-danger);
 }
 
-/* Positioned by `setFloatingElemPositionForLinkEditor`, which writes
+/* Drawn as the stock link editor (`.link-editor`): the dark menu surface in
+   both themes, a strip as tall as its own, the large radius and the canvas
+   elevation, so a token's panel and a link's read as the same control.
+
+   Positioned by `setFloatingElemPositionForLinkEditor`, which writes
    `transform` and `opacity`, so both start neutralized. It sits inside the
    editor, so it resets the font to the admin's own, and above the sticky
-   toolbar (z-index 2), so the date picker's calendar is not cut off by it.
-   It holds controls, so it follows the admin theme as Payload's control
-   panels do, rather than the dark menu of the link editor. */
+   toolbar (z-index 2), so the date picker's calendar is not cut off by it. */
 .content-lock-token-editor {
 	position: absolute;
 	top: 0;
 	inset-inline-start: 0;
 	z-index: 3;
-	padding: var(--spacer-1);
-	border-radius: var(--radius-medium);
-	background: var(--color-bg-elevated);
-	box-shadow: var(--elevation-400-menu-panel);
+	display: flex;
+	align-items: center;
+	min-height: var(--spacer-6);
+	padding: 0 var(--spacer-2);
+	border-radius: var(--radius-large);
+	background: var(--color-bg-menu);
+	box-shadow: var(--elevation-100-canvas);
 	opacity: 0;
-	color: var(--color-text);
+	color: var(--color-text-onbrand);
 	font-family: var(--font-body);
 	transition: opacity 0.2s;
+	will-change: transform;
 }
 
 .content-lock-token-editor__content {
 	display: flex;
-	flex-wrap: wrap;
 	align-items: center;
 	gap: var(--spacer-1);
 	font-size: var(--text-body-medium-font-size);
@@ -83,16 +88,33 @@
 .content-lock-token-editor__kind {
 	display: inline-flex;
 	align-items: center;
-	gap: var(--spacer-1);
-	padding-inline: var(--spacer-1) var(--spacer-2);
-	color: var(--color-text-secondary);
+	gap: var(--spacer-2);
+	margin-inline-end: var(--spacer-2);
+	color: var(--color-text-onbrand);
 	white-space: nowrap;
 }
 
 .content-lock-token-editor__kind svg {
+	flex-shrink: 0;
 	width: var(--spacer-3);
 	height: var(--spacer-3);
-	color: var(--color-icon-secondary);
+	color: var(--color-icon-onbrand-secondary);
+}
+
+/* Payload's ghost buttons, recolored for the dark surface as the link editor's are. */
+.content-lock-token-editor .btn--style-ghost,
+.content-lock-token-editor .btn--style-ghost .icon {
+	color: var(--color-icon-onbrand);
+}
+
+.content-lock-token-editor .btn--style-ghost:hover:not(.btn--disabled),
+.content-lock-token-editor .btn.btn--style-ghost.btn--selected {
+	background-color: var(--color-bg-transparent-hover);
+	color: var(--color-text-onbrand);
+}
+
+.content-lock-token-editor .btn--style-ghost:focus-visible {
+	outline: var(--stroke-width-small) solid var(--color-border-brand-strong);
 }
 
 .content-lock-token-editor__date {
@@ -104,9 +126,18 @@
 	display: none;
 }
 
+/* The link editor's divider, between the value's controls and the note. */
+.content-lock-token-editor__divider {
+	align-self: stretch;
+	width: var(--stroke-width-small);
+	margin-block: var(--spacer-2);
+	margin-inline: var(--spacer-1);
+	background-color: var(--color-text-onbrand-secondary);
+}
+
 .content-lock-token-editor__problem {
-	flex-basis: 100%;
-	margin: 0;
-	padding: var(--spacer-1) var(--spacer-2);
-	color: var(--color-text-danger);
+	max-width: 22rem;
+	padding-block: var(--spacer-1);
+	padding-inline-end: var(--spacer-2);
+	color: var(--color-text-onbrand-secondary);
 }
