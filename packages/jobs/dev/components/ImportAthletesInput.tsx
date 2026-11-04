@@ -28,7 +28,7 @@ export const ImportAthletesInput = ({ path, placeholder, readOnly }: JobInputCom
 	const patch = (part: Partial<Input>) => setValue({ ...input, ...part })
 
 	return (
-		<div style={{ display: 'grid', gap: 'var(--base)' }}>
+		<div style={{ display: 'grid', gap: 'var(--spacer-4)' }}>
 			<SelectInput
 				hasMany
 				label="Disciplines"
@@ -72,7 +72,7 @@ export const ImportAthletesInput = ({ path, placeholder, readOnly }: JobInputCom
 				onToggle={() => patch({ dryRun: !input.dryRun })}
 				readOnly={readOnly}
 			/>
-			<small style={{ color: 'var(--theme-elevation-500)' }}>
+			<small style={{ color: 'var(--color-text-secondary)' }}>
 				Placeholder derived from inputSchema: <code>{JSON.stringify(placeholder)}</code>
 			</small>
 		</div>

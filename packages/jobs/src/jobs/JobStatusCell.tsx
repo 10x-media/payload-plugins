@@ -9,6 +9,7 @@ import { useTranslation } from '../translations/useTranslation'
 import { deriveJobStatus } from './deriveJobStatus'
 import { formatRelativeTime } from './formatRelativeTime'
 import { jobStatusMeta } from './jobStatusMeta'
+import './jobs.css'
 
 const DEFAULT_DATE_FORMAT = 'MMMM do yyyy, h:mm a'
 
@@ -26,9 +27,9 @@ export const JobStatusCell = ({
 	const { config } = useConfig()
 	const { i18n, t } = useTranslation()
 	const status = deriveJobStatus(rowData ?? {})
-	const { labelKey, pillStyle } = jobStatusMeta[status]
+	const { className, labelKey, pillStyle } = jobStatusMeta[status]
 	const pill = (
-		<Pill pillStyle={pillStyle} size="small">
+		<Pill className={className} pillStyle={pillStyle} size="small">
 			{t(labelKey)}
 		</Pill>
 	)
@@ -61,7 +62,7 @@ export const JobStatusCell = ({
 		: undefined
 
 	return (
-		<span style={{ alignItems: 'center', display: 'inline-flex', gap: 'calc(var(--base) / 4)' }}>
+		<span className="jobs-status-cell">
 			{linked}
 			{cron ? (
 				<Pill pillStyle="light-gray" size="small">
@@ -69,7 +70,7 @@ export const JobStatusCell = ({
 				</Pill>
 			) : null}
 			{nextRun ? (
-				<span style={{ color: 'var(--theme-elevation-500)' }} title={exact}>
+				<span className="jobs-muted" title={exact}>
 					{formatRelativeTime(nextRun, Date.now(), i18n.language)}
 				</span>
 			) : null}

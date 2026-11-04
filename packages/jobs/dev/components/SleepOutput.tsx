@@ -1,12 +1,12 @@
 import type { JobLogSlotProps } from '@10x-media/jobs/types'
 
 const CARD = {
-	backgroundColor: 'var(--theme-elevation-100)',
-	borderRadius: '4px',
+	backgroundColor: 'var(--color-bg-tertiary)',
+	borderRadius: 'var(--radius-medium)',
 	display: 'flex',
 	flexDirection: 'column',
 	gap: '4px',
-	padding: 'calc(var(--base) / 2)',
+	padding: 'var(--spacer-2)',
 } as const
 
 /**
@@ -22,7 +22,7 @@ export const SleepOutput = ({ entry, index, value }: JobLogSlotProps) => {
 				Attempt #{index + 1} {entry.state === 'failed' ? 'gave up' : 'finished'}
 				{typeof slept === 'number' ? ` after ${slept}ms` : ' with no measured duration'}.
 			</span>
-			<span style={{ color: 'var(--theme-elevation-500)', fontSize: '0.75rem' }}>
+			<span style={{ color: 'var(--color-text-secondary)', fontSize: '0.75rem' }}>
 				Rendered by SleepOutput (server)
 			</span>
 		</div>

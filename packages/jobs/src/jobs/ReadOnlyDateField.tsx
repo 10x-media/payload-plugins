@@ -2,10 +2,12 @@
 
 import { FieldLabel, useConfig, useField } from '@payloadcms/ui'
 import { formatDate } from '@payloadcms/ui/shared'
-import type { DateFieldClientComponent } from 'payload'
+import type { DateFieldClientProps } from 'payload'
+import type { FC } from 'react'
 
 import { useTranslation } from '../translations/useTranslation'
 import { formatRelativeTime } from './formatRelativeTime'
+import './jobs.css'
 
 const DEFAULT_DATE_FORMAT = 'MMMM do yyyy, h:mm a'
 
@@ -15,7 +17,7 @@ const DEFAULT_DATE_FORMAT = 'MMMM do yyyy, h:mm a'
  * a relative value ("in 3 hours", "30 seconds ago") with the exact timestamp on
  * hover, and an em dash when empty.
  */
-export const ReadOnlyDateField: DateFieldClientComponent = ({ field, path }) => {
+export const ReadOnlyDateField: FC<DateFieldClientProps> = ({ field, path }) => {
 	const { value } = useField<string>({ path })
 	const { config } = useConfig()
 	const { i18n } = useTranslation()
@@ -29,10 +31,7 @@ export const ReadOnlyDateField: DateFieldClientComponent = ({ field, path }) => 
 		<div className="field-type date-time-field">
 			<FieldLabel label={field.label} path={path} />
 			<span
-				style={{
-					color: relative ? undefined : 'var(--theme-elevation-400)',
-					cursor: exact ? 'help' : undefined,
-				}}
+				className={relative ? (exact ? 'jobs-help' : undefined) : 'jobs-date-value--empty'}
 				title={exact}
 			>
 				{relative || '—'}

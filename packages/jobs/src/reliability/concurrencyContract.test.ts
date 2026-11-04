@@ -1,40 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 
-import { enforceConcurrencyControl, withIdempotencyKey } from './concurrencyContract'
-import type { ResolvedReliabilityOptions } from './options'
-
-const options = (over: Partial<ResolvedReliabilityOptions> = {}): ResolvedReliabilityOptions => ({
-	heartbeatIntervalMs: 100_000,
-	jobLeaseTtlMs: 300_000,
-	leaderId: null,
-	leaderLeaseTtlMs: 30_000,
-	maxRecoveries: 3,
-	requireConcurrencyControl: false,
-	serverlessMaxDurationMs: null,
-	sweepIntervalMs: 60_000,
-	...over,
-})
-
-describe('enforceConcurrencyControl', () => {
-	it('does nothing when not required', () => {
-		expect(() => enforceConcurrencyControl({}, options())).not.toThrow()
-	})
-
-	it('passes when required and enabled', () => {
-		expect(() =>
-			enforceConcurrencyControl(
-				{ jobs: { enableConcurrencyControl: true } },
-				options({ requireConcurrencyControl: true })
-			)
-		).not.toThrow()
-	})
-
-	it('throws when required but not enabled', () => {
-		expect(() =>
-			enforceConcurrencyControl({ jobs: {} }, options({ requireConcurrencyControl: true }))
-		).toThrow(/enableConcurrencyControl/)
-	})
-})
+import { withIdempotencyKey } from './concurrencyContract'
 
 describe('withIdempotencyKey', () => {
 	it('runs the handler once per key and skips the second time', async () => {

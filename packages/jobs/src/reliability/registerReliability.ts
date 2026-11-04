@@ -1,11 +1,10 @@
 import { type Config, type Payload, ValidationError } from 'payload'
 
-import { enforceConcurrencyControl } from './concurrencyContract'
 import { reliabilityJobFields } from './fields'
-import type { HeartbeatPlan } from './heartbeat'
 import { buildJobsLocksCollection, JOBS_LOCKS_SLUG, LEADER_ROLES } from './locksCollection'
 import { resolveNodeId } from './nodeId'
 import type { ResolvedReliabilityOptions } from './options'
+import type { RecoveryPlan } from './recovery'
 
 /** Idempotently ensure one lock row per leadership role. Race-safe via the unique `role`. */
 const ensureLockRows = async (payload: Payload): Promise<void> => {
@@ -33,18 +32,17 @@ const ensureLockRows = async (payload: Payload): Promise<void> => {
 }
 
 /**
- * Register the reliability layer on the incoming config: add diagnostic fields to
- * `payload-jobs` through the same `jobsCollectionOverrides` seam the observability
- * layer uses (composing, never clobbering), add the locks collection, and ensure the
- * lock rows at init (preserving any host onInit). Returns the heartbeat plan, which
- * `wrapJobHandlers` applies at init so tasks added by later plugins beat too.
+ * Register the reliability layer on the incoming config: add the run-tracking
+ * fields to `payload-jobs` through the same `jobsCollectionOverrides` seam the
+ * observability layer uses (composing, never clobbering), add the locks collection,
+ * and ensure the lock rows at init (preserving any host onInit). Returns the
+ * recovery plan, which `wrapJobHandlers` applies at init so tasks added by later
+ * plugins are tracked too.
  */
 export const registerReliability = (
 	config: Config,
 	options: ResolvedReliabilityOptions
-): HeartbeatPlan => {
-	enforceConcurrencyControl(config, options)
-
+): RecoveryPlan => {
 	const existingOverride = config.jobs?.jobsCollectionOverrides
 	config.jobs = {
 		...config.jobs,

@@ -12,20 +12,18 @@ import { extractErrorMessage } from './extractErrorMessage'
 import { formatDuration } from './formatDuration'
 import { formatRelativeTime } from './formatRelativeTime'
 import { hasKeys } from './hasKeys'
+import { SUCCESS_PILL_CLASS } from './jobStatusMeta'
 import type { JobLogEntry, JobLogRenderedEntries, JobLogRenderedSlots } from './logSlotComponents'
 import { logRowKey } from './logSlotComponents'
+import './jobs.css'
 
 const DEFAULT_DATE_FORMAT = 'MMMM do yyyy, h:mm a'
 
 const Chevron = ({ open }: { open: boolean }) => (
 	<svg
 		aria-hidden="true"
+		className={`jobs-log__chevron${open ? ' jobs-log__chevron--open' : ''}`}
 		height="10"
-		style={{
-			flexShrink: 0,
-			transform: open ? 'rotate(90deg)' : 'none',
-			transition: 'transform 0.15s',
-		}}
 		viewBox="0 0 10 10"
 		width="10"
 	>
@@ -34,16 +32,8 @@ const Chevron = ({ open }: { open: boolean }) => (
 )
 
 const Detail = ({ label, value }: { label: string; value: string }) => (
-	<div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-		<span
-			style={{
-				color: 'var(--theme-elevation-500)',
-				fontSize: '0.6875rem',
-				textTransform: 'uppercase',
-			}}
-		>
-			{label}
-		</span>
+	<div className="jobs-log__detail">
+		<span className="jobs-caption">{label}</span>
 		<span>{value}</span>
 	</div>
 )
@@ -54,34 +44,9 @@ const Detail = ({ label, value }: { label: string; value: string }) => (
  * label and the surrounding frame stay ours either way.
  */
 const Block = ({ label, node, value }: { label: string; node?: ReactNode; value: unknown }) => (
-	<div>
-		<div
-			style={{
-				color: 'var(--theme-elevation-500)',
-				fontSize: '0.6875rem',
-				marginBottom: '2px',
-				textTransform: 'uppercase',
-			}}
-		>
-			{label}
-		</div>
-		{node ?? (
-			<pre
-				style={{
-					backgroundColor: 'var(--theme-elevation-100)',
-					borderRadius: '4px',
-					fontSize: '0.75rem',
-					margin: 0,
-					maxHeight: '220px',
-					overflow: 'auto',
-					padding: 'calc(var(--base) / 2)',
-					whiteSpace: 'pre-wrap',
-					wordBreak: 'break-word',
-				}}
-			>
-				{JSON.stringify(value, null, 2)}
-			</pre>
-		)}
+	<div className="jobs-log__block">
+		<div className="jobs-caption">{label}</div>
+		{node ?? <pre className="jobs-log__json">{JSON.stringify(value, null, 2)}</pre>}
 	</div>
 )
 
@@ -111,35 +76,20 @@ const LogRow = ({
 	const absolute = (date?: string): string => (date ? formatDate({ date, i18n, pattern }) : '—')
 
 	return (
-		<div
-			style={{
-				backgroundColor: 'var(--theme-elevation-50)',
-				borderLeft: `3px solid ${failed ? 'var(--theme-error-500)' : 'var(--theme-success-500)'}`,
-				borderRadius: '0 4px 4px 0',
-			}}
-		>
+		<div className={`jobs-log__row${failed ? ' jobs-log__row--failed' : ''}`}>
 			<button
 				aria-expanded={open}
+				className="jobs-reset-button jobs-log__summary"
 				onClick={() => setOpen((prev) => !prev)}
-				style={{
-					alignItems: 'center',
-					background: 'none',
-					border: 'none',
-					color: 'inherit',
-					cursor: 'pointer',
-					display: 'flex',
-					flexWrap: 'wrap',
-					font: 'inherit',
-					gap: 'calc(var(--base) / 2)',
-					padding: 'calc(var(--base) / 2)',
-					textAlign: 'left',
-					width: '100%',
-				}}
 				type="button"
 			>
 				<Chevron open={open} />
-				<span style={{ color: 'var(--theme-elevation-400)' }}>#{index + 1}</span>
-				<Pill pillStyle={failed ? 'error' : 'success'} size="small">
+				<span className="jobs-log__index">#{index + 1}</span>
+				<Pill
+					className={failed ? undefined : SUCCESS_PILL_CLASS}
+					pillStyle={failed ? 'error' : 'light'}
+					size="small"
+				>
 					{failed ? t(keys.statusFailed) : t(keys.statusSucceeded)}
 				</Pill>
 				<strong>
@@ -149,41 +99,14 @@ const LogRow = ({
 							? `${taskLabels[entry.taskSlug ?? '']} (${entry.taskSlug} / ${entry.taskID ?? '?'})`
 							: entry.taskSlug || t(keys.fieldTask)}
 				</strong>
-				{relative ? <span style={{ color: 'var(--theme-elevation-500)' }}>{relative}</span> : null}
-				{duration ? <span style={{ color: 'var(--theme-elevation-500)' }}>{duration}</span> : null}
-				{reason ? (
-					<span
-						style={{
-							color: 'var(--theme-elevation-500)',
-							maxWidth: '32ch',
-							overflow: 'hidden',
-							textOverflow: 'ellipsis',
-							whiteSpace: 'nowrap',
-						}}
-					>
-						{reason}
-					</span>
-				) : null}
+				{relative ? <span className="jobs-muted">{relative}</span> : null}
+				{duration ? <span className="jobs-muted">{duration}</span> : null}
+				{reason ? <span className="jobs-log__reason">{reason}</span> : null}
 			</button>
-			<div
-				style={{
-					display: 'grid',
-					gridTemplateRows: open ? '1fr' : '0fr',
-					transition: 'grid-template-rows 0.2s ease',
-				}}
-			>
-				<div style={{ overflow: 'hidden' }}>
-					<div
-						style={{
-							display: 'flex',
-							flexDirection: 'column',
-							gap: 'calc(var(--base) / 2)',
-							padding: '0 calc(var(--base) / 2) calc(var(--base) / 2)',
-						}}
-					>
-						<div
-							style={{ columnGap: 'var(--base)', display: 'flex', flexWrap: 'wrap', rowGap: '8px' }}
-						>
+			<div className={`jobs-log__details${open ? ' jobs-log__details--open' : ''}`}>
+				<div>
+					<div className="jobs-log__body">
+						<div className="jobs-log__facts">
 							<Detail label={t(keys.fieldExecuted)} value={absolute(entry.executedAt)} />
 							<Detail label={t(keys.fieldCompleted)} value={absolute(entry.completedAt)} />
 							{entry.taskID ? <Detail label={t(keys.fieldTaskId)} value={entry.taskID} /> : null}
@@ -225,11 +148,11 @@ export const JobLogTimeline: FC<
 	const entries = Array.isArray(raw) ? raw : []
 
 	if (entries.length === 0) {
-		return <div style={{ color: 'var(--theme-elevation-450)' }}>{t(keys.noAttempts)}</div>
+		return <div className="jobs-muted">{t(keys.noAttempts)}</div>
 	}
 
 	return (
-		<div style={{ display: 'flex', flexDirection: 'column', gap: 'calc(var(--base) / 2)' }}>
+		<div className="jobs-log">
 			{entries.map((entry, index) => (
 				<LogRow
 					entry={entry}

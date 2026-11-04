@@ -3,7 +3,7 @@ import type { PayloadRequest, TaskConfig } from 'payload'
 import { afterAll, afterEach, beforeAll, expect, it } from 'vitest'
 
 import { jobs } from '../../src/index'
-import { runControlEndpoint, statusEndpoint, sweepEndpoint } from '../../src/queueControl/endpoints'
+import { runControlEndpoint, statusEndpoint } from '../../src/queueControl/endpoints'
 import { createPauseStore } from '../../src/queueControl/pauseStore'
 import { getQueueHealth } from '../../src/queueControl/queueHealth'
 
@@ -85,13 +85,23 @@ describeForDb('queue health', {}, (db) => {
 	})
 
 	it('counts pending and processing and reports a null lastScheduledRun', async () => {
-		await booted.payload.jobs.queue({ input: {}, queue: 'default', task: 'noop' })
-		const proc = await booted.payload.jobs.queue({ input: {}, queue: 'emails', task: 'noop' })
-		await booted.payload.update({
-			collection: 'payload-jobs',
-			data: { processing: true },
-			id: proc.id,
+		await booted.payload.jobs.queue({
 			overrideAccess: true,
+			input: {},
+			queue: 'default',
+			task: 'noop',
+		})
+		const proc = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			queue: 'emails',
+			task: 'noop',
+		})
+		await booted.payload.db.updateOne({
+			collection: 'payload-jobs',
+			data: { processingUntil: new Date(Date.now() + 60_000).toISOString() },
+			id: proc.id,
+			returning: false,
 		})
 
 		const report = await getQueueHealth(booted.payload, {
@@ -108,13 +118,17 @@ describeForDb('queue health', {}, (db) => {
 
 	it('counts succeeded jobs and reports recovered from recoveryAttempts, not as a copy of retrying', async () => {
 		// A job that ultimately succeeded after one or more recovery attempts.
-		const done = await booted.payload.jobs.queue({ input: {}, queue: 'default', task: 'noop' })
+		const done = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			queue: 'default',
+			task: 'noop',
+		})
 		await booted.payload.update({
 			collection: 'payload-jobs',
 			data: {
 				completedAt: new Date('2026-08-01T00:00:00.000Z').toISOString(),
 				hasError: false,
-				processing: false,
 				recoveryAttempts: 2,
 			},
 			id: done.id,
@@ -173,8 +187,18 @@ describeForDb('queue-control endpoints', {}, (db) => {
 
 	it('run endpoint honors a paused queue', async () => {
 		await createPauseStore(booted.payload).pause('emails')
-		await booted.payload.jobs.queue({ input: {}, queue: 'emails', task: 'noop' })
-		await booted.payload.jobs.queue({ input: {}, queue: 'default', task: 'noop' })
+		await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			queue: 'emails',
+			task: 'noop',
+		})
+		await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			queue: 'default',
+			task: 'noop',
+		})
 
 		const res = await runControlEndpoint(deps(booted)).handler(
 			fakeReq(booted, { query: { allQueues: 'true' } })
@@ -182,10 +206,12 @@ describeForDb('queue-control endpoints', {}, (db) => {
 		expect(res.status).toBe(200)
 		// emails is paused, so its job remains; default ran and was deleted (deleteJobOnComplete).
 		const emailsLeft = await booted.payload.count({
+			overrideAccess: true,
 			collection: 'payload-jobs',
 			where: { queue: { equals: 'emails' } },
 		})
 		const defaultLeft = await booted.payload.count({
+			overrideAccess: true,
 			collection: 'payload-jobs',
 			where: { queue: { equals: 'default' } },
 		})
@@ -193,37 +219,20 @@ describeForDb('queue-control endpoints', {}, (db) => {
 		expect(defaultLeft.totalDocs).toBe(0)
 	})
 
-	it('sweep endpoint runs the sweeper when reliability is enabled', async () => {
-		const resolved = booted.payload.config.jobs
-		expect(resolved).toBeDefined()
-		const res = await sweepEndpoint(
-			deps(booted, {
-				reliability: {
-					heartbeatIntervalMs: 100_000,
-					jobLeaseTtlMs: 300_000,
-					leaderId: null,
-					leaderLeaseTtlMs: 30_000,
-					maxRecoveries: 3,
-					requireConcurrencyControl: false,
-					serverlessMaxDurationMs: null,
-					sweepIntervalMs: 60_000,
-				},
-			})
-		).handler(fakeReq(booted))
-		expect(res.status).toBe(200)
-		const body = (await res.json()) as { scanned: number }
-		expect(typeof body.scanned).toBe('number')
-	})
-
-	it('sweep endpoint returns 400 when reliability is disabled', async () => {
-		const res = await sweepEndpoint(deps(booted)).handler(fakeReq(booted))
-		expect(res.status).toBe(400)
-	})
-
 	it('run endpoint runs nothing while globally paused', async () => {
 		await createPauseStore(booted.payload).pause()
-		await booted.payload.jobs.queue({ input: {}, queue: 'default', task: 'noop' })
-		await booted.payload.jobs.queue({ input: {}, queue: 'emails', task: 'noop' })
+		await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			queue: 'default',
+			task: 'noop',
+		})
+		await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			queue: 'emails',
+			task: 'noop',
+		})
 
 		const res = await runControlEndpoint(deps(booted)).handler(
 			fakeReq(booted, { query: { allQueues: 'true' } })
@@ -231,7 +240,7 @@ describeForDb('queue-control endpoints', {}, (db) => {
 		expect(res.status).toBe(200)
 		const body = (await res.json()) as { ran: number }
 		expect(body.ran).toBe(0)
-		const total = await booted.payload.count({ collection: 'payload-jobs' })
+		const total = await booted.payload.count({ overrideAccess: true, collection: 'payload-jobs' })
 		expect(total.totalDocs).toBe(2) // both jobs remain; nothing ran
 	})
 })
@@ -257,7 +266,7 @@ describeForDb('queue-control registration', {}, (db) => {
 		const paths = endpoints.map((e) => e.path)
 		expect(paths).toContain('/queue-status')
 		expect(paths).toContain('/queue-run')
-		expect(paths).toContain('/queue-sweep')
+		expect(paths).not.toContain('/queue-sweep')
 		expect(typeof booted.payload.config.jobs?.access?.run).toBe('function')
 	})
 })

@@ -1,9 +1,9 @@
 'use client'
 
 import { Link, useListQuery } from '@payloadcms/ui'
-import type { CSSProperties, ReactNode } from 'react'
+import type { ReactNode } from 'react'
 
-const chipStyle: CSSProperties = { color: 'inherit', textDecoration: 'none' }
+import './jobs.css'
 
 /**
  * The health bar's total chip. Inside the list view it resets search and filters
@@ -20,7 +20,7 @@ export const JobsTotalChip = ({
 	const listQuery = useListQuery()
 	if (typeof listQuery.refineListData !== 'function') {
 		return (
-			<Link href={fallbackHref} prefetch={false} style={chipStyle}>
+			<Link className="jobs-plain-link" href={fallbackHref} prefetch={false}>
 				{children}
 			</Link>
 		)
@@ -31,14 +31,7 @@ export const JobsTotalChip = ({
 			// (handleSearchChange and resetQueryPreset); mergeQuery only replaces keys
 			// present in the incoming query, so both must be passed explicitly.
 			onClick={() => void listQuery.refineListData({ page: 1, search: undefined, where: {} })}
-			style={{
-				...chipStyle,
-				background: 'none',
-				border: 'none',
-				cursor: 'pointer',
-				font: 'inherit',
-				padding: 0,
-			}}
+			className="jobs-reset-button"
 			type="button"
 		>
 			{children}

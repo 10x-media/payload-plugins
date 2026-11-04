@@ -15,6 +15,8 @@ import { collectLogDependencies } from '../jobs/logSlotComponents'
 import type { JobsOptions } from '../options'
 import { keys } from '../translations/keys'
 import { asTranslate, labelForKey } from '../translations/server'
+import { castCancelledQuery } from './castCancelledQuery'
+import { withJobsAccess } from './jobsAccess'
 import { collectJobLabels, type JobLabelMaps } from './labelMaps'
 import { resolve } from './resolve'
 import {
@@ -24,6 +26,7 @@ import {
 	unionSelectValues,
 	workflowCondition,
 } from './selectFields'
+import { withCellInputs } from './statusSelect'
 
 const STATUS_CELL = '@10x-media/jobs/client#JobStatusCell'
 const STATUS_HEADER = '@10x-media/jobs/client#JobStatusHeader'
@@ -33,6 +36,7 @@ const LOG_TIMELINE = '@10x-media/jobs/rsc#JobLogTimelineServer'
 const DOC_DESCRIPTION = '@10x-media/jobs/client#JobDocDescription'
 const HEALTH_BAR = '@10x-media/jobs/rsc#JobsHealthBar'
 const WAIT_UNTIL_FIELD = '@10x-media/jobs/client#WaitUntilField'
+const READONLY_DATE_FIELD = '@10x-media/jobs/client#ReadOnlyDateField'
 const JOB_TITLE_CELL = '@10x-media/jobs/client#JobTitleCell'
 const QUEUE_SELECT_FIELD = '@10x-media/jobs/client#QueueSelectField'
 const ATTEMPTS_CELL = '@10x-media/jobs/client#AttemptsCell'
@@ -46,7 +50,7 @@ const TITLE_FIELD: Field = {
 	admin: {
 		// Form-only hide: admin.hidden would also strip it from list columns.
 		condition: () => false,
-		disableBulkEdit: true,
+		disabled: { bulkEdit: true },
 	},
 }
 
@@ -82,6 +86,8 @@ const rejectWorkflowAndTask: CollectionBeforeValidateHook = ({
 /** Our default document Field component for specific job fields. */
 const FIELD_COMPONENTS: Record<string, PayloadComponent> = {
 	error: ERROR_PANEL,
+	// Payload 4's claim lease, renewed while the job runs; set only while it does.
+	processingUntil: READONLY_DATE_FIELD,
 	waitUntil: WAIT_UNTIL_FIELD,
 }
 
@@ -89,6 +95,7 @@ const DEFAULT_JOBS_COLUMNS = ['jobTitle', 'status', 'queue', 'totalTried', 'upda
 
 /** Friendlier labels for a few of Payload's default job fields. */
 const FIELD_LABELS: Record<string, LabelFunction> = {
+	processingUntil: labelForKey(keys.fieldLeaseExpires),
 	totalTried: labelForKey(keys.fieldAttempts),
 	waitUntil: labelForKey(keys.fieldScheduledFor),
 	workflowSlug: labelForKey(keys.fieldWorkflow),
@@ -104,14 +111,14 @@ const TIMESTAMP_FIELDS: Field[] = [
 		type: 'date',
 		label: labelForKey(keys.fieldCreated),
 		index: true,
-		admin: { disableBulkEdit: true, hidden: true },
+		admin: { disabled: { bulkEdit: true }, hidden: true },
 	},
 	{
 		name: 'updatedAt',
 		type: 'date',
 		label: labelForKey(keys.fieldUpdated),
 		index: true,
-		admin: { disableBulkEdit: true, hidden: true },
+		admin: { disabled: { bulkEdit: true }, hidden: true },
 	},
 ]
 
@@ -153,7 +160,7 @@ const resolveCell = (field: Field, cells: JobsOptions['cells']): Field => {
 }
 
 /** Execution-state fields surfaced in the header; hidden from the form, kept as data/columns. */
-const HIDE_ALWAYS = new Set(['completedAt', 'totalTried', 'hasError', 'processing', 'taskStatus'])
+const HIDE_ALWAYS = new Set(['completedAt', 'totalTried', 'hasError', 'taskStatus'])
 /** Execution output: read-only in the admin (admin-only, so the runner can still write it). */
 const READONLY_OUTPUTS = new Set(['error', 'log'])
 /** Config inputs: editable on Create, read-only on edit; kept in the sidebar. */
@@ -280,13 +287,19 @@ export const registerJobsEnhancements = (
 	}
 
 	const existing = config.jobs?.jobsCollectionOverrides
+	// Captured now: the plugin hardens `jobs.access.run` after this runs.
+	const hostAccess = config.jobs?.access
 
 	const enhance = ({
 		defaultJobsCollection,
 	}: {
 		defaultJobsCollection: CollectionConfig
 	}): CollectionConfig => {
-		const base = existing ? existing({ defaultJobsCollection }) : defaultJobsCollection
+		const base = withJobsAccess(
+			existing ? existing({ defaultJobsCollection }) : defaultJobsCollection,
+			defaultJobsCollection,
+			hostAccess
+		)
 		const existingNames = new Set(
 			base.fields.flatMap((field) => {
 				const name = fieldName(field)
@@ -396,8 +409,10 @@ export const registerJobsEnhancements = (
 					beforeListTable: [...hostBeforeTable, ...ourBeforeTable],
 				},
 			},
+			select: withCellInputs(base.select),
 			hooks: {
 				...base.hooks,
+				beforeOperation: [...(base.hooks?.beforeOperation ?? []), castCancelledQuery],
 				beforeChange: [...(base.hooks?.beforeChange ?? []), setJobTitle],
 				beforeValidate: [...(base.hooks?.beforeValidate ?? []), rejectWorkflowAndTask],
 			},

@@ -7,9 +7,12 @@ describe('jobsListURL', () => {
 	})
 
 	it('serializes the status where-clause into query params', () => {
-		const url = jobsListURL('/admin', 'running')
+		const now = Date.parse('2026-07-08T12:00:00Z')
+		const url = jobsListURL('/admin', 'running', now)
 		expect(url).toContain('/admin/collections/payload-jobs?')
-		expect(decodeURIComponent(url)).toContain('where[processing][equals]=true')
+		expect(decodeURIComponent(url)).toContain(
+			'where[or][0][and][0][processingUntil][greater_than]=2026-07-08T12:00:00.000Z'
+		)
 	})
 
 	it('pins scheduled clauses to the provided timestamp', () => {

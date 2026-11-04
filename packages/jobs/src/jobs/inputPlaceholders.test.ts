@@ -116,8 +116,7 @@ describe('derivePlaceholder', () => {
 			{
 				name: 'refs',
 				type: 'blocks',
-				blocks: [],
-				blockReferences: ['shared', { slug: 'local', fields: [{ name: 'on', type: 'checkbox' }] }],
+				blocks: ['shared', { slug: 'local', fields: [{ name: 'on', type: 'checkbox' }] }],
 			},
 		]
 		expect(derivePlaceholder(fields)).toEqual({

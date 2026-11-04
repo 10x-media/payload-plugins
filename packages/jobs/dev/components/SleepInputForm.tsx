@@ -13,7 +13,7 @@ export const SleepInputForm = ({ path, placeholder, readOnly }: JobInputComponen
 	const { setValue, value } = useField<{ ms?: number } | null>({ path })
 
 	return (
-		<div style={{ display: 'grid', gap: 'calc(var(--base) / 2)' }}>
+		<div style={{ display: 'grid', gap: 'var(--spacer-2)' }}>
 			<TextInput
 				label="Sleep for (ms)"
 				onChange={(event: ChangeEvent<HTMLInputElement>) =>
@@ -23,7 +23,7 @@ export const SleepInputForm = ({ path, placeholder, readOnly }: JobInputComponen
 				readOnly={readOnly}
 				value={String(value?.ms ?? '')}
 			/>
-			<small style={{ color: 'var(--theme-elevation-500)' }}>
+			<small style={{ color: 'var(--color-text-secondary)' }}>
 				Placeholder from input.examples: <code>{JSON.stringify(placeholder)}</code>
 			</small>
 		</div>

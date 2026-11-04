@@ -17,7 +17,7 @@ declare module 'payload' {
 }
 
 /**
- * Jobs plugin for Payload v3. Enhances the built-in `payload-jobs` collection
+ * Jobs plugin for Payload. Enhances the built-in `payload-jobs` collection
  * with an ops dashboard (status, queue health, error and log panels) and the
  * supporting i18n. Authored with `definePlugin` so the automations and webhooks
  * plugins can detect it by slug. Runs first (`order: 0`).
@@ -25,7 +25,7 @@ declare module 'payload' {
 export const jobs = definePlugin<JobsPluginOptions>({
 	slug: '@10x-media/jobs',
 	order: 0,
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config, options = {} }): Config => {
 		if (options.disabled === true) {
 			return config
 		}
@@ -37,8 +37,8 @@ export const jobs = definePlugin<JobsPluginOptions>({
 			...(options.queues ?? []),
 			...(queueControl?.queues ?? []),
 		])
-		const heartbeat = reliability ? registerReliability(config, reliability) : null
-		registerInterruption(config, options.interrupt, heartbeat)
+		const recovery = reliability ? registerReliability(config, reliability) : null
+		registerInterruption(config, options.interrupt, recovery)
 		if (queueControl) {
 			registerQueueControl(config, queueControl, reliability)
 		}
@@ -141,15 +141,6 @@ export {
 	withIdempotencyKey,
 } from './reliability/concurrencyContract'
 export {
-	createJobLeaseStore,
-	type DeadLetterArgs,
-	type JobId,
-	type JobLeaseResult,
-	type JobLeaseRow,
-	type JobLeaseStore,
-	type StampResult,
-} from './reliability/jobLeaseStore'
-export {
 	createLeaderController,
 	type LeaderController,
 } from './reliability/leaderController'
@@ -165,5 +156,5 @@ export {
 	type ResolvedReliabilityOptions,
 	resolveReliabilityOptions,
 } from './reliability/options'
+export { type JobId, releaseClaims } from './reliability/recovery'
 export { decideRecovery, type RecoveryDecision } from './reliability/recoveryDecision'
-export { type RunSweepArgs, runSweep, type SweepResult } from './reliability/sweeper'

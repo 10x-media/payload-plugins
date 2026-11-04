@@ -12,7 +12,6 @@ import { resetHandlersInstalled } from '../../src/execution/signals'
 import { createWorker, type WorkerTestHandle } from '../../src/execution/worker'
 import { jobs } from '../../src/index'
 import { createPauseStore } from '../../src/queueControl/pauseStore'
-import { createJobLeaseStore } from '../../src/reliability/jobLeaseStore'
 import { createLeaseStore } from '../../src/reliability/leaseStore'
 import { resolveReliabilityOptions } from '../../src/reliability/options'
 
@@ -40,22 +39,29 @@ const countingTask: TaskConfig<'count'> = {
 	},
 }
 
-/** Queue a job, then force it into a claimed state owned by `claimedBy`. */
+/** Queue a job, then force it into a claimed state marked as run by `claimedBy`. */
 const claimedJob = async (booted: BootedPayload, claimedBy: string) => {
-	const job = await booted.payload.jobs.queue({ input: {}, task: 'count' })
-	await booted.payload.update({
+	const job = await booted.payload.jobs.queue({ input: {}, overrideAccess: true, task: 'count' })
+	await booted.payload.db.updateOne({
 		collection: 'payload-jobs',
 		data: {
 			claimedBy,
-			fenceToken: 1,
-			leaseExpiresAt: new Date('2027-01-01T00:00:00.000Z'),
-			processing: true,
+			processingToken: 'token',
+			processingUntil: new Date('2027-01-01T00:00:00.000Z').toISOString(),
 		},
 		id: job.id,
-		overrideAccess: true,
+		returning: false,
 	})
 	return job.id
 }
+
+const leaseOf = async (booted: BootedPayload, id: number | string) =>
+	(
+		(await booted.payload.db.findOne({
+			collection: 'payload-jobs',
+			where: { id: { equals: id } },
+		})) as { processingUntil?: null | string } | null
+	)?.processingUntil ?? null
 
 const virtualClock = () => {
 	let nowMs = 0
@@ -67,46 +73,6 @@ const virtualClock = () => {
 		},
 	}
 }
-
-describeForDb('job lease store releaseAllClaims', {}, (db) => {
-	let booted: BootedPayload
-
-	beforeAll(async () => {
-		booted = await bootPayload({
-			plugin: jobs({ reliability: {} }),
-			db,
-			configOverrides: { jobs: { tasks: [countingTask] } },
-		})
-	})
-
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	afterEach(async () => {
-		await booted.payload.delete({ collection: 'payload-jobs', overrideAccess: true, where: {} })
-	})
-
-	it('requeues only the given owner in-flight jobs and bumps recoveryAttempts', async () => {
-		const a1 = await claimedJob(booted, 'node-A')
-		const a2 = await claimedJob(booted, 'node-A')
-		const b1 = await claimedJob(booted, 'node-B')
-		const store = createJobLeaseStore(booted.payload)
-
-		const { released } = await store.releaseAllClaims('node-A')
-		expect(released).toBe(2)
-
-		const ra1 = await store.read(a1)
-		const ra2 = await store.read(a2)
-		const rb1 = await store.read(b1)
-		expect(ra1?.processing).toBe(false)
-		expect(ra1?.recoveryAttempts).toBe(1)
-		expect(ra1?.claimedBy).toBeNull()
-		expect(ra2?.processing).toBe(false)
-		expect(rb1?.processing).toBe(true) // node-B untouched
-		expect(rb1?.claimedBy).toBe('node-B')
-	})
-})
 
 describeForDb('worker graceful drain', {}, (db) => {
 	let booted: BootedPayload
@@ -132,13 +98,11 @@ describeForDb('worker graceful drain', {}, (db) => {
 	it('on a clean drain releases leadership and destroys without requeuing fresh claims (item 26)', async () => {
 		clock = installTestClock(new Date('2026-08-01T00:00:00.000Z'))
 		const leaseStore = createLeaseStore(booted.payload)
-		const jobLeaseStore = createJobLeaseStore(booted.payload)
 		// The worker's node id is resolveNodeId('worker-node') === 'worker-node'.
 		await leaseStore.acquireOrSteal('scheduler', 'worker-node', 30_000, clock.now())
-		await leaseStore.acquireOrSteal('sweeper', 'worker-node', 30_000, clock.now())
 		// Two jobs claimed-in-DB with a valid (future) lease, but NOT tracked by this
 		// process's in-flight counter: this is exactly the shape of a job that just
-		// completed but whose processing:false write has not yet landed.
+		// completed but whose lease-clearing write has not yet landed.
 		const a1 = await claimedJob(booted, 'worker-node')
 		const a2 = await claimedJob(booted, 'worker-node')
 
@@ -160,16 +124,14 @@ describeForDb('worker graceful drain', {}, (db) => {
 		expect(res.inFlightAtStart).toBe(0)
 		expect(res.timedOut).toBe(false)
 		// A clean drain must NOT force-release this node's claims: the two valid-lease
-		// rows are left untouched (their recoveryAttempts stay 0, they are not requeued).
-		// Genuinely orphaned claims carry expired leases and are recovered by the sweeper.
+		// rows are left untouched. Genuinely orphaned claims carry lapsed leases, and
+		// Payload reclaims those itself.
 		expect(res.requeued).toBe(0)
-		expect((await jobLeaseStore.read(a1))?.processing).toBe(true)
-		expect((await jobLeaseStore.read(a1))?.recoveryAttempts).toBe(0)
-		expect((await jobLeaseStore.read(a2))?.processing).toBe(true)
+		expect(await leaseOf(booted, a1)).toBeTruthy()
+		expect(await leaseOf(booted, a2)).toBeTruthy()
 		// Leadership is still released and the instance still destroyed on the clean path.
 		expect(destroy).toHaveBeenCalledTimes(1)
 		expect((await leaseStore.read('scheduler'))?.owner).toBeNull()
-		expect((await leaseStore.read('sweeper'))?.owner).toBeNull()
 
 		// drain is idempotent: a repeat call returns the same result without re-destroying.
 		const again = await worker.drain()
@@ -203,9 +165,8 @@ describeForDb('worker scheduling flag', {}, (db) => {
 		}) as WorkerTestHandle
 		worker.start()
 		try {
-			// Sweeper leadership proves the flag is scoped: the same maintenance tick that
-			// acquired the sweeper lease would have acquired the scheduler lease first.
-			await expect.poll(() => worker.isLeader('sweeper'), { timeout: 5000 }).toBe(true)
+			// Several maintenance ticks pass; none of them may contend for the lease.
+			await new Promise((resolve) => setTimeout(resolve, 400))
 			expect(worker.isLeader('scheduler')).toBe(false)
 			const lease = await createLeaseStore(booted.payload).read('scheduler')
 			expect(lease?.owner ?? null).toBeNull()
@@ -238,7 +199,7 @@ describeForDb('worker run loop', {}, (db) => {
 			reliability: resolved(),
 			runIntervalMs: 50,
 		})
-		await booted.payload.jobs.queue({ input: {}, task: 'count' })
+		await booted.payload.jobs.queue({ overrideAccess: true, input: {}, task: 'count' })
 		worker.start()
 		// Poll until the 50ms run loop has claimed and executed the job. A generous cap
 		// keeps this robust under heavy concurrent-suite load (no fixed-window flake).
@@ -281,7 +242,7 @@ describeForDb('worker run loop', {}, (db) => {
 		worker.start()
 		try {
 			// Liveness: with no pause the worker runs a queued job.
-			await booted.payload.jobs.queue({ input: {}, task: 'count' })
+			await booted.payload.jobs.queue({ overrideAccess: true, input: {}, task: 'count' })
 			const live = Date.now() + 5000
 			while (ran < 1 && Date.now() < live) {
 				await new Promise((r) => setTimeout(r, 25))
@@ -296,7 +257,7 @@ describeForDb('worker run loop', {}, (db) => {
 			// in-flight tick has completed; the pause write above is committed, so every tick
 			// starting after this line reads the paused state before scanning.
 			await worker.settle()
-			await booted.payload.jobs.queue({ input: {}, task: 'count' })
+			await booted.payload.jobs.queue({ overrideAccess: true, input: {}, task: 'count' })
 			await new Promise((r) => setTimeout(r, 500))
 			expect(ran).toBe(afterLive)
 

@@ -49,7 +49,10 @@ describeForDb('jobs reliability registration', {}, (db) => {
 	})
 
 	it('seeds one lock row per leadership role', async () => {
-		const { totalDocs } = await booted.payload.count({ collection: JOBS_LOCKS_SLUG })
+		const { totalDocs } = await booted.payload.count({
+			overrideAccess: true,
+			collection: JOBS_LOCKS_SLUG,
+		})
 		expect(totalDocs).toBe(LEADER_ROLES.length)
 	})
 
@@ -58,14 +61,14 @@ describeForDb('jobs reliability registration', {}, (db) => {
 		const names = new Set(
 			fields.flatMap((f) => ('name' in f && typeof f.name === 'string' ? [f.name] : []))
 		)
-		expect(names.has('leaseExpiresAt')).toBe(true)
+		expect(names.has('startedAt')).toBe(true)
 		expect(names.has('recoveryAttempts')).toBe(true)
 		expect(names.has('claimedBy')).toBe(true)
 	})
 
 	it('read returns the pristine seeded shape for an untouched role', async () => {
-		const rec = await createLeaseStore(booted.payload).read('sweeper')
-		expect(rec?.role).toBe('sweeper')
+		const rec = await createLeaseStore(booted.payload).read('scheduler')
+		expect(rec?.role).toBe('scheduler')
 		expect(rec?.owner).toBeNull()
 		expect(rec?.leaseExpiresAt).toBeNull()
 		expect(rec?.fenceToken).toBe(0)
@@ -198,15 +201,15 @@ describeForDb('lease store concurrency', {}, (db) => {
 	it('yields exactly one winner under N concurrent acquires of a free lease', async () => {
 		clock = installTestClock(new Date('2026-03-01T00:00:00.000Z'))
 		const s = createLeaseStore(booted.payload)
-		// Free the sweeper lease first.
-		const taken = await s.acquireOrSteal('sweeper', 'reset', 1, clock.now())
+		// Free the scheduler lease first.
+		const taken = await s.acquireOrSteal('scheduler', 'reset', 1, clock.now())
 		if (taken.ok) {
-			await s.release('sweeper', 'reset')
+			await s.release('scheduler', 'reset')
 		}
 
 		const now = clock.now()
 		const results = await Promise.all(
-			Array.from({ length: 20 }, (_, i) => s.acquireOrSteal('sweeper', `node-${i}`, 30_000, now))
+			Array.from({ length: 20 }, (_, i) => s.acquireOrSteal('scheduler', `node-${i}`, 30_000, now))
 		)
 		const winners = results.filter((r) => r.ok)
 		expect(winners).toHaveLength(1)
@@ -215,7 +218,7 @@ describeForDb('lease store concurrency', {}, (db) => {
 			clock.advance(40_000)
 			const again = await Promise.all(
 				Array.from({ length: 20 }, (_, i) =>
-					s.acquireOrSteal('sweeper', `r${round}-node-${i}`, 30_000, clock.now())
+					s.acquireOrSteal('scheduler', `r${round}-node-${i}`, 30_000, clock.now())
 				)
 			)
 			expect(again.filter((r) => r.ok)).toHaveLength(1)

@@ -3,8 +3,12 @@ import type { CollectionConfig } from 'payload'
 /** Slug of the plugin-owned leases collection. Table name: payload_jobs_locks. */
 export const JOBS_LOCKS_SLUG = 'payload-jobs-locks'
 
-/** The two singleton leadership roles. */
-export const LEADER_ROLES = ['scheduler', 'sweeper'] as const
+/**
+ * The singleton leadership roles. Payload 4 recovers crashed jobs through its own
+ * lease, so the sweeper role of earlier versions is gone; an old `sweeper` row is
+ * left alone and unused.
+ */
+export const LEADER_ROLES = ['scheduler'] as const
 export type LeaderRole = (typeof LEADER_ROLES)[number]
 
 /**

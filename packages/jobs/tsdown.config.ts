@@ -8,4 +8,6 @@ export default definePluginBuild({
 		'exports/rsc': 'src/exports/rsc.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
 	},
+	// Every stylesheet, mirroring src/ into dist/, so each `import './x.css'` resolves.
+	copy: [{ flatten: false, from: 'src/**/*.css', to: 'dist' }],
 })

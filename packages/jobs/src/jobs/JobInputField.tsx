@@ -61,5 +61,11 @@ export const JobInputField: FC<JobInputFieldProps> = (props) => {
 	}, [id, selected, placeholder, setValue, getDataByPath, path])
 
 	const custom = selected ? rendered?.[selected] : undefined
-	return custom ?? <JSONField path={path} {...fieldProps} />
+	// Payload spaces fields through `.render-fields > .field-type`; a custom editor
+	// renders bare, so it gets the class here to sit apart from the next field.
+	return custom ? (
+		<div className="field-type">{custom}</div>
+	) : (
+		<JSONField path={path} {...fieldProps} />
+	)
 }

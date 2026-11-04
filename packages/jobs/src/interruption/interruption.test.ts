@@ -90,7 +90,8 @@ describe('interruptionUpdate', () => {
 			deferredBy: 'lock',
 			error: null,
 			hasError: false,
-			processing: false,
+			processingToken: null,
+			processingUntil: null,
 			totalTried: 2,
 			waitUntil: until.toISOString(),
 		})
@@ -114,7 +115,8 @@ describe('interruptionUpdate', () => {
 				reason: 'locked',
 			},
 			hasError: true,
-			processing: false,
+			processingToken: null,
+			processingUntil: null,
 			waitUntil: null,
 		})
 	})
@@ -131,17 +133,22 @@ describe('interruptionStep', () => {
 		until,
 	}
 
+	const NOW = Date.parse('2026-05-30T12:00:00.000Z')
+	const leased = new Date(NOW + 60_000).toISOString()
+	const lapsed = new Date(NOW - 60_000).toISOString()
+
 	it('applies to the settled attempt it recorded', () => {
-		expect(interruptionStep(record, { processing: false, totalTried: 3 })).toBe('apply')
+		expect(interruptionStep(record, { processingUntil: null, totalTried: 3 }, NOW)).toBe('apply')
+		expect(interruptionStep(record, { processingUntil: lapsed, totalTried: 3 }, NOW)).toBe('apply')
 	})
 
 	it('waits while Payload has not written the attempt yet', () => {
-		expect(interruptionStep(record, { processing: true, totalTried: 2 })).toBe('wait')
+		expect(interruptionStep(record, { processingUntil: leased, totalTried: 2 }, NOW)).toBe('wait')
 	})
 
 	it('drops when another node claimed the job again', () => {
-		expect(interruptionStep(record, { processing: true, totalTried: 3 })).toBe('drop')
-		expect(interruptionStep(record, { processing: false, totalTried: 4 })).toBe('drop')
+		expect(interruptionStep(record, { processingUntil: leased, totalTried: 3 }, NOW)).toBe('drop')
+		expect(interruptionStep(record, { processingUntil: null, totalTried: 4 }, NOW)).toBe('drop')
 	})
 
 	it('drops a completed or missing job', () => {

@@ -1,0 +1,236 @@
+/* Shared styles for the jobs dashboard: list cells, the health bar, the
+   document header, the error panel and the attempt timeline. */
+
+/* Caption over a value (header facts, panel and block titles): body size in the
+   secondary color, as Payload 4 sets field descriptions and the "Updated" line. */
+.jobs-caption {
+	color: var(--color-text-secondary);
+}
+
+/* Emphasis at the weight Payload 4 gives field labels, not the browser's bold. */
+.jobs-health-bar strong,
+.jobs-log__summary strong {
+	font-weight: var(--text-body-medium-bold-font-weight);
+}
+
+.jobs-muted {
+	color: var(--color-text-secondary);
+}
+
+.jobs-help {
+	cursor: help;
+}
+
+.jobs-plain-link {
+	color: inherit;
+	text-decoration: none;
+}
+
+.jobs-reset-button {
+	background: none;
+	border: none;
+	color: inherit;
+	cursor: pointer;
+	font: inherit;
+	padding: 0;
+}
+
+/* Health bar ------------------------------------------------------------------ */
+
+.jobs-health-bar {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--spacer-2);
+	padding-block: var(--spacer-3);
+}
+
+/* Status cell ------------------------------------------------------------------ */
+
+.jobs-status-cell {
+	align-items: center;
+	display: inline-flex;
+	gap: var(--spacer-1);
+}
+
+/* Document header ---------------------------------------------------------------- */
+
+.jobs-doc-id {
+	align-items: center;
+	color: var(--color-text-secondary);
+	display: flex;
+	gap: var(--spacer-1);
+}
+
+.jobs-doc-id code {
+	font-family: var(--font-mono, monospace);
+	font-size: var(--text-mono-medium-font-size);
+}
+
+.jobs-doc-id .copy-to-clipboard {
+	color: var(--color-icon-secondary);
+}
+
+.jobs-status-header {
+	/* The rule under the facts spans the main column edge to edge, as Payload's own
+	   tabs rule does: bleed out by the gutter, pad back in by the same amount. */
+	align-items: flex-end;
+	border-bottom: 1px solid var(--color-border);
+	column-gap: var(--spacer-5);
+	display: flex;
+	flex-wrap: wrap;
+	margin-bottom: var(--spacer-5);
+	margin-inline: calc(var(--gutter-h) * -1 * var(--field-border-bleed, 1));
+	padding-bottom: var(--spacer-4);
+	padding-inline: calc(var(--gutter-h) * var(--field-border-bleed, 1));
+	row-gap: var(--spacer-3);
+}
+
+.jobs-fact {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.jobs-fact__value {
+	font-weight: var(--text-body-medium-bold-font-weight);
+	position: relative;
+	width: fit-content;
+}
+
+/* Error panel ------------------------------------------------------------------- */
+
+.jobs-error-panel {
+	margin-bottom: var(--spacer-4);
+}
+
+.jobs-error-panel .jobs-caption {
+	margin-bottom: var(--spacer-1);
+}
+
+.jobs-error-panel .banner {
+	font-weight: var(--text-body-medium-font-weight);
+	word-break: break-word;
+}
+
+/* Read-only date field ------------------------------------------------------------ */
+
+.jobs-date-value--empty {
+	color: var(--color-text-tertiary);
+}
+
+/* Attempt timeline ----------------------------------------------------------------- */
+
+.jobs-log {
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacer-2);
+}
+
+/* Rounded all round, the attempt's outcome kept as a colored start edge. */
+.jobs-log__row {
+	background-color: var(--color-bg-secondary);
+	border: 1px solid var(--color-border);
+	border-inline-start: 3px solid var(--color-bg-success);
+	border-radius: var(--radius-medium);
+}
+
+.jobs-log__row--failed {
+	border-inline-start-color: var(--color-bg-danger);
+}
+
+.jobs-log__summary {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	gap: var(--spacer-2);
+	padding: var(--spacer-2);
+	text-align: start;
+	width: 100%;
+}
+
+.jobs-log__summary:focus-visible {
+	outline: 2px solid var(--color-border-selected, var(--color-border-strong));
+	outline-offset: -2px;
+}
+
+.jobs-log__index {
+	color: var(--color-text-tertiary);
+}
+
+.jobs-log__reason {
+	color: var(--color-text-secondary);
+	max-width: 32ch;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.jobs-log__chevron {
+	flex-shrink: 0;
+	transition: transform 0.15s;
+}
+
+.jobs-log__chevron--open {
+	transform: rotate(90deg);
+}
+
+[dir="rtl"] .jobs-log__chevron:not(.jobs-log__chevron--open) {
+	transform: scaleX(-1);
+}
+
+.jobs-log__details {
+	display: grid;
+	grid-template-rows: 0fr;
+	transition: grid-template-rows 0.2s ease;
+}
+
+.jobs-log__details--open {
+	grid-template-rows: 1fr;
+}
+
+.jobs-log__details > div {
+	overflow: hidden;
+}
+
+.jobs-log__body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacer-2);
+	padding: 0 var(--spacer-2) var(--spacer-2);
+}
+
+.jobs-log__facts {
+	column-gap: var(--spacer-4);
+	display: flex;
+	flex-wrap: wrap;
+	row-gap: var(--spacer-2);
+}
+
+.jobs-log__detail {
+	display: flex;
+	flex-direction: column;
+	gap: 2px;
+}
+
+.jobs-log__block .jobs-caption {
+	margin-bottom: 2px;
+}
+
+.jobs-log__json {
+	background-color: var(--color-bg-tertiary);
+	border-radius: var(--radius-medium);
+	font-family: var(--font-mono, monospace);
+	font-size: var(--text-mono-medium-font-size);
+	margin: 0;
+	max-height: 220px;
+	overflow: auto;
+	padding: var(--spacer-2);
+	white-space: pre-wrap;
+	word-break: break-word;
+}
+
+.pill.jobs-pill--success {
+	background: var(--color-bg-success-tertiary);
+	color: var(--color-text-success);
+}

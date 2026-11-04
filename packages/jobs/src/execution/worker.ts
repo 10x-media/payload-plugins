@@ -5,17 +5,16 @@ import { applyJobInterruptions } from '../interruption/records'
 import { wrapJobHandlers } from '../interruption/wrap'
 import { createPauseStore, type PauseStore } from '../queueControl/pauseStore'
 import { runTargetsForPause } from '../queueControl/runTargets'
-import { createJobLeaseStore } from '../reliability/jobLeaseStore'
 import { createLeaderController } from '../reliability/leaderController'
 import { createLeaseStore } from '../reliability/leaseStore'
 import type { LeaderRole } from '../reliability/locksCollection'
 import { resolveNodeId } from '../reliability/nodeId'
 import type { ResolvedReliabilityOptions } from '../reliability/options'
-import { runSweep } from '../reliability/sweeper'
+import { releaseClaims } from '../reliability/recovery'
 import { type DrainResult, drainWorker } from './drain'
 import { getOrCreateCounter, releaseCounter } from './inFlight'
 import { areHandlersInstalled, installSignalHandlers, type SignalCleanup } from './signals'
-import { maintenanceCycle, runCycle, sweepCycle } from './workerCycles'
+import { maintenanceCycle, runCycle } from './workerCycles'
 
 export type CreateWorkerArgs = {
 	payload: Payload
@@ -37,7 +36,7 @@ export type CreateWorkerArgs = {
 	/**
 	 * Register schedules and contend for the scheduler leadership lease. Set false
 	 * for workers that must never create cron jobs (e.g. per-PR preview fleets);
-	 * the run loop and sweeper are unaffected.
+	 * the run loop is unaffected.
 	 */
 	scheduling?: boolean
 	/** Register SIGTERM/SIGINT handlers that drain then exit. Default true. */
@@ -52,11 +51,11 @@ export type CreateWorkerArgs = {
 }
 
 export type Worker = {
-	/** Start the run, maintenance, and sweep loops. */
+	/** Start the run and maintenance loops. */
 	start: () => void
 	/**
-	 * Gracefully drain and shut down (removes signal handlers, stops loops, requeues,
-	 * releases, destroys). Idempotent: repeated calls return the same in-flight drain.
+	 * Gracefully drain and shut down (removes signal handlers, stops loops, hands
+	 * timed-out jobs back, releases leadership, destroys). Idempotent: repeated calls return the same in-flight drain.
 	 */
 	drain: () => Promise<DrainResult>
 	/** Whether this node currently holds the given leadership role. */
@@ -104,8 +103,9 @@ const guardedInterval = (fn: () => Promise<void>, ms: number): LoopHandle => {
 }
 
 /**
- * A plugin-driven worker: runs jobs on every node, schedules and sweeps only while
- * holding the corresponding leadership lease, and drains gracefully on SIGTERM/SIGINT.
+ * A plugin-driven worker: runs jobs on every node, schedules only while holding the
+ * scheduler leadership lease, and drains gracefully on SIGTERM/SIGINT. Crashed jobs
+ * need no sweep: Payload 4 reclaims a job once its `processingUntil` lease lapses.
  * It owns its own timers (never Payload's autoRun cron), because Payload's
  * `shouldAutoRun` gate permanently stops a cron and cannot follow dynamic leadership.
  * Leadership timestamps use Payload's swappable `getCurrentDate()`; the drain budget
@@ -120,16 +120,9 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 	}
 	const nodeId = resolveNodeId(reliability.leaderId)
 	const leaseStore = createLeaseStore(payload)
-	const jobLeaseStore = createJobLeaseStore(payload)
 	const scheduler = createLeaderController({
 		ownerId: nodeId,
 		role: 'scheduler',
-		store: leaseStore,
-		ttlMs: reliability.leaderLeaseTtlMs,
-	})
-	const sweeper = createLeaderController({
-		ownerId: nodeId,
-		role: 'sweeper',
 		store: leaseStore,
 		ttlMs: reliability.leaderLeaseTtlMs,
 	})
@@ -138,7 +131,6 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 	const runIntervalMs = args.runIntervalMs ?? 2000
 	const maintenanceIntervalMs =
 		args.maintenanceIntervalMs ?? Math.max(1000, Math.floor(reliability.leaderLeaseTtlMs / 3))
-	const sweepIntervalMs = reliability.sweepIntervalMs
 	const runLimit = args.runLimit ?? 10
 	const drainTimeoutMs = args.drainTimeoutMs ?? 30_000
 	const pollIntervalMs = args.pollIntervalMs ?? 500
@@ -166,27 +158,18 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 		wrapJobHandlers(payload)
 		const state = withGates(await pauseStore.getState(), await evaluateRunGates(payload))
 		for (const target of runTargetsForPause(args.queues, state)) {
-			await payload.jobs.run({ ...target, limit: runLimit, silent: true })
+			// The worker is the trusted runner; `jobs.access.run` gates HTTP callers.
+			await payload.jobs.run({ ...target, limit: runLimit, overrideAccess: true, silent: true })
 			await applyJobInterruptions(payload)
 		}
 	}
 	const handleSchedules = async (): Promise<void> => {
 		await payload.jobs.handleSchedules({ allQueues: true })
 	}
-	const sweep = async (): Promise<void> => {
-		await runSweep({
-			isLeader: sweeper.isLeader(),
-			now: getCurrentDate(),
-			options: reliability,
-			payload,
-			store: jobLeaseStore,
-		})
-	}
 	const tickLeaders = async (at: Date): Promise<void> => {
 		if (scheduling) {
 			await scheduler.tick(at)
 		}
-		await sweeper.tick(at)
 	}
 
 	/**
@@ -224,9 +207,8 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 				now,
 				releaseLeadership: async () => {
 					await scheduler.release()
-					await sweeper.release()
 				},
-				requeueStragglers: async () => (await jobLeaseStore.releaseAllClaims(nodeId)).released,
+				requeueStragglers: () => releaseClaims(payload, counter.ids()),
 				sleep,
 				stopLoops,
 			},
@@ -246,8 +228,7 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 
 	const worker: Worker = {
 		drain,
-		isLeader: (role) =>
-			role === 'scheduler' ? scheduling && scheduler.isLeader() : sweeper.isLeader(),
+		isLeader: (role) => role === 'scheduler' && scheduling && scheduler.isLeader(),
 		start: () => {
 			if (draining) {
 				return
@@ -265,16 +246,6 @@ export const createWorker = (args: CreateWorkerArgs): Worker => {
 							tickLeaders,
 						}),
 					maintenanceIntervalMs
-				),
-				guardedInterval(
-					() =>
-						sweepCycle({
-							isSweeperLeader: sweeper.isLeader,
-							logger,
-							sweep,
-							tickSweeperLeader: () => sweeper.tick(getCurrentDate()),
-						}),
-					sweepIntervalMs
 				),
 			]
 		},

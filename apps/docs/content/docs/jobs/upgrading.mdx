@@ -1,0 +1,53 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x, where reliability builds on Payload's own processing lease.
+---
+
+`@10x-media/jobs` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. Payload 4 replaced the jobs `processing` flag with a renewable lease, and the plugin's reliability layer now builds on that lease instead of running its own. This page covers what that changes for you.
+
+## Checklist
+
+1. Upgrade `@10x-media/jobs` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.6`.
+2. Remove the [options that are gone](#removed-options) from your plugin config, worker, and `vercel.json`.
+3. Tune the lease on `jobs.processingLease` in the Payload config instead (see [The processing lease](/jobs/reliability#the-processing-lease)).
+4. On Postgres or SQLite, create and run a migration: `pnpm payload migrate:create` then `pnpm payload migrate`. It picks up Payload's own jobs changes and the reliability columns the plugin no longer adds.
+5. Regenerate the import map (`pnpm payload generate:importmap`).
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## How recovery works now
+
+On Payload 3 the plugin leased claimed jobs itself, heartbeated the lease from the worker, and ran a sweeper that requeued jobs whose lease expired. Payload 4 does the first two: every claim sets `processingUntil`, its runner renews it, and a job whose worker died becomes claimable again once it lapses, without spending a retry. The sweeper is therefore gone.
+
+What the plugin still adds is the cap. A run marks the job (`claimedBy`, `startedAt`) and clears the mark when the handler ends, so the next claim knows the previous run died. It counts that in `recoveryAttempts`, and at `maxRecoveries` dead-letters the job instead of running it. See [Reliability](/jobs/reliability).
+
+## Removed options
+
+| Payload 3 line | Payload 4 line |
+|---|---|
+| `reliability.jobLeaseTtlMs` | `jobs.processingLease.duration` in the Payload config. Payload's default is 20 minutes. |
+| `reliability.heartbeatIntervalMs` | Gone: Payload renews the lease every third of its duration. |
+| `reliability.sweepIntervalMs` | Gone, with the sweeper. |
+| `reliability.serverless` | Gone: a killed function's job comes back when the lease lapses. |
+| `reliability.requireConcurrencyControl` | Gone: Payload 4 always applies concurrency keys, and `jobs.enableConcurrencyControl` no longer exists. |
+| `serverlessPreset({ maxDurationMs })` | `serverlessPreset()`; `cronSecretEnvVar` is still accepted. |
+| `vercelCrons({ sweepPath, sweepSchedule })` | `vercelCrons()` returns only the run entry. Drop the `queue-sweep` cron from `vercel.json`. |
+| `GET /api/payload-jobs/queue-sweep` | Removed. |
+| `runSweep`, `createJobLeaseStore` and their types | Removed. `releaseClaims(payload, ids)` hands leased jobs back to the queue. |
+| `worker.isLeader('sweeper')` | `LEADER_ROLES` is only `['scheduler']`. |
+
+## Data changes
+
+- The fields `leaseExpiresAt` and `fenceToken` are gone from `payload-jobs`. The dashboard's **Lease expires** now shows Payload's `processingUntil`. `startedAt`, `claimedBy`, and `recoveryAttempts` stay.
+- `payload-jobs-locks` keeps one leader row, `scheduler`. A `sweeper` row from Payload 3 is left in place and never read; delete it if you like.
+- A job left mid-run by a Payload 3 worker carries `claimedBy`, so its first claim on Payload 4 counts a recovery.
+
+## Access
+
+Payload 4 denies every generic operation on `payload-jobs` and applies access control in the Local API by default. The dashboard needs to read jobs and create them from the form, so the plugin grants those two: read follows `jobs.access.run`, create follows `jobs.access.queue`, and both fall back to a logged-in user, as Payload's own gates do. Update and delete stay denied; cancel through `payload.jobs.cancel`. An access function you set through `jobsCollectionOverrides` wins.
+
+Your own `payload.jobs.queue`, `run`, and `cancel` calls follow Payload's new default too: pass `overrideAccess: true` where they run without a user, as in a seed or `onInit`. The plugin's worker, endpoints, and health bar already do.
+
+## Custom input editors
+
+An editor from `input.components` now renders inside a `field-type` wrapper, so Payload 4 spaces it from the next field. Styles that use Payload 3 tokens (`--theme-elevation-*`, `--base`) resolve to nothing on Payload 4; switch them to the `--color-*` and `--spacer-*` tokens.

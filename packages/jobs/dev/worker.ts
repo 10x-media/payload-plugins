@@ -7,7 +7,7 @@ import config from './payload.config'
 
 /**
  * A standalone worker process: boots Payload, starts the plugin-driven worker (run on
- * every node, schedule and sweep only while holding the lease), and lets `createWorker`
+ * every node, schedule only while holding the lease), and lets `createWorker`
  * install the SIGTERM/SIGINT graceful-drain handlers. This is the documented production
  * worker pattern and the process the drain e2e spawns.
  */

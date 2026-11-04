@@ -1,74 +1,39 @@
 'use client'
 
-import { Pill, useConfig, useFormFields } from '@payloadcms/ui'
+import { Pill, Tooltip, useConfig, useFormFields } from '@payloadcms/ui'
 import { formatDate } from '@payloadcms/ui/shared'
 import type { UIFieldClientProps } from 'payload'
 import type { FC } from 'react'
-import { useEffect, useState } from 'react'
-import { createPortal } from 'react-dom'
+import { useState } from 'react'
 
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { deriveJobStatus } from './deriveJobStatus'
 import { formatRelativeTime } from './formatRelativeTime'
 import { jobStatusMeta } from './jobStatusMeta'
+import './jobs.css'
 
 const DEFAULT_DATE_FORMAT = 'MMMM do yyyy, h:mm a'
 
 const Fact = ({ label, tooltip, value }: { label: string; tooltip?: string; value: string }) => {
-	const [coords, setCoords] = useState<{ left: number; top: number } | null>(null)
-	const [mounted, setMounted] = useState(false)
-	useEffect(() => setMounted(true), [])
+	const [hovered, setHovered] = useState(false)
 
 	return (
-		<div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
-			<span
-				style={{
-					color: 'var(--theme-elevation-500)',
-					fontSize: '0.6875rem',
-					letterSpacing: '0.04em',
-					textTransform: 'uppercase',
-				}}
-			>
-				{label}
-			</span>
+		<div className="jobs-fact">
+			<span className="jobs-caption">{label}</span>
 			{/* biome-ignore lint/a11y/noStaticElementInteractions: supplementary hover tooltip on a read-only text value */}
 			<span
-				onMouseEnter={(event) => {
-					if (!tooltip) {
-						return
-					}
-					const rect = event.currentTarget.getBoundingClientRect()
-					setCoords({ left: rect.left, top: rect.bottom })
-				}}
-				onMouseLeave={() => setCoords(null)}
-				style={{ cursor: tooltip ? 'help' : undefined, fontWeight: 600, width: 'fit-content' }}
+				className={`jobs-fact__value${tooltip ? ' jobs-help' : ''}`}
+				onMouseEnter={() => setHovered(true)}
+				onMouseLeave={() => setHovered(false)}
 			>
 				{value}
+				{tooltip ? (
+					<Tooltip alignCaret="left" position="bottom" show={hovered}>
+						{tooltip}
+					</Tooltip>
+				) : null}
 			</span>
-			{mounted && tooltip && coords
-				? createPortal(
-						<span
-							style={{
-								backgroundColor: 'var(--theme-elevation-900)',
-								borderRadius: '4px',
-								boxShadow: '0 2px 8px rgba(0, 0, 0, 0.25)',
-								color: 'var(--theme-elevation-0)',
-								fontSize: '0.75rem',
-								left: `${coords.left}px`,
-								padding: '4px 8px',
-								pointerEvents: 'none',
-								position: 'fixed',
-								top: `${coords.top + 6}px`,
-								whiteSpace: 'nowrap',
-								zIndex: 9999,
-							}}
-						>
-							{tooltip}
-						</span>,
-						document.body
-					)
-				: null}
 		</div>
 	)
 }
@@ -92,7 +57,7 @@ export const JobStatusHeader: FC<
 		completedAt: get('completedAt') as null | string,
 		error: get('error'),
 		hasError: get('hasError') as boolean,
-		processing: get('processing') as boolean,
+		processingUntil: get('processingUntil') as null | string,
 		totalTried: get('totalTried') as number,
 		waitUntil: get('waitUntil') as null | string,
 	})
@@ -120,19 +85,8 @@ export const JobStatusHeader: FC<
 		date ? formatDate({ date, i18n, pattern }) : undefined
 
 	return (
-		<div
-			style={{
-				alignItems: 'flex-end',
-				borderBottom: '1px solid var(--theme-elevation-100)',
-				columnGap: 'calc(var(--base) * 1.5)',
-				display: 'flex',
-				flexWrap: 'wrap',
-				marginBottom: 'var(--base)',
-				paddingBottom: 'var(--base)',
-				rowGap: 'var(--base)',
-			}}
-		>
-			<Pill pillStyle={meta.pillStyle} size="medium">
+		<div className="jobs-status-header">
+			<Pill className={meta.className} pillStyle={meta.pillStyle} size="medium">
 				{t(meta.labelKey)}
 			</Pill>
 			<Fact label={runsLabel} tooltip={runsFriendly ? runsSlug : undefined} value={runsValue} />

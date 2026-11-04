@@ -24,13 +24,21 @@ docker compose -f docker-compose.test.yml up -d --wait
 echo "Running worker-drain process e2e..."
 node --import tsx dev/e2e/worker-drain.ts
 
+# E2E_FRAMEWORK=tanstack runs the suite on the TanStack Start dev app, anything else on the Next
+# one; either way against its production build (see playwright.config.ts).
+if [[ "${E2E_FRAMEWORK:-next}" == tanstack ]]; then
+	app=@10x-media/jobs-dev-tanstack
+else
+	app=@10x-media/jobs-dev
+fi
+
 # Everything the dev app imports from the workspace, not just this plugin: a fresh
 # checkout has no dist/ for any of it.
 echo "Building the dev app's workspace dependencies..."
-pnpm --filter '@10x-media/jobs-dev^...' build
+pnpm --filter "${app}^..." build
 
 echo "Building dev app..."
-pnpm --filter @10x-media/jobs-dev build
+pnpm --filter "$app" build
 
 echo "Running Playwright e2e..."
 pnpm --filter @10x-media/jobs exec playwright test "$@"
