@@ -1,0 +1,8 @@
+/* Payload 4 lays a field out as a flex column, set per field type; restate it,
+   and keep the pill its own width instead of stretching across the sidebar. */
+.content-lock-status-field {
+	display: flex;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: var(--spacer-2);
+}

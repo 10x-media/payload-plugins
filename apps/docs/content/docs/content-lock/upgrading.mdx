@@ -48,4 +48,5 @@ Payload 4 applies access control in the Local API by default. A lock still block
 - The banner, the stage filter bar, the token chips and their panel use the Payload 4 tokens and Payload's own buttons. Styles of your own that target the banner with Payload 3 tokens (`--theme-*`, `--base`) resolve to nothing on Payload 4.
 - The stage filter bar's links are in the filter builder's shape, so a stage picked there opens in **Filters**.
 - **Lock now** and **End now** are pill buttons.
+- Payload 4's list selects only its visible columns. The collection adds the dates the **Lock status** column derives from whenever it is selected, so a collection `select` of your own set through `collection.overrides` runs first and keeps working.
 - Generated types now include the lock value token node in the message fields' node union, so typed code that builds a message with a token compiles.

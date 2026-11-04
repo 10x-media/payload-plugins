@@ -21,6 +21,7 @@ import { asTranslate, labelForKey } from '../translations/server'
 import { resolveLockAccess, updateUnlessEnded } from './access'
 import { checkWindowChange } from './rules'
 import { buildScopeFields } from './scopeFields'
+import { withStatusInputs } from './statusSelect'
 
 const CLIENT = '@10x-media/content-lock/client'
 const RSC = '@10x-media/content-lock/rsc'
@@ -298,6 +299,11 @@ export const buildLockCollection = (
 		],
 	}
 	const final = collectionOptions?.overrides ? collectionOptions.overrides(collection) : collection
-	// Last, so an override that replaces access keeps ended windows read-only too.
-	return { ...final, access: { ...final.access, update: updateUnlessEnded(final.access?.update) } }
+	// Last, so an override that replaces access keeps ended windows read-only too, and one that
+	// sets `select` still lets the status column read the dates it derives from.
+	return {
+		...final,
+		access: { ...final.access, update: updateUnlessEnded(final.access?.update) },
+		select: withStatusInputs(final.select),
+	}
 }

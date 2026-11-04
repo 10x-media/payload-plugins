@@ -5,6 +5,7 @@ import type { DefaultCellComponentProps, SelectFieldClientProps } from 'payload'
 
 import { useTranslation } from '../../translations/useTranslation'
 import { isLockStage, stageLabel, stagePillStyle } from '../stage'
+import './status.css'
 
 /** A colour-coded pill for a window's stage: red active, yellow announced, blue pending, grey otherwise. */
 export const StatusPill = ({ status }: { status: unknown }) => {

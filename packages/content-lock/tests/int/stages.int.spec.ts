@@ -78,4 +78,19 @@ describeForDb('content-lock stage filters', {}, (db) => {
 			expect((doc as { status?: string }).status).toBe(stage)
 		}
 	})
+
+	// Payload 4's list view selects only its visible columns.
+	it('derives the stage when the list selects only the title and the status', async () => {
+		const { docs } = await booted.payload.find({
+			collection: LOCKS,
+			depth: 0,
+			draft: true,
+			limit: 0,
+			overrideAccess: true,
+			select: { status: true, title: true },
+		})
+		for (const doc of docs) {
+			expect((doc as { status?: string }).status).toBe(expected.get(String(doc.id)))
+		}
+	})
 })
