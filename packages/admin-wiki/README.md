@@ -3,13 +3,15 @@
 # @10x-media/admin-wiki
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/admin-wiki` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/admin-wiki` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/admin-wiki).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/admin-wiki@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/admin-wiki) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
-A living wiki inside the Payload v3 admin panel. Editors write guides as Payload documents, attach each one to the collections, globals, fields, and blocks it explains, and the admin renders it exactly there: under the field, inside the block, in the document sidebar, above the list table.
+A living wiki inside the Payload admin panel. Editors write guides as Payload documents, attach each one to the collections, globals, fields, and blocks it explains, and the admin renders it exactly there: under the field, inside the block, in the document sidebar, above the list table.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/admin-wiki?style=flat-square)](https://www.npmjs.com/package/@10x-media/admin-wiki)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 ## Features
 
@@ -27,7 +29,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Quick start
 
 ```bash
-pnpm add @10x-media/admin-wiki
+pnpm add @10x-media/admin-wiki@alpha
 ```
 
 ```ts
@@ -37,7 +39,8 @@ import { adminWiki } from '@10x-media/admin-wiki'
 
 export default buildConfig({
   plugins: [
-    // Register last: the walker documents the config as it stands when it runs.
+    // Runs after the other plugins on its own (`order: 1000`), so the walker
+    // sees every collection and field they add.
     adminWiki({}),
   ],
 })

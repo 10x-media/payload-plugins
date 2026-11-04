@@ -1,6 +1,6 @@
 'use client'
 
-import { Pill } from '@payloadcms/ui'
+import { Button } from '@payloadcms/ui'
 
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
@@ -17,9 +17,9 @@ import './edit-mode.css'
  * configured for `writeAffordances: 'editMode'`; under `always` or `never`
  * there is nothing here to toggle.
  *
- * The glyph rides inside the label rather than Pill's `icon` slot: that slot
- * zeroes the pill's gap and sizes icons to `--pill-icon-size`, which suits
- * Payload's own 20px chevrons and squashes a 12px one against the text.
+ * A secondary button that reads as selected while on, the way Payload's own
+ * list "Filters" toggle shows its state. The label never changes width: "off"
+ * is a quiet suffix rather than a different word.
  */
 export const WikiEditModeToggle = () => {
 	const { t } = useTranslation()
@@ -30,17 +30,20 @@ export const WikiEditModeToggle = () => {
 	}
 
 	return (
-		<Pill
-			aria-checked={editMode}
+		<Button
 			aria-label={t(keys.editModeTooltip)}
-			className="wiki-edit-mode__pill"
+			aria-pressed={editMode}
+			buttonStyle="secondary"
+			className="wiki-edit-mode__toggle"
+			icon={<BookIcon />}
+			iconPosition="left"
+			margin={false}
 			onClick={() => setEditMode(!editMode)}
-			pillStyle={editMode ? 'success' : 'light-gray'}
-			size="small"
+			selected={editMode}
+			size="medium"
 		>
-			<BookIcon size="small" />
 			{t(keys.editModeLabel)}
 			{editMode ? null : <span className="wiki-edit-mode__state">{t(keys.editModeOff)}</span>}
-		</Pill>
+		</Button>
 	)
 }

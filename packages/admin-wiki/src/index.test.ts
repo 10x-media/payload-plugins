@@ -46,7 +46,7 @@ describe('adminWiki factory', () => {
 		const access = out.collections?.[0]?.access
 		expect(access?.read).toBe(publicRead)
 		const req = { user: null } as unknown as PayloadRequest
-		expect(await access?.create?.({ req })).toBe(false)
+		expect(await access?.create?.({ req, slug: 'wiki-pages' })).toBe(false)
 	})
 
 	it('registers the wiki views by default and omits them when disabled', () => {
@@ -78,6 +78,7 @@ describe('adminWiki factory', () => {
 			{ path: '/components/Footer#Footer', type: 'component' },
 			{ path: '/components/Export#ExportButton', type: 'component' },
 			{ path: '/components/Notice#Notice', type: 'component' },
+			{ path: '@10x-media/admin-wiki/client#WikiEditGuideAction', type: 'component' },
 		])
 		expect(getWikiRegistry(out)?.wikiView).toMatchObject({
 			components: { beforeControls: ['/components/Export#ExportButton'] },
@@ -97,6 +98,7 @@ describe('adminWiki factory', () => {
 		expect(Object.values(out.admin?.dependencies ?? {})).toEqual([
 			{ path: '/components/Tip#Tip', type: 'component' },
 			{ path: '/components/Chip#Chip', type: 'component' },
+			{ path: '@10x-media/admin-wiki/client#WikiEditGuideAction', type: 'component' },
 			{ path: '/wiki/converters#wikiConverters', type: 'function' },
 		])
 	})

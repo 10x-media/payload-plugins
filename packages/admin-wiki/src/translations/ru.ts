@@ -104,6 +104,8 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.wikiEmptyHint]: 'Инструкции здесь объясняют эту админ-панель тем, кто в ней работает.',
 	[keys.wikiFeaturedHeading]: 'Избранные',
 	[keys.wikiFilterLabel]: 'Фильтры',
+	[keys.wikiFilterNoResults]: 'Нет подходящих целей',
+	[keys.wikiFilterSearch]: 'Искать цели',
 	[keys.wikiGuideNotFound]: 'Такой инструкции нет или она не опубликована.',
 	[keys.wikiNoResults]: 'По вашему запросу инструкций не найдено.',
 	[keys.wikiNoResultsHint]: 'Попробуйте более короткий запрос.',

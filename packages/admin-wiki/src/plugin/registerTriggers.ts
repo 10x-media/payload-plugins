@@ -20,7 +20,7 @@ type CollectionComponents = NonNullable<NonNullable<CollectionConfig['admin']>['
  *
  * A UI field carries no data, is excluded from generated types, and never
  * reaches the database, so this adds a surface without touching the host's
- * schema. `disableListColumn` keeps it out of the list view's column selector,
+ * schema. `disabled: { column: true }` keeps it out of the list view's column selector,
  * where a panel of guides would be meaningless.
  */
 const panelField = (targetKey: string): Field => ({
@@ -30,7 +30,7 @@ const panelField = (targetKey: string): Field => ({
 		components: {
 			Field: { clientProps: { targetKey }, path: PANEL_COMPONENT },
 		},
-		disableListColumn: true,
+		disabled: { column: true },
 		position: 'sidebar',
 	},
 })

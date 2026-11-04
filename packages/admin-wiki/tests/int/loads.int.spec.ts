@@ -24,4 +24,9 @@ describeForDb('adminWiki loads', { dbs: ['mongo'] }, (db) => {
 	it('plugin does not mutate config in passthrough mode', () => {
 		expect(booted.payload.collections).toBeDefined()
 	})
+
+	it('keeps wiki media unversioned, as on Payload 3', () => {
+		expect(booted.payload.collections['wiki-media']?.config.versions).toBeFalsy()
+		expect(booted.payload.collections['wiki-pages']?.config.versions).toMatchObject({ drafts: {} })
+	})
 })

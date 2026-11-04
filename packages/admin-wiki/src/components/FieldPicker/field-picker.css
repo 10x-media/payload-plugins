@@ -1,50 +1,76 @@
-/* The select plate takes the Description slot, so it starts from the same
-   metrics as the help trigger next to it (field-help.css) and earns its
-   affordance from the box and the border, not from a louder type size. */
+/* The select plate takes the Description slot. It is drawn as Payload's own
+   secondary button, selected state included (`.btn--style-secondary.btn--selected`),
+   with a checkbox drawn as `checkbox-input` draws one, so it reads as an admin
+   control rather than a tag. A plain <button> rather than <Button>: Button's
+   children ignore the pointer and its smallest size is the one used here anyway. */
 .wiki-field-pick {
 	align-items: center;
-	background: var(--theme-elevation-50);
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s, 3px);
-	color: var(--theme-elevation-600);
+	background-color: var(--color-bg);
+	border: var(--stroke-width-small) solid var(--color-border-control);
+	border-radius: var(--button-radius);
+	color: var(--color-text);
 	cursor: pointer;
 	display: inline-flex;
-	font: inherit;
-	gap: calc(var(--base) / 4);
-	margin-top: calc(var(--base) / 4);
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	gap: var(--spacer-1-5);
+	height: var(--button-height);
+	line-height: var(--text-body-medium-line-height);
 	max-width: 100%;
-	padding: calc(var(--base) / 6) calc(var(--base) / 3);
+	padding: 0 var(--spacer-2) 0 var(--spacer-1);
 	text-align: start;
+	width: fit-content;
 }
 
-.wiki-field-pick:hover,
+.wiki-field-pick:hover {
+	background-color: var(--color-bg-secondary-hover);
+}
+
+.wiki-field-pick:active {
+	background-color: var(--color-bg-secondary-pressed);
+}
+
 .wiki-field-pick:focus-visible {
-	border-color: var(--theme-elevation-400);
-	color: var(--theme-elevation-800);
+	outline: var(--accessibility-outline);
+	outline-offset: var(--accessibility-outline-offset);
 }
 
-.wiki-field-pick--selected {
-	background: var(--theme-success-50, var(--theme-elevation-100));
-	border-color: var(--theme-success-500, var(--theme-elevation-500));
-	color: var(--theme-elevation-800);
+.wiki-field-pick--selected,
+.wiki-field-pick--selected:hover,
+.wiki-field-pick--selected:active {
+	background-color: var(--color-bg-selected);
+	border-color: var(--color-border-selected-strong);
+	color: var(--color-text-selected);
+}
+
+.wiki-field-pick__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .wiki-field-pick__box {
 	align-items: center;
-	background: var(--theme-input-bg);
-	border: 1px solid var(--theme-elevation-250);
-	border-radius: var(--style-radius-s, 3px);
+	background: var(--color-bg-secondary);
+	border: var(--stroke-width-small) solid var(--color-border-control-strong);
+	border-radius: var(--radius-small);
+	box-sizing: border-box;
+	color: var(--color-icon-onbrand);
 	display: inline-flex;
 	flex-shrink: 0;
-	height: calc(var(--base) / 1.5);
+	height: var(--spacer-3);
 	justify-content: center;
-	width: calc(var(--base) / 1.5);
+	width: var(--spacer-3);
 }
 
-.wiki-field-pick--selected .wiki-field-pick__box {
-	background: var(--theme-success-500, var(--theme-elevation-800));
+.wiki-field-pick:hover .wiki-field-pick__box {
+	background: var(--color-bg-secondary-hover);
+}
+
+.wiki-field-pick--selected .wiki-field-pick__box,
+.wiki-field-pick--selected:hover .wiki-field-pick__box {
+	background: var(--color-bg-brand);
 	border-color: transparent;
-	color: var(--theme-base-0);
 }
 
 .wiki-field-pick__box .icon {
@@ -53,36 +79,47 @@
 }
 
 /* Whole-field highlight while a field is covered. `:has()` is progressive
-   enhancement: without it the plate alone still says so. */
+   enhancement: without it the plate alone still says so. The field draws no
+   box of its own, so the radius only rounds the outline. */
 .field-type:has(> .field-type__wrap > .wiki-field-pick--selected),
 .field-type:has(> .wiki-field-pick--selected) {
-	outline: 1px solid var(--theme-success-500, var(--theme-elevation-400));
-	outline-offset: calc(var(--base) / 4);
+	border-radius: var(--radius-medium);
+	outline: var(--stroke-width-small) solid var(--color-border-selected-strong);
+	outline-offset: var(--spacer-1);
 }
 
 /* The drawer keeps Payload's own width. A guide drawer is a reading surface and
-   is capped to a measure; this one holds the host's real edit form, which is
-   laid out for the width the admin gives it, so narrowing it would only reflow
-   the form into something the author does not recognise.
+   is widened for it; this one holds the host's real edit form, which is laid
+   out for the width the admin gives it, so resizing it would only reflow the
+   form into something the author does not recognise.
 
    `.drawer__content-children` owns the scrolling, so the switcher and the
    footer stick to it rather than the panel being split into three panes. The
    confirm button has to stay reachable however long the entity's form is, and a
-   form that scrolls under its own header is what the edit view does anyway. */
+   form that scrolls under its own header is what the edit view does anyway.
+   Payload 4 drawers have no inner gutter, so the picker pays its own.
+
+   That needs the drawer held to the viewport: a Payload 4 side drawer grows with
+   its content and the modal container scrolls the whole of it, which leaves
+   nothing for a sticky child to stick to. */
+.wiki-field-picker-modal .drawer__content {
+	height: 100dvh;
+}
+
 .wiki-field-picker {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 2);
-	padding-bottom: var(--base);
+	gap: var(--spacer-3);
+	padding: 0 var(--gutter-h);
 }
 
 .wiki-field-picker__switcher {
 	align-items: end;
-	background: var(--theme-bg);
+	background: var(--color-bg);
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--base) / 2);
-	padding-bottom: calc(var(--base) / 2);
+	gap: var(--spacer-2);
+	padding-block: var(--spacer-3) var(--spacer-2);
 	position: sticky;
 	top: 0;
 	z-index: 2;
@@ -95,26 +132,27 @@
 .wiki-field-picker__source {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 4);
-	min-width: calc(var(--base) * 10);
-	width: calc(var(--base) * 16);
+	gap: var(--spacer-1);
+	min-width: 8rem;
+	width: 13rem;
 }
 
 .wiki-field-picker__source-label {
-	color: var(--theme-elevation-600);
-	font-size: 0.9em;
+	color: var(--field-color-label);
+	font-weight: var(--text-body-medium-bold-font-weight);
+	letter-spacing: var(--field-label-letter-spacing);
 }
 
 .wiki-field-picker__empty {
 	align-items: start;
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 2);
+	gap: var(--spacer-2);
 }
 
 .wiki-field-picker__body {
-	border-top: 1px solid var(--theme-elevation-100);
-	padding-top: calc(var(--base) / 2);
+	border-top: var(--stroke-width-small) solid var(--color-border);
+	padding-top: var(--spacer-3);
 }
 
 /* The form is laid out by `DocumentFields`, the edit view's own component, so a
@@ -129,15 +167,17 @@
 	--sidebar-wrap-top: auto;
 }
 
-/* The drawer already pays the outer gutter and owns the scrolling, so all that
-   is left for the form is the gap between its two columns. Written as logical
-   properties because core mirrors those gutters for RTL. */
+/* The picker already pays the outer gutter and the drawer owns the scrolling,
+   so all that is left for the form is the gap between its two columns. Written
+   as logical properties because core mirrors those gutters for RTL. Payload 4
+   marks only the layout that has a sidebar, so the single column is its
+   negation. */
 .wiki-field-picker .document-fields__edit {
 	padding-block: 0;
 	padding-inline-start: 0;
 }
 
-.wiki-field-picker .document-fields--no-sidebar .document-fields__edit {
+.wiki-field-picker .document-fields:not(.document-fields--has-sidebar) .document-fields__edit {
 	padding-inline-end: 0;
 }
 
@@ -149,33 +189,33 @@
 .wiki-field-picker__loading {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 2);
+	gap: var(--spacer-2);
 }
 
 .wiki-field-picker__status {
-	color: var(--theme-elevation-600);
+	color: var(--color-text-secondary);
 }
 
 .wiki-field-picker__footer {
 	align-items: center;
-	background: var(--theme-bg);
-	border-top: 1px solid var(--theme-elevation-100);
+	background: var(--color-bg);
+	border-top: var(--stroke-width-small) solid var(--color-border);
 	bottom: 0;
 	display: flex;
-	gap: calc(var(--base) / 2);
-	padding: calc(var(--base) / 2) 0;
+	gap: var(--spacer-2);
+	padding: var(--spacer-2-5) 0;
 	position: sticky;
 	z-index: 2;
 }
 
 .wiki-field-picker__count {
-	color: var(--theme-elevation-600);
+	color: var(--color-text-secondary);
 	margin-inline-end: auto;
 }
 
 /* One section per owner, as Payload's own `Collapsible`, so a group of field
    targets reads like an array row rather than like something this plugin
-   invented. Only the pieces core sizes for icon-only actions are overridden. */
+   invented. */
 .wiki-target-fields__groups,
 .wiki-target-fields__paths {
 	list-style: none;
@@ -186,9 +226,9 @@
 .wiki-target-fields__header {
 	align-items: center;
 	display: flex;
-	gap: calc(var(--base) / 2);
+	gap: var(--spacer-2);
 	justify-content: space-between;
-	margin-bottom: calc(var(--base) / 2);
+	margin-bottom: var(--spacer-2);
 }
 
 .wiki-target-fields__header .field-label {
@@ -199,30 +239,26 @@
 .wiki-target-fields__groups {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 4);
+	gap: var(--spacer-2);
 }
 
 /* `collapsible__toggle` is a full-size absolute overlay, so it paints over the
-   actions unless they are lifted into the same layer. Core sizes the actions
-   slot for a single icon button, which the text shortcut has to opt out of. */
+   actions unless they are lifted into the same layer. */
 .wiki-target-fields__group .collapsible__actions {
-	height: auto;
-	pointer-events: all;
 	position: relative;
-	width: auto;
 	z-index: 1;
 }
 
 .wiki-target-fields__group .collapsible__content {
-	padding: calc(var(--base) / 2) calc(var(--base) / 1.5);
+	--collapsible-content-padding: var(--spacer-2-5);
 }
 
 .wiki-target-fields__group-header {
 	align-items: center;
 	display: flex;
-	gap: calc(var(--base) / 4);
+	gap: var(--spacer-1-5);
 	min-width: 0;
-	padding-inline-end: calc(var(--base) / 2);
+	padding-inline-end: var(--spacer-2);
 }
 
 .wiki-target-fields__group-kind {
@@ -230,7 +266,7 @@
 }
 
 .wiki-target-fields__group-label {
-	font-weight: 600;
+	font-weight: var(--text-body-medium-bold-font-weight);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -244,10 +280,10 @@
 }
 
 .wiki-target-fields__path {
-	align-items: baseline;
+	align-items: center;
 	display: flex;
-	gap: calc(var(--base) / 4);
-	padding: calc(var(--base) / 8) 0;
+	gap: var(--spacer-1-5);
+	padding: 2px 0;
 }
 
 /* The breadcrumb reads as the admin reads: the field's own label carries the
@@ -261,22 +297,22 @@
 }
 
 .wiki-target-fields__crumb {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .wiki-target-fields__crumb--leaf {
-	color: var(--theme-text);
+	color: var(--color-text);
 }
 
 .wiki-target-fields__crumb + .wiki-target-fields__crumb::before {
-	color: var(--theme-elevation-350);
+	color: var(--color-text-tertiary);
 	content: "›";
-	padding: 0 calc(var(--base) / 6);
+	padding: 0 var(--spacer-1);
 }
 
 .wiki-target-fields__raw {
 	font-family: var(--font-mono);
-	font-size: 0.9em;
+	font-size: var(--text-mono-medium-font-size);
 	min-width: 0;
 	overflow: hidden;
 	text-overflow: ellipsis;
@@ -286,7 +322,7 @@
 .wiki-target-fields__remove {
 	background: none;
 	border: 0;
-	color: var(--theme-elevation-400);
+	color: var(--color-icon-secondary);
 	cursor: pointer;
 	display: inline-flex;
 	margin-inline-start: auto;
@@ -295,11 +331,11 @@
 
 .wiki-target-fields__remove:hover,
 .wiki-target-fields__remove:focus-visible {
-	color: var(--theme-error-500, var(--theme-elevation-800));
+	color: var(--color-icon-danger);
 }
 
 .wiki-target-fields__empty {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 	margin: 0;
 }
 
@@ -310,13 +346,13 @@
 .wiki-target-fields__manual {
 	align-items: center;
 	display: flex;
-	gap: calc(var(--base) / 2);
-	margin-top: calc(var(--base) / 2);
+	gap: var(--spacer-2);
+	margin-top: var(--spacer-2);
 }
 
 .wiki-target-fields__manual-input {
 	flex: 1;
-	min-width: calc(var(--base) * 8);
+	min-width: 6.5rem;
 }
 
 .wiki-target-fields__manual-input input {

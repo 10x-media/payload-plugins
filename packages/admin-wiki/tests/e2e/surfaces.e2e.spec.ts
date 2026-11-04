@@ -145,7 +145,7 @@ test.describe('wiki surfaces', () => {
 		// the slot below the list, and a server component above it: the server one
 		// counts drafts, which only the server props can reach.
 		await expect(
-			page.locator('.wiki-view__header-actions a', { hasText: 'Dev link' })
+			page.locator('.wiki-view__header .list-header__actions a', { hasText: 'Dev link' })
 		).toBeVisible()
 		await expect(page.locator('.wiki-index__slot--before-table')).toContainText('in draft')
 		await expect(page.locator('.wiki-index__slot--after-table')).toContainText('guides listed')
@@ -155,7 +155,7 @@ test.describe('wiki surfaces', () => {
 		postId = await createDoc(page, 'posts', { title: 'Edit mode' })
 
 		await page.goto(`/admin/collections/${PAGES}`)
-		await page.locator('.wiki-edit-mode__pill').click()
+		await page.locator('.wiki-edit-mode__toggle').click()
 
 		await page.goto(`/admin/collections/posts/${postId}`)
 		// `tagline` is the one branding field no seeded guide targets. The

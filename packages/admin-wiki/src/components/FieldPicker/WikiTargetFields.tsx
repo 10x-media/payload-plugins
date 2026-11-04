@@ -69,7 +69,7 @@ const WikiPickFieldsButton = ({
 				className="wiki-target-fields__open"
 				margin={false}
 				onClick={() => onPick(only)}
-				size="small"
+				size="medium"
 			>
 				{label}
 			</Button>
@@ -79,7 +79,7 @@ const WikiPickFieldsButton = ({
 	return (
 		<Popup
 			button={
-				<Button className="wiki-target-fields__open" margin={false} size="small">
+				<Button className="wiki-target-fields__open" margin={false} size="medium">
 					{label}
 				</Button>
 			}
@@ -100,7 +100,6 @@ const WikiPickFieldsButton = ({
 					))}
 				</PopupList.ButtonGroup>
 			)}
-			size="medium"
 		/>
 	)
 }
@@ -325,11 +324,11 @@ export const WikiTargetFields = ({
 										actions={
 											editKind ? (
 												<Button
-													buttonStyle="subtle"
+													buttonStyle="secondary"
 													className="wiki-target-fields__group-edit"
 													margin={false}
 													onClick={() => openPicker(editKind, group.id)}
-													size="small"
+													size="medium"
 												>
 													{t(keys.pickerEdit)}
 												</Button>
@@ -404,11 +403,13 @@ export const WikiTargetFields = ({
 				)}
 				{isReadOnly ? null : (
 					<div className="wiki-target-fields__manual">
-						{/* `field-type text` is Payload's own input skin, so the manual path
-						    matches every other text input in the form, theming included. */}
+						{/* `field-type text` and `form-input` are Payload's own input skin, so
+						    the manual path matches every other text input in the form,
+						    theming included. */}
 						<div className="wiki-target-fields__manual-input field-type text">
 							<input
 								aria-label={t(keys.targetFieldsManualLabel)}
+								className="form-input"
 								onChange={(event) => setDraft(event.target.value)}
 								onKeyDown={(event) => {
 									if (event.key === 'Enter') {

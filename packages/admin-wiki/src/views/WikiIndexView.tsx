@@ -1,10 +1,10 @@
-import { DefaultTemplate } from '@payloadcms/next/templates'
-import { Button, Gutter, SetStepNav } from '@payloadcms/ui'
+import { Button, SetStepNav } from '@payloadcms/ui'
+import { ListHeader } from '@payloadcms/ui/elements/ListHeader'
 import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
-import { redirect } from 'next/navigation'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps, CollectionSlug } from 'payload'
 import { formatAdminURL } from 'payload/shared'
-import type { ReactNode } from 'react'
+import { Fragment, type ReactNode } from 'react'
 
 import { WikiEditModeToggle } from '../components/EditMode/WikiEditModeToggle'
 import { WikiIndexClient } from '../components/WikiView/WikiIndexClient'
@@ -32,7 +32,7 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 		return null
 	}
 	if (!req.user) {
-		redirect(wikiLoginRedirectUrl(props, context.wikiPath))
+		props.server.redirect(wikiLoginRedirectUrl(props, context.wikiPath))
 	}
 	const t = asTranslate(i18n.t)
 	let entries: WikiTargetEntry[] = []
@@ -107,6 +107,7 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 			serverProps,
 		})
 	}
+	const beforeControls = renderSlot('beforeControls')
 	return (
 		<DefaultTemplate
 			i18n={i18n}
@@ -116,14 +117,14 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 			permissions={permissions}
 			req={req}
 			searchParams={searchParams}
-			user={req.user}
+			user={props.user}
 			viewActions={props.viewActions}
 			visibleEntities={{
 				collections: visibleEntities?.collections,
 				globals: visibleEntities?.globals,
 			}}
 		>
-			<Gutter className="wiki-view">
+			<div className="wiki-view">
 				<SetStepNav
 					nav={[
 						{
@@ -132,37 +133,36 @@ export const WikiIndexView = async (props: AdminViewServerProps) => {
 						},
 					]}
 				/>
-				<header className="wiki-view__header">
-					<div>
-						<h1 className="wiki-view__title">{t(keys.wikiViewTitle)}</h1>
-						<p className="wiki-view__subtitle">{t(keys.wikiSubtitle)}</p>
-					</div>
-					<div className="wiki-view__header-actions">
-						{renderSlot('beforeControls')}
-						<WikiEditModeToggle />
-						{context.canCreate ? (
+				<ListHeader
+					Actions={[
+						beforeControls ? <Fragment key="before-controls">{beforeControls}</Fragment> : null,
+						<WikiEditModeToggle key="edit-mode" />,
+						context.canCreate ? (
 							<Button
 								buttonStyle="pill"
 								el="link"
 								icon="plus"
 								iconPosition="left"
-								iconStyle="none"
+								key="create"
 								margin={false}
-								size="small"
+								size="medium"
 								to={createUrl}
 							>
 								{t(keys.wikiCreateGuide)}
 							</Button>
-						) : null}
-					</div>
-				</header>
+						) : null,
+					].filter(Boolean)}
+					AfterListHeaderContent={<p className="wiki-view__subtitle">{t(keys.wikiSubtitle)}</p>}
+					className="wiki-view__header"
+					title={t(keys.wikiViewTitle)}
+				/>
 				<WikiIndexClient
 					afterTable={renderSlot('afterTable')}
 					baseUrl={context.wikiPath}
 					beforeTable={renderSlot('beforeTable')}
 					entries={entries}
 				/>
-			</Gutter>
+			</div>
 		</DefaultTemplate>
 	)
 }

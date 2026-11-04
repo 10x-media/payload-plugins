@@ -5,9 +5,9 @@ export const TipBlock = ({ fields }: { fields: Record<string, unknown> }) => (
 	<aside
 		data-dev-renderer="devTip"
 		style={{
-			background: 'var(--theme-elevation-500)',
-			borderInlineStart: '3px solid var(--theme-success-500)',
-			borderRadius: '4px',
+			background: 'var(--color-bg-secondary)',
+			borderInlineStart: '3px solid var(--color-border-success-strong)',
+			borderRadius: 'var(--radius-medium)',
 			marginBlock: '1rem',
 			padding: '0.75rem 1rem',
 		}}

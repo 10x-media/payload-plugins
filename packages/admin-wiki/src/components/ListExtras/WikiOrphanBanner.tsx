@@ -52,7 +52,7 @@ export const WikiOrphanBanner = () => {
 			alignIcon="left"
 			className="wiki-orphan-banner"
 			icon={<CalloutIcon variant="warning" />}
-			type="error"
+			type="danger"
 		>
 			<span className="wiki-orphan-banner__body">
 				<span className="wiki-orphan-banner__heading">{t(keys.orphanedHeading)}</span>

@@ -94,6 +94,7 @@ export {
 	type WikiTargetsContextValue,
 	type WikiVideoPlayerComponent,
 } from '../components/WikiProvider/WikiProvider'
+export { WikiEditGuideAction } from '../components/WikiView/WikiEditGuideAction'
 export { WikiGuideViewLink } from '../components/WikiView/WikiGuideViewLink'
 export {
 	WikiIndexClient,

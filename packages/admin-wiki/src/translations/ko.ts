@@ -104,6 +104,8 @@ export const ko: Record<TranslationKey, string> = {
 		'여기에 작성한 가이드는 이 관리자 패널을 사용하는 사람들에게 사용법을 설명합니다.',
 	[keys.wikiFeaturedHeading]: '추천',
 	[keys.wikiFilterLabel]: '필터',
+	[keys.wikiFilterNoResults]: '일치하는 대상 없음',
+	[keys.wikiFilterSearch]: '대상 검색',
 	[keys.wikiGuideNotFound]: '이 가이드는 존재하지 않거나 게시되지 않았습니다.',
 	[keys.wikiNoResults]: '검색과 일치하는 가이드가 없습니다.',
 	[keys.wikiNoResultsHint]: '더 짧은 검색어로 시도해 보세요.',

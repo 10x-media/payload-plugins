@@ -31,6 +31,8 @@ The tabs are unnamed, so they group the form without adding a level to the store
 
 Only **published** guides reach surfaces, the targets map, and the wiki view. A draft is visible to its author in the collection and nowhere else.
 
+With `localization` in your config, Payload 4 keeps publication status per locale, so a guide is published in each content locale separately: the Publish button publishes the locale you are editing, and "Publish all locales" sits in its dropdown. A guide published in English only does not reach readers whose content locale is German. See [UI language and content locale](/admin-wiki/i18n#ui-language-and-content-locale).
+
 ## The editor
 
 Guides use their own lexical editor with an explicit feature list. It does not inherit the consuming project's `richText` configuration, in either direction: a project's custom nodes and link customizations never appear in guide content, and changing the project editor never changes what guides can contain.

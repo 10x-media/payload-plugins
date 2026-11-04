@@ -107,6 +107,8 @@ export const fr: Record<TranslationKey, string> = {
 		'Les guides écrits ici expliquent ce panneau d’administration aux personnes qui l’utilisent.',
 	[keys.wikiFeaturedHeading]: 'Mis en avant',
 	[keys.wikiFilterLabel]: 'Filtres',
+	[keys.wikiFilterNoResults]: 'Aucune cible correspondante',
+	[keys.wikiFilterSearch]: 'Rechercher des cibles',
 	[keys.wikiGuideNotFound]: 'Ce guide n’existe pas ou n’est pas publié.',
 	[keys.wikiNoResults]: 'Aucun guide ne correspond à votre recherche.',
 	[keys.wikiNoResultsHint]: 'Essayez un terme de recherche plus court.',

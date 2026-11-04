@@ -67,12 +67,11 @@ export const WikiWriteGuide = ({ targetKey, variant = 'inline' }: WikiWriteGuide
 				<Button
 					buttonStyle="pill"
 					className="wiki-write-guide wiki-write-guide--button"
-					icon={<BookIcon size="small" />}
+					icon={<BookIcon size="medium" />}
 					iconPosition="left"
-					iconStyle="none"
 					margin={false}
 					onClick={openDrawer}
-					size="small"
+					size="medium"
 				>
 					{label}
 				</Button>

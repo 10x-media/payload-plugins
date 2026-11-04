@@ -3,30 +3,34 @@
    link" without competing with the external-link styling the stock feature
    gives its own, which is the other kind of link in the same paragraph. */
 .wiki-guide-link-node {
-	border-bottom: 1px solid var(--theme-elevation-400);
+	border-bottom: var(--stroke-width-small) solid var(--color-border-strong);
 	border-radius: 2px;
 	cursor: text;
 	padding: 0 1px;
 }
 
 .wiki-guide-link-node:hover {
-	background: var(--theme-elevation-100);
-	border-bottom-color: var(--theme-elevation-600);
+	background: var(--color-bg-hover);
+	border-bottom-color: var(--color-text-secondary);
 }
 
-/* Positioned by `setFloatingElemPositionForLinkEditor`, which writes `transform`
+/* Drawn as the stock link editor (`.link-editor`): the dark menu surface, a
+   48px strip, the large radius and the canvas elevation, so the two floating
+   editors in one paragraph read as the same control.
+
+   Positioned by `setFloatingElemPositionForLinkEditor`, which writes `transform`
    and `opacity`, so both start neutralized and neither is transitioned from a
    value this stylesheet owns. */
 .wiki-guide-link-editor {
-	background: var(--theme-input-bg);
-	border-radius: 4px;
-	box-shadow:
-		0 1px 2px 1px rgb(0 0 0 / 10%),
-		0 4px 16px 0 rgb(0 0 0 / 10%);
+	align-items: center;
+	background: var(--color-bg-menu);
+	border-radius: var(--radius-large);
+	box-shadow: var(--elevation-100-canvas);
 	display: flex;
+	height: var(--spacer-6);
 	left: 0;
 	opacity: 0;
-	padding: 4px 4px 4px 12px;
+	padding: 0 var(--spacer-2) 0 var(--spacer-3);
 	position: absolute;
 	top: 0;
 	transition: opacity 0.2s;
@@ -37,15 +41,16 @@
 .wiki-guide-link-editor__content {
 	align-items: center;
 	display: flex;
-	font-size: 13px;
-	min-height: 28px;
+	gap: var(--spacer-1);
 	min-width: 0;
 }
 
 .wiki-guide-link-editor__title {
-	color: var(--theme-elevation-800);
-	margin-inline-end: calc(var(--base) / 2);
-	max-width: calc(var(--base) * 12);
+	color: var(--color-text-onbrand);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
+	margin-inline-end: var(--spacer-2);
+	max-width: 13rem;
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -55,17 +60,20 @@
 	align-items: center;
 	background: none;
 	border: 0;
-	border-radius: 4px;
-	color: var(--theme-elevation-600);
+	border-radius: var(--radius-medium);
+	color: var(--color-icon-onbrand);
 	cursor: pointer;
 	display: flex;
-	height: 30px;
 	justify-content: center;
+	min-height: var(--spacer-4);
+	min-width: var(--spacer-4);
 	padding: 0;
-	width: 30px;
 }
 
 .wiki-guide-link-editor button:hover {
-	background-color: var(--theme-elevation-100);
-	color: var(--theme-elevation-800);
+	background-color: var(--color-bg-transparent-hover);
+}
+
+.wiki-guide-link-editor button:focus-visible {
+	outline: var(--stroke-width-small) solid var(--color-border-brand-strong);
 }

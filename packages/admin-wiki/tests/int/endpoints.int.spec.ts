@@ -1,10 +1,10 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import {
 	type CollectionSlug,
-	createLocalReq,
+	createPayloadRequest,
 	type PayloadHandler,
 	type PayloadRequest,
-	type TypedUser,
+	type User,
 } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
@@ -42,7 +42,7 @@ const handlerFor = (booted: BootedPayload, path: string): PayloadHandler => {
  */
 describeForDb('wiki endpoints', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
-	let reader: TypedUser
+	let reader: User
 
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -51,10 +51,14 @@ describeForDb('wiki endpoints', { dbs: ['mongo'] }, (db) => {
 			db,
 			plugin: adminWiki({ localeMap: { 'de-DE': 'de' } }),
 		})
-		reader = (await booted.payload.create({
-			collection: 'users' as CollectionSlug,
-			data: { email: 'reader@10xmedia.de', password: 'password' },
-		})) as unknown as TypedUser
+		reader = {
+			...(await booted.payload.create({
+				collection: 'users' as CollectionSlug,
+				overrideAccess: true,
+				data: { email: 'reader@10xmedia.de', password: 'password' },
+			})),
+			collection: 'users',
+		} as unknown as User
 	})
 
 	afterAll(async () => {
@@ -64,6 +68,7 @@ describeForDb('wiki endpoints', { dbs: ['mongo'] }, (db) => {
 	const createGuide = async ({ published = true, ...guide }: GuideInput): Promise<string> => {
 		const created = await booted.payload.create({
 			collection: PAGES,
+			overrideAccess: true,
 			data: {
 				_status: published ? 'published' : 'draft',
 				featured: guide.featured ?? false,
@@ -80,12 +85,13 @@ describeForDb('wiki endpoints', { dbs: ['mongo'] }, (db) => {
 
 	const call = async (
 		path: string,
-		{ query = '', user }: { query?: string; user?: null | TypedUser } = {}
+		{ query = '', user }: { query?: string; user?: null | User } = {}
 	): Promise<Response> => {
-		const req: PayloadRequest = await createLocalReq(
-			{ urlSuffix: `/api/${PAGES}${path}${query}`, ...(user ? { user } : {}) },
-			booted.payload
-		)
+		const req: PayloadRequest = await createPayloadRequest({
+			payload: booted.payload,
+			urlSuffix: `/api/${PAGES}${path}${query}`,
+			...(user ? { user } : {}),
+		})
 		return handlerFor(booted, path)(req)
 	}
 
@@ -189,7 +195,10 @@ describeForDb('wiki endpoints', { dbs: ['mongo'] }, (db) => {
 		})
 		await booted.payload.update({
 			collection: PAGES,
-			data: { title: 'Deutscher Titel' },
+			overrideAccess: true,
+			// Publication status is per locale on Payload 4: a translation saved
+			// without one is a draft in its own locale and stays off the surfaces.
+			data: { _status: 'published', title: 'Deutscher Titel' },
 			id,
 			locale: 'de',
 		})
@@ -200,6 +209,31 @@ describeForDb('wiki endpoints', { dbs: ['mongo'] }, (db) => {
 			(candidate) => candidate.slug === 'locale-guide'
 		)
 		expect(entry?.title).toBe('Deutscher Titel')
+	})
+
+	it('keeps a guide off the surfaces in a locale it is not published in', async () => {
+		const id = await createGuide({
+			slug: 'english-only-guide',
+			targetCollections: ['posts'],
+			title: 'English only',
+		})
+		await booted.payload.update({
+			collection: PAGES,
+			overrideAccess: true,
+			data: { title: 'Nur Entwurf' },
+			draft: true,
+			id,
+			locale: 'de',
+		})
+
+		const keysFor = async (language: string) =>
+			(
+				(await targetsMap({ query: `?language=${language}`, user: reader })).targets[
+					'collection:posts'
+				] ?? []
+			).map((entry) => entry.slug)
+		expect(await keysFor('en')).toContain('english-only-guide')
+		expect(await keysFor('de')).not.toContain('english-only-guide')
 	})
 
 	it('falls back to the default locale for a language it cannot map', async () => {
@@ -273,14 +307,19 @@ describeForDb('wiki endpoints under a restricted access map', { dbs: ['mongo'] }
 	})
 
 	it('refuses the orphan report to a reader who cannot update guides', async () => {
-		const user = (await booted.payload.create({
-			collection: 'users' as CollectionSlug,
-			data: { email: 'restricted@10xmedia.de', password: 'password' },
-		})) as unknown as TypedUser
-		const req: PayloadRequest = await createLocalReq(
-			{ urlSuffix: `/api/${PAGES}/orphaned-targets`, user },
-			booted.payload
-		)
+		const user = {
+			...(await booted.payload.create({
+				collection: 'users' as CollectionSlug,
+				overrideAccess: true,
+				data: { email: 'restricted@10xmedia.de', password: 'password' },
+			})),
+			collection: 'users',
+		} as unknown as User
+		const req: PayloadRequest = await createPayloadRequest({
+			payload: booted.payload,
+			urlSuffix: `/api/${PAGES}/orphaned-targets`,
+			user,
+		})
 
 		const response = await handlerFor(booted, '/orphaned-targets')(req)
 		expect(response.status).toBe(403)
@@ -288,14 +327,19 @@ describeForDb('wiki endpoints under a restricted access map', { dbs: ['mongo'] }
 	})
 
 	it('still reports the reader cannot update through the targets map', async () => {
-		const user = (await booted.payload.create({
-			collection: 'users' as CollectionSlug,
-			data: { email: 'restricted-2@10xmedia.de', password: 'password' },
-		})) as unknown as TypedUser
-		const req: PayloadRequest = await createLocalReq(
-			{ urlSuffix: `/api/${PAGES}/targets-map`, user },
-			booted.payload
-		)
+		const user = {
+			...(await booted.payload.create({
+				collection: 'users' as CollectionSlug,
+				overrideAccess: true,
+				data: { email: 'restricted-2@10xmedia.de', password: 'password' },
+			})),
+			collection: 'users',
+		} as unknown as User
+		const req: PayloadRequest = await createPayloadRequest({
+			payload: booted.payload,
+			urlSuffix: `/api/${PAGES}/targets-map`,
+			user,
+		})
 
 		const body = (await (
 			await handlerFor(booted, '/targets-map')(req)

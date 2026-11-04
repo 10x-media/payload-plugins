@@ -103,6 +103,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.wikiEmptyHint]: 'Інструкції тут пояснюють цю адмінпанель тим, хто в ній працює.',
 	[keys.wikiFeaturedHeading]: 'Обрані',
 	[keys.wikiFilterLabel]: 'Фільтри',
+	[keys.wikiFilterNoResults]: 'Немає відповідних цілей',
+	[keys.wikiFilterSearch]: 'Шукати цілі',
 	[keys.wikiGuideNotFound]: 'Такої інструкції немає або вона не опублікована.',
 	[keys.wikiNoResults]: 'За вашим запитом інструкцій не знайдено.',
 	[keys.wikiNoResultsHint]: 'Спробуйте коротший запит.',

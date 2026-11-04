@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { type CollectionSlug, createLocalReq, type PayloadRequest, type TypedUser } from 'payload'
+import { type CollectionSlug, createPayloadRequest, type PayloadRequest, type User } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { adminWiki } from '../../src/index'
@@ -17,7 +17,7 @@ const PAGES = 'wiki-pages' as CollectionSlug
  */
 describeForDb('wiki custom targets', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
-	let reader: TypedUser
+	let reader: User
 
 	beforeAll(async () => {
 		booted = await bootPayload({
@@ -28,10 +28,14 @@ describeForDb('wiki custom targets', { dbs: ['mongo'] }, (db) => {
 				customTargets: [{ key: 'dashboard', label: { de: 'Übersicht', en: 'Dashboard' } }],
 			}),
 		})
-		reader = (await booted.payload.create({
-			collection: 'users' as CollectionSlug,
-			data: { email: 'custom@10xmedia.de', password: 'password' },
-		})) as unknown as TypedUser
+		reader = {
+			...(await booted.payload.create({
+				collection: 'users' as CollectionSlug,
+				overrideAccess: true,
+				data: { email: 'custom@10xmedia.de', password: 'password' },
+			})),
+			collection: 'users',
+		} as unknown as User
 	})
 
 	afterAll(async () => {
@@ -44,10 +48,11 @@ describeForDb('wiki custom targets', { dbs: ['mongo'] }, (db) => {
 		if (!endpoint) {
 			throw new Error(`the plugin registered no endpoint at ${path}`)
 		}
-		const req: PayloadRequest = await createLocalReq(
-			{ urlSuffix: `/api/${PAGES}${path}`, user: reader },
-			booted.payload
-		)
+		const req: PayloadRequest = await createPayloadRequest({
+			payload: booted.payload,
+			urlSuffix: `/api/${PAGES}${path}`,
+			user: reader,
+		})
 		return endpoint.handler(req)
 	}
 
@@ -59,6 +64,7 @@ describeForDb('wiki custom targets', { dbs: ['mongo'] }, (db) => {
 	it('maps a stored custom target onto its namespaced key', async () => {
 		await booted.payload.create({
 			collection: PAGES,
+			overrideAccess: true,
 			data: {
 				_status: 'published',
 				slug: 'dashboard-guide',
@@ -76,6 +82,7 @@ describeForDb('wiki custom targets', { dbs: ['mongo'] }, (db) => {
 	it('reports an undeclared custom key as an orphan and leaves a declared one alone', async () => {
 		await booted.payload.create({
 			collection: PAGES,
+			overrideAccess: true,
 			data: {
 				_status: 'published',
 				slug: 'stale-custom-guide',

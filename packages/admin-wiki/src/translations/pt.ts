@@ -106,6 +106,8 @@ export const pt: Record<TranslationKey, string> = {
 		'Os guias escritos aqui explicam este painel de administração a quem trabalha nele.',
 	[keys.wikiFeaturedHeading]: 'Em destaque',
 	[keys.wikiFilterLabel]: 'Filtros',
+	[keys.wikiFilterNoResults]: 'Nenhum alvo correspondente',
+	[keys.wikiFilterSearch]: 'Pesquisar alvos',
 	[keys.wikiGuideNotFound]: 'Este guia não existe ou não está publicado.',
 	[keys.wikiNoResults]: 'Nenhum guia corresponde à sua pesquisa.',
 	[keys.wikiNoResultsHint]: 'Experimente um termo de pesquisa mais curto.',

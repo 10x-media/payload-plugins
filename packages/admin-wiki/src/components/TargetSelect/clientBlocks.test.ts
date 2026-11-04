@@ -41,7 +41,7 @@ describe('collectClientBlocks', () => {
 
 	it('resolves block references through the config blocks map', () => {
 		const fields = [
-			{ name: 'layout', type: 'blocks', blockReferences: ['shared'] },
+			{ name: 'layout', type: 'blocks', blocks: ['shared'] },
 		] as unknown as ClientField[]
 		expect(collect(fields, { shared: block('shared') })).toEqual(['shared'])
 		expect(collect(fields)).toEqual([])

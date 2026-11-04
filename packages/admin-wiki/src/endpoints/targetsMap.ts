@@ -92,8 +92,8 @@ export const buildTargetsMapEndpoint = ({
 			for (const bucket of Object.values(targets)) {
 				bucket.sort(compareTargetEntries)
 			}
-			const canCreate = Boolean(await access.create({ req }))
-			const canUpdate = Boolean(await access.update({ req }))
+			const canCreate = Boolean(await access.create({ req, slug: pagesSlug }))
+			const canUpdate = Boolean(await access.update({ req, slug: pagesSlug }))
 			const body: WikiTargetsResponse = {
 				canCreate,
 				canUpdate,

@@ -28,9 +28,15 @@ type LoadState = 'error' | 'loading' | 'ready'
 /**
  * The reading drawer for one surface's guides: a rail switches between guides
  * when several target the surface (hidden for a single guide), the pane leads
- * with the guide's summary and renders the shared `GuideArticle`, and users with
- * update access get an edit shortcut. Content loads lazily on open and caches
- * per guide and locale.
+ * with the guide's title and summary and renders the shared `GuideArticle`, and
+ * users with update access get an edit shortcut. Content loads lazily on open
+ * and caches per guide and locale.
+ *
+ * Payload 4 drops the document header inside drawers and titles the drawer in
+ * its small header bar, which suits a form. A guide is read, so the pane carries
+ * the title as its h1, as the wiki page does, and the bar says what the drawer
+ * is ("Wiki") rather than repeating it. The bar does not name the guide a nested
+ * drawer returns to: Payload's never does either, and drawers nest without end.
  */
 export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps) => {
 	const { t } = useTranslation()
@@ -96,7 +102,7 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 			: undefined
 
 	return (
-		<Drawer className="wiki-guide-drawer-modal" slug={slug} title={activeEntry?.title ?? ''}>
+		<Drawer className="wiki-guide-drawer-modal" slug={slug} title={t(keys.wikiViewTitle)}>
 			<div className="wiki-guide-drawer">
 				{hasRail ? (
 					<nav aria-label={t(keys.drawerGuideList)} className="wiki-guide-drawer__rail">
@@ -118,14 +124,20 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 					</nav>
 				) : null}
 				<div className="wiki-guide-drawer__pane">
-					<div className="wiki-guide-drawer__header">
-						{activeEntry?.summary ? (
-							<p className="wiki-guide-drawer__summary">{activeEntry.summary}</p>
-						) : null}
+					<header className="wiki-guide-drawer__header">
+						<div className="wiki-guide-drawer__heading">
+							<h1 className="wiki-guide-drawer__title">
+								{activeEntry?.title}
+								{activeEntry?.featured ? <StarIcon /> : null}
+							</h1>
+							{activeEntry?.summary ? (
+								<p className="wiki-guide-drawer__summary">{activeEntry.summary}</p>
+							) : null}
+						</div>
 						{wikiHref || editHref ? (
 							<div className="wiki-guide-drawer__actions">
 								{wikiHref ? (
-									<Button buttonStyle="pill" el="link" margin={false} size="small" to={wikiHref}>
+									<Button buttonStyle="pill" el="link" margin={false} size="medium" to={wikiHref}>
 										{t(keys.wikiOpenInWiki)}
 									</Button>
 								) : null}
@@ -135,9 +147,8 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 										el="link"
 										icon="edit"
 										iconPosition="left"
-										iconStyle="none"
 										margin={false}
-										size="small"
+										size="medium"
 										to={editHref}
 									>
 										{t(keys.drawerEditGuide)}
@@ -145,7 +156,7 @@ export const GuideDrawer = ({ entries, initialGuideId, slug }: GuideDrawerProps)
 								) : null}
 							</div>
 						) : null}
-					</div>
+					</header>
 					{state === 'loading' ? (
 						<div className="wiki-guide-drawer__loading">
 							<ShimmerEffect height="1rem" width="70%" />

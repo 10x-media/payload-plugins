@@ -109,7 +109,7 @@ const injectDescription = (field: Field, schemaPath: string, context: WalkContex
  * a tab bar reads as broken layout. The cost is that the guide sits at the
  * bottom, where it is less obvious.
  *
- * Shared block configs (`config.blocks` / `blockReferences`) are mutated once,
+ * Shared block configs (`config.blocks`, referenced by slug) are mutated once,
  * because the caller dedupes by object identity. Two *distinct* objects sharing
  * a slug are both mutated, so the help field renders at either one's usages; only
  * the bookkeeping (slug list, label) is deduped, and it keeps the first walked,
@@ -138,7 +138,7 @@ const injectBlockHelp = (block: Block, context: WalkContext): void => {
 				components: {
 					Field: { clientProps: { blockSlug: block.slug }, path: BLOCK_HELP_COMPONENT },
 				},
-				disableListColumn: true,
+				disabled: { column: true },
 			},
 		},
 	]
@@ -162,18 +162,15 @@ const queueBlock = (block: Block, origin: string, context: WalkContext): void =>
 	context.pendingBlocks.push({ block, origin })
 }
 
-const blocksOfField = (
-	field: { blockReferences?: unknown; blocks?: Block[] },
-	context: WalkContext
-): Block[] => {
-	const references = Array.isArray(field.blockReferences) ? field.blockReferences : []
-	const resolved = references
-		.map((reference) =>
-			typeof reference === 'string' ? context.blocksBySlug.get(reference) : (reference as Block)
-		)
+/**
+ * The blocks one field offers. Payload 4 holds inline configs and slugs of
+ * `config.blocks` entries in the same array; a slug resolves through the
+ * registry, and one the registry does not know is dropped.
+ */
+const blocksOfField = (field: { blocks?: (Block | string)[] }, context: WalkContext): Block[] =>
+	(field.blocks ?? [])
+		.map((entry) => (typeof entry === 'string' ? context.blocksBySlug.get(entry) : entry))
 		.filter((block): block is Block => Boolean(block))
-	return [...(field.blocks ?? []), ...resolved]
-}
 
 const walkFields = (fields: Field[], parentPath: string, context: WalkContext): void => {
 	for (const field of fields) {

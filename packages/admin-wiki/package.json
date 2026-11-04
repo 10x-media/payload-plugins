@@ -81,21 +81,11 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/next": "^4.0.0-beta.6",
 		"@payloadcms/richtext-lexical": "^4.0.0-beta.6",
 		"@payloadcms/ui": "^4.0.0-beta.6",
-		"next": "^16.4.0",
 		"payload": "^4.0.0-beta.6",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
-	},
-	"peerDependenciesMeta": {
-		"@payloadcms/next": {
-			"optional": true
-		},
-		"next": {
-			"optional": true
-		}
 	},
 	"devDependencies": {
 		"@10x-media/payload-test-harness": "workspace:*",

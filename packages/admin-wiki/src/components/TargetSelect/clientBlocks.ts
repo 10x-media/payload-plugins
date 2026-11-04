@@ -42,15 +42,8 @@ export const collectClientBlocks = (
 	for (const field of fields) {
 		switch (field.type) {
 			case 'blocks':
-				for (const block of field.blocks ?? []) {
-					remember(block, found, blocksMap)
-				}
-				for (const reference of field.blockReferences ?? []) {
-					remember(
-						typeof reference === 'string' ? blocksMap[reference] : reference,
-						found,
-						blocksMap
-					)
+				for (const entry of field.blocks ?? []) {
+					remember(typeof entry === 'string' ? blocksMap[entry] : entry, found, blocksMap)
 				}
 				break
 			case 'array':

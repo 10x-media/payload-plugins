@@ -1,17 +1,18 @@
-/* Deliberately close to Payload's own upload node (`.LexicalEditorTheme__upload`):
-   a bordered card that lifts on hover, with round actions floating in from the
-   top right. Written against the same tokens so the two nodes stay siblings when
-   the theme changes under them. */
+/* A bordered card with actions floating in from the top right, written against
+   the same tokens as Payload's own upload node (`.LexicalEditorTheme__upload`)
+   so the two stay siblings when the theme changes under them. The upload node's
+   floating toolbar is not copied: a video keeps its transport controls where
+   that toolbar would sit. */
 .wiki-video-node {
-	border: 1px solid var(--theme-elevation-100);
-	border-radius: var(--style-radius-m, 4px);
+	border: var(--stroke-width-small) solid var(--color-border);
+	border-radius: var(--radius-large);
 	font-family: var(--font-body);
-	margin-block: calc(var(--base) / 2);
+	margin-block: var(--spacer-2);
 	position: relative;
 }
 
 .wiki-video-node:hover {
-	border-color: var(--theme-elevation-150);
+	border-color: var(--color-border-selected);
 }
 
 .wiki-video-node__card {
@@ -31,28 +32,28 @@
 }
 
 .wiki-video-node__media .wiki-video__player {
-	border-radius: var(--style-radius-m, 4px) var(--style-radius-m, 4px) 0 0;
+	border-radius: var(--radius-large) var(--radius-large) 0 0;
 }
 
 .wiki-video-node__media .wiki-video__status {
 	margin: 0;
-	padding: var(--base);
+	padding: var(--spacer-4);
 }
 
 /* Hidden until the card is hovered or something inside it takes focus, the same
    reveal core uses, so a guide full of videos is not a wall of buttons. */
 .wiki-video-node__actions {
 	align-items: center;
-	background: var(--theme-elevation-50);
-	border-radius: var(--style-radius-m, 4px);
+	background: var(--color-bg-secondary);
+	border-radius: var(--radius-large);
 	display: flex;
-	gap: calc(var(--base) * 0.3);
+	gap: var(--spacer-1);
 	opacity: 0;
-	padding: calc(var(--base) * 0.2);
+	padding: var(--spacer-1);
 	pointer-events: none;
 	position: absolute;
-	right: calc(var(--base) * 0.5);
-	top: calc(var(--base) * 0.5);
+	right: var(--spacer-2);
+	top: var(--spacer-2);
 	transform: translateY(-6px);
 	transition:
 		opacity 0.15s ease,
@@ -71,7 +72,7 @@
 }
 
 .wiki-video-node__actions .btn:hover {
-	background: var(--theme-elevation-100);
+	background: var(--color-bg-hover);
 }
 
 /* Always on, and below the player rather than over it: core can float this strip
@@ -79,12 +80,12 @@
    controls exactly there. */
 .wiki-video-node__meta {
 	align-items: baseline;
-	background: var(--theme-elevation-50);
-	border-radius: 0 0 var(--style-radius-m, 4px) var(--style-radius-m, 4px);
+	background: var(--color-bg-secondary);
+	border-radius: 0 0 var(--radius-large) var(--radius-large);
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--base) * 0.5);
-	padding: calc(var(--base) * 0.5) calc(var(--base) * 0.75);
+	gap: var(--spacer-2);
+	padding: var(--spacer-2) var(--spacer-3);
 	row-gap: 0;
 }
 
@@ -107,8 +108,8 @@
 }
 
 .wiki-video-node__collection {
-	color: var(--theme-elevation-500);
-	font-size: 0.9em;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -118,6 +119,6 @@
 	.wiki-video-node__meta {
 		flex-direction: column;
 		gap: 0;
-		padding: calc(var(--base) * 0.5) calc(var(--base) * 0.6);
+		padding: var(--spacer-2) var(--spacer-2-5);
 	}
 }

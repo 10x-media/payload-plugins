@@ -25,7 +25,7 @@ const panel: ClientBlock = {
 
 const accordion: ClientBlock = {
 	slug: 'accordion',
-	fields: [{ name: 'panels', type: 'blocks', blockReferences: ['panel'] }],
+	fields: [{ name: 'panels', type: 'blocks', blocks: ['panel'] }],
 } as ClientBlock
 
 const orphan: ClientBlock = { slug: 'orphan', fields: [] } as ClientBlock
@@ -45,7 +45,7 @@ describe('collectBlockUsages', () => {
 			configOf([
 				{
 					slug: 'posts',
-					fields: [{ name: 'layout', type: 'blocks', blockReferences: ['hero'] }],
+					fields: [{ name: 'layout', type: 'blocks', blocks: ['hero'] }],
 				},
 			]),
 			covered(['posts'])
@@ -70,12 +70,12 @@ describe('collectBlockUsages', () => {
 							tabs: [
 								{
 									label: 'Content',
-									fields: [{ name: 'layout', type: 'blocks', blockReferences: ['hero'] }],
+									fields: [{ name: 'layout', type: 'blocks', blocks: ['hero'] }],
 								},
 								{
 									name: 'meta',
 									label: 'Meta',
-									fields: [{ name: 'extras', type: 'blocks', blockReferences: ['cta'] }],
+									fields: [{ name: 'extras', type: 'blocks', blocks: ['cta'] }],
 								},
 							],
 						},
@@ -97,11 +97,11 @@ describe('collectBlockUsages', () => {
 						{
 							name: 'branding',
 							type: 'group',
-							fields: [{ name: 'layout', type: 'blocks', blockReferences: ['hero'] }],
+							fields: [{ name: 'layout', type: 'blocks', blocks: ['hero'] }],
 						},
 						{
 							type: 'row',
-							fields: [{ name: 'extras', type: 'blocks', blockReferences: ['cta'] }],
+							fields: [{ name: 'extras', type: 'blocks', blocks: ['cta'] }],
 						},
 					],
 				},
@@ -117,7 +117,7 @@ describe('collectBlockUsages', () => {
 			configOf([
 				{
 					slug: 'posts',
-					fields: [{ name: 'layout', type: 'blocks', blockReferences: ['accordion'] }],
+					fields: [{ name: 'layout', type: 'blocks', blocks: ['accordion'] }],
 				},
 			]),
 			covered(['posts'])
@@ -127,7 +127,7 @@ describe('collectBlockUsages', () => {
 
 	it('prefers the registry variant when a slug is also declared inline', () => {
 		const config = configOf(
-			[{ slug: 'posts', fields: [{ name: 'layout', type: 'blocks', blockReferences: ['cta'] }] }],
+			[{ slug: 'posts', fields: [{ name: 'layout', type: 'blocks', blocks: ['cta'] }] }],
 			[{ slug: 'settings', fields: [{ name: 'sections', type: 'blocks', blocks: [inlineCta] }] }]
 		)
 		const fromCollectionFirst = collectBlockUsages(config, covered(['posts'], ['settings']))
@@ -155,9 +155,7 @@ describe('collectBlockUsages', () => {
 
 	it('ignores entities the plugin does not cover', () => {
 		const usages = collectBlockUsages(
-			configOf([
-				{ slug: 'posts', fields: [{ name: 'layout', type: 'blocks', blockReferences: ['hero'] }] },
-			]),
+			configOf([{ slug: 'posts', fields: [{ name: 'layout', type: 'blocks', blocks: ['hero'] }] }]),
 			covered([])
 		)
 		expect(usages.size).toBe(0)
@@ -165,9 +163,7 @@ describe('collectBlockUsages', () => {
 
 	it('has no entry for a registry block nothing renders', () => {
 		const usages = collectBlockUsages(
-			configOf([
-				{ slug: 'posts', fields: [{ name: 'layout', type: 'blocks', blockReferences: ['hero'] }] },
-			]),
+			configOf([{ slug: 'posts', fields: [{ name: 'layout', type: 'blocks', blocks: ['hero'] }] }]),
 			covered(['posts'])
 		)
 		expect(usages.has('orphan')).toBe(false)

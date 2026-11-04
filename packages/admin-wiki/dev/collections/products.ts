@@ -14,6 +14,6 @@ export const products: CollectionConfig = {
 		{ name: 'name', type: 'text', localized: true, required: true },
 		{ name: 'price', type: 'number' },
 		{ name: 'description', type: 'textarea', localized: true },
-		{ name: 'layout', type: 'blocks', blockReferences: ['heroBanner', 'cta'], blocks: [] },
+		{ name: 'layout', type: 'blocks', blocks: ['heroBanner', 'cta'] },
 	],
 }

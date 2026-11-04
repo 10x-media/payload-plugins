@@ -29,11 +29,10 @@ export const WikiGuideViewLink = () => {
 
 	return (
 		<Button
-			buttonStyle="subtle"
+			buttonStyle="pill"
 			el="link"
 			icon={<BookIcon />}
 			iconPosition="left"
-			iconStyle="none"
 			margin={false}
 			to={`${config.routes.admin}/wiki/${encodeURIComponent(slug)}`}
 		>

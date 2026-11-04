@@ -8,12 +8,18 @@ import { WikiCustomHelp } from '@10x-media/admin-wiki/client'
  * describes them, so their guides hang off `customTargets` instead.
  */
 export const DevDashboard = () => (
-	<div className="gutter--left gutter--right" style={{ paddingBlock: 'var(--base)' }}>
-		<h1>
+	<div className="gutter--left gutter--right" style={{ paddingBlock: 'var(--spacer-4)' }}>
+		<h1 style={{ fontSize: 'var(--text-heading-xl-font-size)', fontWeight: 600 }}>
 			Dashboard <WikiCustomHelp target="dashboard" />
 		</h1>
 		<section id="dev-dashboard-attention">
-			<h2>
+			<h2
+				style={{
+					fontSize: 'var(--text-heading-medium-font-size)',
+					fontWeight: 600,
+					marginTop: 'var(--spacer-4)',
+				}}
+			>
 				Needs attention <WikiCustomHelp target="dashboard.attention" />
 			</h2>
 			<p>Three posts have been in review for more than a week.</p>

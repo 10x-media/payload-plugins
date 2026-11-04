@@ -18,7 +18,7 @@ export const posts: CollectionConfig = {
 	slug: 'posts',
 	fields: [
 		{ name: 'title', type: 'text' },
-		{ name: 'layout', type: 'blocks', blockReferences: ['hero'], blocks: [] },
+		{ name: 'layout', type: 'blocks', blocks: ['hero'] },
 	],
 }
 

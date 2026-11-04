@@ -138,7 +138,7 @@ export const WikiFieldPickerDrawer = ({
 	const { config, getEntityConfig } = useConfig()
 	const { closeModal, modalState, openModal } = useModal()
 	const { getFormState } = useServerFunctions()
-	const { code: locale } = useLocale()
+	const locale = useLocale()?.code
 	const blocksDrawerSlug = useDrawerSlug('wiki-field-picker-blocks')
 
 	const isOpen = Boolean(modalState[slug]?.isOpen)
@@ -238,18 +238,34 @@ export const WikiFieldPickerDrawer = ({
 			: undefined
 	}, [blockUsages, getEntityConfig, isBlockPicker, kind, selection])
 
+	/**
+	 * The target and locale the current form state was loaded for. React may run
+	 * this effect's cleanup and setup again without any dependency changing: on
+	 * TanStack Start the loaded form renders field components that suspend on
+	 * their first load, and React disconnects and reconnects the effects around
+	 * it. Without this, every reconnect cleared the form, refetched it, rendered
+	 * it, suspended again, and the picker never left its loading state.
+	 */
+	const loadedFor = useRef<null | { locale: string | undefined; target: ResolvedTarget }>(null)
+
 	useEffect(() => {
 		if (!isOpen) {
+			loadedFor.current = null
 			return
 		}
 		if (!selection) {
+			loadedFor.current = null
 			setFormState(null)
 			setStatus('empty')
 			return
 		}
 		if (!target || target.fields.length === 0) {
+			loadedFor.current = null
 			setFormState(null)
 			setStatus('error')
+			return
+		}
+		if (loadedFor.current?.target === target && loadedFor.current.locale === locale) {
 			return
 		}
 		const controller = new AbortController()
@@ -276,6 +292,7 @@ export const WikiFieldPickerDrawer = ({
 				if (controller.signal.aborted) {
 					return
 				}
+				loadedFor.current = state ? { locale, target } : null
 				setFormState(state ?? null)
 				setStatus(state ? 'ready' : 'error')
 			})
@@ -392,7 +409,7 @@ export const WikiFieldPickerDrawer = ({
 						<div className="wiki-field-picker__empty">
 							<p className="wiki-field-picker__status">{t(keys.pickerNoBlock)}</p>
 							{isBlockPicker ? (
-								<Button buttonStyle="secondary" margin={false} onClick={browseBlocks} size="small">
+								<Button buttonStyle="secondary" margin={false} onClick={browseBlocks} size="medium">
 									{t(keys.pickerChooseBlock)}
 								</Button>
 							) : null}

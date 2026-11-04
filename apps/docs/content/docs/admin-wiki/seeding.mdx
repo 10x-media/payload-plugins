@@ -34,6 +34,8 @@ export default buildConfig({
 
 Guides are keyed by `slug`. A re-run updates the existing guide rather than creating a second one, so calling it on every boot is safe.
 
+Every read and write the seed makes runs with `overrideAccess: true`, so it works from `onInit` with no user and is not limited by the wiki's [access options](/admin-wiki/configuration#access).
+
 Targets are always written in full, every list, so dropping a target from a seed definition clears it rather than leaving it behind. `publish: false` leaves the guide as a draft; the default is published.
 
 ## Content
@@ -155,6 +157,10 @@ Any of `title`, `summary`, and `content` may be a plain value or a record keyed 
 ```
 
 A plain value is written to the default locale. Every other locale is written in its own pass, so a guide can be seeded in one language now and gain another later without touching the first.
+
+<Callout type="warn">
+  Payload 4 tracks publication status per locale, and the seed publishes a guide only in the locales it writes: the default locale, plus every locale some `title`, `summary`, or `content` record names. A guide seeded in English alone stays unpublished in German, so German readers do not see it anywhere. Give it a German `title` to publish it there (publishing a locale validates its required fields, and the title is required); a `summary` or `content` you leave out falls back to the default locale.
+</Callout>
 
 Targets and `featured` are not localized and are written once.
 

@@ -12,6 +12,7 @@ import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8c
 import { LexicalDiffComponent as LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { InlineToolbarFeatureClient as InlineToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { BlocksFeatureClient as BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { WikiVideoFeatureClient as WikiVideoFeatureClient_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { UploadFeatureClient as UploadFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
 import { WikiGuideLinkFeatureClient as WikiGuideLinkFeatureClient_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { LinkFeatureClient as LinkFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
@@ -33,6 +34,7 @@ import { HeadingFeatureClient as HeadingFeatureClient_e70f5e05f09f93e00b997edb1e
 import { WikiTargetSelect as WikiTargetSelect_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiTargetFields as WikiTargetFields_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiTargetBlocks as WikiTargetBlocks_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
+import { WikiTargetCustom as WikiTargetCustom_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiOrphanBanner as WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiGuideViewLink as WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
 import { WikiViewLink as WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
@@ -53,6 +55,16 @@ import { ActivityWidget as ActivityWidget_ab83ff7e88da8d3530831f296ec4756a } fro
 import { CollectionFilter as CollectionFilter_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { UploadDropzoneWidget as UploadDropzoneWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { UploadDropzoneCollectionsField as UploadDropzoneCollectionsField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { LucideAdapterIcon as LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
+import { LucideAdapterAssets as LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
+import { LucideAdapterNodes as LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087 } from '@10x-media/fields/icon/adapters/lucide'
+import { TipBlock as TipBlock_c426dff9a53db9c82f385a6b49c712ac } from '../../../../dev/components/TipBlock'
+import { StatusChip as StatusChip_6732a09e156d190cb034e40e5f1d110b } from '../../../../dev/components/StatusChip'
+import { DevWikiFooter as DevWikiFooter_11e8e95b5d0d9379cf226322fe5b25e7 } from '../../../../dev/components/WikiSlotsClient'
+import { DevWikiHeaderLink as DevWikiHeaderLink_11e8e95b5d0d9379cf226322fe5b25e7 } from '../../../../dev/components/WikiSlotsClient'
+import { DevWikiNotice as DevWikiNotice_1fd8d133534d362bbfb4ddbacfaedd8e } from '../../../../dev/components/WikiSlots'
+import { WikiEditGuideAction as WikiEditGuideAction_bd0a8d2193330fdfdceeb64a56ffc89f } from '@10x-media/admin-wiki/client'
+import { wikiConverters as wikiConverters_11dfbf8344a61b1c952128fd4054c2dc } from '../../../../dev/components/wikiConverters'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -70,6 +82,7 @@ export const importMap = {
   "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/client#InlineToolbarFeatureClient": InlineToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@payloadcms/richtext-lexical/client#BlocksFeatureClient": BlocksFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@10x-media/admin-wiki/client#WikiVideoFeatureClient": WikiVideoFeatureClient_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@payloadcms/richtext-lexical/client#UploadFeatureClient": UploadFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
   "@10x-media/admin-wiki/client#WikiGuideLinkFeatureClient": WikiGuideLinkFeatureClient_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@payloadcms/richtext-lexical/client#LinkFeatureClient": LinkFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
@@ -91,6 +104,7 @@ export const importMap = {
   "@10x-media/admin-wiki/client#WikiTargetSelect": WikiTargetSelect_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiTargetFields": WikiTargetFields_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiTargetBlocks": WikiTargetBlocks_bd0a8d2193330fdfdceeb64a56ffc89f,
+  "@10x-media/admin-wiki/client#WikiTargetCustom": WikiTargetCustom_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiOrphanBanner": WikiOrphanBanner_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiGuideViewLink": WikiGuideViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,
   "@10x-media/admin-wiki/client#WikiViewLink": WikiViewLink_bd0a8d2193330fdfdceeb64a56ffc89f,
@@ -110,5 +124,15 @@ export const importMap = {
   "@payloadcms/ui/rsc#ActivityWidget": ActivityWidget_ab83ff7e88da8d3530831f296ec4756a,
   "@payloadcms/ui#CollectionFilter": CollectionFilter_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui/rsc#UploadDropzoneWidget": UploadDropzoneWidget_ab83ff7e88da8d3530831f296ec4756a,
-  "@payloadcms/ui#UploadDropzoneCollectionsField": UploadDropzoneCollectionsField_3817bf644402e67bfe6577f60ef982de
+  "@payloadcms/ui#UploadDropzoneCollectionsField": UploadDropzoneCollectionsField_3817bf644402e67bfe6577f60ef982de,
+  "@10x-media/fields/icon/adapters/lucide#LucideAdapterIcon": LucideAdapterIcon_7e91801d7dc297269e57a0aeaa5a9087,
+  "@10x-media/fields/icon/adapters/lucide#LucideAdapterAssets": LucideAdapterAssets_7e91801d7dc297269e57a0aeaa5a9087,
+  "@10x-media/fields/icon/adapters/lucide#LucideAdapterNodes": LucideAdapterNodes_7e91801d7dc297269e57a0aeaa5a9087,
+  "/components/TipBlock#TipBlock": TipBlock_c426dff9a53db9c82f385a6b49c712ac,
+  "/components/StatusChip#StatusChip": StatusChip_6732a09e156d190cb034e40e5f1d110b,
+  "/components/WikiSlotsClient#DevWikiFooter": DevWikiFooter_11e8e95b5d0d9379cf226322fe5b25e7,
+  "/components/WikiSlotsClient#DevWikiHeaderLink": DevWikiHeaderLink_11e8e95b5d0d9379cf226322fe5b25e7,
+  "/components/WikiSlots#DevWikiNotice": DevWikiNotice_1fd8d133534d362bbfb4ddbacfaedd8e,
+  "@10x-media/admin-wiki/client#WikiEditGuideAction": WikiEditGuideAction_bd0a8d2193330fdfdceeb64a56ffc89f,
+  "/components/wikiConverters#wikiConverters": wikiConverters_11dfbf8344a61b1c952128fd4054c2dc
 }

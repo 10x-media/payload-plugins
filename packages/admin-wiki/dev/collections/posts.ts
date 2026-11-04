@@ -36,8 +36,7 @@ export const posts: CollectionConfig = {
 						{
 							name: 'layout',
 							type: 'blocks',
-							blockReferences: ['heroBanner'],
-							blocks: [],
+							blocks: ['heroBanner'],
 						},
 					],
 				},

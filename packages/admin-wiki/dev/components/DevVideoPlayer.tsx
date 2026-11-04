@@ -12,15 +12,15 @@ import type { WikiVideoPlayerProps } from '@10x-media/admin-wiki/client'
 export const DevVideoPlayer = ({ media }: WikiVideoPlayerProps) => (
 	<div
 		style={{
-			background: 'var(--theme-elevation-50)',
-			border: '2px dashed var(--theme-success-500)',
+			background: 'var(--color-bg-secondary)',
+			border: '2px dashed var(--color-border-success-strong)',
 			borderRadius: '4px',
 			display: 'grid',
 			gap: '0.5rem',
 			padding: '0.75rem',
 		}}
 	>
-		<strong style={{ color: 'var(--theme-success-600)' }}>Dev player (consumer component)</strong>
+		<strong style={{ color: 'var(--color-text-success)' }}>Dev player (consumer component)</strong>
 		<code style={{ fontSize: '0.8125rem' }}>
 			#{media.id} · {media.filename ?? 'no filename'} · {media.mimeType ?? 'no mimeType'}
 		</code>

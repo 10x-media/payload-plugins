@@ -20,7 +20,7 @@ export const DevWikiNotice = async ({
 	return (
 		<aside
 			style={{
-				background: 'var(--theme-elevation-50)',
+				background: 'var(--color-bg-secondary)',
 				borderRadius: '4px',
 				fontSize: '0.8125rem',
 				padding: '0.75rem 1rem',

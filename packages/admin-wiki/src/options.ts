@@ -1,4 +1,4 @@
-import type { LexicalEditorProps } from '@payloadcms/richtext-lexical'
+import type { LexicalEditorArgs } from '@payloadcms/richtext-lexical'
 import type {
 	Access,
 	AdminViewServerProps,
@@ -66,7 +66,7 @@ export type WikiEditorBlockOption = {
  * three prop types this plugin has no business naming.
  */
 export type WikiEditorFeature = Extract<
-	NonNullable<LexicalEditorProps['features']>,
+	NonNullable<LexicalEditorArgs['features']>,
 	readonly unknown[]
 >[number]
 

@@ -103,6 +103,8 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.wikiEmptyHint]: 'الأدلة المكتوبة هنا تشرح لوحة الإدارة هذه لمن يستخدمها.',
 	[keys.wikiFeaturedHeading]: 'مميزة',
 	[keys.wikiFilterLabel]: 'عوامل التصفية',
+	[keys.wikiFilterNoResults]: 'لا توجد أهداف مطابقة',
+	[keys.wikiFilterSearch]: 'البحث في الأهداف',
 	[keys.wikiGuideNotFound]: 'هذا الدليل غير موجود أو غير منشور.',
 	[keys.wikiNoResults]: 'لا توجد أدلة تطابق بحثك.',
 	[keys.wikiNoResultsHint]: 'جرّب كلمة بحث أقصر.',

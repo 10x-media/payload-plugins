@@ -89,7 +89,7 @@ export const WikiVideoNodeView = ({ data, nodeKey }: WikiVideoNodeViewProps) => 
 					{isEditable ? (
 						<div className="wiki-video-node__actions" role="toolbar">
 							<Button
-								buttonStyle="icon-label"
+								buttonStyle="ghost"
 								el="button"
 								icon="swap"
 								onClick={swap}
@@ -98,7 +98,7 @@ export const WikiVideoNodeView = ({ data, nodeKey }: WikiVideoNodeViewProps) => 
 								tooltip={t(keys.videoSwap)}
 							/>
 							<Button
-								buttonStyle="icon-label"
+								buttonStyle="ghost"
 								el="button"
 								icon="x"
 								onClick={remove}

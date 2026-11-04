@@ -31,8 +31,23 @@ import { WikiVideoNodeView } from './component'
 import type { WikiVideoClientProps } from './server'
 import { type SerializedWikiVideoNode, type WikiVideoData, WikiVideoServerNode } from './videoNode'
 
-/** Client node: same data as the server node, plus the editor card. */
+/**
+ * Client node: same data as the server node, plus the editor card.
+ *
+ * `clone` and `getType` are restated, not inherited: Lexical checks that a
+ * registered node class owns both, and warns on every editor mount when a
+ * subclass only inherits them. `new this(...)` in the server node's `clone`
+ * already builds this class.
+ */
 export class WikiVideoNode extends WikiVideoServerNode {
+	static override clone(node: WikiVideoNode): WikiVideoNode {
+		return WikiVideoServerNode.clone(node) as WikiVideoNode
+	}
+
+	static override getType(): string {
+		return WikiVideoServerNode.getType()
+	}
+
 	static override importJSON(serializedNode: SerializedWikiVideoNode): WikiVideoNode {
 		return $createWikiVideoNode({
 			relationTo: serializedNode.relationTo,

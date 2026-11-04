@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Payload } from 'payload'
@@ -7,7 +8,16 @@ import { devTipTransformer, embedTransformer, statusChipTransformer } from './se
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
 
-const dirname = path.dirname(fileURLToPath(import.meta.url))
+/**
+ * The dev app's fixtures. Next keeps `import.meta.url` on this source file, but the TanStack Start
+ * build bundles it into `dev-tanstack/dist/server/assets`, where `../fixtures` does not exist;
+ * `srvx` runs from `dev-tanstack`, so the working directory finds them there.
+ */
+const fixturesDir =
+	[
+		path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../fixtures'),
+		path.resolve(process.cwd(), '../dev/fixtures'),
+	].find((dir) => existsSync(dir)) ?? ''
 
 // Guide content never restates the guide's own title: the wiki view, the drawer
 // and the hover card all print it above the content already.
@@ -110,10 +120,11 @@ The **accent color** and **icon** in the branding group come from the
  * loudly but never blocks the dev boot.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ collection: 'users', overrideAccess: true })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
 			collection: 'users',
+			overrideAccess: true,
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
@@ -239,7 +250,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				media: [
 					{
 						alt: { de: 'Beispieldiagramm', en: 'Example diagram' },
-						file: path.resolve(dirname, '../fixtures/diagram.png'),
+						file: path.join(fixturesDir, 'diagram.png'),
 						key: 'diagram',
 					},
 				],
