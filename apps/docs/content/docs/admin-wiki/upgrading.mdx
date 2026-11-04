@@ -1,0 +1,106 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x, including the guide data Payload 4's per-locale publication status needs migrated.
+---
+
+`@10x-media/admin-wiki` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. This page covers what the wiki adds on top: one config detail, a few renames, and, for a project with `localization`, a data migration without which every guide disappears from the wiki.
+
+## Checklist
+
+1. Upgrade `@10x-media/admin-wiki` with Payload: its peers are `payload`, `@payloadcms/ui`, and `@payloadcms/richtext-lexical` at `^4.0.0-beta.6`. `next` and `@payloadcms/next` are no longer peers, so the wiki runs on TanStack Start too.
+2. Check the [config changes](#config-changes) against your config and custom CSS.
+3. With `localization` in your config, migrate the guides' publication status before the first boot on the old data: [MongoDB](#mongodb), [Postgres](#postgres), [SQLite](#sqlite). Without `localization` there is no wiki data to migrate.
+4. Regenerate the import map (`pnpm payload generate:importmap`).
+5. [Check the wiki](#after-the-migration): every guide you expect is in the wiki index, in every content locale.
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## Config changes
+
+- **Plugin order.** The plugin declares `order: 1000` (exported as `ADMIN_WIKI_PLUGIN_ORDER`), so Payload runs it after every plugin on the default order. It no longer has to be listed last in `plugins`; leaving it last does no harm. See [Plugin order](/admin-wiki/configuration#plugin-order).
+- **Blocks.** Payload 4 removed `blockReferences`; the wiki reads a blocks field's `blocks` alone, whether it lists slugs or inline configs. Payload's own migration of your config is all it needs.
+- **Wiki media stays unversioned.** Payload 4 versions every collection by default. `wiki-media` sets `versions: false`, as it had no versions on Payload 3, so it adds no tables. To version it anyway, return `versions` from [`overrides.media`](/admin-wiki/configuration#collection-overrides) and migrate for the new tables.
+- **`seedWiki`.** Payload 4's Local API applies access control by default; the seeder passes `overrideAccess: true` on every call, so it still runs from `onInit` with no user. Nothing to change. It now publishes only the locales it writes content for (see [Seeding](/admin-wiki/seeding#localization)).
+
+## Per-locale publication status
+
+With `localization` and drafts, Payload 4 keeps a guide's publication status per locale (see [Authoring](/admin-wiki/authoring#the-guide-collection)). Payload 3 stored one status for the whole document, and Payload 4 cannot read it:
+
+- On MongoDB every published guide reads as unpublished. The wiki index, the guide pages, and every surface come up empty, with no error.
+- On Postgres and SQLite the status column moves to the locales table, so every read of the guide collection fails until the schema is migrated.
+
+Payload ships the data migration as a predefined migration per adapter, `localize-status`. It converts every collection and global with drafts and localized fields in the project, not only the wiki's, so run it once for the whole project.
+
+<Callout type="warn">
+`localize-status` takes each document's new status from its latest version. A guide that was published and then edited without publishing again (its latest version is a draft) comes out unpublished in every locale. Before migrating, note those guides (on Payload 3 their edit view shows the status "Changed"), and publish them again afterwards.
+</Callout>
+
+Back up the database first.
+
+### MongoDB
+
+```bash
+pnpm payload migrate:create --file @payloadcms/db-mongodb/localize-status
+pnpm payload migrate
+```
+
+The generated file runs as is.
+
+### Postgres
+
+Two migrations: the predefined one for the data, then the regular schema migration Payload 4 needs anyway (it adds `createdBy` and `updatedBy` to every collection, among others).
+
+```bash
+pnpm payload migrate:create --file @payloadcms/db-postgres/localize-status
+pnpm payload migrate:create payload-4
+```
+
+Both files need edits before `pnpm payload migrate`.
+
+**The `localize-status` file** passes the migration's Drizzle transaction where the function expects the adapter, and fails with `query.getSQL is not a function`. Pass `payload.db`:
+
+```ts title="migrations/<timestamp>_localize_status.ts"
+export async function up({ payload, req }: MigrateUpArgs): Promise<void> {
+  await migrateLocalizeStatus({
+    db: payload.db, // was: db
+    payload,
+    req,
+    sql,
+  })
+}
+```
+
+**The schema migration** is generated from your last Payload 3 snapshot, so it repeats what `localize-status` already did: it drops the old status columns and their indexes again and adds the new status columns again. For the guide collection (table names follow [`slugs.pages`](/admin-wiki/configuration); `wiki_pages` by default), and the same way for every other collection `localize-status` converted:
+
+- Make the drops tolerant: `DROP INDEX IF EXISTS` for `wiki_pages__status_idx`, `_wiki_pages_v_version_version__status_idx`, and `_wiki_pages_v_snapshot_idx`, and `DROP COLUMN IF EXISTS` for `wiki_pages._status`, `_wiki_pages_v.version__status`, and `_wiki_pages_v.snapshot`.
+- Replace the two `ADD COLUMN` lines for the status columns, which exist already as plain text, with a conversion to the enum:
+
+```sql
+-- instead of: ALTER TABLE "wiki_pages_locales" ADD COLUMN "_status" "enum_wiki_pages_status" DEFAULT 'draft';
+ALTER TABLE "wiki_pages_locales" ALTER COLUMN "_status" DROP DEFAULT;
+ALTER TABLE "wiki_pages_locales" ALTER COLUMN "_status" SET DATA TYPE "enum_wiki_pages_status" USING "_status"::"enum_wiki_pages_status";
+ALTER TABLE "wiki_pages_locales" ALTER COLUMN "_status" SET DEFAULT 'draft';
+
+-- instead of: ALTER TABLE "_wiki_pages_v_locales" ADD COLUMN "version__status" "enum__wiki_pages_v_version_status" DEFAULT 'draft';
+ALTER TABLE "_wiki_pages_v_locales" ALTER COLUMN "version__status" DROP DEFAULT;
+ALTER TABLE "_wiki_pages_v_locales" ALTER COLUMN "version__status" SET DATA TYPE "enum__wiki_pages_v_version_status" USING "version__status"::"enum__wiki_pages_v_version_status";
+ALTER TABLE "_wiki_pages_v_locales" ALTER COLUMN "version__status" SET DEFAULT 'draft';
+```
+
+Then `pnpm payload migrate`. `pnpm payload migrate:create --skip-empty` afterwards creating nothing confirms the schema matches the config.
+
+### SQLite
+
+```bash
+pnpm payload migrate:create --file @payloadcms/db-sqlite/localize-status
+pnpm payload migrate:create payload-4
+```
+
+The `localize-status` file runs as generated. Review the schema migration the same way as on [Postgres](#postgres): anything it does to the status columns, `localize-status` has done already.
+
+## After the migration
+
+Open the wiki in each content locale and compare it with the list from before:
+
+- **Guides with unpublished edits** come out unpublished (see the warning above). Publish them again, in every locale they were live in.
+- **Guides written in one locale only.** On Payload 3 such a guide was read in every locale through fallback. On Payload 4 it reaches a locale only once it is published there, and publishing a locale needs its required fields, so a guide with no German title cannot be published in German. MongoDB's migration marks it published in every locale anyway; Postgres and SQLite's leave it unpublished where it has no translation. Translate it, or accept that readers in that locale no longer see it.

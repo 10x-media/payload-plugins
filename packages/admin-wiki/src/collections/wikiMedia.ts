@@ -49,6 +49,9 @@ export const buildWikiMediaCollection = ({
 				...(localize ? { localized: true } : {}),
 			},
 		],
+		// Payload 4 versions every collection by default; wiki media never had versions, and
+		// keeping it that way spares an upgrading project the extra tables.
+		versions: false,
 	}
 
 	return override ? override(collection) : collection
