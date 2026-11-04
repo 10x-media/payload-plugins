@@ -324,7 +324,7 @@ export const WikiTargetFields = ({
 										actions={
 											editKind ? (
 												<Button
-													buttonStyle="pill"
+													buttonStyle="secondary"
 													className="wiki-target-fields__group-edit"
 													margin={false}
 													onClick={() => openPicker(editKind, group.id)}

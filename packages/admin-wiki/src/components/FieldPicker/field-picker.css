@@ -1,26 +1,33 @@
-/* The select plate takes the Description slot, so it starts from the same
-   metrics as the help trigger next to it (field-help.css) and earns its
-   affordance from the box and the border, not from a louder type size. */
+/* The select plate takes the Description slot. It is drawn as Payload's own
+   secondary button, selected state included (`.btn--style-secondary.btn--selected`),
+   with a checkbox drawn as `checkbox-input` draws one, so it reads as an admin
+   control rather than a tag. A plain <button> rather than <Button>: Button's
+   children ignore the pointer and its smallest size is the one used here anyway. */
 .wiki-field-pick {
 	align-items: center;
-	background: var(--color-bg-secondary);
-	border: var(--stroke-width-small) solid var(--color-border);
-	border-radius: var(--radius-small);
-	color: var(--color-text-secondary);
+	background-color: var(--color-bg);
+	border: var(--stroke-width-small) solid var(--color-border-control);
+	border-radius: var(--button-radius);
+	color: var(--color-text);
 	cursor: pointer;
 	display: inline-flex;
-	font: inherit;
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
 	gap: var(--spacer-1-5);
+	height: var(--button-height);
+	line-height: var(--text-body-medium-line-height);
 	max-width: 100%;
-	padding: 2px var(--spacer-1-5);
+	padding: 0 var(--spacer-2) 0 var(--spacer-1);
 	text-align: start;
 	width: fit-content;
 }
 
-.wiki-field-pick:hover,
-.wiki-field-pick:focus-visible {
-	border-color: var(--color-border-strong);
-	color: var(--color-text);
+.wiki-field-pick:hover {
+	background-color: var(--color-bg-secondary-hover);
+}
+
+.wiki-field-pick:active {
+	background-color: var(--color-bg-secondary-pressed);
 }
 
 .wiki-field-pick:focus-visible {
@@ -28,28 +35,42 @@
 	outline-offset: var(--accessibility-outline-offset);
 }
 
-.wiki-field-pick--selected {
-	background: var(--color-bg-success-tertiary);
-	border-color: var(--color-border-success-strong);
-	color: var(--color-text);
+.wiki-field-pick--selected,
+.wiki-field-pick--selected:hover,
+.wiki-field-pick--selected:active {
+	background-color: var(--color-bg-selected);
+	border-color: var(--color-border-selected-strong);
+	color: var(--color-text-selected);
+}
+
+.wiki-field-pick__label {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
 .wiki-field-pick__box {
 	align-items: center;
-	background: var(--color-bg);
-	border: var(--stroke-width-small) solid var(--color-border-strong);
+	background: var(--color-bg-secondary);
+	border: var(--stroke-width-small) solid var(--color-border-control-strong);
 	border-radius: var(--radius-small);
+	box-sizing: border-box;
+	color: var(--color-icon-onbrand);
 	display: inline-flex;
 	flex-shrink: 0;
-	height: 12px;
+	height: var(--spacer-3);
 	justify-content: center;
-	width: 12px;
+	width: var(--spacer-3);
 }
 
-.wiki-field-pick--selected .wiki-field-pick__box {
-	background: var(--color-bg-success);
+.wiki-field-pick:hover .wiki-field-pick__box {
+	background: var(--color-bg-secondary-hover);
+}
+
+.wiki-field-pick--selected .wiki-field-pick__box,
+.wiki-field-pick--selected:hover .wiki-field-pick__box {
+	background: var(--color-bg-brand);
 	border-color: transparent;
-	color: var(--color-icon-onsuccess);
 }
 
 .wiki-field-pick__box .icon {
@@ -58,10 +79,12 @@
 }
 
 /* Whole-field highlight while a field is covered. `:has()` is progressive
-   enhancement: without it the plate alone still says so. */
+   enhancement: without it the plate alone still says so. The field draws no
+   box of its own, so the radius only rounds the outline. */
 .field-type:has(> .field-type__wrap > .wiki-field-pick--selected),
 .field-type:has(> .wiki-field-pick--selected) {
-	outline: var(--stroke-width-small) solid var(--color-border-success-strong);
+	border-radius: var(--radius-medium);
+	outline: var(--stroke-width-small) solid var(--color-border-selected-strong);
 	outline-offset: var(--spacer-1);
 }
 
@@ -257,7 +280,7 @@
 }
 
 .wiki-target-fields__path {
-	align-items: baseline;
+	align-items: center;
 	display: flex;
 	gap: var(--spacer-1-5);
 	padding: 2px 0;

@@ -107,6 +107,8 @@ export const es: Record<TranslationKey, string> = {
 		'Las guías escritas aquí explican este panel de administración a quienes lo usan.',
 	[keys.wikiFeaturedHeading]: 'Destacadas',
 	[keys.wikiFilterLabel]: 'Filtros',
+	[keys.wikiFilterNoResults]: 'No hay destinos coincidentes',
+	[keys.wikiFilterSearch]: 'Buscar destinos',
 	[keys.wikiGuideNotFound]: 'Esta guía no existe o no está publicada.',
 	[keys.wikiNoResults]: 'Ninguna guía coincide con su búsqueda.',
 	[keys.wikiNoResultsHint]: 'Pruebe con un término de búsqueda más corto.',

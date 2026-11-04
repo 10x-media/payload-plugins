@@ -1,14 +1,6 @@
 'use client'
 
-import {
-	AnimateHeight,
-	Button,
-	ChevronIcon,
-	Gutter,
-	ListSearchFilter,
-	PillSelector,
-	useConfig,
-} from '@payloadcms/ui'
+import { Gutter, ListSearchFilter, useConfig } from '@payloadcms/ui'
 import { type ReactNode, useCallback, useMemo, useState } from 'react'
 
 import type { WikiTargetEntry } from '../../shared/targetKeys'
@@ -18,6 +10,7 @@ import { useTranslation } from '../../translations/useTranslation'
 import { BookIcon, StarIcon } from '../icons'
 import { TargetChips } from '../TargetChips/TargetChips'
 import { useWikiTargets } from '../WikiProvider/WikiProvider'
+import { WikiTargetFilter } from './WikiTargetFilter'
 import './wiki-view.css'
 
 export type WikiIndexClientProps = {
@@ -34,9 +27,6 @@ export type WikiIndexClientProps = {
 	entries: WikiTargetEntry[]
 }
 
-/** Ties the filters toggle to the panel it opens, for assistive tech. */
-const FILTERS_ID = 'wiki-index-filters'
-
 const matches = (entry: WikiTargetEntry, query: string): boolean =>
 	(entry.title ?? '').toLowerCase().includes(query) ||
 	(entry.summary ?? '').toLowerCase().includes(query) ||
@@ -49,17 +39,10 @@ const matches = (entry: WikiTargetEntry, query: string): boolean =>
  *
  * The controls reproduce `ListControls` structurally, not just visually: the
  * same `list-controls` wrapper and search row, `ListSearchFilter` on the left,
- * a secondary "Filters" button on the right that reads as selected while open
- * or filtering, and the panel behind `AnimateHeight`. Payload's stylesheet then
- * does the rest: the full-bleed band with its rule below, and the spacing of a
- * `pill-selector` under the row. Everything after the controls sits in a
- * `Gutter`, as a list's table does. A panel that is always open and labelled
- * is the one thing a Payload list never shows, which is why the earlier
- * version read as foreign.
- *
- * Filtering is `PillSelector` rather than a where-builder because guides attach
- * to whole surfaces: picking among those surfaces is the entire query a reader
- * can express.
+ * and on the right the target filter, drawn as Payload 4's Columns popup (see
+ * `WikiTargetFilter`). Payload's stylesheet does the rest: the full-bleed band
+ * with its rule below. Everything after the controls sits in a `Gutter`, as a
+ * list's table does.
  */
 export const WikiIndexClient = ({
 	afterTable,
@@ -72,16 +55,15 @@ export const WikiIndexClient = ({
 	const { blockChips, blockLabels, customLabels } = useWikiTargets()
 	const [query, setQuery] = useState('')
 	const [selectedTargets, setSelectedTargets] = useState<string[]>([])
-	const [filtersOpen, setFiltersOpen] = useState(false)
 	const trimmed = query.trim().toLowerCase()
 	const linkable = useMemo(() => entries.filter((entry) => entry.slug), [entries])
 
 	const onSearchChange = useCallback((search: string) => setQuery(search ?? ''), [])
 
 	/**
-	 * Every surface some guide covers, labelled and sorted for the pill row. The
-	 * filters offer exactly what the chips show: a pill for a surface no row
-	 * displays would filter the list by something invisible.
+	 * Every surface some guide covers, labelled and sorted for the filter. It
+	 * offers exactly what the chips show: a switch for a surface no row displays
+	 * would filter the list by something invisible.
 	 */
 	const targetOptions = useMemo(() => {
 		const unique = new Set<string>()
@@ -168,33 +150,14 @@ export const WikiIndexClient = ({
 					<div className="list-controls__spacer" />
 					{hasFilters ? (
 						<div className="list-controls__actions">
-							<Button
-								buttonStyle="secondary"
-								className="list-controls__toggle-where"
-								extraButtonProps={{ 'aria-controls': FILTERS_ID, 'aria-expanded': filtersOpen }}
-								icon={<ChevronIcon direction={filtersOpen ? 'up' : 'down'} size={16} />}
-								margin={false}
-								onClick={() => setFiltersOpen((open) => !open)}
-								selected={filtersOpen || selectedTargets.length > 0}
-								size="medium"
-							>
-								{t(keys.wikiFilterLabel)}
-							</Button>
+							<WikiTargetFilter
+								onToggle={toggleTarget}
+								options={targetOptions}
+								selected={selectedTargets}
+							/>
 						</div>
 					) : null}
 				</div>
-				{hasFilters ? (
-					<AnimateHeight height={filtersOpen ? 'auto' : 0} id={FILTERS_ID}>
-						<PillSelector
-							onClick={({ pill }) => toggleTarget(pill.key ?? pill.name)}
-							pills={targetOptions.map((option) => ({
-								key: option.key,
-								name: option.label,
-								selected: selectedTargets.includes(option.key),
-							}))}
-						/>
-					</AnimateHeight>
-				) : null}
 			</div>
 			<Gutter className="wiki-index__body">
 				{renderSlot(beforeTable, 'before-table')}

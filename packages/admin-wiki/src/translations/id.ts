@@ -105,6 +105,8 @@ export const id: Record<TranslationKey, string> = {
 		'Panduan yang ditulis di sini menjelaskan panel admin ini kepada orang yang memakainya.',
 	[keys.wikiFeaturedHeading]: 'Unggulan',
 	[keys.wikiFilterLabel]: 'Filter',
+	[keys.wikiFilterNoResults]: 'Tidak ada target yang cocok',
+	[keys.wikiFilterSearch]: 'Cari target',
 	[keys.wikiGuideNotFound]: 'Panduan ini tidak ada atau belum diterbitkan.',
 	[keys.wikiNoResults]: 'Tidak ada panduan yang cocok dengan pencarian Anda.',
 	[keys.wikiNoResultsHint]: 'Coba kata pencarian yang lebih pendek.',

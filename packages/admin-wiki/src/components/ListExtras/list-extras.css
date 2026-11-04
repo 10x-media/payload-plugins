@@ -1,10 +1,19 @@
 /* Orphan banner ------------------------------------------------------------ */
 
 /* Payload's Banner carries the danger surface, radius and spacing; the content
-   here is a heading plus a list, which its single-line default does not lay out. */
+   here is a heading plus a list, which its single-line default does not lay out.
+   `beforeListTable` renders bare in Payload 4's list, whose table runs full bleed,
+   so the banner takes the list controls' gutter (narrower in a drawer, as theirs is)
+   and spaces itself off their bottom border and the table. */
 .wiki-orphan-banner {
 	align-items: flex-start;
 	gap: var(--spacer-2);
+	margin: var(--spacer-2-5) var(--gutter-h);
+}
+
+.drawer .wiki-orphan-banner {
+	margin-left: var(--spacer-3);
+	margin-right: var(--spacer-3);
 }
 
 .wiki-orphan-banner__body {

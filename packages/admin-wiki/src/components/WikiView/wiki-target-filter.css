@@ -1,0 +1,143 @@
+/* Payload 4's column selector, restated: its stylesheet only loads with the list
+   view, and its classes are not a public API. Metrics follow
+   `@payloadcms/ui/dist/elements/ColumnSelection/Popup.css`. */
+
+.popup__scroll-container:has(.wiki-target-filter__panel) {
+	max-height: fit-content;
+	padding: 0;
+}
+
+.wiki-target-filter__panel {
+	display: flex;
+	flex-direction: column;
+	max-height: 430px;
+	min-width: 240px;
+}
+
+.wiki-target-filter__header {
+	align-items: center;
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
+	display: flex;
+	flex-shrink: 0;
+	height: var(--spacer-6);
+	justify-content: space-between;
+	padding-inline: var(--spacer-2);
+}
+
+.wiki-target-filter__title {
+	color: var(--color-text);
+	font-size: var(--text-body-medium-bold-font-size);
+	font-weight: var(--text-body-medium-bold-font-weight);
+	line-height: var(--text-body-medium-bold-line-height);
+	margin: 0;
+	padding-inline-start: var(--spacer-2);
+}
+
+.wiki-target-filter__close {
+	color: var(--color-icon);
+	padding: 0;
+}
+
+.wiki-target-filter__search {
+	align-items: center;
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
+	display: flex;
+	flex-shrink: 0;
+	height: calc(var(--spacer-5) + var(--spacer-2) + var(--stroke-width-small));
+	padding-inline: var(--spacer-2-5);
+}
+
+.wiki-target-filter__search-bar {
+	align-items: center;
+	background: var(--color-bg-secondary);
+	border-radius: var(--button-radius);
+	display: flex;
+	flex: 1;
+	height: var(--spacer-4);
+	padding-inline-end: var(--spacer-2);
+}
+
+.wiki-target-filter__search-bar svg {
+	color: var(--color-icon-secondary);
+	display: block;
+	flex-shrink: 0;
+}
+
+.wiki-target-filter__search-input {
+	appearance: none;
+	background: transparent;
+	border: none;
+	color: var(--color-text);
+	flex: 1;
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	height: 100%;
+	line-height: var(--text-body-medium-line-height);
+	min-width: 0;
+	padding: 0;
+}
+
+.wiki-target-filter__search-input::placeholder {
+	color: var(--color-text-tertiary);
+}
+
+.wiki-target-filter__search-input:focus {
+	outline: none;
+}
+
+.wiki-target-filter__content {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+	overflow-y: auto;
+}
+
+.wiki-target-filter__list {
+	list-style: none;
+	margin: 0;
+	padding: var(--spacer-2) 0;
+}
+
+.wiki-target-filter__item {
+	align-items: center;
+	display: flex;
+	gap: var(--spacer-2);
+	padding-block: var(--spacer-1);
+	padding-inline: var(--spacer-3);
+}
+
+.wiki-target-filter__item:hover {
+	background: var(--color-bg-secondary);
+}
+
+.wiki-target-filter__item-label {
+	color: var(--color-text);
+	flex: 1;
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	line-height: var(--text-body-medium-line-height);
+	min-width: 0;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+
+.wiki-target-filter__item--inactive .wiki-target-filter__item-label {
+	color: var(--color-text-secondary);
+}
+
+.wiki-target-filter__no-results {
+	align-items: center;
+	color: var(--color-text);
+	display: flex;
+	font-size: var(--text-body-medium-font-size);
+	justify-content: center;
+	margin: 0;
+	min-height: calc(var(--spacer-6) + var(--spacer-2));
+	padding-block: var(--spacer-2);
+}
+
+html[data-enhanced-contrast] .wiki-target-filter__search-bar {
+	outline: var(--stroke-width-small) solid var(--color-border-control);
+}

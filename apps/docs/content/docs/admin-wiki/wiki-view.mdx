@@ -22,11 +22,11 @@ Neither appears in the nav. They are reached from the **Open wiki** action on th
 
 **Search** matches title, summary, and target keys, so typing a collection slug finds every guide about it.
 
-**Filters** sit behind a toggle beside the search field, as on any Payload list view. The panel is a row of surface pills rather than a query builder. Field targets are excluded from the pills.
+**Filters** sit in a popup beside the search field, drawn like a Payload list's Columns control: a search over the surfaces guides cover and a switch per surface, rather than a query builder. A guide is listed when it covers any surface that is switched on. Field targets are not offered.
 
 **Featured guides** lead the page as cards while neither search nor a filter is active, and give way to results once either is.
 
-The controls use Payload's own `list-controls`, `search-bar`, and `pill-selector` classes, so they follow your admin theme.
+The controls use Payload's own `list-controls` and `search-bar` classes and Payload 4's tokens, so they follow your admin theme.
 
 ## The "Covers" chips
 
@@ -42,7 +42,7 @@ adminWiki({
 
 A guide attached to a dozen blocks chips a dozen times, and a block whose `labels` are a function is not in the label map at all, so it chips its slug. Turning blocks off keeps the collections and globals a reader actually navigates by.
 
-The index's filter pills follow the chips: with blocks off, no block pill is offered either, since filtering by a surface no row displays would sort the list by something invisible. Blocks remain full targets throughout, with their own [block help](/admin-wiki/surfaces) and their entry in the target pickers; only the chips change.
+The index's filter follows the chips: with blocks off, no block is offered in it either, since filtering by a surface no row displays would sort the list by something invisible. Blocks remain full targets throughout, with their own [block help](/admin-wiki/surfaces) and their entry in the target pickers; only the chips change.
 
 ## Slots on the index
 

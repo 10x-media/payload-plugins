@@ -99,8 +99,24 @@
 	padding-bottom: var(--spacer-2-5);
 }
 
-.wiki-guide-drawer__header:empty {
-	display: none;
+.wiki-guide-drawer__heading {
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacer-2);
+	min-width: 0;
+}
+
+/* The pane's h1, sized as the wiki page's title: Payload 4's preflight resets
+   heading sizes, and the article's own h2s (1.4em of the prose) stay below it. */
+.wiki-guide-drawer__title {
+	align-items: center;
+	display: flex;
+	font-size: var(--text-heading-xl-font-size);
+	font-weight: var(--text-heading-xl-font-weight);
+	gap: var(--spacer-2);
+	letter-spacing: var(--text-heading-xl-letter-spacing);
+	line-height: var(--text-heading-xl-line-height);
+	margin: 0;
 }
 
 /* Sized with the prose it introduces: a lede set smaller than its own body text

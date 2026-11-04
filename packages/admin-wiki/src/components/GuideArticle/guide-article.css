@@ -1,6 +1,7 @@
 /* One reading size for every guide surface, and the single knob a project turns
    to change it. Payload's admin text is 12px (body-medium), which is right for
-   form chrome and too small for prose, so guides opt up to 15px.
+   form chrome and too small for prose, so guides take the top of Payload's own
+   body scale, body-large (14px).
 
    Declared on the article as well as on the two surfaces that frame it, because
    `GuideArticle` is exported and a consumer may render it somewhere else
@@ -8,7 +9,7 @@
 .wiki-guide-article,
 .wiki-guide-drawer,
 .wiki-view {
-	--wiki-prose-size: 0.9375rem;
+	--wiki-prose-size: var(--text-body-large-font-size);
 }
 
 /* Leading is a touch looser than Payload's form defaults because the measure is

@@ -104,6 +104,8 @@ export const keys = {
 	wikiEmptyHint: 'adminWiki:wikiEmptyHint',
 	wikiFeaturedHeading: 'adminWiki:wikiFeaturedHeading',
 	wikiFilterLabel: 'adminWiki:wikiFilterLabel',
+	wikiFilterNoResults: 'adminWiki:wikiFilterNoResults',
+	wikiFilterSearch: 'adminWiki:wikiFilterSearch',
 	wikiGuideNotFound: 'adminWiki:wikiGuideNotFound',
 	wikiNoResults: 'adminWiki:wikiNoResults',
 	wikiNoResultsHint: 'adminWiki:wikiNoResultsHint',

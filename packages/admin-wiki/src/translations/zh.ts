@@ -102,6 +102,8 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.wikiEmptyHint]: '这里写的指南向使用者说明这个管理后台。',
 	[keys.wikiFeaturedHeading]: '精选',
 	[keys.wikiFilterLabel]: '过滤条件',
+	[keys.wikiFilterNoResults]: '没有匹配的目标',
+	[keys.wikiFilterSearch]: '搜索目标',
 	[keys.wikiGuideNotFound]: '此指南不存在或尚未发布。',
 	[keys.wikiNoResults]: '没有指南匹配您的搜索。',
 	[keys.wikiNoResultsHint]: '试试更短的搜索词。',
