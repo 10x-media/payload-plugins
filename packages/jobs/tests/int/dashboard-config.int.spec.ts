@@ -128,6 +128,7 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 	it('rejects creating a job with both a workflow and a task', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'payload-jobs',
 				data: { taskSlug: 'sendEmail', workflowSlug: 'onboarding' } as never,
 			})
@@ -136,6 +137,7 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 
 	it('still accepts programmatic queue names outside any configured list', async () => {
 		const job = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'payload-jobs',
 			data: { queue: 'not-in-options', taskSlug: 'sendEmail' } as never,
 		})
@@ -154,12 +156,14 @@ describeForDb('jobs dashboard config', { dbs: ['mongo'] }, (db) => {
 
 	it('finds runtime-queued jobs via the search fields without runHooks', async () => {
 		await booted.payload.jobs.queue({
+			overrideAccess: true,
 			input: {},
 			task: 'sendEmail',
 			waitUntil: new Date(Date.now() + 3_600_000),
 		} as never)
 		const fields = ['jobTitle', 'workflowSlug', 'taskSlug', 'queue']
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'payload-jobs',
 			where: { or: fields.map((field) => ({ [field]: { like: 'send' } })) },
 		})
@@ -194,7 +198,7 @@ describeForDb('jobs collection override seam', { dbs: ['mongo'] }, (db) => {
 		const cfg = booted.payload.collections['payload-jobs']?.config
 		expect(cfg?.admin?.group).toBe('Ops')
 		expect(cfg && fieldByName(cfg.fields, 'costCenter')).toBeDefined()
-		expect(cfg && fieldByName(cfg.fields, 'leaseExpiresAt')).toBeDefined()
+		expect(cfg && fieldByName(cfg.fields, 'startedAt')).toBeDefined()
 		expect(cfg && fieldByName(cfg.fields, 'jobTitle')).toBeDefined()
 	})
 

@@ -93,10 +93,12 @@ export type JobsPluginOptions = JobsOptions & {
 	 */
 	translations?: TranslationsOption
 	/**
-	 * Reliability layer: stuck-job recovery, a heartbeat lease, and multi-node
-	 * leader election. Off by default; pass `true` for defaults or an object to
-	 * tune it. It adds fields to `payload-jobs` and a `payload-jobs-locks`
-	 * collection, so adopters run one `migrate:create`.
+	 * Reliability layer: a recovery cap for jobs whose worker keeps dying, and
+	 * leader-elected scheduling across nodes. Payload 4 already reclaims a crashed
+	 * job once its claim lease lapses (`jobs.processingLease`). Off by default;
+	 * pass `true` for defaults or an object to tune it. It adds fields to
+	 * `payload-jobs` and a `payload-jobs-locks` collection, so adopters run one
+	 * `migrate:create`.
 	 */
 	reliability?: boolean | ReliabilityOptions
 	/**

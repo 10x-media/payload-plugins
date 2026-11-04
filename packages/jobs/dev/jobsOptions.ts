@@ -3,14 +3,15 @@ import type { TaskConfig, WorkflowConfig } from 'payload'
 import type { ReliabilityOptions } from '../src/index'
 
 /**
- * Reliability tuning shared by the dev app and the worker entrypoint. Short TTLs so
- * the e2e drains and recovers quickly.
+ * Reliability tuning shared by the dev app and the worker entrypoint. A short leader
+ * lease so the e2e fails over quickly.
  */
 export const RELIABILITY_OPTIONS: ReliabilityOptions = {
-	jobLeaseTtlMs: 10_000,
 	leaderLeaseTtlMs: 5_000,
-	sweepIntervalMs: 2_000,
 }
+
+/** Payload's own claim lease, short so a killed worker's job is claimable again soon. */
+export const PROCESSING_LEASE = { duration: 10_000, safetyBuffer: 2_000 }
 
 /**
  * Tasks are typed by their inline input/output shape rather than a slug, because the

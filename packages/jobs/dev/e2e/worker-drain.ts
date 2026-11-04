@@ -43,15 +43,16 @@ const main = async (): Promise<void> => {
 
 	await payload.delete({ collection: 'payload-jobs', overrideAccess: true, where: {} })
 	// A job that sleeps far longer than the worker's 2s drain budget, so the worker must
-	// requeue it as a straggler rather than finish it. The dev app's generated
+	// hand it back as a straggler rather than finish it. The dev app's generated
 	// `payload-types.ts` augments `TypedJobs` with workflows but leaves `tasks` open
 	// (`unknown`), so the typed `queue` overload rejects a free-string task slug; queue
 	// through a structurally typed alias to assert the runtime-correct shape without `any`.
 	const queueJob = payload.jobs.queue as unknown as (args: {
 		input: { ms: number }
+		overrideAccess: boolean
 		task: string
 	}) => Promise<unknown>
-	await queueJob({ input: { ms: 60_000 }, task: 'sleep' })
+	await queueJob({ input: { ms: 60_000 }, overrideAccess: true, task: 'sleep' })
 
 	const worker = spawn('node', ['--import', 'tsx', 'dev/worker.ts'], {
 		cwd: pkgRoot,
@@ -69,7 +70,8 @@ const main = async (): Promise<void> => {
 	while (Date.now() < claimDeadline) {
 		const { totalDocs } = await payload.count({
 			collection: 'payload-jobs',
-			where: { processing: { equals: true } },
+			overrideAccess: true,
+			where: { processingUntil: { greater_than: new Date().toISOString() } },
 		})
 		if (totalDocs >= 1) {
 			claimed = true
@@ -96,11 +98,13 @@ const main = async (): Promise<void> => {
 		fail(`worker exited ${workerExit}, expected 0`)
 	}
 
-	// The in-flight job must have been requeued as a straggler.
+	// The in-flight job must have been handed back as a straggler: its lease cleared,
+	// its run mark kept so the next claim counts the recovery.
 	const { totalDocs: requeued } = await payload.count({
 		collection: 'payload-jobs',
+		overrideAccess: true,
 		where: {
-			and: [{ processing: { equals: false } }, { recoveryAttempts: { greater_than: 0 } }],
+			and: [{ processingUntil: { exists: false } }, { claimedBy: { exists: true } }],
 		},
 	})
 	if (requeued < 1) {

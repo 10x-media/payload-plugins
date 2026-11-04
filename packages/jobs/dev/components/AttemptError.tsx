@@ -4,12 +4,12 @@ import type { JobLogSlotProps } from '@10x-media/jobs/types'
 import { useState } from 'react'
 
 const CARD = {
-	backgroundColor: 'var(--theme-error-100)',
-	borderRadius: '4px',
+	backgroundColor: 'var(--color-bg-danger-tertiary)',
+	borderRadius: 'var(--radius-medium)',
 	display: 'flex',
 	flexDirection: 'column',
 	gap: '4px',
-	padding: 'calc(var(--base) / 2)',
+	padding: 'var(--spacer-2)',
 } as const
 
 const messageOf = (value: unknown): string => {
@@ -36,7 +36,7 @@ export const AttemptError = ({ value }: JobLogSlotProps) => {
 					alignSelf: 'flex-start',
 					background: 'none',
 					border: 'none',
-					color: 'var(--theme-elevation-600)',
+					color: 'var(--color-text-secondary)',
 					cursor: 'pointer',
 					font: 'inherit',
 					padding: 0,

@@ -18,7 +18,12 @@ export const resumeDeferred = async (
 	const where: Where = {
 		and: [
 			{ deferredBy: { equals: by } },
-			{ processing: { equals: false } },
+			{
+				or: [
+					{ processingUntil: { exists: false } },
+					{ processingUntil: { less_than_equal: new Date().toISOString() } },
+				],
+			},
 			{ completedAt: { exists: false } },
 			{ hasError: { not_equals: true } },
 		],

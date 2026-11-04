@@ -57,10 +57,15 @@ export type GetQueueHealthOptions = {
 }
 
 // The dev app compiles this file with generated types lacking our custom fields, so
-// reach the data layer through slug-agnostic signatures (same pattern as the sweeper).
-type Counter = (args: { collection: string; where?: Where }) => Promise<{ totalDocs: number }>
+// reach the data layer through slug-agnostic signatures (same pattern as `registerReliability`).
+type Counter = (args: {
+	collection: string
+	overrideAccess?: boolean
+	where?: Where
+}) => Promise<{ totalDocs: number }>
 type Finder = (args: {
 	collection: string
+	overrideAccess?: boolean
 	where?: Where
 	limit?: number
 	sort?: string
@@ -144,7 +149,7 @@ export const getQueueHealth = async (
 	const find = payload.find as unknown as Finder
 
 	const countWhere = async (where: Where): Promise<number> =>
-		(await count({ collection: JOBS_SLUG, where })).totalDocs
+		(await count({ collection: JOBS_SLUG, overrideAccess: true, where })).totalDocs
 
 	const countState = (status: JobStatus, queue?: string): Promise<number> =>
 		countWhere(stateWhere(status, nowMs, queue))
@@ -165,6 +170,7 @@ export const getQueueHealth = async (
 		collection: JOBS_SLUG,
 		depth: 0,
 		limit: 1,
+		overrideAccess: true,
 		sort: 'createdAt',
 		where: statusWhere('queued', nowMs),
 	})

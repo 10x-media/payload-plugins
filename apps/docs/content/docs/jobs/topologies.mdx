@@ -8,7 +8,7 @@ Three presets wire [reliability](/jobs/reliability) and [queue control](/jobs/qu
 ```ts title="payload.config.ts"
 import { jobs, serverlessPreset, singleNodePreset, multiNodePreset } from '@10x-media/jobs'
 
-jobs({ ...serverlessPreset({ maxDurationMs: 800_000 }) }) // Vercel
+jobs({ ...serverlessPreset() })                           // Vercel
 jobs({ ...singleNodePreset() })                           // one worker container
 jobs({ ...multiNodePreset({ leaderId: process.env.HOSTNAME }) }) // many replicas
 ```
@@ -24,15 +24,14 @@ jobs({
 
 ## Serverless (Vercel)
 
-No long-running worker exists; functions are killed at `maxDuration` with no SIGTERM. `serverlessPreset({ maxDurationMs })` sets `reliability.jobLeaseTtlMs` and `reliability.serverless.maxDurationMs` to that value, and guards the control endpoints with `cronSecretAccess()` (pass `cronSecretEnvVar` if your secret is not in `CRON_SECRET`). You drive runs and sweeps from Vercel Cron.
+No long-running worker exists; functions are killed at `maxDuration` with no SIGTERM. `serverlessPreset()` turns reliability on with its defaults and guards the control endpoints with `cronSecretAccess()` (pass `cronSecretEnvVar` if your secret is not in `CRON_SECRET`). You drive runs from Vercel Cron. A function killed mid-job leaves it to Payload's processing lease, so keep `jobs.processingLease.duration` in the Payload config short enough that the wait is acceptable (see [Reliability](/jobs/reliability#serverless)).
 
 Generate the cron entries with `vercelCrons()`:
 
 ```json title="vercel.json"
 {
   "crons": [
-    { "path": "/api/payload-jobs/queue-run?allQueues=true", "schedule": "* * * * *" },
-    { "path": "/api/payload-jobs/queue-sweep", "schedule": "* * * * *" }
+    { "path": "/api/payload-jobs/queue-run?allQueues=true", "schedule": "* * * * *" }
   ]
 }
 ```
@@ -74,9 +73,9 @@ services:
 
 ## Multi-node Docker / Kubernetes
 
-Many replicas share one database. Every replica runs jobs; only the `scheduler` lease holder handles schedules and only the `sweeper` lease holder sweeps. `multiNodePreset({ leaderId })` is the default wiring; pass a stable per-replica id such as `process.env.HOSTNAME`.
+Many replicas share one database. Every replica runs jobs; only the `scheduler` lease holder handles schedules. `multiNodePreset({ leaderId })` is the default wiring; pass a stable per-replica id such as `process.env.HOSTNAME`.
 
-Graceful shutdown is a hard requirement here. The drain requeues in-flight jobs and releases leases, but only if the orchestrator gives it time:
+Graceful shutdown is a hard requirement here. The drain hands in-flight jobs back and releases the leadership lease, but only if the orchestrator gives it time:
 
 ```yaml title="docker-compose.yml"
 services:
@@ -116,4 +115,4 @@ This trades automatic failover for zero coordination state. Prefer election (the
 Two checks worth running by hand against a real database:
 
 1. One elected scheduler: start two workers with distinct `leaderId`s, then query `payload-jobs-locks` for `role: scheduler`. Exactly one row, whose `owner` is one of the two ids.
-2. Orphan recovery: queue a slow job, `kill -9` the worker that claimed it, and watch the survivor's sweeper requeue it after `jobLeaseTtlMs` (the job reappears with `recoveryAttempts >= 1`). Allow `jobLeaseTtlMs + sweepIntervalMs` before asserting.
+2. Crash recovery: queue a slow job, `kill -9` the worker that claimed it, and watch the survivor run it again once `jobs.processingLease.duration` has passed (the job then shows `recoveryAttempts >= 1`). Allow the lease duration plus one `runIntervalMs` before asserting.

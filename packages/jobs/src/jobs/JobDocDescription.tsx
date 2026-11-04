@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
+import './jobs.css'
 
 /** Document-header description for a job: the record ID, kept accessible and copyable. */
 export const JobDocDescription = () => {
@@ -27,32 +28,10 @@ export const JobDocDescription = () => {
 	}
 
 	return (
-		<div
-			style={{
-				alignItems: 'center',
-				color: 'var(--theme-elevation-500)',
-				display: 'flex',
-				fontSize: '0.8125rem',
-				gap: '6px',
-			}}
-		>
-			<span style={{ fontSize: '0.6875rem', letterSpacing: '0.04em', textTransform: 'uppercase' }}>
-				{t(keys.fieldId)}
-			</span>
-			<code style={{ fontFamily: 'var(--font-mono, monospace)' }}>{value}</code>
-			<button
-				onClick={copy}
-				style={{
-					background: 'none',
-					border: 'none',
-					color: 'var(--theme-elevation-400)',
-					cursor: 'pointer',
-					font: 'inherit',
-					padding: 0,
-					textDecoration: 'underline',
-				}}
-				type="button"
-			>
+		<div className="jobs-doc-id">
+			<span className="jobs-caption">{t(keys.fieldId)}</span>
+			<code>{value}</code>
+			<button className="jobs-reset-button" onClick={copy} type="button">
 				{copied ? t(keys.copied) : t(keys.copy)}
 			</button>
 		</div>

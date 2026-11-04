@@ -3208,6 +3208,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.6(react@19.2.6)
+      srvx:
+        specifier: 'catalog:'
+        version: 1.0.8
       vite:
         specifier: 'catalog:'
         version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.0)(jiti@2.7.0)(sass@1.77.4)(tsx@4.23.15)(yaml@2.9.0)

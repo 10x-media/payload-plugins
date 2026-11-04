@@ -15,18 +15,16 @@ describe('presets', () => {
 		expect(multiNodePreset()).toEqual({ queueControl: {}, reliability: {} })
 	})
 
-	it('serverlessPreset derives staleness from maxDuration and guards with the cron secret', () => {
-		const preset = serverlessPreset({ maxDurationMs: 800_000 })
-		expect(preset.reliability.serverless).toEqual({ maxDurationMs: 800_000 })
-		expect(preset.reliability.jobLeaseTtlMs).toBe(800_000)
+	it('serverlessPreset enables reliability and guards with the cron secret', () => {
+		const preset = serverlessPreset()
+		expect(preset.reliability).toEqual({})
 		expect(typeof preset.queueControl.access).toBe('function')
 	})
 
-	it('vercelCrons builds run and sweep cron entries', () => {
+	it('vercelCrons builds the run cron entry', () => {
 		expect(vercelCrons()).toEqual([
 			{ path: '/api/payload-jobs/queue-run?allQueues=true', schedule: '* * * * *' },
-			{ path: '/api/payload-jobs/queue-sweep', schedule: '* * * * *' },
 		])
-		expect(vercelCrons({ sweepSchedule: '*/5 * * * *' })[1]?.schedule).toBe('*/5 * * * *')
+		expect(vercelCrons({ runSchedule: '*/5 * * * *' })[0]?.schedule).toBe('*/5 * * * *')
 	})
 })

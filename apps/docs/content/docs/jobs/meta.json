@@ -10,6 +10,7 @@
 		"queue-control",
 		"interruptions",
 		"testing",
-		"i18n"
+		"i18n",
+		"upgrading"
 	]
 }

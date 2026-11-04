@@ -3,29 +3,31 @@
 # @10x-media/jobs
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/jobs` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/jobs` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/jobs).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/jobs@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/jobs) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
-An ops dashboard plus reliability, worker, and queue-control layers for Payload v3's built-in jobs queue. See what the queue is doing, recover jobs that die mid-run, run a proper worker process with graceful drain, and pause or drive the queue from the outside. Every layer is opt-in.
+An ops dashboard plus reliability, worker, and queue-control layers for Payload's built-in jobs queue. See what the queue is doing, recover jobs that die mid-run, run a proper worker process with graceful drain, and pause or drive the queue from the outside. Every layer is opt-in.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/jobs?style=flat-square)](https://www.npmjs.com/package/@10x-media/jobs)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 ## Features
 
 - **Dashboard**: a derived Status column, a queue-health bar, and error/log panels on the `payload-jobs` collection. On by default.
 - **Custom log blocks**: register your own renderer for an attempt's `input`, `output`, or `error`, per task slug or for every task.
 - **Create-form input**: `input` is pre-filled from the selected task's or workflow's `inputSchema`, and `input.components` swaps the JSON editor for your own per slug.
-- **Reliability**: job leases, an orphan sweeper with dead-lettering, leader election with fence tokens, serverless staleness.
+- **Reliability**: recovery of jobs whose worker died on top of Payload's processing lease, dead-lettering, leader-elected scheduling with fence tokens.
 - **Workers**: `createWorker` runs jobs as a standalone process and drains gracefully on SIGTERM.
-- **Queue control**: cluster-wide pause/resume plus hardened `queue-run`, `queue-sweep`, and `queue-status` endpoints with access guards.
+- **Queue control**: cluster-wide pause/resume plus hardened `queue-run` and `queue-status` endpoints with access guards.
 - **Topology presets** for serverless (Vercel Cron), single-node, and multi-node deployments.
 - **Typed translations** with per-key overrides via `@10x-media/jobs/i18n`.
 
 ## Quick start
 
 ```bash
-pnpm add @10x-media/jobs
+pnpm add @10x-media/jobs@alpha
 ```
 
 ```ts

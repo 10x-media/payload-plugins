@@ -10,12 +10,12 @@ export type TopologyPreset = {
 
 /**
  * Single-node Docker: one serial claimer, so claim races are moot. Reliability and
- * queue control on with defaults; the sweeper runs from the in-process worker.
+ * queue control on with defaults.
  */
 export const singleNodePreset = (): TopologyPreset => ({ queueControl: {}, reliability: {} })
 
 /**
- * Multi-node Docker: leader-elected scheduling and sweeping (the default). Pass a
+ * Multi-node Docker: leader-elected scheduling (the default). Pass a
  * stable `leaderId` per node if you do not want the generated hostname:pid identity.
  */
 export const multiNodePreset = (options: { leaderId?: string } = {}): TopologyPreset => ({
@@ -24,20 +24,14 @@ export const multiNodePreset = (options: { leaderId?: string } = {}): TopologyPr
 })
 
 /**
- * Serverless (Vercel): no long-running worker, so staleness derives from the platform
- * hard-kill duration (the function maxDuration) rather than a heartbeat, and the run
- * and sweep endpoints are guarded by the cron secret. Drive them with Vercel Cron
- * (see `vercelCrons`).
+ * Serverless (Vercel): no long-running worker, so the run endpoint is guarded by the
+ * cron secret and driven by Vercel Cron (see `vercelCrons`). A function killed at its
+ * `maxDuration` stops renewing Payload's job lease, and the job is claimable again
+ * once `jobs.processingLease.duration` passes: set that near your `maxDuration`.
  */
-export const serverlessPreset = (options: {
-	maxDurationMs: number
-	cronSecretEnvVar?: string
-}): TopologyPreset => ({
+export const serverlessPreset = (options: { cronSecretEnvVar?: string } = {}): TopologyPreset => ({
 	queueControl: { access: cronSecretAccess({ envVar: options.cronSecretEnvVar }) },
-	reliability: {
-		jobLeaseTtlMs: options.maxDurationMs,
-		serverless: { maxDurationMs: options.maxDurationMs },
-	},
+	reliability: {},
 })
 
 /** A `vercel.json` `crons` entry. */
@@ -45,24 +39,14 @@ export type VercelCron = { path: string; schedule: string }
 
 /**
  * Build the `vercel.json` `crons` array: one entry hitting the hardened run endpoint
- * (all queues) and one hitting the sweep endpoint. Defaults to every minute (Vercel
- * Pro). Vercel sends the `CRON_SECRET` as a Bearer token, which `cronSecretAccess`
- * checks.
+ * (all queues). Defaults to every minute (Vercel Pro). Vercel sends the `CRON_SECRET`
+ * as a Bearer token, which `cronSecretAccess` checks.
  */
 export const vercelCrons = (
-	options: {
-		runPath?: string
-		sweepPath?: string
-		runSchedule?: string
-		sweepSchedule?: string
-	} = {}
+	options: { runPath?: string; runSchedule?: string } = {}
 ): VercelCron[] => [
 	{
 		path: options.runPath ?? '/api/payload-jobs/queue-run?allQueues=true',
 		schedule: options.runSchedule ?? '* * * * *',
-	},
-	{
-		path: options.sweepPath ?? '/api/payload-jobs/queue-sweep',
-		schedule: options.sweepSchedule ?? '* * * * *',
 	},
 ]

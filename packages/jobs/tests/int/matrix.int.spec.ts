@@ -57,7 +57,9 @@ describeForDb('jobs cross-db', {}, (db) => {
 			{ totalTried: 0 },
 			{ totalTried: 0, waitUntil: future },
 			{ totalTried: 2 },
-			{ processing: true },
+			{ processingUntil: future },
+			// A lapsed lease is a run that died: back to whatever the job was.
+			{ processingUntil: past, totalTried: 1 },
 			{ completedAt: past, totalTried: 1 },
 			{ hasError: true, error: { message: 'boom' }, totalTried: 3 },
 			{ hasError: true, error: { cancelled: true } },
@@ -76,6 +78,7 @@ describeForDb('jobs cross-db', {}, (db) => {
 			await payload.create({
 				collection: 'payload-jobs',
 				data: { ...row, workflowSlug: 'runAutomation' } as never,
+				overrideAccess: true,
 			})
 			expected[deriveJobStatus(row, now)] += 1
 		}
@@ -84,6 +87,7 @@ describeForDb('jobs cross-db', {}, (db) => {
 		for (const status of STATUSES) {
 			const { totalDocs } = await payload.count({
 				collection: 'payload-jobs',
+				overrideAccess: true,
 				where: statusWhere(status, now),
 			})
 			expect(totalDocs, `status ${status}`).toBe(expected[status])

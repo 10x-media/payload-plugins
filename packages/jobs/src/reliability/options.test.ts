@@ -9,34 +9,23 @@ describe('resolveReliabilityOptions', () => {
 	})
 
 	it('applies all defaults for an empty object', () => {
-		const resolved = resolveReliabilityOptions({})
-		expect(resolved).not.toBeNull()
-		expect(resolved?.jobLeaseTtlMs).toBe(300_000)
-		expect(resolved?.heartbeatIntervalMs).toBe(100_000)
-		expect(resolved?.sweepIntervalMs).toBe(60_000)
-		expect(resolved?.maxRecoveries).toBe(3)
-		expect(resolved?.leaderLeaseTtlMs).toBe(30_000)
-		expect(resolved?.serverlessMaxDurationMs).toBeNull()
+		expect(resolveReliabilityOptions({})).toEqual({
+			leaderId: null,
+			leaderLeaseTtlMs: 30_000,
+			maxRecoveries: 3,
+		})
 	})
 
 	it('treats true as enabling with all defaults (same as {})', () => {
 		expect(resolveReliabilityOptions(true)).toEqual(resolveReliabilityOptions({}))
-		expect(resolveReliabilityOptions(true)).not.toBeNull()
-	})
-
-	it('derives heartbeatIntervalMs from jobLeaseTtlMs when not given', () => {
-		expect(resolveReliabilityOptions({ jobLeaseTtlMs: 30_000 })?.heartbeatIntervalMs).toBe(10_000)
 	})
 
 	it('honors explicit overrides', () => {
 		const resolved = resolveReliabilityOptions({
-			heartbeatIntervalMs: 5_000,
-			jobLeaseTtlMs: 30_000,
+			leaderId: 'node-a',
+			leaderLeaseTtlMs: 5_000,
 			maxRecoveries: 5,
-			serverless: { maxDurationMs: 800_000 },
 		})
-		expect(resolved?.heartbeatIntervalMs).toBe(5_000)
-		expect(resolved?.maxRecoveries).toBe(5)
-		expect(resolved?.serverlessMaxDurationMs).toBe(800_000)
+		expect(resolved).toEqual({ leaderId: 'node-a', leaderLeaseTtlMs: 5_000, maxRecoveries: 5 })
 	})
 })

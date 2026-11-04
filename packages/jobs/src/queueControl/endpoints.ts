@@ -3,9 +3,7 @@ import type { Endpoint, PayloadRequest } from 'payload'
 import { evaluateRunGates, withGates } from '../interruption/gates'
 import { applyJobInterruptions } from '../interruption/records'
 import { wrapJobHandlers } from '../interruption/wrap'
-import { createJobLeaseStore } from '../reliability/jobLeaseStore'
 import type { ResolvedReliabilityOptions } from '../reliability/options'
-import { runSweep } from '../reliability/sweeper'
 import type { JobAccess } from './access'
 import { createPauseStore } from './pauseStore'
 import { getQueueHealth } from './queueHealth'
@@ -76,8 +74,10 @@ export const runControlEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 		const results = []
 		for (const target of targets) {
 			results.push(
+				// `deps.access` above already decided; Payload's own run gate is the same check.
 				await req.payload.jobs.run({
 					...target,
+					overrideAccess: true,
 					...(limit !== undefined ? { limit } : {}),
 					silent,
 				})
@@ -88,33 +88,4 @@ export const runControlEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
 	},
 	method: 'get',
 	path: '/queue-run',
-})
-
-/**
- * GET a one-shot sweep for serverless (one cron invocation, so no leader election).
- *
- * Security note: same CSRF exposure as `runControlEndpoint`; override `access` with
- * `cronSecretAccess` for cookie-session deployments.
- */
-export const sweepEndpoint = (deps: QueueEndpointDeps): Endpoint => ({
-	handler: async (req: PayloadRequest) => {
-		if (!(await deps.access({ req }))) {
-			return unauthorized()
-		}
-		if (!deps.reliability) {
-			return Response.json(
-				{ message: 'reliability is not enabled; the sweeper is unavailable' },
-				{ status: 400 }
-			)
-		}
-		const result = await runSweep({
-			isLeader: true,
-			options: deps.reliability,
-			payload: req.payload,
-			store: createJobLeaseStore(req.payload),
-		})
-		return Response.json(result, { status: 200 })
-	},
-	method: 'get',
-	path: '/queue-sweep',
 })

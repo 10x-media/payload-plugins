@@ -45,9 +45,9 @@ const sampleFor = (field: Field): unknown => {
 		case 'array':
 			return [derivePlaceholder(field.fields)]
 		case 'blocks': {
-			const block = (field.blockReferences ?? field.blocks).find(
-				(entry) => typeof entry !== 'string'
-			)
+			// A string entry is the slug of a `config.blocks` entry, which this
+			// config-free walk cannot resolve; the first inline block stands in.
+			const block = field.blocks.find((entry) => typeof entry !== 'string')
 			return block ? [{ blockType: block.slug, ...derivePlaceholder(block.fields) }] : []
 		}
 		case 'group':

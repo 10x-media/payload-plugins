@@ -20,9 +20,9 @@ export default buildConfig({
 | Layer | What it adds | How to enable |
 |---|---|---|
 | [Dashboard](/jobs/dashboard) | A derived Status column, a queue-health bar, error and log panels on the `payload-jobs` collection. | Always on with `jobs()`. |
-| [Reliability](/jobs/reliability) | Job leases, an orphan sweeper with dead-lettering, leader election, serverless staleness. | `reliability: true` or a tuned object. |
+| [Reliability](/jobs/reliability) | Recovery of jobs whose worker died, dead-lettering, leader-elected scheduling. | `reliability: true` or a tuned object. |
 | [Workers](/jobs/workers) | `createWorker`: a standalone worker process with graceful SIGTERM drain. | Run the worker entrypoint as its own process. |
-| [Queue control](/jobs/queue-control) | Cluster-wide pause/resume plus hardened `queue-run`, `queue-sweep`, and `queue-status` endpoints with access guards. | `queueControl: true` or a tuned object. |
+| [Queue control](/jobs/queue-control) | Cluster-wide pause/resume plus hardened `queue-run` and `queue-status` endpoints with access guards. | `queueControl: true` or a tuned object. |
 
 [Topology presets](/jobs/topologies) wire reliability and queue control consistently for serverless, single-node, and multi-node deployments.
 

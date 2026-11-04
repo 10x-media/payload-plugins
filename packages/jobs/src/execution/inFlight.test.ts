@@ -3,17 +3,22 @@ import { createInFlightCounter } from './inFlight'
 
 describe('createInFlightCounter', () => {
 	it('starts at zero', () => {
-		expect(createInFlightCounter().count()).toBe(0)
+		const c = createInFlightCounter()
+		expect(c.count()).toBe(0)
+		expect(c.ids()).toEqual([])
 	})
 
-	it('increments and decrements correctly', () => {
+	it('counts running jobs and lists their ids', () => {
 		const c = createInFlightCounter()
-		c.increment()
-		c.increment()
+		c.increment('a')
+		c.increment(2)
 		expect(c.count()).toBe(2)
-		c.decrement()
+		expect(c.ids()).toEqual(['a', 2])
+		c.decrement('a')
 		expect(c.count()).toBe(1)
-		c.decrement()
+		expect(c.ids()).toEqual([2])
+		c.decrement(2)
 		expect(c.count()).toBe(0)
+		expect(c.ids()).toEqual([])
 	})
 })

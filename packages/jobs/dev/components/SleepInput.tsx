@@ -1,11 +1,11 @@
 import type { JobLogSlotProps } from '@10x-media/jobs/types'
 
 const CARD = {
-	backgroundColor: 'var(--theme-elevation-100)',
-	borderRadius: '4px',
+	backgroundColor: 'var(--color-bg-tertiary)',
+	borderRadius: 'var(--radius-medium)',
 	display: 'flex',
-	gap: 'var(--base)',
-	padding: 'calc(var(--base) / 2)',
+	gap: 'var(--spacer-4)',
+	padding: 'var(--spacer-2)',
 } as const
 
 const format = (ms: number): string => (ms >= 1000 ? `${(ms / 1000).toFixed(1)}s` : `${ms}ms`)
@@ -20,11 +20,11 @@ export const SleepInput = ({ value }: JobLogSlotProps) => {
 	return (
 		<div style={CARD}>
 			<div>
-				<div style={{ color: 'var(--theme-elevation-500)', fontSize: '0.6875rem' }}>Requested</div>
+				<div style={{ color: 'var(--color-text-secondary)', fontSize: '0.6875rem' }}>Requested</div>
 				<strong style={{ fontSize: '1.125rem' }}>{format(ms)}</strong>
 			</div>
 			<div>
-				<div style={{ color: 'var(--theme-elevation-500)', fontSize: '0.6875rem' }}>
+				<div style={{ color: 'var(--color-text-secondary)', fontSize: '0.6875rem' }}>
 					Rendered by
 				</div>
 				<code>SleepInput (server)</code>

@@ -25,9 +25,14 @@ describe('deriveJobStatus', () => {
 		expect(deriveJobStatus({ totalTried: 2, waitUntil: future }, NOW)).toBe('retrying')
 	})
 
-	it('is running while processing, regardless of prior attempts', () => {
-		expect(deriveJobStatus({ processing: true }, NOW)).toBe('running')
-		expect(deriveJobStatus({ processing: true, totalTried: 3 }, NOW)).toBe('running')
+	it('is running while its claim lease holds, regardless of prior attempts', () => {
+		expect(deriveJobStatus({ processingUntil: future }, NOW)).toBe('running')
+		expect(deriveJobStatus({ processingUntil: future, totalTried: 3 }, NOW)).toBe('running')
+	})
+
+	it('is not running once the claim lease has lapsed (the run died)', () => {
+		expect(deriveJobStatus({ processingUntil: past }, NOW)).toBe('queued')
+		expect(deriveJobStatus({ processingUntil: past, totalTried: 1 }, NOW)).toBe('retrying')
 	})
 
 	it('is succeeded when completed without error', () => {
@@ -45,7 +50,7 @@ describe('deriveJobStatus', () => {
 	})
 
 	it('prioritises running over a terminal error (a re-picked-up job)', () => {
-		expect(deriveJobStatus({ processing: true, hasError: true }, NOW)).toBe('running')
+		expect(deriveJobStatus({ processingUntil: future, hasError: true }, NOW)).toBe('running')
 	})
 
 	it('prioritises a terminal error over completion', () => {

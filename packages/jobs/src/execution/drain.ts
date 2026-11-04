@@ -4,11 +4,11 @@ export type DrainDeps = {
 	 * in-flight tick has settled, so no run-loop write can outlive the drain.
 	 */
 	stopLoops: () => Promise<void>
-	/** Count this node's in-flight jobs (processing and claimed by it). */
+	/** Count the jobs this node is running. */
 	countInFlight: () => Promise<number>
-	/** Requeue this node's remaining in-flight jobs. Returns how many were released. */
+	/** Hand this node's still-running jobs back to the queue. Returns how many were released. */
 	requeueStragglers: () => Promise<number>
-	/** Release the held scheduler and sweeper leadership leases. */
+	/** Release the held scheduler leadership lease. */
 	releaseLeadership: () => Promise<void>
 	/** Destroy the Payload instance (stops crons, closes the DB). */
 	destroy: () => Promise<void>
@@ -58,9 +58,8 @@ export const drainWorker = async (deps: DrainDeps, options: DrainOptions): Promi
 		remaining = await deps.countInFlight()
 	}
 	const timedOut = remaining > 0
-	// Only on timeout, to abandon still-running handlers. On a clean drain a just-finished
-	// job can still read processing:true before its completion write lands; requeuing it
-	// would bump recoveryAttempts and re-run it. The sweeper recovers genuine orphans.
+	// Only on timeout, to abandon still-running handlers. A clean drain leaves nothing
+	// to hand back, and Payload reclaims a job whose lease lapses anyway.
 	const requeued = timedOut ? await deps.requeueStragglers() : 0
 	await Promise.race([loopsSettled, deps.sleep(options.pollIntervalMs)])
 	await deps.destroy()

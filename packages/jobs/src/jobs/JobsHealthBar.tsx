@@ -1,4 +1,4 @@
-import { Link, Pill } from '@payloadcms/ui'
+import { Gutter, Link, Pill } from '@payloadcms/ui'
 import type { ServerProps } from 'payload'
 
 import { keys } from '../translations/keys'
@@ -7,6 +7,7 @@ import { type JobStatus, statusWhere } from './deriveJobStatus'
 import { JobsTotalChip } from './JobsTotalChip'
 import { jobStatusMeta } from './jobStatusMeta'
 import { jobsListURL } from './jobsListURL'
+import './jobs.css'
 
 const DEFAULT_CAP = 100
 
@@ -32,8 +33,10 @@ export const JobsHealthBar = async ({ cap = DEFAULT_CAP, i18n, payload }: Props)
 	const now = Date.now()
 	const results = await Promise.all(
 		ORDER.map(async (status) => {
+			// Only rendered inside the jobs list, which read access already gates.
 			const { totalDocs } = await payload.count({
 				collection: 'payload-jobs',
+				overrideAccess: true,
 				where: statusWhere(status, now),
 			})
 			return { count: totalDocs, status }
@@ -50,15 +53,7 @@ export const JobsHealthBar = async ({ cap = DEFAULT_CAP, i18n, payload }: Props)
 	const adminRoute = payload.config.routes?.admin ?? '/admin'
 
 	return (
-		<div
-			style={{
-				alignItems: 'center',
-				display: 'flex',
-				flexWrap: 'wrap',
-				gap: 'calc(var(--base) / 2)',
-				marginBottom: 'var(--base)',
-			}}
-		>
+		<Gutter className="jobs-health-bar">
 			<JobsTotalChip fallbackHref={jobsListURL(adminRoute)}>
 				<strong>
 					{show(total)} {t(total === 1 ? keys.jobSingular : keys.jobPlural)}
@@ -70,7 +65,7 @@ export const JobsHealthBar = async ({ cap = DEFAULT_CAP, i18n, payload }: Props)
 						href={jobsListURL(adminRoute, status, now)}
 						key={status}
 						prefetch={false}
-						style={{ textDecoration: 'none' }}
+						className="jobs-plain-link"
 					>
 						<Pill pillStyle={jobStatusMeta[status].pillStyle} size="small">
 							{show(count)} {t(jobStatusMeta[status].labelKey)}
@@ -78,6 +73,6 @@ export const JobsHealthBar = async ({ cap = DEFAULT_CAP, i18n, payload }: Props)
 					</Link>
 				)
 			)}
-		</div>
+		</Gutter>
 	)
 }

@@ -3,7 +3,7 @@ title: Testing and local dev
 description: Run the plugin against an in-memory Mongo replica set, no Docker required.
 ---
 
-Jobs code needs a real database: leases, sweeps, and leader election are all rows. For local development and integration tests, an in-memory MongoDB replica set gives you that in milliseconds, with no Docker and no installed Mongo. This is the same pattern Payload's own test suite uses.
+Jobs code needs a real database: processing leases, recovery marks, and leader election are all rows. For local development and integration tests, an in-memory MongoDB replica set gives you that in milliseconds, with no Docker and no installed Mongo. This is the same pattern Payload's own test suite uses.
 
 ## The memory-Mongo pattern
 
@@ -50,9 +50,9 @@ Two details matter. It must be a replica set, not a standalone: Payload's mongoo
 The reliability internals are exported precisely so tests can drive them without a worker process:
 
 ```ts
-import { createWorker, resolveReliabilityOptions, runSweep, getQueueHealth } from '@10x-media/jobs'
+import { createWorker, resolveReliabilityOptions, getQueueHealth } from '@10x-media/jobs'
 
-const reliability = resolveReliabilityOptions({ jobLeaseTtlMs: 1_000, sweepIntervalMs: 200 })
+const reliability = resolveReliabilityOptions({ leaderLeaseTtlMs: 1_000, maxRecoveries: 2 })
 
 // A worker without signal handlers, safe to create per test:
 const worker = createWorker({ payload, reliability: reliability!, installSignals: false })
@@ -61,6 +61,6 @@ worker.start()
 await worker.drain()
 ```
 
-Short TTLs make orphan-recovery paths testable in seconds: claim a job, skip the heartbeat, advance past `jobLeaseTtlMs`, and assert `runSweep` requeues it. `getQueueHealth` gives you the same counts as the dashboard for assertions.
+A crash is easy to stage without killing anything: queue a job and write `claimedBy` on it with `payload.db.updateOne`, as a run that died mid-handler leaves it. The next `payload.jobs.run` counts a recovery, and at `maxRecoveries` dead-letters the job instead. To exercise the lease itself, give the test config a short `jobs.processingLease.duration`, so a job left holding one becomes claimable in seconds. `getQueueHealth` gives you the same counts as the dashboard for assertions.
 
 Only one worker per process may install signal handlers, so always pass `installSignals: false` in tests that create several.

@@ -1,6 +1,6 @@
 import type { Config, Field } from 'payload'
 
-import type { HeartbeatPlan } from '../reliability/heartbeat'
+import type { RecoveryPlan } from '../reliability/recovery'
 import { keys } from '../translations/keys'
 import { labelForKey } from '../translations/server'
 import { JOBS_CUSTOM_KEY, type JobsRegistry } from './registry'
@@ -34,12 +34,12 @@ const deferredByField = (): Field => ({
 export const registerInterruption = (
 	config: Config,
 	options: InterruptOptions | undefined,
-	heartbeat: HeartbeatPlan | null
+	recovery: RecoveryPlan | null
 ): void => {
 	const registry: JobsRegistry = {
 		api: { resumeDeferred },
 		extensions: { interruptOn: [], runGates: [] },
-		plan: { defer: options?.defer ?? [], heartbeat },
+		plan: { defer: options?.defer ?? [], recovery },
 	}
 	config.custom = { ...config.custom, [JOBS_CUSTOM_KEY]: registry }
 

@@ -110,10 +110,10 @@ type JobRow = {
 	completedAt?: null | string
 	deferredBy?: null | string
 	error?: { interruptedBy?: string; message?: string } | null
-	fenceToken?: null | number
 	hasError?: boolean | null
 	log?: Array<{ state?: string; taskSlug?: string }> | null
-	processing?: boolean | null
+	processingUntil?: null | string
+	startedAt?: null | string
 	totalTried?: null | number
 	waitUntil?: null | string
 }
@@ -130,7 +130,7 @@ describeForDb('job interruptions', {}, (db) => {
 		})) as unknown as JobRow
 
 	const runOnce = async (): Promise<void> => {
-		await booted.payload.jobs.run({ allQueues: true, silent: true })
+		await booted.payload.jobs.run({ overrideAccess: true, allQueues: true, silent: true })
 		await applyJobInterruptions(booted.payload)
 	}
 
@@ -164,11 +164,15 @@ describeForDb('job interruptions', {}, (db) => {
 	})
 
 	it('fails an interrupted job for good by default, cutting off its retries', async () => {
-		const job = await booted.payload.jobs.queue({ input: {}, task: 'failing' })
+		const job = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			task: 'failing',
+		})
 		await runOnce()
 		const row = await read(job.id)
 		expect(row.hasError).toBe(true)
-		expect(row.processing).toBe(false)
+		expect(row.processingUntil ?? null).toBeNull()
 		expect(row.waitUntil ?? null).toBeNull()
 		expect(row.error?.message).toBe('Interrupted by test')
 		expect(row.error?.interruptedBy).toBe('test')
@@ -176,11 +180,15 @@ describeForDb('job interruptions', {}, (db) => {
 	})
 
 	it('defers a job that opted in, spending no retry', async () => {
-		const job = await booted.payload.jobs.queue({ input: {}, task: 'lateDefer' })
+		const job = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			task: 'lateDefer',
+		})
 		await runOnce()
 		const row = await read(job.id)
 		expect(row.hasError).toBe(false)
-		expect(row.processing).toBe(false)
+		expect(row.processingUntil ?? null).toBeNull()
 		expect(row.totalTried).toBe(0)
 		expect(row.deferredBy).toBe('test')
 		expect(new Date(row.waitUntil ?? 0).toISOString()).toBe(UNTIL.toISOString())
@@ -188,7 +196,7 @@ describeForDb('job interruptions', {}, (db) => {
 	})
 
 	it('defers a task named in the central list', async () => {
-		const job = await booted.payload.jobs.queue({ input: {}, task: 'listed' })
+		const job = await booted.payload.jobs.queue({ overrideAccess: true, input: {}, task: 'listed' })
 		await runOnce()
 		const row = await read(job.id)
 		expect(row.hasError).toBe(false)
@@ -196,7 +204,11 @@ describeForDb('job interruptions', {}, (db) => {
 	})
 
 	it('leaves errors no classifier recognises to Payload', async () => {
-		const job = await booted.payload.jobs.queue({ input: {}, task: 'plainError' })
+		const job = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			task: 'plainError',
+		})
 		await runOnce()
 		const row = await read(job.id)
 		expect(row.hasError).toBe(true)
@@ -205,7 +217,11 @@ describeForDb('job interruptions', {}, (db) => {
 	})
 
 	it('checkpoint defers a job whose queue a gate pauses, whatever its policy', async () => {
-		const job = await booted.payload.jobs.queue({ input: {}, task: 'checkpointed' })
+		const job = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			task: 'checkpointed',
+		})
 		// The gate must not stop the run itself: payload.jobs.run ignores gates.
 		state.gate = { by: 'test', paused: 'all', until: UNTIL }
 		await runOnce()
@@ -216,14 +232,22 @@ describeForDb('job interruptions', {}, (db) => {
 	})
 
 	it('checkpoint passes when no gate pauses the queue', async () => {
-		const job = await booted.payload.jobs.queue({ input: {}, task: 'checkpointed' })
+		const job = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			task: 'checkpointed',
+		})
 		state.gate = { by: 'test', paused: ['elsewhere'], until: UNTIL }
 		await runOnce()
 		expect((await read(job.id)).completedAt).toBeTruthy()
 	})
 
 	it('re-runs a deferred workflow from the step it stopped at', async () => {
-		const job = await booted.payload.jobs.queue({ input: {}, workflow: 'twoSteps' })
+		const job = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			workflow: 'twoSteps',
+		})
 		await runOnce()
 		expect((await read(job.id)).deferredBy).toBe('test')
 		expect(state.stepOneRuns).toBe(1)
@@ -237,8 +261,16 @@ describeForDb('job interruptions', {}, (db) => {
 	})
 
 	it('resumeDeferred releases only the jobs deferred by that name', async () => {
-		const ours = await booted.payload.jobs.queue({ input: {}, task: 'lateDefer' })
-		const theirs = await booted.payload.jobs.queue({ input: {}, task: 'deferredByOther' })
+		const ours = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			task: 'lateDefer',
+		})
+		const theirs = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			task: 'deferredByOther',
+		})
 		await runOnce()
 		expect((await read(theirs.id)).deferredBy).toBe('other')
 
@@ -252,13 +284,17 @@ describeForDb('job interruptions', {}, (db) => {
 		expect(untouched.waitUntil).toBeTruthy()
 	})
 
-	it('heartbeats tasks a later plugin added, and wraps each handler once', async () => {
+	it('tracks tasks a later plugin added, and wraps each handler once', async () => {
 		state.blocked = false
-		const job = await booted.payload.jobs.queue({ input: {}, task: 'lateDefer' })
+		const job = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			task: 'lateDefer',
+		})
 		await runOnce()
 		const row = await read(job.id)
 		expect(row.completedAt).toBeTruthy()
-		expect(row.fenceToken ?? 0).toBeGreaterThan(0)
+		expect(row.startedAt).toBeTruthy()
 
 		const before = booted.payload.config.jobs.tasks
 		expect(wrapJobHandlers(booted.payload)).toBe(false)
@@ -280,7 +316,11 @@ describeForDb('job interruptions', {}, (db) => {
 			runIntervalMs: 50,
 			scheduling: false,
 		}) as WorkerTestHandle
-		const job = await booted.payload.jobs.queue({ input: {}, task: 'lateDefer' })
+		const job = await booted.payload.jobs.queue({
+			overrideAccess: true,
+			input: {},
+			task: 'lateDefer',
+		})
 		worker.start()
 		try {
 			await new Promise((resolve) => setTimeout(resolve, 300))

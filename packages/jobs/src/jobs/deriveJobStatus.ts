@@ -15,7 +15,7 @@ export interface JobStatusInput {
 	completedAt?: null | string
 	error?: unknown
 	hasError?: boolean | null
-	processing?: boolean | null
+	processingUntil?: null | string
 	totalTried?: null | number
 	waitUntil?: null | string
 }
@@ -27,11 +27,15 @@ const isCancelled = (error: unknown): boolean =>
 
 /**
  * Collapse a job's raw fields into one status. Payload has no status field; the
- * state lives across `processing`, `hasError`, `error.cancelled`, `completedAt`,
+ * state lives across `processingUntil`, `hasError`, `error.cancelled`, `completedAt`,
  * `waitUntil`, and `totalTried`. Order matters: the first matching rule wins.
+ *
+ * A job is running while a runner holds its claim: Payload 4 sets `processingUntil`
+ * on claim, renews it while the job runs, and clears it when the run ends. A lapsed
+ * lease is a run that died, and the job reads as whatever it was before it.
  */
 export const deriveJobStatus = (job: JobStatusInput, now: number = Date.now()): JobStatus => {
-	if (job.processing === true) {
+	if (job.processingUntil && new Date(job.processingUntil).getTime() > now) {
 		return 'running'
 	}
 	if (job.hasError === true) {
@@ -49,7 +53,6 @@ export const deriveJobStatus = (job: JobStatusInput, now: number = Date.now()): 
 	return 'queued'
 }
 
-const NOT_RUNNING: Where = { processing: { not_equals: true } }
 const NO_ERROR: Where = { hasError: { equals: false } }
 const NOT_COMPLETED: Where = { completedAt: { exists: false } }
 const NOT_TRIED: Where = { totalTried: { equals: 0 } }
@@ -59,13 +62,16 @@ const NOT_TRIED: Where = { totalTried: { equals: 0 } }
  * `status`. Each clause negates the higher-precedence rules so the seven
  * partition the collection; the health bar counts each with `payload.count`, and
  * a cross-DB test asserts the counts match `deriveJobStatus` row for row.
- * `processing`/`hasError`/`totalTried` always carry their Payload defaults
- * (`false`/`false`/`0`), so the boolean and number clauses are null-safe.
+ * `hasError`/`totalTried` always carry their Payload defaults (`false`/`0`), so
+ * the boolean and number clauses are null-safe.
  */
 export const statusWhere = (status: JobStatus, now: number = Date.now()): Where => {
 	const at = new Date(now).toISOString()
+	const NOT_RUNNING: Where = {
+		or: [{ processingUntil: { exists: false } }, { processingUntil: { less_than_equal: at } }],
+	}
 	const clauses: Record<JobStatus, Where> = {
-		running: { processing: { equals: true } },
+		running: { processingUntil: { greater_than: at } },
 		cancelled: {
 			and: [NOT_RUNNING, { hasError: { equals: true } }, { 'error.cancelled': { equals: true } }],
 		},

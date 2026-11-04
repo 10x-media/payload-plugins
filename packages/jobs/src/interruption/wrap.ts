@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 
-import { createHeartbeatLayer, type HeartbeatPlan, type JobHandler } from '../reliability/heartbeat'
+import { createRecoveryLayer, type JobHandler, type RecoveryPlan } from '../reliability/recovery'
 import { isJobDeferredError } from './deferredError'
 import { type DeferSlugs, policyFor, resolveDeferSlugs } from './policy'
 import { hasInterruption, type InterruptionRecord, recordInterruption } from './records'
@@ -10,7 +10,7 @@ import { jobsRegistryOf } from './registry'
 export type WrapPlan = {
 	/** Task and workflow slugs that defer on interrupt (`jobs({ interrupt: { defer } })`). */
 	defer: string[]
-	heartbeat: HeartbeatPlan | null
+	recovery: RecoveryPlan | null
 }
 
 type ClaimedJob = {
@@ -133,7 +133,7 @@ const withInterruption =
 
 /**
  * Wrap every function handler in `payload.config.jobs` with the interruption
- * wrapper and, when reliability is on, the heartbeat around it. Runs in the
+ * wrapper and, when reliability is on, the recovery layer around it. Runs in the
  * plugin's `onInit`, after every plugin has added its tasks; Payload reads
  * handlers from `payload.config.jobs` at run time, so every run path sees the
  * wrapped ones. Idempotent per jobs config: the worker and `queue-run` call it
@@ -150,8 +150,8 @@ export const wrapJobHandlers = (payload: Payload): boolean => {
 	const tasks = Array.isArray(jobs.tasks) ? jobs.tasks : []
 	const workflows = Array.isArray(jobs.workflows) ? jobs.workflows : []
 	const defer = resolveDeferSlugs(tasks, workflows, registry.plan.defer)
-	const heartbeat = registry.plan.heartbeat
-		? createHeartbeatLayer(registry.plan.heartbeat, workflows)
+	const recovery = registry.plan.recovery
+		? createRecoveryLayer(registry.plan.recovery, workflows)
 		: null
 
 	const wrap = <T extends { handler?: unknown }>(entry: T, kind: 'task' | 'workflow'): T => {
@@ -160,8 +160,8 @@ export const wrapJobHandlers = (payload: Payload): boolean => {
 			return entry
 		}
 		let next = withInterruption(handler as Handler, defer)
-		if (heartbeat) {
-			next = heartbeat(next as unknown as JobHandler, kind) as unknown as Handler
+		if (recovery) {
+			next = recovery(next as unknown as JobHandler, kind) as unknown as Handler
 		}
 		Object.defineProperty(next, WRAPPED, { value: true })
 		return { ...entry, handler: next }

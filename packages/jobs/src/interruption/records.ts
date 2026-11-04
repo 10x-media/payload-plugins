@@ -24,7 +24,7 @@ type LogEntry = { id?: null | string; state?: null | string }
 
 /** The slice of a `payload-jobs` row the fix-up reads. */
 export type JobRow = {
-	processing?: boolean | null
+	processingUntil?: null | string
 	totalTried?: null | number
 	completedAt?: null | string
 	log?: LogEntry[] | null
@@ -88,7 +88,8 @@ export const interruptionUpdate = (
 				reason: record.reason,
 			},
 			hasError: true,
-			processing: false,
+			processingUntil: null,
+			processingToken: null,
 			waitUntil: null,
 		}
 	}
@@ -99,7 +100,8 @@ export const interruptionUpdate = (
 		deferredBy: record.by,
 		error: null,
 		hasError: false,
-		processing: false,
+		processingUntil: null,
+		processingToken: null,
 		totalTried: record.totalTried,
 		waitUntil: record.until.toISOString(),
 		...(kept.length === log.length ? {} : { log: kept }),
@@ -112,18 +114,20 @@ export type ApplyInterruptionsResult = { deferred: number; failed: number }
  * What to do with a record, given the row as it is now. Payload bumps
  * `totalTried` by one when it records the failed attempt, so the record
  * applies to a settled row one try past the claim. A row still at the claim
- * and processing has not been written yet (wait). Any other row has moved on:
+ * and still leased (`processingUntil` ahead of `now`) has not been written yet
+ * (wait). Any other row has moved on:
  * another node claimed the job again, so that node owns its outcome (drop).
  */
 export const interruptionStep = (
 	record: InterruptionRecord,
-	row: JobRow | null
+	row: JobRow | null,
+	now: number = Date.now()
 ): 'apply' | 'drop' | 'wait' => {
 	if (!row || row.completedAt) {
 		return 'drop'
 	}
 	const tried = row.totalTried ?? 0
-	if (row.processing) {
+	if (row.processingUntil && new Date(row.processingUntil).getTime() > now) {
 		return tried === record.totalTried ? 'wait' : 'drop'
 	}
 	return tried === record.totalTried + 1 ? 'apply' : 'drop'
@@ -149,7 +153,7 @@ export const applyJobInterruptions = async (
 			collection: JOBS_SLUG,
 			where: { id: { equals: id } },
 		})) as JobRow | null
-		const step = interruptionStep(record, row)
+		const step = interruptionStep(record, row, now)
 		if (step === 'wait') {
 			if (now - record.recordedAt > RECORD_TTL_MS) {
 				store.delete(key)
