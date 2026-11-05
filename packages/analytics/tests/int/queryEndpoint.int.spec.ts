@@ -1,7 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { PayloadRequest } from 'payload'
 import { type CollectionConfig, type Endpoint, handleEndpoints, type Payload } from 'payload'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { ProviderHttpError } from '../../src/adapters/http/fetchJson'
 import {
 	type AnalyticsAdapter,
@@ -11,15 +11,14 @@ import {
 } from '../../src/core/contract'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
-import {
-	DOCUMENT_PATH,
-	GOALS_PATH,
-	QUERY_PATH,
-	REALTIME_PATH,
-	SOURCES_PATH,
-} from '../../src/plugin/paths'
-import type { QueryResponse } from '../../src/query/response'
+import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
+import { getRuntime } from '../../src/plugin/runtime'
+import { askedAboutNoGoals, type QueryResponse } from '../../src/query/response'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { callEndpoint, handlerAt } from './endpointHelpers'
+import { advancePayloadClock, resetPayloadClock } from './payloadClock'
+
+const routes = routePaths(DEFAULT_ROUTE_BASE)
 
 const accessUsers: CollectionConfig = { slug: 'access-users', auth: true, fields: [] }
 
@@ -34,15 +33,12 @@ type ErrorBody = { error: { code: string; message: string; param?: string } }
 
 // No `comparison` key: a provider-shaped source that never declares it still compares.
 const baseCapabilities: AnalyticsCapabilities = {
-	perPageQuery: true,
 	realtime: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews', 'visitors']),
 	dimensions: new Set(['page']),
-	filters: new Set(['page']),
-	filterOperators: new Set(['eq']),
-	batchPageReport: false,
+	filters: { page: ['eq'] },
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 3600 },
 }
@@ -74,9 +70,8 @@ const stubAdapter = (opts: StubOptions): AnalyticsAdapter => ({
 const RANGE = 'from=2026-01-10&to=2026-01-16'
 
 /**
- * A source shaped like the provider adapters: goal rows exist only for the slugs the read
- * hints at, a read whose hint failed or is missing says so instead of counting every event,
- * and a scope with no goals is an empty table rather than a failure.
+ * Shaped like provider adapters: goal rows only for hinted slugs, a failed or absent hint says so
+ * instead of counting every event, and a scope without goals is an empty table, not a failure.
  */
 const goalsAdapter = (seen: AnalyticsQuery[]): AnalyticsAdapter => ({
 	id: 'goals',
@@ -119,8 +114,7 @@ describeForDb('analytics query endpoint', {}, (db) => {
 						label: 'Narrow source',
 						capabilities: {
 							comparison: false,
-							filters: new Set(),
-							filterOperators: new Set(),
+							filters: {},
 							metrics: new Set(['pageviews']),
 							dimensions: new Set(['page']),
 						},
@@ -154,24 +148,16 @@ describeForDb('analytics query endpoint', {}, (db) => {
 		await booted.stop()
 	})
 
-	const handler = () => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === QUERY_PATH
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('query endpoint not registered')
-		}
-		return endpoint.handler
-	}
+	const handler = () => handlerAt(booted.payload, routes.query)
 
-	const user = { id: 1, email: 'reader@t.dev' }
+	const user = { id: 1, email: 'reader@t.dev', collection: 'access-users' }
 
 	const call = (query: string, as: unknown = user): Promise<Response> =>
 		Promise.resolve(
 			handler()({
 				payload: booted.payload,
 				user: as,
-				url: `http://localhost/api${QUERY_PATH}?${query}`,
+				url: `http://localhost/api${routes.query}?${query}`,
 				headers: new Headers(),
 			} as unknown as PayloadRequest)
 		)
@@ -190,22 +176,28 @@ describeForDb('analytics query endpoint', {}, (db) => {
 
 	it(`registers the endpoint under the api route on ${db}`, () => {
 		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === QUERY_PATH
+			(e): e is Endpoint => typeof e === 'object' && e.path === routes.query
 		)
 		expect(endpoint?.method).toBe('get')
 	})
 
-	// This install configures no goals, so the hint is empty rather than missing: the source
-	// answers an empty goal table, which is an empty state and not a failure to report.
-	it(`hints an empty goal list and answers unflagged empty rows on ${db}`, async () => {
+	// No goals declared, so the hint carries only the latent built-in purchase goal: its slug must
+	// reach the source (it matches at ingest), but reports read it as an install with no goals.
+	it(`hints only the latent goal and names it as built in on ${db}`, async () => {
 		goalQueries.length = 0
 		const body = await okBody(`source=goals&metrics=conversions&dimensions=goal&${RANGE}`)
-		expect(goalQueries[0]?.goalSlugs).toEqual([])
-		expect(body.result.rows).toEqual([])
+		expect(goalQueries[0]?.goalSlugs).toEqual(['purchase'])
+		// The endpoint names latent slugs and reports drop their rows, rather than hiding rows a
+		// consumer's own dashboard may want.
+		expect(body.result.rows).toEqual([
+			{ dimensions: { goal: 'purchase' }, metrics: { conversions: 1 } },
+		])
 		expect(body.result.meta.goalsUnresolved).toBeUndefined()
 		// The echo is how a client tells this apart from a resolver that failed, which
 		// echoes the string `unresolved` instead.
-		expect(body.query.goalSlugs).toEqual([])
+		expect(body.query.goalSlugs).toEqual(['purchase'])
+		expect(body.builtinGoalSlugs).toEqual(['purchase'])
+		expect(askedAboutNoGoals(body)).toBe(true)
 	})
 
 	it(`leaves a read that is about no goal unhinted on ${db}`, async () => {
@@ -303,10 +295,19 @@ describeForDb('analytics query endpoint', {}, (db) => {
 	})
 
 	it(`adds the previous window as comparison for compare=previous on ${db}`, async () => {
+		const engine = getRuntime(booted.payload)?.engine
+		if (!engine) {
+			throw new Error('runtime missing after boot')
+		}
+		const reads = vi.spyOn(engine, 'read')
 		const body = await okBody(`metrics=pageviews&compare=previous&${RANGE}`)
 		expect(body.query.dateRange.start).toBe('2026-01-10T00:00:00.000Z')
 		expect(body.comparison).toBeDefined()
-		expect(body.comparison?.meta.fetchedAt).toBe('2026-01-09T23:59:59.999Z')
+		expect(reads.mock.calls.map(([, query]) => query.dateRange.end.toISOString())).toEqual([
+			'2026-01-16T23:59:59.999Z',
+			'2026-01-09T23:59:59.999Z',
+		])
+		reads.mockRestore()
 	})
 
 	it(`adds the comparison for a provider-shaped source that never declared it on ${db}`, async () => {
@@ -348,7 +349,7 @@ describeForDb('analytics query endpoint', {}, (db) => {
 		const res = await handleEndpoints({
 			config: booted.payload.config,
 			payloadInstanceCacheKey: booted.cacheKey,
-			request: new Request(`http://localhost:3000/api${QUERY_PATH}?metrics=pageviews&${RANGE}`, {
+			request: new Request(`http://localhost:3000/api${routes.query}?metrics=pageviews&${RANGE}`, {
 				headers: { cookie: `payload-token=${token}` },
 			}),
 		})
@@ -362,7 +363,7 @@ describeForDb('analytics query endpoint', {}, (db) => {
 		const res = await handleEndpoints({
 			config: booted.payload.config,
 			payloadInstanceCacheKey: booted.cacheKey,
-			request: new Request(`http://localhost:3000/api${QUERY_PATH}?metrics=pageviews&${RANGE}`),
+			request: new Request(`http://localhost:3000/api${routes.query}?metrics=pageviews&${RANGE}`),
 		})
 		expect(res.status).toBe(401)
 	})
@@ -377,6 +378,7 @@ describeForDb('analytics query endpoint - access.read', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [native()],
+				capture: { gate: 'off' },
 				collections: { pages: { path: (doc) => (doc.slug ? `/${doc.slug as string}` : null) } },
 				goals: [{ slug: 'book-demo', name: 'Book a demo', match: { kind: 'goal' } }],
 				access: {
@@ -390,29 +392,19 @@ describeForDb('analytics query endpoint - access.read', {}, (db) => {
 		await booted.stop()
 	})
 
-	const call = (path: string, query: string, email: string): Promise<Response> => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === path
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error(`endpoint ${path} not registered`)
-		}
-		return Promise.resolve(
-			endpoint.handler({
-				payload: booted.payload,
-				user: { id: 1, email },
-				url: `http://localhost/api${path}?${query}`,
-				headers: new Headers(),
-			} as unknown as PayloadRequest)
-		)
-	}
+	const call = (path: string, query: string, email: string): Promise<Response> =>
+		callEndpoint(booted.payload, {
+			path,
+			query,
+			user: { id: 1, email, collection: 'access-users' },
+		})
 
 	const endpoints: Array<[string, string]> = [
-		[QUERY_PATH, `metrics=pageviews&${RANGE}`],
-		[DOCUMENT_PATH, 'collection=pages&id=000000000000000000000000'],
-		[REALTIME_PATH, 'metric=visitors'],
-		[SOURCES_PATH, ''],
-		[GOALS_PATH, ''],
+		[routes.query, `metrics=pageviews&${RANGE}`],
+		[routes.document, 'collection=pages&id=000000000000000000000000'],
+		[routes.live, 'metric=visitors'],
+		[routes.sources, ''],
+		[routes.goals, ''],
 	]
 
 	for (const [path, query] of endpoints) {
@@ -423,12 +415,32 @@ describeForDb('analytics query endpoint - access.read', {}, (db) => {
 	}
 
 	it(`serves the query endpoint to a user access.read grants on ${db}`, async () => {
-		const res = await call(QUERY_PATH, `metrics=pageviews&${RANGE}`, 'allowed@t.dev')
+		const res = await call(routes.query, `metrics=pageviews&${RANGE}`, 'allowed@t.dev')
 		expect(res.status).toBe(200)
 	})
 
+	// The admin names native's sessions Visits, so a caller asking for `visits` gets that count.
+	it(`answers visits from native's sessions, under the name asked for, on ${db}`, async () => {
+		const res = await call(routes.query, `metrics=visits,pageviews&${RANGE}`, 'allowed@t.dev')
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as QueryResponse
+		expect(body.query.metrics).toEqual(['visits', 'pageviews'])
+		expect(Object.keys(body.result.totals ?? {}).sort()).toEqual(['pageviews', 'visits'])
+		const ranked = await call(
+			routes.query,
+			`metrics=visits&order=visits:desc&dimensions=page&${RANGE}`,
+			'allowed@t.dev'
+		)
+		expect(ranked.status).toBe(200)
+		const both = await call(routes.query, `metrics=sessions,visits&${RANGE}`, 'allowed@t.dev')
+		expect(both.status).toBe(200)
+		const totals = ((await both.json()) as QueryResponse).result.totals ?? {}
+		expect(totals.visits).toBe(totals.sessions)
+		expect(typeof totals.visits).toBe('number')
+	})
+
 	it(`keeps the sources wire shape for a user access.read grants on ${db}`, async () => {
-		const res = await call(SOURCES_PATH, '', 'allowed@t.dev')
+		const res = await call(routes.sources, '', 'allowed@t.dev')
 		expect(res.status).toBe(200)
 		const body = (await res.json()) as {
 			defaultId: string | null
@@ -439,7 +451,7 @@ describeForDb('analytics query endpoint - access.read', {}, (db) => {
 	})
 })
 
-describeForDb('analytics query endpoint - platform scope resolver', {}, (db) => {
+describeForDb('analytics query endpoint - a scope resolver answering the wildcard', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
@@ -448,9 +460,9 @@ describeForDb('analytics query endpoint - platform scope resolver', {}, (db) => 
 			db,
 			plugin: analytics({
 				adapters: [stubAdapter({ id: 'shared', pageviews: 4 })],
-				scopeResolver: () => PLATFORM_SCOPE,
+				scope: { member: () => true, resolve: () => PLATFORM_SCOPE },
 				access: {
-					platformRead: ({ req }) =>
+					crossScope: ({ req }) =>
 						(req.user as { email?: string } | null)?.email === 'platform@t.dev',
 				},
 			}),
@@ -461,44 +473,40 @@ describeForDb('analytics query endpoint - platform scope resolver', {}, (db) => 
 		await booted.stop()
 	})
 
-	const call = (path: string, query: string, email: string): Promise<Response> => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === path
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error(`endpoint ${path} not registered`)
+	const call = (path: string, query: string, email: string): Promise<Response> =>
+		callEndpoint(booted.payload, {
+			path,
+			query,
+			user: { id: 1, email, collection: 'access-users' },
+		})
+
+	// The wildcard is a reader's request for every scope. A resolver answering it would hand every
+	// request the aggregate without the gate having been asked, so it is refused outright.
+	it(`lists no sources for any reader, the resolver being refused on ${db}`, async () => {
+		for (const email of ['tenant@t.dev', 'platform@t.dev']) {
+			const res = await call(routes.sources, '', email)
+			expect(res.status).toBe(200)
+			const body = (await res.json()) as { defaultId: string | null; sources: unknown[] }
+			expect(body).toEqual({ defaultId: null, sources: [] })
 		}
-		return Promise.resolve(
-			endpoint.handler({
-				payload: booted.payload,
-				user: { id: 1, email },
-				url: `http://localhost/api${path}?${query}`,
-				headers: new Headers(),
-			} as unknown as PayloadRequest)
-		)
-	}
-
-	it(`lists no sources for a resolved platform scope the caller may not read on ${db}`, async () => {
-		const res = await call(SOURCES_PATH, '', 'tenant@t.dev')
-		expect(res.status).toBe(200)
-		const body = (await res.json()) as { defaultId: string | null; sources: unknown[] }
-		expect(body).toEqual({ defaultId: null, sources: [] })
 	})
 
-	it(`404s a query for a resolved platform scope the caller may not read on ${db}`, async () => {
-		const res = await call(QUERY_PATH, `metrics=pageviews&${RANGE}`, 'tenant@t.dev')
-		expect(res.status).toBe(404)
-		const body = (await res.json()) as ErrorBody
-		expect(body.error.code).toBe('unknown_source')
+	it(`404s a query that leaves the scope to the resolver on ${db}`, async () => {
+		for (const email of ['tenant@t.dev', 'platform@t.dev']) {
+			const res = await call(routes.query, `metrics=pageviews&${RANGE}`, email)
+			expect(res.status).toBe(404)
+			const body = (await res.json()) as ErrorBody
+			expect(body.error.code).toBe('unknown_source')
+		}
 	})
 
-	it(`reads install-wide for a platformRead user on ${db}`, async () => {
-		const sources = await call(SOURCES_PATH, '', 'platform@t.dev')
-		expect(((await sources.json()) as { defaultId: string | null }).defaultId).toBe('shared')
-		const res = await call(QUERY_PATH, `metrics=pageviews&${RANGE}`, 'platform@t.dev')
+	it(`still reads install-wide for a reader the aggregate gate lets name every scope on ${db}`, async () => {
+		const res = await call(routes.query, `metrics=pageviews&scope=*&${RANGE}`, 'platform@t.dev')
 		expect(res.status).toBe(200)
 		const body = (await res.json()) as QueryResponse
 		expect(body.query.scope).toBeUndefined()
+		const refused = await call(routes.query, `metrics=pageviews&scope=*&${RANGE}`, 'tenant@t.dev')
+		expect(refused.status).toBe(400)
 	})
 })
 
@@ -516,6 +524,7 @@ describeForDb('analytics query endpoint - scoped install', {}, (db) => {
 			collections: [accessUsers],
 			db,
 			plugin: analytics({
+				capture: { gate: 'off' },
 				adapters: [
 					stubAdapter({
 						id: 'tenanted',
@@ -526,10 +535,12 @@ describeForDb('analytics query endpoint - scoped install', {}, (db) => {
 					stubAdapter({ id: 'shared', pageviews: 2, seen }),
 				],
 				defaultAdapter: 'tenanted',
-				scopeResolver: ({ req }) =>
-					scopeByEmail[(req.user as { email?: string })?.email ?? ''] ?? null,
+				scope: {
+					member: () => true,
+					resolve: ({ req }) => scopeByEmail[(req.user as { email?: string })?.email ?? ''] ?? null,
+				},
 				access: {
-					platformRead: ({ req }) =>
+					crossScope: ({ req }) =>
 						(req.user as { email?: string } | null)?.email === 'platform@t.dev',
 				},
 				providers: {
@@ -544,22 +555,12 @@ describeForDb('analytics query endpoint - scoped install', {}, (db) => {
 		await booted.stop()
 	})
 
-	const call = (query: string, email: string): Promise<Response> => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === QUERY_PATH
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('query endpoint not registered')
-		}
-		return Promise.resolve(
-			endpoint.handler({
-				payload: booted.payload,
-				user: { id: 1, email },
-				url: `http://localhost/api${QUERY_PATH}?${query}`,
-				headers: new Headers(),
-			} as unknown as PayloadRequest)
-		)
-	}
+	const call = (query: string, email: string): Promise<Response> =>
+		callEndpoint(booted.payload, {
+			path: routes.query,
+			query,
+			user: { id: 1, email, collection: 'access-users' },
+		})
 
 	it(`stamps the request's own scope on the read on ${db}`, async () => {
 		const res = await call(`metrics=pageviews&${RANGE}`, 'a@t.dev')
@@ -591,11 +592,13 @@ describeForDb('analytics query endpoint - scoped install', {}, (db) => {
 		expect(body.error).toMatchObject({ code: 'untrusted_scope', param: 'scope' })
 	})
 
-	it(`403s a tenant read through a shared source that cannot filter by scope on ${db}`, async () => {
+	// A shared source that cannot filter by scope is not among this tenant's sources at all,
+	// so naming it reads like naming a source that does not exist rather than like a refusal.
+	it(`404s a tenant read through a shared source that cannot filter by scope on ${db}`, async () => {
 		const res = await call(`source=shared&metrics=pageviews&${RANGE}`, 'a@t.dev')
-		expect(res.status).toBe(403)
+		expect(res.status).toBe(404)
 		const body = (await res.json()) as ErrorBody
-		expect(body.error.code).toBe('forbidden')
+		expect(body.error).toMatchObject({ code: 'unknown_source', param: 'source' })
 	})
 
 	it(`404s a user whose request resolves no scope on ${db}`, async () => {
@@ -605,7 +608,7 @@ describeForDb('analytics query endpoint - scoped install', {}, (db) => {
 		expect(body.error.code).toBe('unknown_source')
 	})
 
-	it(`lets a platformRead user read another scope explicitly on ${db}`, async () => {
+	it(`lets a crossScope reader name another scope explicitly on ${db}`, async () => {
 		const res = await call(
 			`scope=tenant-b&source=src-tenant-b&metrics=pageviews&${RANGE}`,
 			'platform@t.dev'
@@ -638,48 +641,71 @@ describeForDb('analytics query endpoint - stale passthrough', {}, (db) => {
 	}, 240_000)
 
 	afterAll(async () => {
+		resetPayloadClock()
 		await booted.stop()
 	})
 
-	const call = (params = 'metrics=pageviews'): Promise<Response> => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === QUERY_PATH
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('query endpoint not registered')
-		}
-		return Promise.resolve(
-			endpoint.handler({
-				payload: booted.payload,
-				user: { id: 1 },
-				url: `http://localhost/api${QUERY_PATH}?${params}&${RANGE}`,
-				headers: new Headers(),
-			} as unknown as PayloadRequest)
-		)
-	}
+	const call = (params = 'metrics=pageviews'): Promise<Response> =>
+		callEndpoint(booted.payload, {
+			path: routes.query,
+			query: `${params}&${RANGE}`,
+			user: { id: 1, collection: 'access-users' },
+		})
 
 	it(`passes meta.stale through when the refresh fails after the entry expires on ${db}`, async () => {
 		const first = (await (await call()).json()) as QueryResponse
 		expect(first.result.totals?.pageviews).toBe(1)
 		expect(first.result.meta.stale).toBeUndefined()
 
-		// The aggregate TTL above is 1s; sleeping past it with a real timer expires the entry
-		// without reaching into the cache store's clock, as engineResilience.int.spec.ts does.
-		await new Promise((resolve) => setTimeout(resolve, 2_000))
+		// Past the aggregate TTL above (1s) on the clock the cache expires its entries by.
+		await advancePayloadClock(booted.payload, 2_000)
 
-		// A non-429 4xx never retries (retryPolicy.ts), so one failNext fails the whole read.
-		mem.failNext(new ProviderHttpError(400, 'memory', 'memory: injected failure'))
+		// The expired entry is answered at once and refreshed behind the answer, so the refresh
+		// failing changes nothing for this read.
+		mem.failNext(new ProviderHttpError(503, 'memory', 'memory: injected outage'))
 		const second = (await (await call()).json()) as QueryResponse
 		expect(second.result.meta.stale).toBe(true)
 		expect(second.result.totals?.pageviews).toBe(1)
+		// The refresh retries behind the answer; let it finish before the next read injects failures.
+		await getRuntime(booted.payload)?.engine.idle?.()
 	})
 
 	it(`503s with Retry-After when a cold read fails outright on ${db}`, async () => {
-		mem.failNext(new ProviderHttpError(400, 'memory', 'memory: injected failure'))
+		// An outage is retried twice, so the whole read fails only when all three attempts do.
+		mem.failNext(new ProviderHttpError(503, 'memory', 'memory: injected outage'), 3)
 		const res = await call('metrics=visitors')
 		expect(res.status).toBe(503)
 		expect(res.headers.get('Retry-After')).toBe('30')
 		const body = (await res.json()) as ErrorBody
 		expect(body.error.code).toBe('unavailable')
+	})
+
+	it(`400s a query the source refuses as asked, blaming the query on ${db}`, async () => {
+		mem.failNext(new ProviderHttpError(400, 'memory', 'memory: bad query detail'))
+		const res = await call('metrics=sessions')
+		expect(res.status).toBe(400)
+		expect(res.headers.get('Retry-After')).toBeNull()
+		const body = (await res.json()) as ErrorBody
+		expect(body.error).toEqual({
+			code: 'invalid_param',
+			message: 'analytics: the source refused this query as asked',
+			param: 'query',
+		})
+	})
+
+	// Last in the block: a refused key opens the source's breaker for every later read.
+	it(`502s a refused key, and keeps saying so at once while the source rests on ${db}`, async () => {
+		mem.failNext(new ProviderHttpError(401, 'memory', 'memory: key revoked'))
+		const refused = await call('metrics=bounceRate')
+		expect(refused.status).toBe(502)
+		expect(refused.headers.get('Retry-After')).toBeNull()
+		expect(((await refused.json()) as ErrorBody).error).toMatchObject({
+			code: 'source_misconfigured',
+			param: 'source',
+		})
+		const resting = await call('metrics=avgDuration')
+		expect(resting.status).toBe(502)
+		expect(resting.headers.get('Retry-After')).toBeNull()
+		expect(((await resting.json()) as ErrorBody).error.code).toBe('source_misconfigured')
 	})
 })

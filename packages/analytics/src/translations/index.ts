@@ -4,15 +4,15 @@ import { en } from './en'
 import { es } from './es'
 import { fr } from './fr'
 import { id } from './id'
-import type { TranslationKey } from './keys'
+import { splitKey, type TranslationKey } from './keys'
 import { ko } from './ko'
 import { pt } from './pt'
 import { ru } from './ru'
 import { uk } from './uk'
 import { zh } from './zh'
 
-export type { TranslationKey } from './keys'
-export { keys } from './keys'
+export type { PluralCategory, PluralName, PluralVariant, SingularKey, TranslationKey } from './keys'
+export { keys, pluralKeys } from './keys'
 
 /** Per-locale string overrides keyed by this plugin's typed translation keys. */
 export type TranslationsOption = {
@@ -20,9 +20,8 @@ export type TranslationsOption = {
 }
 
 /**
- * Flat `analytics:foo` entries to the nested `{ analytics: { foo } }`
- * shape Payload resolves `t('analytics:foo')` against (it splits on `:`).
- * Undefined values are skipped so `Partial` override maps pass through.
+ * Flat `analytics:foo` entries nested as `{ analytics: { foo } }`, the shape Payload's `t` resolves
+ * (it splits on `:`). Undefined values are skipped so `Partial` overrides pass.
  */
 export const toNested = (flat: {
 	[key: string]: string | undefined
@@ -32,10 +31,9 @@ export const toNested = (flat: {
 		if (typeof value !== 'string') {
 			continue
 		}
-		const separator = fullKey.indexOf(':')
-		const namespace = fullKey.slice(0, separator)
+		const { namespace, name } = splitKey(fullKey)
 		const bucket = out[namespace] ?? {}
-		bucket[fullKey.slice(separator + 1)] = value
+		bucket[name] = value
 		out[namespace] = bucket
 	}
 	return out

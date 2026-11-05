@@ -1,0 +1,138 @@
+---
+title: Checking before saving
+description: The search outside the queue, findDuplicates, the check endpoint and useDuplicateCheck, and a guided create form built on them.
+---
+
+The plugin adds no duplicate check to the edit form. These three run the queue's search on values that are not saved yet, for a check of your own.
+
+## findDuplicates
+
+```ts
+import { findDuplicates } from '@10x-media/dedupe'
+
+const found = await findDuplicates({
+  req,
+  collection: 'customers',
+  doc: { name: 'Olena Koval', phone: '+380 44 123 4567' },
+})
+// [{ doc, score, signals }], best first
+```
+
+- `doc` may hold unsaved values; with an `id`, that document is left out. On a collection scoped by `multiTenancy`, it must hold the tenant field: without it, nothing is found.
+- `overrideAccess: false` leaves out documents `req.user` may not read.
+- `minScore` replaces the collection's `match.minScore` for this call, for example a lower one for a check before creating. It only filters the candidates the adapter offers: a lower one finds no document the adapter missed.
+- Without a request, make one with `createLocalReq({}, payload)`.
+
+`score` runs from 0 to 1 and is not a probability. `signals` says why: one per match field that both documents fill, `{ path, kind, similarity }`.
+
+| `kind` | The field |
+| --- | --- |
+| `match` | Holds the same value, as its `compare` defines it. |
+| `similar` | Holds a value at least 85% alike. |
+| `differ` | Holds another value. |
+| `veto` | Holds another value, and the field's `onDiffer: 'veto'` rules the pair out: the score is 0. |
+
+A rule of your own can single out one field. A look-alike born on the same day is the same person rather than a namesake:
+
+```ts
+const sameDay = found.some(({ signals }) =>
+  signals.some((signal) => signal.path === 'birthDate' && signal.kind === 'match'),
+)
+```
+
+## The check endpoint
+
+`POST /api/dedupe/check` runs `findDuplicates` on values sent from the admin, as the user who sends them.
+
+| Body | |
+| --- | --- |
+| `collection` | The collection to search. |
+| `data` | The values, saved or not. |
+| `id` | The document being edited, left out of its own results. |
+| `minScore` | As for `findDuplicates`. |
+
+It answers `{ candidates: [{ id, title, score, signals }] }`, each signal with its field's `label`. `?locale=` sets the locale titles are read in.
+
+The endpoint answers only users that pass `access.review`. For anyone else, call `findDuplicates` on the server, for example in a form-variants step's `gate`.
+
+## useDuplicateCheck
+
+`useDuplicateCheck({ collection, paths, delay, follow, minScore })` from `@10x-media/dedupe/client` calls the endpoint with the form's current values and returns `{ candidates, check }`.
+
+- `candidates` follows the form: it asks again `delay` ms (500 by default) after a change to one of `paths`, the match field paths. `follow: false` turns this off.
+- `check()` asks at once and resolves to the candidates, for a step or a save that cannot wait.
+
+## Example: a guided create form
+
+With [form-variants](/form-variants/configuration), a create form can end on a [component step](/form-variants/steps#component-steps) that checks the values the earlier steps took: a look-alike born on the same day blocks the save, a weaker one is listed with a warning.
+
+```ts title="variants/customers.ts"
+import type { FormVariantsConfig } from '@10x-media/form-variants'
+
+export const customerVariants: FormVariantsConfig<'customers'> = {
+  defaultVariant: 'native',
+  variants: [
+    { key: 'native', label: 'Full form' },
+    {
+      key: 'guided',
+      label: 'Guided',
+      steps: [
+        { key: 'person', label: 'Who is this?', fields: ['name', 'email', 'phone', 'birthDate'] },
+        {
+          key: 'duplicates',
+          label: 'Check for duplicates',
+          Component: '/components/DuplicateCheckStep#DuplicateCheckStep',
+        },
+      ],
+    },
+  ],
+}
+```
+
+```tsx title="components/DuplicateCheckStep.tsx"
+'use client'
+
+import { type DuplicateCandidate, useDuplicateCheck } from '@10x-media/dedupe/client'
+import { useWizard } from '@10x-media/form-variants/client'
+import { useEffect, useState } from 'react'
+
+const isStrong = (candidate: DuplicateCandidate) =>
+  candidate.signals.some((signal) => signal.path === 'birthDate' && signal.kind === 'match')
+
+export const DuplicateCheckStep = () => {
+  const { allowSave, blockSave, setMessage } = useWizard()
+  const { check } = useDuplicateCheck({
+    collection: 'customers',
+    paths: ['email', 'name', 'phone', 'birthDate'],
+    follow: false,
+  })
+  const [found, setFound] = useState<DuplicateCandidate[] | Error | null>(null)
+
+  useEffect(() => {
+    let current = true
+    check().then(
+      (candidates) => current && setFound(candidates),
+      (error: Error) => current && setFound(error),
+    )
+    return () => {
+      current = false
+    }
+  }, [check])
+
+  useEffect(() => {
+    if (found === null) blockSave('Checking for duplicates…')
+    else if (found instanceof Error) blockSave(found.message)
+    else if (found.some(isStrong)) blockSave('This customer already exists.')
+    else {
+      allowSave()
+      if (found.length > 0) setMessage('Similar customers exist. Check them before saving.')
+    }
+  }, [allowSave, blockSave, found, setMessage])
+
+  useEffect(() => allowSave, [allowSave])
+
+  // Render `found`: a link and the score for each candidate.
+}
+```
+
+`useEffect(() => allowSave, [allowSave])` lifts the block when the user steps back. A user outside `access.review` gets a 403, which blocks their save.

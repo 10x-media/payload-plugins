@@ -1,188 +1,105 @@
-import { describe, expect, it, vi } from 'vitest'
-import type { AnalyticsAdapter } from '../core/contract'
-import { memoryAdapter } from '../testing/memoryAdapter'
-import { createRateLimiter, limiterFor } from './rateLimiter'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createTokenSource } from './rateLimiter'
 
-describe('createRateLimiter', () => {
-	it('passes through immediately for a null descriptor', async () => {
-		const limiter = createRateLimiter(null)
-		const releases = await Promise.all([limiter.take(), limiter.take(), limiter.take()])
-		expect(releases).toHaveLength(3)
-		expect(() => {
-			for (const release of releases) release()
-		}).not.toThrow()
+const interactive = { priority: 'interactive' as const }
+
+/** Whether a take has resolved yet, without awaiting it. */
+const watch = (pending: Promise<void>): { done: boolean } => {
+	const state = { done: false }
+	void pending.then(() => {
+		state.done = true
 	})
+	return state
+}
 
-	it('allows N takes immediately at capacity, then makes the N+1th wait for refill', async () => {
+describe('createTokenSource', () => {
+	beforeEach(() => {
 		vi.useFakeTimers()
-		try {
-			const limiter = createRateLimiter({ requestsPerMinute: 2 })
-			// Fake timers never auto-advance, so these would hang past the test timeout
-			// if either take needed to wait on a bucket refill.
-			await limiter.take()
-			await limiter.take()
-
-			let resolved = false
-			limiter.take().then(() => {
-				resolved = true
-			})
-			await vi.advanceTimersByTimeAsync(0)
-			expect(resolved).toBe(false)
-
-			await vi.advanceTimersByTimeAsync(29_999)
-			expect(resolved).toBe(false)
-
-			await vi.advanceTimersByTimeAsync(1)
-			expect(resolved).toBe(true)
-		} finally {
-			vi.useRealTimers()
-		}
+	})
+	afterEach(() => {
+		vi.useRealTimers()
 	})
 
-	it('enforces an hourly bucket on the same refill schedule', async () => {
-		vi.useFakeTimers()
-		try {
-			const limiter = createRateLimiter({ requestsPerHour: 2 })
-			await limiter.take()
-			await limiter.take()
-
-			let resolved = false
-			limiter.take().then(() => {
-				resolved = true
-			})
-			await vi.advanceTimersByTimeAsync(1_799_999)
-			expect(resolved).toBe(false)
-
-			await vi.advanceTimersByTimeAsync(1)
-			expect(resolved).toBe(true)
-		} finally {
-			vi.useRealTimers()
-		}
+	it('never waits without a per-minute or per-hour limit', async () => {
+		const tokens = createTokenSource({ maxConcurrent: 1 })
+		await Promise.all([
+			tokens.take(interactive),
+			tokens.take(interactive),
+			tokens.take(interactive),
+		])
+		expect(tokens.waiting).toBe(0)
 	})
 
-	it('requires a token from every configured bucket, gating on the tighter one', async () => {
-		vi.useFakeTimers()
-		try {
-			// Minute bucket refills a token every 12s; hour bucket every 30min. The hour
-			// bucket is exhausted first and must be the one that gates the third take.
-			const limiter = createRateLimiter({ requestsPerMinute: 5, requestsPerHour: 2 })
-			await limiter.take()
-			await limiter.take()
-
-			let resolved = false
-			limiter.take().then(() => {
-				resolved = true
-			})
-
-			await vi.advanceTimersByTimeAsync(12_000)
-			expect(resolved).toBe(false) // minute bucket alone would have refilled by now
-
-			await vi.advanceTimersByTimeAsync(1_800_000 - 12_000)
-			expect(resolved).toBe(true)
-		} finally {
-			vi.useRealTimers()
-		}
+	it('spends one token per take and makes the one past capacity wait for the refill', async () => {
+		const tokens = createTokenSource({ requestsPerMinute: 2 })
+		await tokens.take(interactive)
+		await tokens.take(interactive)
+		const third = watch(tokens.take(interactive))
+		await vi.advanceTimersByTimeAsync(29_999)
+		expect(third.done).toBe(false)
+		await vi.advanceTimersByTimeAsync(1)
+		expect(third.done).toBe(true)
 	})
 
-	it('does not refund a spent token on release', async () => {
-		vi.useFakeTimers()
-		try {
-			const limiter = createRateLimiter({ requestsPerMinute: 1 })
-			const release = await limiter.take()
-			release()
-
-			let resolved = false
-			limiter.take().then(() => {
-				resolved = true
-			})
-			await vi.advanceTimersByTimeAsync(59_999)
-			expect(resolved).toBe(false)
-			await vi.advanceTimersByTimeAsync(1)
-			expect(resolved).toBe(true)
-		} finally {
-			vi.useRealTimers()
-		}
+	it('needs a token from every bucket, gating on the tighter one', async () => {
+		// The minute bucket refills every 12 s, the hour bucket every 30 minutes.
+		const tokens = createTokenSource({ requestsPerMinute: 5, requestsPerHour: 2 })
+		await tokens.take(interactive)
+		await tokens.take(interactive)
+		const third = watch(tokens.take(interactive))
+		await vi.advanceTimersByTimeAsync(12_000)
+		expect(third.done).toBe(false)
+		await vi.advanceTimersByTimeAsync(1_800_000 - 12_000)
+		expect(third.done).toBe(true)
 	})
 
-	it('blocks a second take under maxConcurrent until the first releases', async () => {
-		const limiter = createRateLimiter({ maxConcurrent: 1 })
-		const release = await limiter.take()
-
-		let resolved = false
-		limiter.take().then(() => {
-			resolved = true
-		})
-		await Promise.resolve() // flush a microtask tick
-		expect(resolved).toBe(false)
-
-		release()
-		await vi.waitFor(() => expect(resolved).toBe(true))
+	it('serves a waiting reader before background work that waited longer', async () => {
+		const tokens = createTokenSource({ requestsPerMinute: 1 })
+		await tokens.take(interactive)
+		const order: string[] = []
+		void tokens.take({ priority: 'background' }).then(() => order.push('background'))
+		void tokens.take(interactive).then(() => order.push('interactive'))
+		await vi.advanceTimersByTimeAsync(60_000)
+		expect(order).toEqual(['interactive'])
+		await vi.advanceTimersByTimeAsync(60_000)
+		expect(order).toEqual(['interactive', 'background'])
 	})
 
-	it('rejects a take waiting on a token bucket when aborted, without leaking a token', async () => {
-		vi.useFakeTimers()
-		try {
-			const limiter = createRateLimiter({ requestsPerMinute: 1 })
-			await limiter.take()
-
-			const controller = new AbortController()
-			const reason = new Error('aborted')
-			const pending = limiter.take(controller.signal)
-			const assertion = expect(pending).rejects.toBe(reason)
-			controller.abort(reason)
-			await assertion
-
-			// The abandoned wait must not have consumed the token that was about to refill:
-			// a fresh take still resolves on the bucket's normal schedule, not early.
-			let resolved = false
-			limiter.take().then(() => {
-				resolved = true
-			})
-			await vi.advanceTimersByTimeAsync(59_999)
-			expect(resolved).toBe(false)
-			await vi.advanceTimersByTimeAsync(1)
-			expect(resolved).toBe(true)
-		} finally {
-			vi.useRealTimers()
-		}
+	it('serves interactive takers, then normal ones, then background work, each in arrival order', async () => {
+		const tokens = createTokenSource({ requestsPerMinute: 1 })
+		await tokens.take(interactive)
+		const order: string[] = []
+		void tokens.take({ priority: 'background' }).then(() => order.push('background'))
+		void tokens.take({ priority: 'normal' }).then(() => order.push('normal'))
+		void tokens.take(interactive).then(() => order.push('interactive'))
+		await vi.advanceTimersByTimeAsync(3 * 60_000)
+		expect(order).toEqual(['interactive', 'normal', 'background'])
 	})
 
-	it('rejects a take waiting on maxConcurrent when aborted, without leaking a slot', async () => {
-		const limiter = createRateLimiter({ maxConcurrent: 1 })
-		const release = await limiter.take()
-
+	it('drops an aborted taker without spending the token it waited for', async () => {
+		const tokens = createTokenSource({ requestsPerMinute: 1 })
+		await tokens.take(interactive)
 		const controller = new AbortController()
 		const reason = new Error('aborted')
-		const pending = limiter.take(controller.signal)
-		const assertion = expect(pending).rejects.toBe(reason)
+		const abandoned = tokens.take({ signal: controller.signal, priority: 'interactive' })
+		const refused = expect(abandoned).rejects.toBe(reason)
 		controller.abort(reason)
-		await assertion
-
-		release()
-		const next = await limiter.take()
-		expect(typeof next).toBe('function')
+		await refused
+		expect(tokens.waiting).toBe(0)
+		const next = watch(tokens.take(interactive))
+		await vi.advanceTimersByTimeAsync(59_999)
+		expect(next.done).toBe(false)
+		await vi.advanceTimersByTimeAsync(1)
+		expect(next.done).toBe(true)
 	})
 
-	it('rejects immediately when the signal is already aborted', async () => {
-		const limiter = createRateLimiter({ requestsPerMinute: 1 })
+	it('refuses at once when the signal already aborted', async () => {
+		const tokens = createTokenSource({ requestsPerMinute: 1 })
 		const controller = new AbortController()
 		const reason = new Error('already aborted')
 		controller.abort(reason)
-		await expect(limiter.take(controller.signal)).rejects.toBe(reason)
-	})
-})
-
-describe('limiterFor', () => {
-	it('builds a limiter once per adapter id and reuses it', () => {
-		const map = new Map()
-		const adapter: AnalyticsAdapter = {
-			...memoryAdapter(),
-			id: 'plausible',
-			capabilities: { ...memoryAdapter().capabilities, rateLimit: { requestsPerHour: 600 } },
-		}
-		const a = limiterFor(map, adapter)
-		const b = limiterFor(map, adapter)
-		expect(a).toBe(b)
-		expect(map.size).toBe(1)
+		await expect(tokens.take({ signal: controller.signal, priority: 'interactive' })).rejects.toBe(
+			reason
+		)
 	})
 })

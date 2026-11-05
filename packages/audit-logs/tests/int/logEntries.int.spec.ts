@@ -57,8 +57,8 @@ describe('audit log entries', () => {
 		const doc = await create({ title: 'Attributed' })
 		const [log] = await readLogs(booted.payload, { documentId: { equals: String(doc.id) } })
 
-		expect(log?.user).toBeTruthy()
-		expect(log?.impersonator ?? null).toBeNull()
+		expect(log?.user).toEqual({ relationTo: 'users', value: String(req.user?.id) })
+		expect(log?.impersonator?.value ?? null).toBeNull()
 	})
 
 	it('records the impersonator stamped on the acting user', async () => {
@@ -78,8 +78,8 @@ describe('audit log entries', () => {
 		})
 		const [log] = await readLogs(booted.payload, { documentId: { equals: String(doc.id) } })
 
-		expect(String(log?.user)).toBe(String(req.user?.id))
-		expect(String(log?.impersonator)).toBe(String(admin.id))
+		expect(log?.user?.value).toBe(String(req.user?.id))
+		expect(log?.impersonator).toEqual({ relationTo: 'users', value: String(admin.id) })
 	})
 
 	it('diffs only the fields that changed on update', async () => {
@@ -252,7 +252,7 @@ describe('audit log entries without the impersonation plugin', () => {
 		})
 		const [log] = await readLogs(booted.payload, { documentId: { equals: String(doc.id) } })
 
-		expect(String(log?.user)).toBe(String(req.user?.id))
+		expect(log?.user?.value).toBe(String(req.user?.id))
 		expect(log).not.toHaveProperty('impersonator')
 	})
 })

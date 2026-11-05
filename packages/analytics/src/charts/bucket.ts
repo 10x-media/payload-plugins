@@ -1,22 +1,25 @@
-import type { DateRange } from '../core/contract'
+import type { DateRange, Granularity, MetricValue } from '../core/contract'
 import type { TimeframePreset } from '../timeframe/presets'
-import {
-	DEFAULT_TIMEZONE,
-	startOfDayInTz,
-	startOfMonthInTz,
-	startOfWeekInTz,
-} from '../timeframe/tz'
-import type { SeriesPoint } from '../widgets/readForWidgetSeries'
+import { addDaysInTz, DAY_MS, DEFAULT_TIMEZONE, HOUR_MS, startOfHourInTz } from '../timeframe/tz'
+import { dateTimeFormat } from '../translations/intl'
+import type { SeriesPoint } from './series'
 
 export interface ChartBucket {
+	/** The bucket's period start as an ISO string; identity for React lists. */
+	at: string
 	label: string
-	value: number
+	/** Carries the day an hour tick leaves out; the tooltip reads it instead of `label`. */
+	tooltipLabel?: string
+	/** `null` when the bucket has no reading: a gap in the line, not a zero. */
+	value: MetricValue
+	/** An hour the day has not reached yet: it holds its place on the axis and nothing more. */
+	upcoming?: boolean
 }
 
-type Unit = 'day' | 'week' | 'month'
+export type BucketUnit = 'hour' | 'day' | 'week' | 'month'
 
-const UNIT_BY_TIMEFRAME: Record<TimeframePreset, Unit> = {
-	today: 'day',
+const UNIT_BY_TIMEFRAME: Record<TimeframePreset, BucketUnit> = {
+	today: 'hour',
 	last7days: 'day',
 	last30days: 'day',
 	thisMonth: 'day',
@@ -26,105 +29,150 @@ const UNIT_BY_TIMEFRAME: Record<TimeframePreset, Unit> = {
 	allTime: 'month',
 }
 
-const bucketStart = (d: Date, unit: Unit, tz: string): Date => {
-	if (unit === 'month') return startOfMonthInTz(d, tz)
-	if (unit === 'week') return startOfWeekInTz(d, tz)
-	return startOfDayInTz(d, tz)
+const DEFAULT_LOCALE = 'en-US'
+
+/**
+ * The unit a preset's chart buckets on. `hour` needs an hourly series: a daily one has a single
+ * point there, so a source without hourly rows has no chart.
+ */
+export const unitForTimeframe = (timeframe: TimeframePreset): BucketUnit =>
+	UNIT_BY_TIMEFRAME[timeframe]
+
+/**
+ * The unit a window's series is read and charted at: a window of two days or less by hour,
+ * short ranges by day, a quarter by week, longer by month.
+ */
+export const unitForRange = (range: DateRange): BucketUnit => {
+	const spanDays = Math.round((range.end.getTime() - range.start.getTime()) / DAY_MS)
+	return spanDays <= 2 ? 'hour' : spanDays <= 31 ? 'day' : spanDays <= 120 ? 'week' : 'month'
 }
 
-interface BucketConfig {
-	unit: Unit
-	/** Label each bucket by weekday (only the fixed 7-day / today presets). */
-	weekday: boolean
-	tz: string
+export interface BucketLabelOptions {
+	/** The bucket the series was read at; the label only names it. */
+	granularity: Granularity
+	/** Reporting timezone the buckets start in; defaults to UTC. */
+	tz?: string
+	/** The reader's locale, from `i18n.language` on either side; defaults to `en-US`. */
+	locale?: string
+	/** Name each day by its weekday, as the fixed 7-day preset does. */
+	weekday?: boolean
+	/** A month always names its year; without it, only a series that spans two years does. */
+	year?: 'always' | 'auto'
+	/**
+	 * The window's first instant. A bucket starting before it, the week from the Monday before
+	 * the range or the month from its first, is named by the day the range starts instead.
+	 */
+	from?: Date
 }
 
-const bucketByUnit = (
-	points: SeriesPoint[],
-	{ unit, weekday, tz }: BucketConfig
-): ChartBucket[] => {
-	const groups = new Map<string, { date: Date; value: number }>()
-	for (const p of points) {
-		const d = bucketStart(new Date(p.date), unit, tz)
-		const key = d.toISOString()
-		const g = groups.get(key)
-		if (g) {
-			g.value += p.value
-		} else {
-			groups.set(key, { date: d, value: p.value })
-		}
+const yearOf = (at: Date, locale: string, timeZone: string): string =>
+	dateTimeFormat(locale, { year: 'numeric', timeZone }).format(at)
+
+/** One bucket's axis label, from its start in the reporting timezone (or `from`, if later). */
+export const bucketLabel = (
+	start: Date,
+	{
+		granularity,
+		tz: timeZone = DEFAULT_TIMEZONE,
+		locale = DEFAULT_LOCALE,
+		weekday,
+		from,
+	}: BucketLabelOptions,
+	withYear = false
+): string => {
+	const at = from !== undefined && start.getTime() < from.getTime() ? from : start
+	if (granularity === 'minute') {
+		return dateTimeFormat(locale, { hour: '2-digit', minute: '2-digit', timeZone }).format(at)
 	}
-	const sorted = [...groups.values()].sort((a, b) => a.date.getTime() - b.date.getTime())
-	// The label reads each bucket's start in the reporting timezone, so a zone whose day
-	// starts fall on the previous UTC calendar day still labels the correct local date.
-	const years = new Set(
-		sorted.map((g) =>
-			new Intl.DateTimeFormat('en-US', { year: 'numeric', timeZone: tz }).format(g.date)
-		)
-	)
-	const multiYear = years.size > 1
-	const format = (d: Date): string => {
-		if (weekday) {
-			return new Intl.DateTimeFormat('en-US', { weekday: 'short', timeZone: tz }).format(d)
-		}
-		if (unit === 'month') {
-			return new Intl.DateTimeFormat('en-US', {
-				month: 'short',
-				year: multiYear ? 'numeric' : undefined,
-				timeZone: tz,
-			}).format(d)
-		}
-		return new Intl.DateTimeFormat('en-US', {
+	if (granularity === 'hour') {
+		return dateTimeFormat(locale, { hour: 'numeric', timeZone }).format(at)
+	}
+	if (granularity === 'day' && weekday === true) {
+		return dateTimeFormat(locale, { weekday: 'short', timeZone }).format(at)
+	}
+	if (granularity === 'month') {
+		return dateTimeFormat(locale, {
 			month: 'short',
-			day: 'numeric',
-			timeZone: tz,
-		}).format(d)
+			...(withYear ? { year: 'numeric' } : {}),
+			timeZone,
+		}).format(at)
 	}
-	return sorted.map((g) => ({ label: format(g.date), value: g.value }))
+	return dateTimeFormat(locale, { month: 'short', day: 'numeric', timeZone }).format(at)
 }
 
 /**
- * Aggregate a daily series into display buckets sized to the timeframe (day for short
- * ranges, week for ~quarter, month for year+), each with a formatted label. Buckets and
- * labels resolve in `tz` (defaulting to UTC) so the axis lines up with the reporting
- * timezone the series and comparison windows are aligned to. Distinct metrics are summed
- * per bucket (a documented daily-uniques approximation).
+ * The day an hour tick leaves out, so a two-day window's tooltip still says which "9 AM" it is.
+ * Every coarser bucket's tick already identifies itself, and reads undefined here.
  */
-export const bucketSeries = (
-	points: SeriesPoint[],
-	timeframe: TimeframePreset,
-	tz: string = DEFAULT_TIMEZONE
-): ChartBucket[] =>
-	bucketByUnit(points, {
-		unit: UNIT_BY_TIMEFRAME[timeframe],
-		weekday: timeframe === 'last7days' || timeframe === 'today',
-		tz,
-	})
+export const bucketTooltipLabel = (
+	at: Date,
+	{ granularity, tz = DEFAULT_TIMEZONE, locale = DEFAULT_LOCALE }: BucketLabelOptions
+): string | undefined =>
+	granularity === 'hour'
+		? dateTimeFormat(locale, { weekday: 'short', hour: 'numeric', timeZone: tz }).format(at)
+		: undefined
+
+/** Whether a month axis needs its years: always on request, else when the series crosses one. */
+const monthsNeedYear = (dates: Date[], options: BucketLabelOptions): boolean => {
+	if (options.granularity !== 'month') {
+		return false
+	}
+	if (options.year === 'always') {
+		return true
+	}
+	const locale = options.locale ?? DEFAULT_LOCALE
+	const tz = options.tz ?? DEFAULT_TIMEZONE
+	return new Set(dates.map((at) => yearOf(at, locale, tz))).size > 1
+}
+
+/** A bucket's axis label and, for an hour, the tooltip label naming its day. */
+const labelsOf = (
+	start: Date,
+	options: BucketLabelOptions,
+	withYear = false
+): Pick<ChartBucket, 'label' | 'tooltipLabel'> => {
+	const tooltipLabel = bucketTooltipLabel(start, options)
+	return {
+		label: bucketLabel(start, options, withYear),
+		...(tooltipLabel === undefined ? {} : { tooltipLabel }),
+	}
+}
+/** A day holds at most 25 hours, the one a clock falls back in. */
+const MAX_DAY_HOURS = 25
 
 /**
- * Re-date a comparison series onto the primary axis it is already index-aligned to, so both
- * series bucket on identical boundaries: bucketed on its own dates, a previous window can
- * split into a different number of weeks or months than the window it overlays.
+ * The hours after `last` to the end of its day in the reporting timezone, marked upcoming, so a day
+ * under way keeps its whole axis.
  */
-export const onPrimaryAxis = (comparison: SeriesPoint[], axis: SeriesPoint[]): SeriesPoint[] =>
-	comparison.map((point, i) => ({ date: axis[i]?.date ?? point.date, value: point.value }))
-
-const DAY = 86_400_000
-
-const unitForSpan = (spanDays: number): Unit =>
-	spanDays <= 31 ? 'day' : spanDays <= 120 ? 'week' : 'month'
+export const upcomingHours = (last: Date, options: BucketLabelOptions): ChartBucket[] => {
+	const tz = options.tz ?? DEFAULT_TIMEZONE
+	const hourly: BucketLabelOptions = { ...options, granularity: 'hour' }
+	const dayEnd = addDaysInTz(last, 1, tz).getTime()
+	const hours: ChartBucket[] = []
+	let at = startOfHourInTz(new Date(last.getTime() + HOUR_MS), tz)
+	while (at.getTime() < dayEnd && hours.length < MAX_DAY_HOURS) {
+		hours.push({ at: at.toISOString(), ...labelsOf(at, hourly), value: null, upcoming: true })
+		at = startOfHourInTz(new Date(at.getTime() + HOUR_MS), tz)
+	}
+	return hours
+}
 
 /**
- * Bucket a daily series for a custom (arbitrary) range, choosing the bucket unit from
- * the span the way the presets do: short ranges by day, a quarter by week, longer by
- * month. Buckets resolve in `tz` (defaulting to UTC); weekday labels are only used for
- * the fixed 7-day preset, never here.
+ * Labels a series the engine already bucketed and summed, one chart bucket per point named by its
+ * start in the reporting timezone; an hourly series runs on to its day's end via {@link upcomingHours}.
  */
-export const bucketByRange = (
-	points: SeriesPoint[],
-	range: DateRange,
-	tz: string = DEFAULT_TIMEZONE
-): ChartBucket[] => {
-	const spanDays = Math.round((range.end.getTime() - range.start.getTime()) / DAY)
-	return bucketByUnit(points, { unit: unitForSpan(spanDays), weekday: false, tz })
+export const labelSeries = (points: SeriesPoint[], options: BucketLabelOptions): ChartBucket[] => {
+	const dates = points.map((point) => new Date(point.date))
+	const withYear = monthsNeedYear(dates, options)
+	const labeled = points.map(
+		(point, i): ChartBucket => ({
+			at: point.date,
+			...labelsOf(dates[i] ?? new Date(point.date), options, withYear),
+			value: point.value,
+		})
+	)
+	const last = dates.at(-1)
+	return options.granularity === 'hour' && last !== undefined
+		? [...labeled, ...upcomingHours(last, options)]
+		: labeled
 }

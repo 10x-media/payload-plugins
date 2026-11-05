@@ -93,6 +93,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.refPlaceholder]: 'Выберите или введите ID',
 	[keys.impersonated]: 'имперсонация',
 	[keys.impersonatedBy]: 'От имени пользователя действовал',
+	[keys.aboutUser]: 'О пользователе',
 	[keys.deletedUser]: 'Удалённый пользователь',
 	[keys.toggleDetails]: 'Показать или скрыть детали',
 	[keys.sectionSnapshot]: 'Снимок',

@@ -1,19 +1,30 @@
-import type { CityResponse, Reader } from 'maxmind'
+import type { MaxmindReader, MaxmindSdk } from '../../core/sdks'
+import { valueAt } from '../../core/values'
+import { loadMaxmind } from '../../plugin/peers'
 import { clientIpFromHeaders } from '../ingest/clientIp'
-import type { Geo, GeoResolver, GeoResolverOptions } from './geoResolver'
+import {
+	type Geo,
+	type GeoResolver,
+	type GeoResolverOptions,
+	geoOf,
+	loadsMaxmindAtRuntime,
+} from './geoResolver'
 
 export interface MaxmindOptions {
 	dbPath: string
+	/**
+	 * `{ open }` from `maxmind`. Unset, the plugin's `sdks.maxmind` serves, and without either it is
+	 * loaded at runtime, which a standalone build does not ship.
+	 */
+	sdk?: MaxmindSdk
 }
 
 /**
- * Optional MaxMind GeoLite2 resolver. The mmdb and the maxmind lib are loaded
- * lazily on first use. Any failure (lib not installed, file missing/unreadable,
- * lookup error) degrades to empty geo after a single warning, so a missing or
- * unconfigured database never breaks ingestion.
+ * MaxMind GeoLite2 resolver, opened on first use. Any failure degrades to empty geo after one
+ * warning, so a missing or unconfigured database never breaks ingestion.
  */
 export function maxmindResolver(options: MaxmindOptions): GeoResolver {
-	let readerPromise: Promise<Reader<CityResponse>> | undefined
+	let readerPromise: Promise<MaxmindReader> | undefined
 	let warned = false
 
 	const warn = (detail: unknown): null => {
@@ -27,41 +38,42 @@ export function maxmindResolver(options: MaxmindOptions): GeoResolver {
 		return null
 	}
 
-	const getReader = (): Promise<Reader<CityResponse>> => {
+	const getReader = (pluginSdk: MaxmindSdk | undefined): Promise<MaxmindReader> => {
 		if (!readerPromise) {
 			readerPromise = (async () => {
-				const { open } = await import('maxmind')
-				return open<CityResponse>(options.dbPath)
+				const { open } = options.sdk ?? pluginSdk ?? (await loadMaxmind())
+				return open(options.dbPath)
 			})()
 		}
 		return readerPromise
 	}
 
-	return async (headers: Headers, opts?: GeoResolverOptions): Promise<Geo> => {
-		const ip = clientIpFromHeaders(headers, { trustedProxyHops: opts?.trustedProxyHops })
+	const resolve = async (headers: Headers, opts?: GeoResolverOptions): Promise<Geo> => {
+		const ip = clientIpFromHeaders(headers, {
+			trustedProxyHops: opts?.trustedProxyHops,
+			trustedPlatform: opts?.trustedPlatform,
+		})
 		if (!ip) {
 			return {}
 		}
-		let reader: Reader<CityResponse> | null
+		let reader: MaxmindReader
 		try {
-			reader = await getReader()
+			reader = await getReader(opts?.maxmind)
 		} catch (err) {
 			warn(err)
 			return {}
 		}
 		try {
-			const r = reader.get(ip)
-			if (!r) {
-				return {}
-			}
-			return {
-				country: r.country?.iso_code ?? undefined,
-				region: r.subdivisions?.[0]?.iso_code ?? undefined,
-				city: r.city?.names.en ?? undefined,
-			}
+			const found = reader.get(ip)
+			return geoOf({
+				country: valueAt(found, 'country.iso_code'),
+				region: valueAt(found, 'subdivisions.0.iso_code'),
+				city: valueAt(found, 'city.names.en'),
+			})
 		} catch (err) {
 			warn(err)
 			return {}
 		}
 	}
+	return options.sdk ? resolve : loadsMaxmindAtRuntime(resolve)
 }

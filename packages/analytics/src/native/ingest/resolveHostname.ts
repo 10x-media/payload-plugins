@@ -2,16 +2,8 @@ import type { PayloadRequest } from 'payload'
 import { isHostname, normalizeHostname, requestHostname } from './requestHost'
 
 /**
- * Decides the hostname an event is stored under, or null to drop it. `claimed` is what the
- * body sent, which is never trusted on its own; `scope` is the scope the request already
- * resolved to, so a split deployment can validate `Origin` against that tenant's own domains.
- *
- * The answer must be a hostname: it is normalized and then held to the same shape a request
- * host is, and anything else (a slug, a tenant id, free text) drops the event rather than
- * storing per-event text no rollup family can ever be pruned from.
- *
- * Distinct from the binding `HostnameResolver`, which names the hostname a document is read
- * under rather than the one an event is written under.
+ * Hostname to store an event under; null or a non-hostname drops it. `claimed` is untrusted body
+ * input. Not the binding `HostnameResolver`, which names where a document is read.
  */
 export type EventHostnameResolver = (args: {
 	claimed: string | undefined
@@ -20,9 +12,8 @@ export type EventHostnameResolver = (args: {
 }) => string | null | Promise<string | null>
 
 /**
- * `'request'` stores the host the request carried. A list stores the request host only when it
- * is one of those, for a single-site install behind no host validation. A function decides for
- * itself.
+ * `'request'` stores the request's host; a list stores it only when listed, for a single-site
+ * install behind no host validation; a function decides for itself.
  */
 export type HostnameOption = 'request' | string[] | EventHostnameResolver
 
@@ -32,9 +23,8 @@ export type ResolvedHostnameOption =
 	| { kind: 'resolver'; resolve: EventHostnameResolver }
 
 /**
- * Config-time list validation: entries are lowercased here, so the ingest compare is exact.
- * The port is not stripped the way a request host's is, because an entry carrying one would
- * otherwise be accepted and then silently never match what is stored.
+ * Config-time list validation, lowercased so the ingest compare is exact. Ports are not stripped:
+ * an entry carrying one would be accepted and then never match what is stored.
  */
 export const hostnameSet = (values: string[] | undefined, option: string): ReadonlySet<string> => {
 	const hosts = new Set<string>()
@@ -50,6 +40,7 @@ export const hostnameSet = (values: string[] | undefined, option: string): Reado
 	return hosts
 }
 
+/** The `hostname` option checked at config time, in the shape ingest reads it. */
 export const resolveHostnameOption = (
 	option: HostnameOption | undefined
 ): ResolvedHostnameOption => {
@@ -70,7 +61,7 @@ export const resolveHostnameOption = (
 	return { kind: 'list', hosts: hostnameSet(option, 'hostname') }
 }
 
-export interface ResolveEventHostnameArgs {
+interface ResolveEventHostnameArgs {
 	option: ResolvedHostnameOption
 	claimed: string | undefined
 	req: PayloadRequest
@@ -79,9 +70,8 @@ export interface ResolveEventHostnameArgs {
 }
 
 /**
- * The hostname to store for one event, or null to drop it. A resolver that throws drops the
- * event too: ingest is a public path, so a broken lookup loses the event rather than the
- * response.
+ * Hostname to store for one event, or null to drop it. A throwing resolver drops the event too:
+ * on a public path a broken lookup loses the event, not the response.
  */
 export const resolveEventHostname = async ({
 	option,

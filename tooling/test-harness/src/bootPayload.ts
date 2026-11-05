@@ -10,33 +10,38 @@ import {
 	SHARED_POSTGRES_SERVER_ENV,
 	startPostgresContainer,
 } from './db/postgres-container'
+import type { SqliteTestDb } from './db/sqlite'
+import { settleBeforeRelease } from './release'
 
-export type SupportedDb = 'mongo' | 'postgres'
+export type SupportedDb = 'mongo' | 'postgres' | 'sqlite'
 
 /**
- * Mongo can run in-memory (default) or in a real container.
- * Postgres always runs in a real container (matches Payload's own test pattern;
- * no in-process Postgres support).
+ * Where a boot's database lives. Mongo runs in-memory (default) or in a real container;
+ * Postgres always runs in a real container (Payload's own test pattern, no in-process
+ * Postgres); SQLite always runs on a temp file.
  */
-export type TestDbMode = 'memory' | 'container'
+export type TestDbMode = 'memory' | 'container' | 'file'
 
 export interface BootPayloadOptions {
 	plugin: Plugin
 	db: SupportedDb
 	/**
 	 * Mongo only. When omitted, TEST_DB env is consulted ('container' opts in,
-	 * anything else defaults to 'memory'). Postgres always runs containerized.
+	 * anything else defaults to 'memory'). Postgres always runs containerized, SQLite on a file.
 	 */
-	mode?: TestDbMode
+	mode?: Exclude<TestDbMode, 'file'>
 	collections?: Config['collections']
 	seed?: (payload: Payload) => Promise<void>
 	configOverrides?: Partial<Config>
 	/**
 	 * Reuse an existing boot's database (a second Payload instance against one DB, for
 	 * multi-instance tests). Skips starting a database; the attached `stop()` only
-	 * destroys this Payload (the owning boot stops the DB).
+	 * destroys this Payload (the owning boot stops the DB). On SQLite both instances open
+	 * the same file.
 	 */
 	attachTo?: BootedPayload
+	/** Boots without running any `onInit` (the config's or a plugin's), as a jobs worker does. */
+	disableOnInit?: boolean
 }
 
 export interface BootedPayload {
@@ -54,7 +59,7 @@ export interface BootedPayload {
 	stop: () => Promise<void>
 }
 
-type AnyDbHandle = MongoTestDb | MongoContainerDb | PostgresContainerDb
+type AnyDbHandle = MongoTestDb | MongoContainerDb | PostgresContainerDb | SqliteTestDb
 
 /**
  * The slice of node-postgres' `Pool` teardown needs. Payload types `payload.db` as the base
@@ -76,14 +81,83 @@ const isTeardownPool = (value: unknown): value is TeardownPool =>
 const teardownPoolOf = (db: Payload['db']): TeardownPool | undefined =>
 	'pool' in db && isTeardownPool(db.pool) ? db.pool : undefined
 
+/** The libsql client, which `payload.destroy()` leaves open; reachable only structurally. */
+type ClosableClient = { close: () => void }
+
+const isClosableClient = (value: unknown): value is ClosableClient =>
+	typeof value === 'object' &&
+	value !== null &&
+	'close' in value &&
+	typeof value.close === 'function'
+
+const sqliteClientOf = (db: Payload['db']): ClosableClient | undefined =>
+	'client' in db && isClosableClient(db.client) ? db.client : undefined
+
+/**
+ * Releases what one Payload instance opened, once the `onRelease` hooks let its background work
+ * settle: its crons and adapter, the pg pool drizzle's `destroy()` leaves open, and the libsql
+ * client. A boot that failed part way may have no adapter yet.
+ */
+const releaseInstance = async (payload: Payload, db: SupportedDb): Promise<void> => {
+	await settleBeforeRelease(payload)
+	await payload.destroy()
+	const adapter: Payload['db'] | undefined = payload.db
+	if (!adapter) {
+		return
+	}
+	// A per-boot container is SIGKILLed right after, terminating its idle connections (57P01),
+	// so there the handler is enough; on a shared server nothing is killed between boots, so end
+	// the pool, unawaited because a test still holding a checked-out client would hang the await.
+	const pool = teardownPoolOf(adapter)
+	pool?.on('error', () => undefined)
+	if (process.env[SHARED_POSTGRES_SERVER_ENV]) {
+		void pool?.end().catch(() => undefined)
+	}
+	if (db === 'sqlite') {
+		sqliteClientOf(adapter)?.close()
+	}
+}
+
+/** The adapter as given, reporting the instance it is initialized for. */
+const reportingInstance = (
+	adapter: Config['db'],
+	onInit: (payload: Payload) => void
+): Config['db'] => ({
+	...adapter,
+	init: (args) => {
+		onInit(args.payload)
+		return adapter.init(args)
+	},
+})
+
 const resolveMode = (explicit?: TestDbMode): TestDbMode => {
 	if (explicit) return explicit
 	return process.env.TEST_DB === 'container' ? 'container' : 'memory'
 }
 
+const modeFor = (db: SupportedDb, explicit?: TestDbMode): TestDbMode => {
+	if (db === 'postgres') return 'container'
+	if (db === 'sqlite') return 'file'
+	return resolveMode(explicit)
+}
+
+// Loaded on first use, so a run that boots no SQLite never loads libsql's native module.
+const sqliteHarness = () => import('./db/sqlite')
+
 const startDb = async (db: SupportedDb, mode: TestDbMode): Promise<AnyDbHandle> => {
 	if (db === 'postgres') return startPostgresContainer()
+	if (db === 'sqlite') return (await sqliteHarness()).startSqlite()
 	return mode === 'container' ? startMongoContainer() : startMongo()
+}
+
+/** A second adapter on an existing boot's database, so two instances share one store. */
+const attachedAdapter = async (
+	db: SupportedDb,
+	connectionString: string
+): Promise<AnyDbHandle['adapter']> => {
+	if (db === 'postgres') return postgresAdapter({ pool: { connectionString } })
+	if (db === 'sqlite') return (await sqliteHarness()).sqliteTestAdapter(connectionString)
+	return mongooseAdapter({ ensureIndexes: true, url: connectionString })
 }
 
 /** A Mongoose version model, exposed on the adapter as `payload.db.versions[slug]`. */
@@ -138,17 +212,19 @@ let bootSequence = 0
  * One call = one payload + one DB. Use describeForDb to parameterize.
  */
 export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPayload> => {
-	const mode = options.db === 'postgres' ? 'container' : resolveMode(options.mode)
+	if (options.attachTo && options.attachTo.db !== options.db) {
+		throw new Error(
+			`bootPayload: cannot attach a ${options.db} boot to a ${options.attachTo.db} database`
+		)
+	}
+	const mode = options.attachTo?.mode ?? modeFor(options.db, options.mode)
 
 	let adapter: AnyDbHandle['adapter']
 	let connectionString: string
 	let stopDb: () => Promise<void>
 	if (options.attachTo) {
 		connectionString = options.attachTo.connectionString
-		adapter =
-			options.db === 'postgres'
-				? postgresAdapter({ pool: { connectionString } })
-				: mongooseAdapter({ ensureIndexes: true, url: connectionString })
+		adapter = await attachedAdapter(options.db, connectionString)
 		stopDb = async () => undefined
 	} else {
 		const dbHandle = await startDb(options.db, mode)
@@ -159,14 +235,17 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 
 	// Payload's pushDevSchema caches the last-pushed schema in a module-level global and skips
 	// the push when the next boot's schema is identical. Every test boot uses a fresh database,
-	// so a second same-schema boot would otherwise receive no tables. Force the push each boot.
-	if (options.db === 'postgres') {
+	// so a second same-schema boot would otherwise receive no tables. Force the push each boot,
+	// on both drizzle adapters.
+	if (options.db !== 'mongo') {
 		process.env.PAYLOAD_FORCE_DRIZZLE_PUSH = 'true'
 	}
 
+	// Payload never hands back an instance whose init rejected, so the adapter reports it: a
+	// failed boot still has a connection to close and a database to stop.
+	let initialized: Payload | undefined
 	const baseConfig: Config = {
 		secret: 'test-secret-not-for-prod',
-		db: adapter,
 		collections: options.collections ?? [],
 		// Plugins registering richText fields need a config editor or sanitize throws MissingEditorProp
 		editor: lexicalEditor(),
@@ -174,18 +253,32 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 		admin: { importMap: { autoGenerate: false } },
 		telemetry: false,
 		...options.configOverrides,
+		db: reportingInstance(options.configOverrides?.db ?? adapter, (instance) => {
+			initialized = instance
+		}),
 		plugins: [options.plugin, ...(options.configOverrides?.plugins ?? [])],
 	}
 
 	const key = `bootPayload-${bootSequence++}`
-	const payload = await getPayload({ config: buildConfig(baseConfig), key })
-
-	if (options.db !== 'postgres') {
-		await warmVersionCollections(payload)
-	}
-
-	if (options.seed) {
-		await options.seed(payload)
+	let payload: Payload
+	try {
+		payload = await getPayload({
+			config: buildConfig(baseConfig),
+			key,
+			disableOnInit: options.disableOnInit === true,
+		})
+		if (options.db === 'mongo') {
+			await warmVersionCollections(payload)
+		}
+		if (options.seed) {
+			await options.seed(payload)
+		}
+	} catch (err) {
+		if (initialized) {
+			await releaseInstance(initialized, options.db).catch(() => undefined)
+		}
+		await stopDb().catch(() => undefined)
+		throw err
 	}
 
 	return {
@@ -195,17 +288,9 @@ export const bootPayload = async (options: BootPayloadOptions): Promise<BootedPa
 		connectionString,
 		cacheKey: key,
 		stop: async () => {
-			// When attached, only this Payload is destroyed; the owning boot stops the DB.
-			await payload.destroy()
-			// Drizzle's destroy() leaves the pg pool open. A per-boot container is SIGKILLed
-			// right after, terminating its idle connections (57P01), so there the handler is
-			// enough; on a shared server nothing is killed between boots, so end the pool,
-			// unawaited because a test still holding a checked-out client would hang the await.
-			const pool = teardownPoolOf(payload.db)
-			pool?.on('error', () => undefined)
-			if (process.env[SHARED_POSTGRES_SERVER_ENV]) {
-				void pool?.end().catch(() => undefined)
-			}
+			// When attached, only this Payload is released; the owning boot stops the DB, and on
+			// SQLite removes the file once every instance closed its own client.
+			await releaseInstance(payload, options.db)
 			await stopDb()
 		},
 	}

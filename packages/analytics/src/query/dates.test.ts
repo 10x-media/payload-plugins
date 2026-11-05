@@ -55,6 +55,15 @@ describe('parseDayOrInstant', () => {
 		}
 	})
 
+	it('rejects years before 1970 rather than reading 0050 as 1950', () => {
+		for (const raw of ['0050-06-01', '1000-01-01', '1969-12-31', '0099-12-31T10:00:00Z']) {
+			expect(parseDayOrInstant(raw, { timezone: 'UTC', edge: 'start' })).toBeNull()
+		}
+		expect(parseDayOrInstant('1970-01-01', { timezone: 'UTC', edge: 'start' })?.toISOString()).toBe(
+			'1970-01-01T00:00:00.000Z'
+		)
+	})
+
 	it('rejects a day that names no real calendar date', () => {
 		expect(parseDayOrInstant('2026-02-30', { timezone: 'UTC', edge: 'start' })).toBeNull()
 		expect(parseDayOrInstant('2026-13-01', { timezone: 'UTC', edge: 'start' })).toBeNull()

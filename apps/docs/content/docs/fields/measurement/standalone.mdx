@@ -1,0 +1,44 @@
+---
+title: Standalone input
+description: The measurement field's input without a form, for custom admin views and components.
+---
+
+`MeasurementInput` is the same row, unit menu and conversion pipeline the field renders, with no `useField` behind it. Use it inside custom admin views and components where the value lives in your own state. `MeasurementField` renders the same row bound to the document form, so both behave identically.
+
+```tsx
+'use client'
+import { MeasurementInput } from '@10x-media/fields/client'
+import { useState } from 'react'
+
+export const ParcelWeight = () => {
+  const [weight, setWeight] = useState<number | null>(null)
+  return (
+    <MeasurementInput
+      label="Parcel weight"
+      onChange={setWeight}
+      options={{ storageUnit: 'kg', units: ['kg', 'g', 'lb', 'oz'] }}
+      value={weight}
+    />
+  )
+}
+```
+
+`value` and `onChange` carry the number in `storageUnit`, exactly as `measurementField` stores it. The viewer reads and types in their display unit, and every edit is converted back before `onChange` fires.
+
+## Options
+
+`options` takes the same keys as the factory, and only `storageUnit` is required:
+
+- `units`: units offered in the menu. Defaults to every unit of the storage unit's dimension.
+- `preferenceKey`: preference bucket. Defaults to the dimension, so a standalone weight input shares its display unit with every weight field on that key.
+- `fallbackUnit`, `localeDefaults`, `precision` and `custom` work as on the [field](/fields/measurement).
+
+Inside the admin the display unit is the viewer's saved preference, read and written through the plugin's `MeasurementUnitsProvider` like any measurement field. Without the provider the chosen unit lasts for the session only. The plugin-level `measurement.defaultUnits` and `measurement.precision` defaults are resolved per request on the server, so they do not apply here; pass `fallbackUnit` or `precision` explicitly when they matter.
+
+Options are compared by content, so passing an inline object on every render is fine.
+
+## Bounds, label and errors
+
+`min` and `max` are in the storage unit, like the field's. A value outside them shows a message formatted in the viewer's display unit. Pass `error` for your own message, or `showError` to take over the error state entirely.
+
+The remaining props mirror Payload's own `TextInput`: `label`, `description`, `placeholder`, `required`, `localized`, `readOnly`, `className`, `style`, `path`, and `Label`, `Error`, `Description`, `BeforeInput`, `AfterInput` nodes that replace the defaults.

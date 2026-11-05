@@ -1,7 +1,10 @@
 'use client'
 
-import { useAuth, useConfig } from '@payloadcms/ui'
+import { useConfig } from '@payloadcms/ui'
 import { useEffect, useState } from 'react'
+import { apiPath } from '../../plugin/apiPath'
+import { analyticsRoutes } from '../../plugin/routes'
+import { useRequestScope } from '../../ui/data/useRequestScope'
 import { fetchSources, type WireSource } from './fetchSources'
 import {
 	EMPTY_SOURCES,
@@ -10,6 +13,7 @@ import {
 	resolveSourcesState,
 } from './sourcesState'
 
+/** @beta */
 export interface AnalyticsSources {
 	sources: WireSource[] | null
 	defaultId: string | null
@@ -20,44 +24,36 @@ export interface AnalyticsSources {
 }
 
 /**
- * Fetches the caller-scope source list for widget config pickers, sharing the
- * per-user cache `fetchSources` already keeps. `sources` and `defaultId` stay
- * null until the fetch resolves, on a failed fetch, or when there is no
- * authenticated user yet; consumers fall back to their static option list in
- * that window, and `loading`/`error` tell those two windows apart. Sources
- * fetched for a previous user are never returned while a new user's fetch is
- * pending.
+ * Caller-scope source list for config pickers; `sources` stays null while pending, failed or
+ * signed out, and a previous user's or tenant's list never shows while a new scope loads.
+ *
+ * @beta
  */
 export const useAnalyticsSources = (): AnalyticsSources => {
-	const { user } = useAuth()
-	const {
-		config: {
-			routes: { api },
-			serverURL,
-		},
-	} = useConfig()
-	const userKey = String(user?.id ?? '')
+	const { config } = useConfig()
+	const url = apiPath(config, analyticsRoutes(config).sources)
+	const scope = useRequestScope()
 	const [state, setState] = useState<KeyedSources>({ key: '', data: EMPTY_SOURCES })
 
 	useEffect(() => {
-		if (!userKey) {
+		if (!scope) {
 			setState({ key: '', data: EMPTY_SOURCES })
 			return
 		}
 		let cancelled = false
-		fetchSources(serverURL ?? '', api, userKey)
+		fetchSources(url, scope)
 			.then(({ defaultId, sources }) => {
 				if (!cancelled) {
-					setState({ key: userKey, data: { defaultId, error: false, loading: false, sources } })
+					setState({ key: scope, data: { defaultId, error: false, loading: false, sources } })
 				}
 			})
 			.catch(() => {
-				if (!cancelled) setState({ key: userKey, data: FAILED_SOURCES })
+				if (!cancelled) setState({ key: scope, data: FAILED_SOURCES })
 			})
 		return () => {
 			cancelled = true
 		}
-	}, [api, serverURL, userKey])
+	}, [url, scope])
 
-	return resolveSourcesState(state, userKey)
+	return resolveSourcesState(state, scope)
 }

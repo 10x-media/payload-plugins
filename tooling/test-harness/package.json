@@ -24,6 +24,16 @@
 			"development": "./src/db/postgres-container.ts",
 			"types": "./src/db/postgres-container.ts",
 			"default": "./src/db/postgres-container.ts"
+		},
+		"./db/sqlite": {
+			"development": "./src/db/sqlite.ts",
+			"types": "./src/db/sqlite.ts",
+			"default": "./src/db/sqlite.ts"
+		},
+		"./release": {
+			"development": "./src/release.ts",
+			"types": "./src/release.ts",
+			"default": "./src/release.ts"
 		}
 	},
 	"scripts": {
@@ -35,6 +45,7 @@
 	"dependencies": {
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
+		"@payloadcms/db-sqlite": "catalog:",
 		"@payloadcms/richtext-lexical": "catalog:",
 		"mongodb-memory-server": "^10.1.0",
 		"testcontainers": "^12.0.1"

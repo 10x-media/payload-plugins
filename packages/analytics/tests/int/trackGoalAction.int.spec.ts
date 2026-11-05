@@ -1,17 +1,17 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
-import type { MetricKey } from '../../src/core/contract'
+import type { MetricKey, MetricValues } from '../../src/core/contract'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import type { GoalActionRunArgs } from '../../src/goals/trackGoalAction'
 import { GOAL_ACTION_TYPE, trackGoalAction } from '../../src/goals/trackGoalAction'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
-import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { native } from '../../src/native/nativeAdapter'
+import { DAY_MS } from '../../src/timeframe/tz'
 import { ACTION_HOST_SLUG, actionHost } from './actionHost'
+import { storedHits } from './nativeHelpers'
 
-const DAY_MS = 86_400_000
 const HOST = 'shop.example'
 
 const configGoals: Goal[] = [{ slug: 'book-demo', name: 'Book a demo', match: { kind: 'goal' } }]
@@ -23,8 +23,11 @@ describeForDb('analytics trackGoalAction', {}, (db) => {
 	let booted: BootedPayload
 	let range: { start: Date; end: Date }
 
-	const totalsFor = async (path: string): Promise<Partial<Record<MetricKey, number>>> => {
-		const result = await adapter.query({ path, metrics, dateRange: range }, {})
+	const totalsFor = async (path: string): Promise<MetricValues> => {
+		const result = await adapter.query(
+			{ path, metrics, dateRange: range },
+			{ payload: booted.payload }
+		)
 		return result.totals ?? {}
 	}
 
@@ -43,6 +46,7 @@ describeForDb('analytics trackGoalAction', {}, (db) => {
 			collections: [actionHost()],
 			plugin: analytics({
 				adapters: [adapter],
+				capture: { gate: 'off' },
 				goals: { collection: true, defaults: configGoals },
 			}),
 		})
@@ -61,12 +65,9 @@ describeForDb('analytics trackGoalAction', {}, (db) => {
 
 		expect(await totalsFor('/forms/demo-form')).toMatchObject({ conversions: 1, revenue: 25 })
 
-		const stored = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/forms/demo-form' } },
-		})
-		expect(stored.docs).toHaveLength(1)
-		expect((stored.docs[0] as { props?: Record<string, unknown> }).props).toMatchObject({
+		const stored = await storedHits(booted.payload, { path: { equals: '/forms/demo-form' } })
+		expect(stored).toHaveLength(1)
+		expect(stored[0]?.props).toMatchObject({
 			formId: 'demo-form',
 			formTitle: 'Demo request',
 			submissionId: 'sub-1',
@@ -98,6 +99,32 @@ describeForDb('analytics trackGoalAction', {}, (db) => {
 			conversions: 1,
 			revenue: 1500,
 		})
+	})
+
+	it(`records a submission as no visitor's when identity says 'none', on ${db}`, async () => {
+		const submitter = (consented: boolean): PayloadRequest =>
+			({
+				payload: booted.payload,
+				headers: new Headers({
+					host: HOST,
+					'x-forwarded-for': '9.9.9.9',
+					'user-agent': 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) Mobile/15E148',
+					...(consented ? { cookie: 'measured=1' } : {}),
+				}),
+			}) as unknown as PayloadRequest
+		const action = trackGoalAction({
+			hostname: HOST,
+			identity: ({ req }) =>
+				req?.headers.get('cookie')?.includes('measured=1') ? 'request' : 'none',
+		})
+		const form = { id: 'identity-form', title: 'Identity' }
+		await action.run(runArgs({ form, config: { goal: 'book-demo' }, req: submitter(true) }))
+		await action.run(runArgs({ form, config: { goal: 'book-demo' }, req: submitter(false) }))
+
+		expect(await totalsFor('/forms/identity-form')).toMatchObject({ conversions: 2 })
+		const stored = await storedHits(booted.payload, { path: { equals: '/forms/identity-form' } })
+		expect(stored.map((hit) => hit.v === '')).toEqual([false, true])
+		expect(stored.map((hit) => hit.device ?? '')).toEqual(['mobile', ''])
 	})
 
 	it('stores the action config as a block under the action type', async () => {
@@ -141,20 +168,18 @@ describeForDb('analytics trackGoalAction hostname policy', {}, (db) => {
 	const reqWithHost = (host: string): PayloadRequest =>
 		({ payload: booted.payload, headers: new Headers({ host }) }) as unknown as PayloadRequest
 
-	const hostnameOf = async (path: string): Promise<string | undefined> => {
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: path } },
-			pagination: false,
-		})
-		return (docs as unknown as Array<{ hostname: string }>)[0]?.hostname
-	}
+	const hostnameOf = async (path: string): Promise<unknown> =>
+		(await storedHits(booted.payload, { path: { equals: path } }))[0]?.hostname
 
 	beforeAll(async () => {
 		booted = await bootPayload({
 			db,
 			configOverrides: { serverURL: 'https://cms.example' },
-			plugin: analytics({ adapters: [adapter], goals: { defaults: configGoals } }),
+			plugin: analytics({
+				adapters: [adapter],
+				capture: { gate: 'off' },
+				goals: { defaults: configGoals },
+			}),
 		})
 	}, 240_000)
 
@@ -195,7 +220,11 @@ describeForDb('analytics trackGoalAction with nothing to attribute to', {}, (db)
 	beforeAll(async () => {
 		booted = await bootPayload({
 			db,
-			plugin: analytics({ adapters: [native()], goals: { defaults: configGoals } }),
+			plugin: analytics({
+				adapters: [native()],
+				capture: { gate: 'off' },
+				goals: { defaults: configGoals },
+			}),
 		})
 	}, 240_000)
 
@@ -218,12 +247,7 @@ describeForDb('analytics trackGoalAction with nothing to attribute to', {}, (db)
 		await expect(action.run(args)).resolves.toBeUndefined()
 		await expect(action.run({ ...args, submissionId: 'sub-hostless-2' })).resolves.toBeUndefined()
 
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/hostless' } },
-			pagination: false,
-		})
-		expect(docs).toHaveLength(0)
+		expect(await storedHits(booted.payload, { path: { equals: '/hostless' } })).toHaveLength(0)
 		expect(warn).toHaveBeenCalledTimes(1)
 		warn.mockRestore()
 	})

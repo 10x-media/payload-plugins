@@ -1,0 +1,209 @@
+---
+title: Customizing the admin
+description: Restyle the plugin's admin surfaces with tokens and classes, change a built-in widget, replace the analytics view's body, draw your own flags, and rename labels.
+---
+
+The plugin's admin surfaces (the [analytics view](/analytics/analytics-view), the [dashboard widgets](/analytics/widgets) and the [display fields](/analytics/display-fields)) follow Payload's own look and can be changed at every level: a color through a token, a piece through its class, a built-in widget through `widgets.overrides`, the view's body through `view.Component`, the flags through `countryFlags`, and every label through the [translations](/analytics/reference/translations).
+
+The tokens and the documented classes are stable within a major release. `widgets.overrides`, `view.Component`, the view's sections and `countryFlags.Component` are marked `@beta`: they may change in a minor release while these surfaces settle ([Stability](/analytics/reference/stability)).
+
+## Styling
+
+Every admin surface the plugin draws (the analytics view, the widgets, the display fields and its own field components) reads one stylesheet, which each component imports itself. Its rules sit in Payload's `payload` [CSS layer](https://payloadcms.com/docs/admin/customizing-css): they outrank Payload's own defaults, which sit in `payload-default`, and lose to any rule in your admin CSS outside a layer, whatever its specificity. To restyle a piece, write an ordinary rule for its class in your admin stylesheet.
+
+```scss title="app/(payload)/custom.scss"
+:root {
+  --analytics-chart-1: #7c3aed;
+  --analytics-card-radius: 8px;
+}
+
+.analytics-widget__title {
+  letter-spacing: 0;
+}
+```
+
+### Tokens
+
+The tokens are custom properties on `:root`, each built on Payload's theme variables, so light and dark mode follow the admin's theme:
+
+| Token | Default | What it styles |
+|---|---|---|
+| `--analytics-chart-1` | `--theme-success-500` | Trend lines and areas, solid bars, the realtime sparkline |
+| `--analytics-chart-comparison` | `--theme-elevation-500` | The previous-period line and its legend swatch |
+| `--analytics-card-bg`, `--analytics-card-border` | `--theme-elevation-50`, `--theme-border-color` | Widget cards and the view's cards and panels |
+| `--analytics-card-radius`, `--analytics-card-padding` | `--style-radius-m`, `0.8` of `--base` | The same cards |
+| `--analytics-bar-fill` | `--color-success-600`, from the base palette so light text reads on it in either theme | A solid bar |
+| `--analytics-bar-label-on-fill`, `--analytics-bar-label` | `--color-base-0` (white), `--theme-elevation-800` | A bar's label where it sits on the bar, and past the bar's end |
+| `--analytics-delta-up-fg`, `--analytics-delta-up-bg` | `--theme-success-800` on `--theme-success-150` | A period-over-period change for the better (for bounce rate, a fall) |
+| `--analytics-delta-down-fg`, `--analytics-delta-down-bg` | `--theme-error-800` on `--theme-error-150` | A change for the worse |
+| `--analytics-text-muted` | `--theme-elevation-600` | Captions, notes and other muted text |
+
+### Classes
+
+The classes are BEM, one block per piece: `analytics-card` (the card chrome), `analytics-metric` (one metric's label, number and delta, on the view's overview, the document panel and stat fields), `analytics-widget`, `analytics-view`, `analytics-panel` (the Analytics tab), `analytics-stat` (stat fields), `analytics-chart` (the trend charts), `analytics-table` (every list and table; a ranked one also carries `analytics-bars`, its rows `analytics-bars__row` and each label cell's bar `analytics-bars__track`), `analytics-delta` (inside it, the change is Payload's `Pill` with `analytics-delta__change--up`, `--down` or `--none`), `analytics-live` (the live counter), `analytics-empty-state` and `analytics-sr-only`. Elements and modifiers hang off them: `analytics-widget__title`, `analytics-bars--soft`, `analytics-table__sort`.
+
+The stylesheet places everything with logical properties (`margin-inline`, `inset-inline-start`), so a right-to-left admin mirrors without rules of its own; the few that need one use `:dir(rtl)`. The inline styles the plugin writes are custom properties a render alone knows: a row's share of its track (`--analytics-bar`), a chart's height (`--analytics-chart-height`), and the position of a tooltip, a chart's dots, cursor and axis ticks (`--analytics-x`, `--analytics-y`, shares of the plot). Its own field components (the widget drawer's pickers, the date range, the goal fields) also carry the field's `admin.style` and `admin.width` inline, merged the way Payload's own fields merge them (`mergeFieldStyles`), so a width you give such a field in a `fields` override applies as it would to a Payload field.
+
+### Outside the admin
+
+`BarList` and `TrendChart` from `@10x-media/analytics/client` import the stylesheet as well. Drawn outside the admin, where Payload's theme variables are absent, they fall back to neutral colors; where your bundler does not follow a package's stylesheet imports, import `@10x-media/analytics/styles.css` yourself. The package declares `"sideEffects": ["*.css"]`, so a production build keeps those imports.
+
+## A built-in widget
+
+`widgets.overrides` changes a built-in widget by its slug, keeping its place in the dashboard's widget list and everything it stores. Each entry takes any of three keys:
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  widgets: {
+    overrides: {
+      // Your component in place of the plugin's.
+      'analytics-metric': { Component: '/components/BigNumber#BigNumber' },
+      // A name of your own in the dashboard's widget list.
+      'analytics-breakdown-countries': { label: { en: 'Where people come from', de: 'Herkunft' } },
+      // The settings form, given the plugin's own fields.
+      'analytics-trend': {
+        fields: ({ defaultFields }) => [...defaultFields, { name: 'note', type: 'text' }],
+      },
+    },
+  },
+})
+```
+
+- **`Component`** replaces the widget's component path. Write it as a server component: Payload hands a widget's server props to server components only, so a server component receives the same props the plugin's own does (Payload's widget props such as `widgetData`, `widgetSlug` and `req`, and the plugin's `view` and `countryFlags`, with any `serverProps` of your own added; `AnalyticsWidgetProps` from `@10x-media/analytics/rsc` types them), while a client component in its place receives only its `clientProps` and none of the widget's data. To draw it in the browser, render your client component from a small server component that reads the widget first. Payload renders it like any widget component, so run `payload generate:importmap` after setting it.
+- **`label`** is the widget's name in the widget list: a string, a map keyed by admin language, or a label function.
+- **`fields`** receives `{ defaultFields }`, the widget's own fields, and returns the form, the same shape Payload's form builder and search plugins take for their `fields` overrides. Keep the fields the widget reads (`title`, `metric`, `timeframe`, `range`, `compare`, `windowMinutes`, `limit`, `dataSource`, `filter`) unless your component reads its own instead.
+
+An override is checked at boot: a slug that names no built-in widget (the `BuiltInWidgetSlug` type lists them), a key other than these three, a component that is neither a path nor `{ path, exportName?, clientProps?, serverProps? }`, or a `fields` that is not a function fails it. A widget of your own goes in [`widgets.register`](/analytics/widgets#custom-widgets). A widget listed in `widgets.disabled` stays out whatever its override says, and the capability gate still decides whether a built-in widget registers at all.
+
+## The analytics view's body
+
+`view.Component` replaces the view's body and keeps its server shell: the shell still checks `access.view`, resolves the scope, the sources, the goals and the timezone, and hands your component the same `AnalyticsViewClientProps` the plugin's own body gets. It is a client component; the plugin lists it in `admin.dependencies`, so `payload generate:importmap` adds it to the import map. A path the import map does not hold yet falls back to the plugin's own body.
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  view: { Component: '/components/MyAnalyticsView#MyAnalyticsView' },
+})
+```
+
+Compose it from the sections `@10x-media/analytics/client` exports. `ViewRoot` is the view's frame: the title and scope caption, the URL state, the reads, the refresh, the empty state of a scope with no source, and the exclusion panel. Whatever goes inside reads the view through `useView`, and each `View*` section is wired to it and keeps its own error boundary:
+
+```tsx title="components/MyAnalyticsView.tsx"
+'use client'
+
+import {
+  type AnalyticsViewClientProps,
+  Card,
+  Toolbar,
+  useView,
+  ViewBreakdowns,
+  ViewRoot,
+  ViewTrend,
+} from '@10x-media/analytics/client'
+
+function Visitors() {
+  const { queries } = useView()
+  const visitors = queries.cards.data?.result.totals?.visitors
+  return <Card as="section">{visitors ?? '-'}</Card>
+}
+
+export function MyAnalyticsView(props: AnalyticsViewClientProps) {
+  return (
+    <ViewRoot {...props}>
+      <Toolbar />
+      <Visitors />
+      <ViewTrend />
+      <ViewBreakdowns />
+    </ViewRoot>
+  )
+}
+```
+
+`ViewRoot` issues the view's four reads (cards, trend, breakdown, goals) whichever sections you render, so leaving a section out saves no read.
+
+| Export | What it is |
+|---|---|
+| `ViewRoot` | The frame and the context the sections read. |
+| `Toolbar` | Source, range, Compare, Refresh, Site select, notes and filter chips. Reads the context. |
+| `ViewOverview`, `ViewTrend`, `ViewBreakdowns`, `ViewGoals`, `ViewRealtime` | The sections, wired to the context, each in its own error boundary. |
+| `useView` | The context, a `ViewContextValue`: below. |
+| `Card`, `MetricCard`, `DataTable`, `ChartDataTable` | The building blocks every surface draws: the card chrome, a metric's label and number, the ranked table with sort headers and bars, and a chart's hidden data table. |
+
+`useView()` answers:
+
+| Member | What it is |
+|---|---|
+| `state`, `stateKey` | The view's URL state (range, source, metric, tab, grouping, filters, order, limit, comparison) and a key that changes with it. |
+| `write(next)` | Writes a new state to the URL, as every control does. |
+| `source` | The selected source, with its serialized capabilities. |
+| `gate` | A `ReadonlyViewGate`: what the source serves here (`metrics`, `granularities`, `maxRangeDays`, `canCompare`, `canHour`, `goals`, `realtime`). Read it to decide what to offer; it is not yours to change. |
+| `range`, `now` | The window being read, as days in the reporting timezone, and the view's clock. |
+| `queries`, `answers` | The four reads and what each answered. |
+| `refresh` | The refresh the toolbar's button runs. |
+
+The building blocks are exported because a section of your own should look and read like the ones beside it: same card, same table semantics, same hidden data table for a chart. The view's server shell is the plugin's own: its component, `AnalyticsView`, is exported only for the import map (`@internal`). To replace the whole page rather than its body, set `view: false` and register a Payload view of your own that reads through the [query endpoint](/analytics/reference/endpoints#query-endpoint) and `fetchQuery`, the same way the view does.
+
+## Country flags
+
+A flag is drawn beside a country name: in the view's geography rows, the countries widget, the document panel and a country filter chip. `countryFlags` is a top-level option rather than a view option, because the widgets and the panel draw flags with or without the view:
+
+| `countryFlags` | What is drawn |
+|---|---|
+| `true` (default) | The plugin's flags, from [`country-flag-icons`](https://www.npmjs.com/package/country-flag-icons), served by its own [flag route](/analytics/reference/endpoints#flags-endpoint), one lazy, immutably cached SVG per row, so the admin bundle carries no artwork. |
+| `false` | No flag anywhere; the name stands alone, and the route is not mounted. |
+| `{ Component }` | Your component, below. The route is not mounted. |
+
+`countryFlags: { Component }` draws your component wherever a flag goes. It is a client component receiving `{ code }`, the two-letter country code in capitals:
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  countryFlags: { Component: '/components/Flag#Flag' },
+})
+```
+
+```tsx title="components/Flag.tsx"
+'use client'
+
+import type { CountryFlagProps } from '@10x-media/analytics/client'
+
+const REGIONAL = 0x1f1e6 - 65
+
+export function Flag({ code }: CountryFlagProps) {
+  const emoji = String.fromCodePoint(...[...code].map((letter) => REGIONAL + letter.charCodeAt(0)))
+  return <span aria-hidden="true">{emoji}</span>
+}
+```
+
+The view's shell and the document panel look it up in the import map once and hand the component down, with any `clientProps` you gave it, and each row renders it with its own code; a widget, rendered on the server, renders it once per row. It has to be a client component: a server component reaches the widgets only, and the view and the panel draw no flag for it (a warning says so once). It reaches the import map through `admin.dependencies`. Keep it decorative: the country's name stands beside it.
+
+## Labels
+
+Every label the plugin writes is a typed translation, so renaming a metric, a channel or the settings nav group (`adminGroup`) is one entry in the `translations` option, and it applies everywhere the label appears:
+
+```ts title="payload.config.ts"
+import { analytics } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { keys } from '@10x-media/analytics/i18n'
+
+export const plugin = analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  translations: { en: { [keys.metricAvgDuration]: 'Reading time' } },
+})
+```
+
+A single field can take its own label instead: the [display fields](/analytics/display-fields#labels) take `label` and `labels`, and the view's nav link takes `view.navLabel`. [Translations](/analytics/reference/translations) lists the keys, the counted phrases and the languages.

@@ -39,12 +39,16 @@ describeForDb('analytics sources endpoint', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [memoryAdapter()],
-				scopeResolver: ({ req }) => {
-					const email = (req.user as { email?: string })?.email ?? ''
-					if (email === BROKEN_EMAIL) throw new Error('scope resolution boom')
-					return scopeByEmail[email] ?? null
+				capture: { gate: 'off' },
+				scope: {
+					member: () => true,
+					resolve: ({ req }) => {
+						const email = (req.user as { email?: string })?.email ?? ''
+						if (email === BROKEN_EMAIL) throw new Error('scope resolution boom')
+						return scopeByEmail[email] ?? null
+					},
 				},
-				access: { platformRead: () => false },
+				access: { crossScope: () => false },
 				providers: { collection: true },
 			}),
 		})
@@ -83,15 +87,14 @@ describeForDb('analytics sources endpoint', {}, (db) => {
 		expect(res.headers.get('cache-control')).toBe('private, no-store')
 	})
 
-	it('lists config adapters with serialized capabilities and reports the registry default', async () => {
+	// A config adapter is the platform's own. On an install running the providers collection,
+	// a tenant reads through its own documents, so one holding none reads through nothing.
+	it('keeps the config adapters away from a tenant without `platformAdapter`', async () => {
 		const res = await handler(reqFor(userC))
 		expect(res.status).toBe(200)
 		const body = (await res.json()) as SourcesBody
-		expect(body.defaultId).toBe('memory')
-		const memory = body.sources.find((s) => s.id === 'memory')
-		expect(memory).toBeDefined()
-		expect(memory?.kind).toBe('config')
-		expect(Array.isArray(memory?.capabilities.metrics)).toBe(true)
+		expect(body.sources).toEqual([])
+		expect(body.defaultId).toBeNull()
 	})
 
 	it("includes the scope's own runtime providers under instance ids", async () => {
@@ -114,6 +117,10 @@ describeForDb('analytics sources endpoint', {}, (db) => {
 			expect(source).toBeDefined()
 			expect(source?.label).toBe('A plausible')
 			expect(source?.kind).toBe('runtime')
+			expect(Array.isArray(source?.capabilities.metrics)).toBe(true)
+			// The scope's own document is the whole listing: the config adapter stays platform-only.
+			expect(body.sources.map((s) => s.id)).toEqual([`plausible:${doc.id}`])
+			expect(body.defaultId).toBe(`plausible:${doc.id}`)
 		} finally {
 			await booted.payload.delete({ collection: SLUG as never, id: doc.id, overrideAccess: true })
 		}
@@ -162,9 +169,9 @@ describeForDb('analytics sources endpoint - null scope gating', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [memoryAdapter()],
-				scopeResolver: () => null,
+				scope: { member: () => true, resolve: () => null },
 				access: {
-					platformRead: ({ req }) =>
+					crossScope: ({ req }) =>
 						(req.user as { email?: string } | null)?.email === 'platform@t.dev',
 				},
 			}),
@@ -191,7 +198,7 @@ describeForDb('analytics sources endpoint - null scope gating', {}, (db) => {
 		expect(body.sources).toEqual([])
 	})
 
-	it('answers the full registry for a platformRead-granted user', async () => {
+	it('answers the full registry for a reader crossScope grants', async () => {
 		const res = await handler(reqFor(platformUser))
 		expect(res.status).toBe(200)
 		const body = (await res.json()) as SourcesBody

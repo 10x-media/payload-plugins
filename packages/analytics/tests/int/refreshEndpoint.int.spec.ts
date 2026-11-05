@@ -3,10 +3,13 @@ import type { Endpoint, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { AnalyticsAdapter, AnalyticsQuery } from '../../src/core/contract'
 import { analytics } from '../../src/index'
-import { REFRESH_PATH } from '../../src/plugin/paths'
+import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { getRuntime } from '../../src/plugin/runtime'
 import { createEpochStore } from '../../src/surfacing/epoch'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { handlerAt } from './endpointHelpers'
+
+const routes = routePaths(DEFAULT_ROUTE_BASE)
 
 type ErrorBody = { error: { code: string; message: string; param?: string } }
 
@@ -49,11 +52,14 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [memoryAdapter()],
-				scopeResolver: ({ req }) =>
-					scopeByEmail[(req.user as { email?: string } | null)?.email ?? ''] ?? null,
+				scope: {
+					member: () => true,
+					resolve: ({ req }) =>
+						scopeByEmail[(req.user as { email?: string } | null)?.email ?? ''] ?? null,
+				},
 				access: {
 					read: ({ req }) => (req.user as { email?: string } | null)?.email !== 'noread@t.dev',
-					platformRead: ({ req }) =>
+					crossScope: ({ req }) =>
 						(req.user as { email?: string } | null)?.email === 'platform@t.dev',
 				},
 			}),
@@ -64,15 +70,7 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 		await booted.stop()
 	})
 
-	const handler = () => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === REFRESH_PATH
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('refresh endpoint not registered')
-		}
-		return endpoint.handler
-	}
+	const handler = () => handlerAt(booted.payload, routes.refresh)
 
 	const call = (opts: { email?: string | null; body?: unknown } = {}): Promise<Response> => {
 		const user = opts.email === null ? null : { id: 1, email: opts.email ?? 'a@t.dev' }
@@ -80,7 +78,7 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 			handler()({
 				payload: booted.payload,
 				user,
-				url: `http://localhost/api${REFRESH_PATH}`,
+				url: `http://localhost/api${routes.refresh}`,
 				headers: new Headers(),
 				...(opts.body === undefined
 					? {}
@@ -94,7 +92,7 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 
 	it(`registers a POST endpoint under the api route on ${db}`, () => {
 		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === REFRESH_PATH
+			(e): e is Endpoint => typeof e === 'object' && e.path === routes.refresh
 		)
 		expect(endpoint?.method).toBe('post')
 	})
@@ -156,12 +154,24 @@ describeForDb('analytics refresh endpoint', {}, (db) => {
 	})
 
 	it(`lets a platform reader name another scope on ${db}`, async () => {
+		// Something of tenant-c's is cached, so naming it has something to retire.
+		await getRuntime(booted.payload)?.cache?.store.set(
+			'tenant-c-read',
+			{ rows: [], meta: { provider: 'memory', fetchedAt: new Date().toISOString() } },
+			{ ttlSeconds: 60, staleSeconds: 60, scope: 'tenant-c' }
+		)
 		const before = await epochOf('tenant-c')
 		const res = await call({ email: 'platform@t.dev', body: { scope: '  tenant-c  ' } })
 		expect(res.status).toBe(200)
 		const { epoch } = (await res.json()) as { epoch: string }
 		expect(epoch).not.toBe(before)
 		expect(await epochOf('tenant-c')).toBe(epoch)
+	})
+
+	it(`bumps nothing for a named scope nothing belongs to on ${db}`, async () => {
+		const res = await call({ email: 'platform@t.dev', body: { scope: 'tenant-nobody' } })
+		expect(res.status).toBe(200)
+		expect(await booted.payload.kv.get('analytics:epoch:s:tenant-nobody')).toBeNull()
 	})
 
 	// A debounce of invalidation: the second press answers the token the first one wrote,

@@ -93,6 +93,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.refPlaceholder]: 'Pilih, atau ketik ID',
 	[keys.impersonated]: 'ditiru',
 	[keys.impersonatedBy]: 'Ditiru oleh',
+	[keys.aboutUser]: 'Tentang pengguna ini',
 	[keys.deletedUser]: 'Pengguna dihapus',
 	[keys.toggleDetails]: 'Tampilkan atau sembunyikan detail',
 	[keys.sectionSnapshot]: 'Snapshot',

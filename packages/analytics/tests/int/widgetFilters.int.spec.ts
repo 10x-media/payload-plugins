@@ -15,24 +15,31 @@ import { trackServerEvent } from '../../src/native/ingest/serverTrack'
 import { native } from '../../src/native/nativeAdapter'
 import { readForWidget } from '../../src/widgets/readForWidget'
 import { type BreakdownRow, readForWidgetBreakdown } from '../../src/widgets/readForWidgetBreakdown'
+import { aroundNow } from './nativeHelpers'
+import { readerRequest } from './readerRequest'
 
 /** Ranking ties are not ordered by the adapter, so compare rows by label. */
 const byLabel = (rows: BreakdownRow[]): BreakdownRow[] =>
 	[...rows].sort((a, b) => a.label.localeCompare(b.label))
 
-const DAY_MS = 86_400_000
 const HOST = 'shop.example'
 const UA = 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) Chrome/125.0 Safari/537.36'
 
 /**
- * Server events stamp themselves with the wall clock, so every read takes an explicit
- * window around the seeding instead of a preset: a day back holds today's rollup bucket
- * whatever the hour, and a minute ahead holds the events just written.
+ * The metric widget's pageviews over `range`. Server events stamp the wall clock, so reads take an
+ * explicit window around now (`aroundNow`) rather than a preset.
  */
-const windowAround = (now: number): DateRange => ({
-	start: new Date(now - DAY_MS),
-	end: new Date(now + 60_000),
-})
+const readPageviews = (req: PayloadRequest, range: DateRange, filters?: AnalyticsFilter[]) =>
+	readForWidget({
+		req,
+		metrics: ['pageviews'],
+		timeframe: 'today',
+		now: new Date(),
+		range,
+		timezone: 'UTC',
+		comparison: false,
+		...(filters ? { filters } : {}),
+	})
 
 interface Seed {
 	path: string
@@ -42,9 +49,8 @@ interface Seed {
 }
 
 /**
- * A pageview through the native adapter's server ingest, attributed from the platform geo
- * headers a hosted deployment sets. Seeding this way rather than writing rows directly is
- * the point of the country cases: `country` has to survive the ingest to be filterable.
+ * A pageview through native's server ingest with a hosted deployment's geo headers, not a direct
+ * row write: `country` has to survive ingest to be filterable.
  */
 const seed = (booted: BootedPayload, event: Seed): Promise<void> =>
 	trackServerEvent(
@@ -55,7 +61,7 @@ const seed = (booted: BootedPayload, event: Seed): Promise<void> =>
 				payload: booted.payload,
 				headers: new Headers({
 					'x-vercel-ip-country': event.country,
-					'x-forwarded-for': event.ip,
+					'x-real-ip': event.ip,
 					'user-agent': UA,
 					...(event.tenant ? { 'x-tenant': event.tenant } : {}),
 				}),
@@ -84,32 +90,28 @@ describeForDb('widget filters against the native adapter', {}, (db) => {
 	let range: DateRange
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+		booted = await bootPayload({
+			plugin: analytics({
+				adapters: [native()],
+				capture: { gate: 'off' },
+				trustedPlatform: 'vercel',
+			}),
+			db,
+		})
 		await seedAll(booted, traffic)
-		range = windowAround(Date.now())
+		range = aroundNow()
 	}, 240_000)
 
 	afterAll(async () => {
 		await booted.stop()
 	})
 
-	const req = () => ({ payload: booted.payload }) as unknown as PayloadRequest
-
 	const metric = (filters?: AnalyticsFilter[]) =>
-		readForWidget({
-			req: req(),
-			metrics: ['pageviews'],
-			timeframe: 'today',
-			now: new Date(),
-			range,
-			timezone: 'UTC',
-			comparison: false,
-			...(filters ? { filters } : {}),
-		})
+		readPageviews(readerRequest(booted.payload), range, filters)
 
 	const breakdown = (filters?: AnalyticsFilter[]) =>
 		readForWidgetBreakdown({
-			req: req(),
+			req: readerRequest(booted.payload),
 			metric: 'pageviews',
 			dimension: 'page',
 			timeframe: 'today',
@@ -134,16 +136,16 @@ describeForDb('widget filters against the native adapter', {}, (db) => {
 		const all = await breakdown()
 		expect(all.status).toBe('ok')
 		expect(byLabel(all.rows)).toEqual([
-			{ label: '/a', value: 3 },
-			{ label: '/blog/deep', value: 1 },
-			{ label: '/blog/intro', value: 1 },
+			{ label: '/a', dimensionValue: '/a', value: 3 },
+			{ label: '/blog/deep', dimensionValue: '/blog/deep', value: 1 },
+			{ label: '/blog/intro', dimensionValue: '/blog/intro', value: 1 },
 		])
 
 		const american = await breakdown([{ dimension: 'country', operator: 'eq', value: 'US' }])
 		expect(american.status).toBe('ok')
 		expect(byLabel(american.rows)).toEqual([
-			{ label: '/a', value: 2 },
-			{ label: '/blog/deep', value: 1 },
+			{ label: '/a', dimensionValue: '/a', value: 2 },
+			{ label: '/blog/deep', dimensionValue: '/blog/deep', value: 1 },
 		])
 	})
 
@@ -151,21 +153,24 @@ describeForDb('widget filters against the native adapter', {}, (db) => {
 		const blog = await breakdown([{ dimension: 'page', operator: 'contains', value: '/blog' }])
 		expect(blog.status).toBe('ok')
 		expect(byLabel(blog.rows)).toEqual([
-			{ label: '/blog/deep', value: 1 },
-			{ label: '/blog/intro', value: 1 },
+			{ label: '/blog/deep', dimensionValue: '/blog/deep', value: 1 },
+			{ label: '/blog/intro', dimensionValue: '/blog/intro', value: 1 },
 		])
 	})
 
-	it('answers filter-unsupported for an operator the native adapter does not declare', async () => {
-		// native declares eq and contains; `matches` is a provider-only operator.
+	it('applies a matches filter where the store runs one, and refuses it on SQLite', async () => {
 		const result = await metric([{ dimension: 'page', operator: 'matches', value: '^/blog' }])
-		expect(result.status).toBe('filter-unsupported')
-		expect(result.metrics.pageviews).toBeUndefined()
+		if (db === 'sqlite') {
+			expect(result.status).toBe('filter-unsupported')
+			expect(result.metrics.pageviews).toBeUndefined()
+			return
+		}
+		expect(result.status).toBe('ok')
+		expect(result.metrics.pageviews).toBe(2)
 	})
 
-	it('answers filter-unsupported for a dimension the native adapter cannot filter on', async () => {
-		// native groups by `goal` but cannot filter by it: completions live in a json column.
-		const result = await metric([{ dimension: 'goal', operator: 'eq', value: 'thanks' }])
+	it('answers filter-unsupported for a dimension the native adapter does not offer', async () => {
+		const result = await metric([{ dimension: 'medium', operator: 'eq', value: 'cpc' }])
 		expect(result.status).toBe('filter-unsupported')
 	})
 
@@ -177,15 +182,12 @@ describeForDb('widget filters against the native adapter', {}, (db) => {
 })
 
 const caps = (over: Partial<AnalyticsCapabilities> = {}): AnalyticsCapabilities => ({
-	perPageQuery: false,
 	realtime: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),
 	dimensions: new Set(['page']),
-	filters: new Set(['page']),
-	filterOperators: new Set(['eq', 'contains', 'matches']),
-	batchPageReport: false,
+	filters: { page: ['eq', 'contains', 'matches'] },
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },
 	...over,
@@ -232,16 +234,9 @@ describeForDb('widget filters against a provider that matches patterns', {}, (db
 	})
 
 	it('applies a matches filter the provider declares', async () => {
-		const result = await readForWidget({
-			req: { payload: booted.payload } as unknown as PayloadRequest,
-			metrics: ['pageviews'],
-			timeframe: 'today',
-			now: new Date(),
-			range: windowAround(Date.now()),
-			timezone: 'UTC',
-			comparison: false,
-			filters: [{ dimension: 'page', operator: 'matches', value: '^/docs' }],
-		})
+		const result = await readPageviews(readerRequest(booted.payload), aroundNow(), [
+			{ dimension: 'page', operator: 'matches', value: '^/docs' },
+		])
 		expect(result.status).toBe('ok')
 		expect(result.metrics.pageviews).toBe(2)
 	})
@@ -253,7 +248,7 @@ describeForDb('widget filters against a source that cannot filter', {}, (db) => 
 	beforeAll(async () => {
 		booted = await bootPayload({
 			plugin: analytics({
-				adapters: [patternAdapter({ filters: new Set(), filterOperators: new Set() })],
+				adapters: [patternAdapter({ filters: {} })],
 			}),
 			db,
 		})
@@ -264,16 +259,9 @@ describeForDb('widget filters against a source that cannot filter', {}, (db) => 
 	})
 
 	it('answers filter-unsupported rather than an unfiltered total', async () => {
-		const result = await readForWidget({
-			req: { payload: booted.payload } as unknown as PayloadRequest,
-			metrics: ['pageviews'],
-			timeframe: 'today',
-			now: new Date(),
-			range: windowAround(Date.now()),
-			timezone: 'UTC',
-			comparison: false,
-			filters: [{ dimension: 'page', operator: 'eq', value: '/docs/api' }],
-		})
+		const result = await readPageviews(readerRequest(booted.payload), aroundNow(), [
+			{ dimension: 'page', operator: 'eq', value: '/docs/api' },
+		])
 		expect(result.status).toBe('filter-unsupported')
 		expect(result.metrics.pageviews).toBeUndefined()
 	})
@@ -287,7 +275,9 @@ describeForDb('widget filters on a scoped install', {}, (db) => {
 		booted = await bootPayload({
 			plugin: analytics({
 				adapters: [native()],
-				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				capture: { gate: 'off' },
+				trustedPlatform: 'vercel',
+				scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant') },
 			}),
 			db,
 		})
@@ -298,7 +288,7 @@ describeForDb('widget filters on a scoped install', {}, (db) => {
 			{ path: '/a', country: 'DE', ip: '2.2.2.4', tenant: 'tenant-b' },
 			{ path: '/a', country: 'DE', ip: '2.2.2.5', tenant: 'tenant-b' },
 		])
-		range = windowAround(Date.now())
+		range = aroundNow()
 	}, 240_000)
 
 	afterAll(async () => {
@@ -306,19 +296,11 @@ describeForDb('widget filters on a scoped install', {}, (db) => {
 	})
 
 	const readFor = (tenant: string, filters?: AnalyticsFilter[]) =>
-		readForWidget({
-			req: {
-				payload: booted.payload,
-				headers: new Headers({ 'x-tenant': tenant }),
-			} as unknown as PayloadRequest,
-			metrics: ['pageviews'],
-			timeframe: 'today',
-			now: new Date(),
+		readPageviews(
+			readerRequest(booted.payload, { headers: new Headers({ 'x-tenant': tenant }) }),
 			range,
-			timezone: 'UTC',
-			comparison: false,
-			...(filters ? { filters } : {}),
-		})
+			filters
+		)
 
 	it('never widens the scope: a filtered tenant read still excludes the other tenant', async () => {
 		const unfiltered = await readFor('tenant-a')

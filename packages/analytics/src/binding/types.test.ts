@@ -46,8 +46,17 @@ describe('binding resolver types', () => {
 		expect(badPath).toBeDefined()
 	})
 
+	it('takes a field name or false as the scope field, nothing else', () => {
+		const named: AnalyticsBinding = { pathField: 'slug', scopeField: 'tenant' }
+		const off: AnalyticsBinding = { pathField: 'slug', scopeField: false }
+		// @ts-expect-error true names no field
+		const bad: AnalyticsBinding = { pathField: 'slug', scopeField: true }
+		expect([named, off, bad]).toHaveLength(3)
+	})
+
 	it('types docs for inline per-collection bindings in plugin options', () => {
 		const options = {
+			adapters: [],
 			collections: {
 				pages: {
 					path: (doc) => {
@@ -56,7 +65,7 @@ describe('binding resolver types', () => {
 					},
 				},
 			},
-			sync: { collectionSlug: 'analytics-daily' },
+			sync: { collection: { slug: 'analytics-daily' } },
 		} satisfies AnalyticsPluginOptions
 		expect(options.collections.pages.path).toBeTypeOf('function')
 	})

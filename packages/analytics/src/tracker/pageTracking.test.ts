@@ -83,6 +83,25 @@ describe('createPageTracking', () => {
 		expect(window.history.pushState).toBe(theirs)
 	})
 
+	it('stops reporting once destroyed, even while its wrapper stays buried in the chain', () => {
+		const original = window.history.pushState
+		const onChange = vi.fn()
+		const tracking = createPageTracking(window, onChange)
+		const ours = window.history.pushState
+		window.history.pushState = (...args: Parameters<History['pushState']>) => {
+			ours.apply(window.history, args)
+		}
+		teardowns.push(() => {
+			window.history.pushState = original
+		})
+
+		tracking.destroy()
+		window.history.pushState(null, '', '/buried')
+
+		expect(window.location.pathname).toBe('/buried')
+		expect(onChange).not.toHaveBeenCalled()
+	})
+
 	it('keeps the history methods working', () => {
 		start(vi.fn())
 		window.history.pushState({ id: 7 }, '', '/pricing')

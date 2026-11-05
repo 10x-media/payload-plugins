@@ -1,20 +1,31 @@
-import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
+import {
+	type BootedPayload,
+	bootPayload,
+	describeForDb,
+	installTestClock,
+	type TestClock,
+} from '@10x-media/payload-test-harness'
 import { handleEndpoints } from 'payload'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { analytics } from '../../src/index'
-import { EVENTS_SLUG } from '../../src/native/collections/events'
-import { ROLLUPS_SLUG } from '../../src/native/collections/rollups'
 import { composeGeoResolvers } from '../../src/native/geo/composeGeoResolvers'
 import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { maxmindResolver } from '../../src/native/geo/maxmindResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
-import { kvCacheStore } from '../../src/surfacing/cacheStore'
+import type { HitRow } from '../../src/native/store/types'
+import { CACHE_SLUG } from '../../src/surfacing/cacheCollection'
+import { collectionCacheStore } from '../../src/surfacing/collectionCacheStore'
 import { createEngine } from '../../src/surfacing/engine'
 import { INGEST_HOST, ingestRequest } from './ingestRequest'
+import { aroundNow, countHits, nativeOf, storedHits } from './nativeHelpers'
 
 const ingest = (booted: BootedPayload, path: string) =>
-	makeIngestHandler({ geoResolver: platformHeaderResolver })(
+	makeIngestHandler({
+		geoResolver: platformHeaderResolver,
+		attribution: { trustedPlatform: 'vercel' },
+		target: nativeOf,
+	})(
 		ingestRequest(
 			booted.payload,
 			{ type: 'pageview', path, hostname: 'h', durationMs: 500 },
@@ -25,63 +36,67 @@ const ingest = (booted: BootedPayload, path: string) =>
 describeForDb('native ingest endpoint', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
+	let clock: TestClock
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+		// Held still: the one visitor below hashes with its day's salt, so every test's hits must
+		// land on one day however late the run reaches them.
+		clock = installTestClock(new Date())
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], capture: { gate: 'off' } }),
+			db,
+		})
 	})
 
 	afterAll(async () => {
+		clock?.reset()
 		await booted.stop()
 	})
 
-	it('ingests a pageview into events and rollups', async () => {
+	it('stores a pageview as one raw hit, which the adapter reads back', async () => {
 		const res = await ingest(booted, '/p')
 		expect(res.status).toBe(202)
-		const { totalDocs: events } = await booted.payload.count({ collection: EVENTS_SLUG as never })
-		expect(events).toBe(1)
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG as never,
-			where: { path: { equals: '/p' } },
-			pagination: false,
-		})
-		expect((docs[0] as { pageviews: number; durationMs: number } | undefined)?.pageviews).toBe(1)
-		expect((docs[0] as { pageviews: number; durationMs: number } | undefined)?.durationMs).toBe(500)
+		expect(await countHits(booted.payload)).toBe(1)
+		const [hit] = await storedHits(booted.payload, { path: { equals: '/p' } })
+		expect(hit).toMatchObject({ type: 'pageview', hostname: 'h', durationMs: 500, country: 'US' })
+		const read = await adapter.query(
+			{ path: '/p', metrics: ['pageviews', 'avgDuration'], dateRange: aroundNow() },
+			{ payload: booted.payload }
+		)
+		expect(read.totals).toEqual({ pageviews: 1, avgDuration: 500 })
 	})
 
 	it('serves native pageviews through the surfacing engine', async () => {
 		await ingest(booted, '/e2e')
 		await ingest(booted, '/e2e')
 		const engine = createEngine({
-			store: kvCacheStore(booted.payload.kv),
-			queue: { concurrency: 4 },
+			payload: booted.payload,
+			store: collectionCacheStore(booted.payload, { slug: CACHE_SLUG }),
 			ttl: { aggregate: 60, realtime: 5 },
 			timeoutMs: 15_000,
 		})
 		const result = await engine.read(adapter, {
 			path: '/e2e',
 			metrics: ['pageviews', 'avgDuration'],
-			dateRange: { start: new Date('2020-01-01'), end: new Date('2030-01-01') },
+			dateRange: aroundNow(),
 		})
 		expect(result.totals?.pageviews).toBe(2)
 		expect(result.totals?.avgDuration).toBe(500)
+		await engine.idle()
 	})
 
-	it('counts unique visitors and sessions across repeated ingests', async () => {
+	it('counts unique visitors and visits across repeated ingests', async () => {
 		await ingest(booted, '/u')
 		await ingest(booted, '/u')
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG as never,
-			where: { path: { equals: '/u' }, dimension: { equals: '' } },
-			pagination: false,
-		})
-		const row = docs[0] as { pageviews: number; visitors: number; sessions: number } | undefined
-		expect(row?.pageviews).toBe(2)
-		expect(row?.visitors).toBe(1)
-		expect(row?.sessions).toBe(1)
+		const read = await adapter.query(
+			{ path: '/u', metrics: ['pageviews', 'visitors', 'sessions'], dateRange: aroundNow() },
+			{ payload: booted.payload }
+		)
+		expect(read.totals).toEqual({ pageviews: 2, visitors: 1, sessions: 1 })
 	})
 
 	it('persists browser, os, language and the utm keys, and never the raw query', async () => {
-		const res = await makeIngestHandler({ geoResolver: platformHeaderResolver })(
+		const res = await makeIngestHandler({ geoResolver: platformHeaderResolver, target: nativeOf })(
 			ingestRequest(
 				booted.payload,
 				{
@@ -99,11 +114,7 @@ describeForDb('native ingest endpoint', {}, (db) => {
 			)
 		)
 		expect(res.status).toBe(202)
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/dimensions' } },
-			pagination: false,
-		})
+		const docs = await storedHits(booted.payload, { path: { equals: '/dimensions' } })
 		expect(docs[0]).toMatchObject({
 			browser: 'chrome',
 			os: 'macos',
@@ -122,7 +133,11 @@ describeForDb('native ingest endpoint', {}, (db) => {
 			platformHeaderResolver,
 			maxmindResolver({ dbPath: '/nonexistent/GeoLite2-City.mmdb' })
 		)
-		const res = await makeIngestHandler({ geoResolver: composed })(
+		const res = await makeIngestHandler({
+			geoResolver: composed,
+			attribution: { trustedPlatform: 'vercel' },
+			target: nativeOf,
+		})(
 			ingestRequest(
 				booted.payload,
 				{ type: 'pageview', path: '/geo', hostname: 'h' },
@@ -130,18 +145,14 @@ describeForDb('native ingest endpoint', {}, (db) => {
 			)
 		)
 		expect(res.status).toBe(202)
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/geo' } },
-			pagination: false,
-		})
-		expect((docs[0] as { country?: string } | undefined)?.country).toBe('US')
+		const docs = await storedHits(booted.payload, { path: { equals: '/geo' } })
+		expect(docs[0]?.country).toBe('US')
 	})
 
-	// Every distinct stored hostname opens a rollup bucket family that nothing prunes, so the
-	// spellings of one host have to land in one family and junk has to land in none.
-	it('lands every spelling of one host in one bucket family', async () => {
-		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver })
+	// Every distinct stored hostname opens a family of daily totals that is kept, so the spellings
+	// of one host have to land in one family and junk has to land in none.
+	it('lands every spelling of one host under one hostname', async () => {
+		const handler = makeIngestHandler({ geoResolver: platformHeaderResolver, target: nativeOf })
 		const spellings = ['Site.Example', 'site.example:3000', 'site.example.', 'SITE.EXAMPLE..:443']
 		const junk = ['site..example', '.site.example', 'site example', `${'a'.repeat(300)}.example`]
 		for (const host of [...spellings, ...junk]) {
@@ -151,26 +162,19 @@ describeForDb('native ingest endpoint', {}, (db) => {
 			expect(res.status, host).toBe(202)
 		}
 
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/spelling' } },
-			pagination: false,
-		})
+		const docs = await storedHits(booted.payload, { path: { equals: '/spelling' } })
 		expect(docs).toHaveLength(spellings.length)
-		expect([
-			...new Set((docs as unknown as Array<{ hostname: string }>).map((d) => d.hostname)),
-		]).toEqual(['site.example'])
-
-		const rollups = await booted.payload.find({
-			collection: ROLLUPS_SLUG as never,
-			where: { path: { equals: '/spelling' } },
-			pagination: false,
-		})
-		const families = new Set(
-			(rollups.docs as unknown as Array<{ hostname: string }>).map((d) => d.hostname)
+		expect([...new Set(docs.map((doc) => doc.hostname))]).toEqual(['site.example'])
+		const read = await adapter.query(
+			{
+				path: '/spelling',
+				hostname: 'site.example',
+				metrics: ['pageviews'],
+				dateRange: aroundNow(),
+			},
+			{ payload: booted.payload }
 		)
-		// The hostname-less family every delta also writes, and exactly one named family.
-		expect([...families].sort()).toEqual(['', 'site.example'])
+		expect(read.totals?.pageviews).toBe(spellings.length)
 	})
 
 	it('serves a site-wide country breakdown through the native adapter', async () => {
@@ -180,14 +184,14 @@ describeForDb('native ingest endpoint', {}, (db) => {
 			{
 				metrics: ['pageviews', 'visitors'],
 				dimensions: ['country'],
-				dateRange: { start: new Date('2020-01-01'), end: new Date('2030-01-01') },
+				dateRange: aroundNow(),
 			},
-			{}
+			{ payload: booted.payload }
 		)
 		const us = result.rows.find((r) => r.dimensions?.country === 'US')
 		expect(us?.metrics.pageviews).toBeGreaterThanOrEqual(2)
-		// Every request in this suite shares one visitor hash, so the US country bucket
-		// holds exactly one distinct visitor regardless of how many pages were hit.
+		// Every request in this suite comes from one visitor, so the US row holds exactly one
+		// visitor however many pages were hit.
 		expect(us?.metrics.visitors).toBe(1)
 	})
 })
@@ -198,7 +202,10 @@ describeForDb('native ingest through the router', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], capture: { gate: 'off' } }),
+			db,
+		})
 	})
 
 	afterAll(async () => {
@@ -209,7 +216,7 @@ describeForDb('native ingest through the router', {}, (db) => {
 		handleEndpoints({
 			config: booted.payload.config,
 			payloadInstanceCacheKey: booted.cacheKey,
-			request: new Request('http://localhost:3000/api/analytics/ingest', {
+			request: new Request('http://localhost:3000/api/_x/e', {
 				method: 'POST',
 				body,
 				headers: { 'content-type': contentType, 'user-agent': 'UA', host: INGEST_HOST },
@@ -233,11 +240,7 @@ describeForDb('native ingest through the router', {}, (db) => {
 			})
 		)
 		expect(res.status).toBe(413)
-		const { totalDocs } = await booted.payload.count({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/big' } } as never,
-		})
-		expect(totalDocs).toBe(0)
+		expect(await countHits(booted.payload, { path: { equals: '/big' } })).toBe(0)
 	})
 
 	it('still ingests a valid event', async () => {
@@ -245,19 +248,14 @@ describeForDb('native ingest through the router', {}, (db) => {
 			JSON.stringify({ type: 'pageview', path: '/routed', hostname: 'h', durationMs: 300 })
 		)
 		expect(res.status).toBe(202)
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/routed' } },
-			pagination: false,
-		})
+		const docs = await storedHits(booted.payload, { path: { equals: '/routed' } })
 		expect(docs).toHaveLength(1)
-		expect((docs[0] as { durationMs?: number } | undefined)?.durationMs).toBe(300)
+		expect(docs[0]?.durationMs).toBe(300)
 	})
 
-	// A pageview and a goal from the same visitor share every rollup bucket, so they race on
-	// the same seen-ledger row. Whichever loses the unique index gets a duplicate-key error
-	// back from the driver, which used to escape flushBatch as a 500.
-	it('202s a pageview and a goal racing on the same seen-ledger row', async () => {
+	// One visitor's pageview and goal arriving together share nothing a write has to wait for:
+	// each is one row of its own.
+	it('202s a pageview and a goal from one visitor arriving at once, and stores both', async () => {
 		const body = (type: 'pageview' | 'goal') =>
 			JSON.stringify({
 				type,
@@ -271,6 +269,7 @@ describeForDb('native ingest through the router', {}, (db) => {
 			)
 			expect(statuses, `round ${round}`).toEqual([202, 202])
 		}
+		expect(await countHits(booted.payload, { path: { equals: '/race' } })).toBe(40)
 	})
 })
 
@@ -279,14 +278,17 @@ describeForDb('native write buffer', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], capture: { gate: 'off' } }),
+			db,
+		})
 	})
 	afterAll(async () => {
 		await booted.stop()
 	})
 
 	const ingestBuffered = async (path: string): Promise<void> => {
-		const ep = booted.payload.config.endpoints?.find((e) => e.path === '/analytics/ingest')
+		const ep = booted.payload.config.endpoints?.find((e) => e.path === '/_x/e')
 		if (!ep) {
 			throw new Error('ingest endpoint not registered')
 		}
@@ -300,25 +302,80 @@ describeForDb('native write buffer', {}, (db) => {
 	}
 
 	it('holds ingests until flushed, then writes them in one batch', async () => {
-		await ingestBuffered('/buf')
-		await ingestBuffered('/buf')
-		const before = await booted.payload.find({
-			collection: ROLLUPS_SLUG as never,
-			where: { path: { equals: '/buf' } },
-			pagination: false,
-		})
-		expect(before.docs).toHaveLength(0)
+		const append = vi.spyOn(nativeOf(booted.payload).store, 'append')
+		try {
+			await ingestBuffered('/buf')
+			await ingestBuffered('/buf')
+			expect(await countHits(booted.payload, { path: { equals: '/buf' } })).toBe(0)
 
-		await adapter.flush()
+			await adapter.flush(booted.payload)
 
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG as never,
-			where: { path: { equals: '/buf' }, dimension: { equals: '' } },
-			pagination: false,
+			expect(append).toHaveBeenCalledTimes(1)
+			expect(append.mock.calls[0]?.[0]).toHaveLength(2)
+			const read = await adapter.query(
+				{ path: '/buf', metrics: ['pageviews', 'visitors', 'sessions'], dateRange: aroundNow() },
+				{ payload: booted.payload }
+			)
+			expect(read.totals).toEqual({ pageviews: 2, visitors: 1, sessions: 1 })
+		} finally {
+			append.mockRestore()
+		}
+	})
+
+	it('stores the rows of a batch that land when the database refused one of them for its values', async () => {
+		const { store } = nativeOf(booted.payload)
+		const append = store.append.bind(store)
+		const refusing = vi
+			.spyOn(store, 'append')
+			.mockImplementation(async (hits: readonly HitRow[]) => {
+				if (hits.some((hit) => hit.path === '/batch-refused')) {
+					// What a driver raises for a row's own values: Postgres' value-too-long class.
+					throw Object.assign(new Error('value too long for type character varying'), {
+						code: '22001',
+					})
+				}
+				return append(hits)
+			})
+		const error = vi.spyOn(booted.payload.logger, 'error').mockImplementation(() => undefined)
+		try {
+			for (const path of ['/batch-a', '/batch-refused', '/batch-b']) {
+				await ingestBuffered(path)
+			}
+			await adapter.flush(booted.payload)
+			for (const path of ['/batch-a', '/batch-b']) {
+				expect(await countHits(booted.payload, { path: { equals: path } }), path).toBe(1)
+			}
+			expect(await countHits(booted.payload, { path: { equals: '/batch-refused' } })).toBe(0)
+			expect(error).toHaveBeenCalledTimes(1)
+		} finally {
+			refusing.mockRestore()
+			error.mockRestore()
+		}
+	})
+
+	it('writes a batch the database refused for a lock again whole, once, rather than row by row', async () => {
+		const { store } = nativeOf(booted.payload)
+		const append = store.append.bind(store)
+		let locked = 1
+		const calls: number[] = []
+		const busy = vi.spyOn(store, 'append').mockImplementation(async (hits: readonly HitRow[]) => {
+			calls.push(hits.length)
+			if (locked-- > 0) {
+				throw Object.assign(new Error('SQLITE_BUSY: database is locked'), { code: 'SQLITE_BUSY' })
+			}
+			return append(hits)
 		})
-		const row = docs[0] as { pageviews: number; visitors: number; sessions: number } | undefined
-		expect(row?.pageviews).toBe(2)
-		expect(row?.visitors).toBe(1)
-		expect(row?.sessions).toBe(1)
+		try {
+			for (const path of ['/locked-a', '/locked-b', '/locked-c']) {
+				await ingestBuffered(path)
+			}
+			await adapter.flush(booted.payload)
+			expect(calls).toEqual([3, 3])
+			for (const path of ['/locked-a', '/locked-b', '/locked-c']) {
+				expect(await countHits(booted.payload, { path: { equals: path } }), path).toBe(1)
+			}
+		} finally {
+			busy.mockRestore()
+		}
 	})
 })

@@ -11,14 +11,14 @@ describe('createScriptLoader', () => {
 	it('injects a src script with its attributes and resolves on load', async () => {
 		const load = createScriptLoader(window, 'nonce-123')
 		const pending = load({
-			src: '/api/analytics/p/tenant/script.js',
+			src: '/api/_x/p/tenant/script.js',
 			defer: true,
-			attrs: { 'data-website-id': 'abc', 'data-host-url': '/api/analytics/p/tenant' },
+			attrs: { 'data-website-id': 'abc', 'data-host-url': '/api/_x/p/tenant' },
 		})
 
 		const [el] = injected()
 		expect(el).toBeDefined()
-		expect(el?.getAttribute('src')).toBe('/api/analytics/p/tenant/script.js')
+		expect(el?.getAttribute('src')).toBe('/api/_x/p/tenant/script.js')
 		expect(el?.defer).toBe(true)
 		expect(el?.async).toBe(false)
 		expect(el?.getAttribute('data-website-id')).toBe('abc')
@@ -47,14 +47,14 @@ describe('createScriptLoader', () => {
 
 	it('does not re-inject a script the page already carries', async () => {
 		const existing = document.createElement('script')
-		existing.src = '/api/analytics/p/global/static/array.js'
+		existing.src = '/api/_x/p/global/static/array.js'
 		document.head.appendChild(existing)
 		const inline = document.createElement('script')
 		inline.text = 'window.__analyticsBooted = true'
 		document.head.appendChild(inline)
 
 		const load = createScriptLoader(window)
-		await load({ src: '/api/analytics/p/global/static/array.js' })
+		await load({ src: '/api/_x/p/global/static/array.js' })
 		await load({ inline: 'window.__analyticsBooted = true' })
 
 		expect(injected()).toHaveLength(2)

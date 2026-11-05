@@ -1,29 +1,11 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter, AnalyticsCapabilities, MetricKey } from '../core/contract'
-import { createRegistry } from '../core/registry'
-import { type AnalyticsRuntime, setRuntime } from '../plugin/runtime'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { prepareWidgetRead } from './prepareWidgetRead'
+import { requestWith } from './widgetTestKit'
 
 const NOW = new Date('2026-06-01T00:00:00Z')
-
-const reqWith = (
-	adapters: AnalyticsAdapter[],
-	runtime: Partial<AnalyticsRuntime> = {}
-): PayloadRequest => {
-	const payload = { logger: { warn: () => {} } } as unknown as PayloadRequest['payload']
-	setRuntime(payload, {
-		registry: createRegistry(adapters),
-		configAdapterIds: new Set(adapters.map((a) => a.id)),
-		bindings: {},
-		engine: { read: async (adapter, query) => adapter.query(query, {}) },
-		ttl: { aggregate: 3600, realtime: 300 },
-		comparison: true,
-		...runtime,
-	} as AnalyticsRuntime)
-	return { payload } as PayloadRequest
-}
 
 const withCapabilities = (
 	overrides: Partial<AnalyticsCapabilities>,
@@ -52,9 +34,54 @@ describe('prepareWidgetRead', () => {
 		expect(prepared.tz).toBe('UTC')
 	})
 
+	it('shows a reader access.read denies the no-access state, without reading', async () => {
+		const adapter = withCapabilities({})
+		const query = vi.spyOn(adapter, 'query')
+		const prepared = await prepareWidgetRead({
+			req: requestWith([adapter], { readAccess: () => false }),
+			now: NOW,
+			timeframe: 'last30days',
+		})
+		expect(prepared).toMatchObject({ ok: false, status: 'no-access' })
+		expect(query).not.toHaveBeenCalled()
+	})
+
+	it('shows the no-access state for a tenant the user does not belong to', async () => {
+		const adapter = withCapabilities({ scopedQueries: true })
+		const prepared = await prepareWidgetRead({
+			req: requestWith([adapter], {
+				scoped: true,
+				resolveScope: async () => 'beta',
+				member: () => false,
+				crossScope: { named: () => false, aggregate: () => false, unscopedSource: () => false },
+			}),
+			now: NOW,
+			timeframe: 'last30days',
+		})
+		expect(prepared).toMatchObject({ ok: false, status: 'no-access' })
+	})
+
+	// A tenant admin with no site selected reads no site, which is not the source's fault.
+	it('asks for a site when a per-site reader has none selected', async () => {
+		const adapter = withCapabilities({ scopedQueries: true })
+		const query = vi.spyOn(adapter, 'query')
+		const prepared = await prepareWidgetRead({
+			req: requestWith([adapter], {
+				scoped: true,
+				resolveScope: async () => null,
+				member: () => true,
+				crossScope: { named: () => false, aggregate: () => false, unscopedSource: () => false },
+			}),
+			now: NOW,
+			timeframe: 'last30days',
+		})
+		expect(prepared).toMatchObject({ ok: false, status: 'no-scope' })
+		expect(query).not.toHaveBeenCalled()
+	})
+
 	it('refuses an unconfigured source by its own id', async () => {
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({}, false)]),
+			req: requestWith([withCapabilities({}, false)]),
 			now: NOW,
 			timeframe: 'last30days',
 		})
@@ -63,7 +90,7 @@ describe('prepareWidgetRead', () => {
 
 	it('refuses an unconfigured source in the resolved timezone, not the caller default', async () => {
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({}, false)], {
+			req: requestWith([withCapabilities({}, false)], {
 				resolveTimezone: () => Promise.resolve('Europe/Berlin'),
 			}),
 			now: NOW,
@@ -76,7 +103,7 @@ describe('prepareWidgetRead', () => {
 
 	it('refuses a source that does not serve what the read needs', async () => {
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({ metrics: new Set(['pageviews']) })]),
+			req: requestWith([withCapabilities({ metrics: new Set(['pageviews']) })]),
 			now: NOW,
 			timeframe: 'last30days',
 			requires: { metrics: ['conversions'] },
@@ -86,7 +113,7 @@ describe('prepareWidgetRead', () => {
 
 	it('refuses a bucket finer than the source can serve', async () => {
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({ minGranularity: 'month' })]),
+			req: requestWith([withCapabilities({ minGranularity: 'month' })]),
 			now: NOW,
 			timeframe: 'last30days',
 			granularity: 'day',
@@ -96,7 +123,7 @@ describe('prepareWidgetRead', () => {
 
 	it('refuses a filter the source cannot apply, rather than reading past it', async () => {
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({})]),
+			req: requestWith([withCapabilities({})]),
 			now: NOW,
 			timeframe: 'last30days',
 			filters: [{ dimension: 'country', operator: 'eq', value: 'DE' }],
@@ -107,7 +134,7 @@ describe('prepareWidgetRead', () => {
 	it('resolves the reporting timezone and reads the window in it', async () => {
 		const resolveTimezone = vi.fn(() => Promise.resolve('Europe/Berlin'))
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({})], { resolveTimezone }),
+			req: requestWith([withCapabilities({})], { resolveTimezone }),
 			now: NOW,
 			timeframe: 'today',
 		})
@@ -122,7 +149,7 @@ describe('prepareWidgetRead', () => {
 	it('keeps an explicit window instead of resolving the preset', async () => {
 		const range = { start: new Date('2026-05-01T00:00:00Z'), end: new Date('2026-05-02T00:00:00Z') }
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({})]),
+			req: requestWith([withCapabilities({})]),
 			now: NOW,
 			timeframe: 'last30days',
 			range,
@@ -132,7 +159,7 @@ describe('prepareWidgetRead', () => {
 
 	it('hints the scope goal slugs for a read that asks about goals', async () => {
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({})], {
+			req: requestWith([withCapabilities({})], {
 				goals: [{ slug: 'signup', name: 'Signup', match: { kind: 'goal' } }],
 			}),
 			now: NOW,
@@ -144,7 +171,7 @@ describe('prepareWidgetRead', () => {
 
 	it('leaves the hint off a read that asks about no goals', async () => {
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({})], {
+			req: requestWith([withCapabilities({})], {
 				goals: [{ slug: 'signup', name: 'Signup', match: { kind: 'goal' } }],
 			}),
 			now: NOW,
@@ -156,7 +183,7 @@ describe('prepareWidgetRead', () => {
 
 	it('hints unresolved when the goal resolver throws', async () => {
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({})], {
+			req: requestWith([withCapabilities({})], {
 				resolveGoals: () => Promise.reject(new Error('boom')),
 			}),
 			now: NOW,
@@ -171,7 +198,7 @@ describe('prepareWidgetRead', () => {
 			metrics: [...adapter.capabilities.metrics],
 		}))
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({ metrics: new Set<MetricKey>(['conversions']) })], {
+			req: requestWith([withCapabilities({ metrics: new Set<MetricKey>(['conversions']) })], {
 				goals: [{ slug: 'signup', name: 'Signup', match: { kind: 'goal' } }],
 			}),
 			now: NOW,
@@ -186,7 +213,7 @@ describe('prepareWidgetRead', () => {
 	it('takes a hint the caller already resolved over resolving one itself', async () => {
 		const goalRead = vi.fn(() => ({ metrics: ['conversions'] as MetricKey[] }))
 		const prepared = await prepareWidgetRead({
-			req: reqWith([withCapabilities({})], {
+			req: requestWith([withCapabilities({})], {
 				goals: [{ slug: 'signup', name: 'Signup', match: { kind: 'goal' } }],
 			}),
 			now: NOW,

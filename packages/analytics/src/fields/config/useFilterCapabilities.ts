@@ -1,7 +1,7 @@
 'use client'
 
-import { useFormFields } from '@payloadcms/ui'
 import { useMemo } from 'react'
+import { filterOperatorsFor } from '../../core/capabilities'
 import {
 	DIMENSION_KEYS,
 	type DimensionKey,
@@ -10,12 +10,16 @@ import {
 } from '../../core/contract'
 import type { WireSource } from './fetchSources'
 import { useAnalyticsSources } from './useAnalyticsSources'
+import { useFormString } from './useFormString'
 
+/** @beta */
 export interface FilterCapabilities {
 	/** Dimensions the widget may filter on, in contract order. */
 	dimensions: DimensionKey[]
-	/** Operators the widget may filter with, in contract order. */
+	/** Operators the widget may filter some offered dimension with, in contract order. */
 	operators: FilterOperator[]
+	/** The operators the widget may filter one dimension with, in contract order. */
+	operatorsFor: (dimension: DimensionKey) => FilterOperator[]
 	/** The source list has yet to answer; offer nothing rather than a wrong list. */
 	loading: boolean
 	/** The source list could not be fetched, so an empty offer is not a verdict. */
@@ -27,48 +31,60 @@ export interface FilterCapabilities {
 	resolved: boolean
 }
 
-const EMPTY: Pick<FilterCapabilities, 'dimensions' | 'operators'> = {
+type SourceFilters = Pick<FilterCapabilities, 'dimensions' | 'operators' | 'operatorsFor'>
+
+const EMPTY: SourceFilters = {
 	dimensions: [],
 	operators: [],
+	operatorsFor: () => [],
 }
 
 /**
- * What the widget's chosen source can filter by. An unknown source id (a stale value, a
- * runtime source the endpoint could not list) falls back to the union, mirroring the
- * metric picker's narrowing; the union is also what a single-provider install sees, where
- * there is no source field to read.
+ * A filter an editor cannot write by hand: an item filter takes a ref (`offers:12`), which names
+ * nothing an editor would recognize. The analytics view sets one from a row of its Content tab.
  */
-export const deriveFilterCapabilities = (args: {
+const UNTYPED_DIMENSIONS: ReadonlySet<DimensionKey> = new Set<DimensionKey>(['item'])
+
+/**
+ * What the chosen source can filter by. An unknown source id falls back to the union over all
+ * sources, which is also what a single-provider install (no source field) sees.
+ */
+const deriveFilterCapabilities = (args: {
 	sources: WireSource[] | null
 	sourceId: string | undefined
-}): Pick<FilterCapabilities, 'dimensions' | 'operators'> => {
+}): SourceFilters => {
 	const { sourceId, sources } = args
 	if (!sources || sources.length === 0) return EMPTY
 	const picked = sourceId ? sources.find((s) => s.id === sourceId) : undefined
 	const scope = picked ? [picked] : sources
+	const operatorsFor = (dimension: DimensionKey): FilterOperator[] =>
+		UNTYPED_DIMENSIONS.has(dimension)
+			? []
+			: FILTER_OPERATORS.filter((operator) =>
+					scope.some((s) => filterOperatorsFor(s.capabilities, dimension).includes(operator))
+				)
+	const dimensions = DIMENSION_KEYS.filter((d) => operatorsFor(d).length > 0)
 	return {
-		dimensions: DIMENSION_KEYS.filter((d) => scope.some((s) => s.capabilities.filters.includes(d))),
-		operators: FILTER_OPERATORS.filter((op) =>
-			scope.some((s) => s.capabilities.filterOperators.includes(op))
+		dimensions,
+		operators: FILTER_OPERATORS.filter((operator) =>
+			dimensions.some((d) => operatorsFor(d).includes(operator))
 		),
+		operatorsFor,
 	}
 }
 
 /**
- * Filter capabilities for the source a widget's config form currently points at, read
- * from that field's value in form state. `dataSourcePath` is a form path, not a relative
- * sibling lookup: it defaults to the top-level `dataSource` the widget config forms use,
- * and a custom widget whose source field sits elsewhere passes its own path, exactly as
- * `MetricSelectField` does.
+ * Filter capabilities for the source the config form points at. `dataSourcePath` is a form
+ * path, not a sibling lookup: a custom widget whose source field sits elsewhere passes its own.
+ *
+ * @beta
  */
 export const useFilterCapabilities = (dataSourcePath = 'dataSource'): FilterCapabilities => {
 	const { error, loading, sources } = useAnalyticsSources()
-	const sourceId = useFormFields(
-		([fields]) => fields?.[dataSourcePath]?.value as string | undefined
-	)
-	const { dimensions, operators } = useMemo(
+	const sourceId = useFormString(dataSourcePath)
+	const { dimensions, operators, operatorsFor } = useMemo(
 		() => deriveFilterCapabilities({ sourceId, sources }),
 		[sourceId, sources]
 	)
-	return { dimensions, error, loading, operators, resolved: sources !== null }
+	return { dimensions, error, loading, operators, operatorsFor, resolved: sources !== null }
 }

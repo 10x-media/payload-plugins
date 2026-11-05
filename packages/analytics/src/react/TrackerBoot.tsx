@@ -1,28 +1,35 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
-import type { TrackerConfig } from '../capture/trackerConfig'
+import type { TrackerConfig } from '../tracker/config'
 import { acquireTracker } from '../tracker/registry'
+import type { GateState } from '../tracker/types'
 
 export interface TrackerBootProps {
 	config: TrackerConfig
-	/** CSP nonce for any script this component injects. */
+	/** CSP nonce for any script the tracker injects. */
 	nonce?: string
+	/** The answer the server rendered the page with, applied at boot. */
+	gate?: GateState
+	/** `false` injects no vendor script at all. */
+	snippets?: boolean
 }
 
 /**
- * Boots the browser tracker from a server-resolved config and renders nothing. This is the
- * RSC path: `<AnalyticsScripts />` renders it after the slot snippets, so a page gets
- * pageviews and auto-capture with no provider and no client state. Wrap the tree in
- * `<AnalyticsProvider>` as well when components need to call `track` themselves: both take
- * a lease on the window's one tracker, so neither double-counts.
+ * Internal: what `<AnalyticsScripts />` renders to boot the tracker with server-passable props. It
+ * leases the window's one tracker, so it and `<AnalyticsProvider>` never double-count.
  */
-export const TrackerBoot = ({ config, nonce }: TrackerBootProps): null => {
-	const boot = useRef({ config, nonce })
-	boot.current = { config, nonce }
+export const TrackerBoot = ({ config, nonce, gate, snippets }: TrackerBootProps): null => {
+	const boot = useRef({ config, nonce, gate, snippets })
+	boot.current = { config, nonce, gate, snippets }
 
 	useEffect(() => {
-		const lease = acquireTracker(boot.current.config, { nonce: boot.current.nonce })
+		const current = boot.current
+		const lease = acquireTracker(current.config, {
+			nonce: current.nonce,
+			gate: current.gate,
+			snippets: current.snippets,
+		})
 		return () => lease.release()
 	}, [])
 

@@ -1,15 +1,14 @@
+import type { MetricValue } from '../core/contract'
+
 /**
- * Share of the site's visitors a goal converted, as a 0..1 ratio rounded to four decimals.
- * Null when either side is missing, unreadable, or the site total is zero, where a rate is
- * undefined rather than zero. The two numbers come from separate reads (a goal breakdown
- * row and the range totals), so a bucket wider than the total is clamped instead of
- * reported as more than 100 percent.
+ * Share of site visitors a goal converted, 0..1 at four decimals; null when undefined (a side
+ * missing, or zero total). Goal row and totals are separate reads, so it clamps at 1.
  */
 export const conversionRate = (
-	goalVisitors: number | undefined,
-	siteVisitors: number | undefined
+	goalVisitors: MetricValue | undefined,
+	siteVisitors: MetricValue | undefined
 ): number | null => {
-	if (goalVisitors === undefined || siteVisitors === undefined) {
+	if (typeof goalVisitors !== 'number' || typeof siteVisitors !== 'number') {
 		return null
 	}
 	if (!Number.isFinite(goalVisitors) || !Number.isFinite(siteVisitors) || siteVisitors === 0) {
@@ -18,3 +17,12 @@ export const conversionRate = (
 	const ratio = Math.min(Math.max(goalVisitors / siteVisitors, 0), 1)
 	return Math.round(ratio * 10_000) / 10_000
 }
+
+/**
+ * One item's clicks over its own views, `null` with none. Clicks can outrun counted views (a click
+ * in the first second, a browser that cannot measure visibility), so it clamps at 100 percent.
+ */
+export const clickRate = (
+	clicks: MetricValue | undefined,
+	views: MetricValue | undefined
+): number | null => conversionRate(clicks, views)

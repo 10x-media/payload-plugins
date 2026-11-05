@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TrackerConfig } from '../capture/trackerConfig'
+import type { TrackerConfig } from './config'
 import { DEFAULT_TRACKER_ENDPOINT, initTracker } from './initTracker'
+import { acquireTracker, liveTracker } from './registry'
 import type { Tracker } from './types'
 
 const config: TrackerConfig = {
@@ -11,9 +12,10 @@ const config: TrackerConfig = {
 		fileDownloads: false,
 		goalAttribute: false,
 		query: false,
+		items: { impressions: false, clicks: false, pages: false },
 	},
 	goals: [],
-	ingestPath: '/api/analytics/ingest',
+	ingestPath: '/api/_x/e',
 }
 
 const fetchMock = vi.fn()
@@ -37,7 +39,7 @@ describe('initTracker', () => {
 		expect(fetchMock).toHaveBeenCalledWith(DEFAULT_TRACKER_ENDPOINT, {
 			credentials: 'same-origin',
 		})
-		expect(DEFAULT_TRACKER_ENDPOINT).toBe('/api/analytics/tracker')
+		expect(DEFAULT_TRACKER_ENDPOINT).toBe('/api/_x/config')
 	})
 
 	it('honours a custom endpoint', async () => {
@@ -59,5 +61,23 @@ describe('initTracker', () => {
 		tracker = await initTracker({ window })
 
 		expect(() => tracker?.track('signup')).not.toThrow()
+	})
+
+	// A statically rendered page boots this way, and its components still reach the tracker.
+	it("boots the window's one tracker, which useAnalytics reaches, and gives its hold back on destroy", async () => {
+		fetchMock.mockResolvedValue(Response.json(config))
+		tracker = await initTracker({ window })
+		const live = liveTracker(window)
+		expect(live).not.toBeNull()
+		const second = acquireTracker(config, { window })
+		expect(second.tracker).toBe(live)
+
+		tracker.destroy()
+		tracker = null
+		await new Promise((resolve) => setTimeout(resolve, 0))
+		expect(liveTracker(window)).toBe(live)
+		second.release()
+		await new Promise((resolve) => setTimeout(resolve, 0))
+		expect(liveTracker(window)).toBeNull()
 	})
 })

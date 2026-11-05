@@ -1,14 +1,17 @@
 'use client'
 
-import { formatMetricValue } from '../../fields/format'
-import { askedAboutNoGoals, type QueryResponse } from '../../query/response'
+import { type ReactNode, useId } from 'react'
+import { formatMetricValue, formatRate } from '../../fields/format'
+import type { QueryResponse } from '../../query/response'
 import { keys } from '../../translations/keys'
 import { METRIC_KEYS } from '../../translations/metricKeys'
 import { useTranslation } from '../../translations/useTranslation'
-import { conversionRate } from '../conversionRate'
+import { Card } from '../../ui/components/Card'
+import { DataTable } from '../../ui/components/DataTable'
+import { sourceRowsOf, toDisplayRows } from '../../ui/rows/toDisplayRows'
 import type { QueryState } from '../useViewQueries'
 import type { ViewGoal } from '../viewProps'
-import { SectionEmpty, SectionError, Skeleton } from './EmptyStates'
+import { goalsEmptyLabel, QueryError, SectionEmpty, Skeleton } from './EmptyStates'
 
 export interface GoalsPanelProps {
 	query: QueryState<QueryResponse>
@@ -17,78 +20,77 @@ export interface GoalsPanelProps {
 	/** Range total the rate divides by; undefined when the source does not serve visitors. */
 	siteVisitors?: number
 	locale: string
+	/** ISO 4217 code revenue renders in; absent leaves it a plain number. */
+	currency?: string
 }
 
 /**
- * Conversions per goal over the window. Revenue is a bare number: the goal's currency is
- * per goal, not per read, so formatting one column in one currency would be a lie. The
- * rate needs visitors on both sides (the goal's bucket and the site total) and is left out
- * whenever either is missing.
+ * Conversions per goal. Revenue stays a bare number without an install currency, since a goal's
+ * currency is then per goal; the rate is left out when either visitor side is missing.
  */
-export function GoalsPanel({ query, goals, siteVisitors, locale }: GoalsPanelProps) {
+export function GoalsPanel({ query, goals, siteVisitors, locale, currency }: GoalsPanelProps) {
 	const { t } = useTranslation()
-	const rows = query.data?.result.rows ?? []
-	const names = new Map(goals.map((goal) => [goal.slug, goal.name]))
+	const headingId = useId()
+	const builtinGoalSlugs = query.data?.builtinGoalSlugs
+	const rows = toDisplayRows(sourceRowsOf(query.data?.result.rows ?? [], 'goal'), {
+		dimension: 'goal',
+		provider: query.data?.result.meta.provider ?? '',
+		t,
+		locale,
+		goals,
+		...(builtinGoalSlugs ? { builtinGoalSlugs } : {}),
+		countryFlags: false,
+		...(siteVisitors === undefined ? {} : { siteVisitors }),
+	})
 	const servesRevenue = rows.some((row) => row.metrics.revenue !== undefined)
-	const rates = rows.map((row) => conversionRate(row.metrics.visitors, siteVisitors))
-	const servesRate = rates.some((rate) => rate !== null)
-	const percent = new Intl.NumberFormat(locale, { style: 'percent', maximumFractionDigits: 2 })
+	const servesRate = rows.some((row) => typeof row.rate === 'number')
+
+	const body = (): ReactNode => {
+		if (query.data === undefined) {
+			return query.status === 'error' ? null : (
+				<Skeleton rows={Math.max(goals.length, 1)} variant="table" />
+			)
+		}
+		if (query.data.result.meta.goalsUnresolved === true || rows.length === 0) {
+			return <SectionEmpty label={goalsEmptyLabel(query.data)} />
+		}
+		return (
+			<DataTable
+				columns={[
+					{ key: 'conversions', header: t(METRIC_KEYS.conversions) },
+					...(servesRevenue ? [{ key: 'revenue', header: t(METRIC_KEYS.revenue) }] : []),
+					...(servesRate ? [{ key: 'rate', header: t(keys.viewConversionRate) }] : []),
+				]}
+				label={t(keys.goalsCollectionPlural)}
+				labelHeader={t(keys.fieldGoalLabel)}
+				noValueLabel={t(keys.stateNoValue)}
+				rows={rows.map((row) => ({
+					key: row.key,
+					label: row.label,
+					cells: [
+						formatMetricValue('conversions', row.metrics.conversions ?? 0, locale),
+						...(servesRevenue
+							? [formatMetricValue('revenue', row.metrics.revenue ?? 0, { locale, currency })]
+							: []),
+						...(servesRate ? [formatRate(row.rate, locale)] : []),
+					],
+				}))}
+			/>
+		)
+	}
 
 	return (
-		<section
+		<Card
 			aria-busy={query.isRefetching}
+			aria-labelledby={headingId}
+			as="section"
 			className="analytics-view__panel analytics-view__section"
 		>
-			<span className="analytics-view__label">{t(keys.goalsCollectionPlural)}</span>
-			{query.status === 'error' ? (
-				<SectionError error={query.error ?? new Error('')} onRetry={query.refetch} />
-			) : null}
-			{query.data === undefined ? (
-				query.status === 'error' ? null : (
-					<Skeleton rows={3} variant="row" />
-				)
-			) : query.data.result.meta.goalsUnresolved === true ? (
-				// The source never answered about the goals, which the plain empty state would
-				// read as "nobody converted".
-				<SectionEmpty label={keys.stateGoalsUnresolved} />
-			) : rows.length === 0 ? (
-				// A scope that configures no goals has nothing to convert on, which is a setup
-				// step rather than a window in which nobody converted.
-				<SectionEmpty
-					label={askedAboutNoGoals(query.data.query) ? keys.stateNoGoals : keys.stateNoBreakdown}
-				/>
-			) : (
-				<div className="analytics-view__scroll">
-					<table className="analytics-view__table">
-						<thead>
-							<tr>
-								<th scope="col">{t(keys.fieldGoalLabel)}</th>
-								<th scope="col">{t(METRIC_KEYS.conversions)}</th>
-								{servesRevenue ? <th scope="col">{t(METRIC_KEYS.revenue)}</th> : null}
-								{servesRate ? <th scope="col">{t(keys.viewConversionRate)}</th> : null}
-							</tr>
-						</thead>
-						<tbody>
-							{rows.map((row, index) => {
-								const slug = row.dimensions?.goal ?? ''
-								const rate = rates[index] ?? null
-								return (
-									<tr key={slug}>
-										<td>{names.get(slug) ?? slug}</td>
-										<td>
-											{formatMetricValue('conversions', row.metrics.conversions ?? 0, locale)}
-										</td>
-										{servesRevenue ? (
-											<td>{formatMetricValue('revenue', row.metrics.revenue ?? 0, locale)}</td>
-										) : null}
-										{servesRate ? <td>{rate === null ? '-' : percent.format(rate)}</td> : null}
-									</tr>
-								)
-							})}
-						</tbody>
-					</table>
-				</div>
-			)}
-		</section>
+			<h2 className="analytics-view__label analytics-view__heading" id={headingId}>
+				{t(keys.goalsCollectionPlural)}
+			</h2>
+			<QueryError query={query} />
+			{body()}
+		</Card>
 	)
 }

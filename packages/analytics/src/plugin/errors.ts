@@ -1,12 +1,8 @@
+import { isRecord } from '../core/values'
+
 /**
- * Every code any analytics endpoint answers with, in one place so a handler cannot invent
- * a word only its own client knows. Kept free of Payload and Node imports: admin clients
- * import {@link readErrorCode} from here to branch on what an endpoint said.
- *
- * `invalid_param` and the `unsupported_*` family are the query parser's `400`s;
- * `unauthorized` (`401`), `forbidden` (`403`), `not_found` (`404`), `unknown_source`
- * (`404`), `untrusted_scope` (`400`), `payload_too_large` (`413`), `unavailable` (`503`)
- * and `internal` (`500`) are raised by the handlers themselves.
+ * Every code an analytics endpoint answers with, so no handler invents one only its client knows.
+ * Free of Payload and Node imports: admin clients import {@link readErrorCode} from here.
  */
 export const ANALYTICS_ERROR_CODES = [
 	'invalid_param',
@@ -22,6 +18,8 @@ export const ANALYTICS_ERROR_CODES = [
 	'payload_too_large',
 	'unauthorized',
 	'forbidden',
+	'rate_limited',
+	'source_misconfigured',
 	'unavailable',
 	'internal',
 ] as const
@@ -51,6 +49,13 @@ export const NO_STORE = { 'Cache-Control': 'private, no-store' }
 /** How long a client should wait out a provider outage before retrying the same read. */
 export const RETRY_AFTER = { 'Retry-After': '30' }
 
+/**
+ * A `Retry-After` header for a wait in milliseconds, in whole seconds and never below 1; the
+ * default 30 seconds when the wait is unknown.
+ */
+export const retryAfter = (ms: number | undefined): Record<'Retry-After', string> =>
+	ms === undefined ? RETRY_AFTER : { 'Retry-After': String(Math.max(1, Math.ceil(ms / 1000))) }
+
 /** An endpoint's error answer: coded body, never cached, headers merged over `NO_STORE`. */
 export const errorResponse = (
 	status: number,
@@ -58,17 +63,32 @@ export const errorResponse = (
 	headers: Record<string, string> = {}
 ): Response => Response.json({ error }, { status, headers: { ...NO_STORE, ...headers } })
 
-const CODES: ReadonlySet<string> = new Set<AnalyticsErrorCode>(ANALYTICS_ERROR_CODES)
+/** 401 for a request with no signed-in user. */
+export const unauthorizedResponse = (): Response =>
+	errorResponse(401, analyticsError('unauthorized', 'analytics: authentication required'))
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === 'object' && value !== null
+/** 403 for a reader `access.read` turns away. */
+export const readDeniedResponse = (): Response =>
+	errorResponse(403, analyticsError('forbidden', 'analytics: read access denied'))
+
+/** 503 while no runtime is registered; as retryable as a provider outage, so it waits as long. */
+export const notAvailableResponse = (): Response =>
+	errorResponse(503, analyticsError('unavailable', 'analytics: not available'), RETRY_AFTER)
+
+/** 400 for a scope the request may not read; `param` names the parameter that carried it. */
+export const untrustedScopeResponse = (param?: string): Response =>
+	errorResponse(
+		400,
+		analyticsError('untrusted_scope', 'analytics: scope is not permitted for this request', param)
+	)
+
+const CODES: ReadonlySet<string> = new Set<AnalyticsErrorCode>(ANALYTICS_ERROR_CODES)
 
 const isErrorCode = (value: string): value is AnalyticsErrorCode => CODES.has(value)
 
 /**
- * The error out of a parsed response body, or undefined for anything this version cannot
- * read: a body that is not the envelope, and a code no release of this package ever sent.
- * A code added by a newer server therefore reads as a generic failure rather than as a lie.
+ * The error in a parsed body, or undefined for a non-envelope body or a code this version never
+ * sent, so a newer server's code reads as a generic failure rather than a lie.
  */
 export const readError = (body: unknown): AnalyticsError | undefined => {
 	if (!isRecord(body)) {
@@ -90,9 +110,8 @@ export const readErrorCode = (body: unknown): AnalyticsErrorCode | undefined =>
 	readError(body)?.code
 
 /**
- * {@link readError} over a response whose body has yet to be read. A body that is not JSON
- * at all, including an empty one, reads as no error rather than throwing: the status still
- * carries the failure.
+ * {@link readError} over an unread response. A non-JSON or empty body reads as no error rather than
+ * throwing, since the status still carries the failure.
  */
 export const readResponseError = async (res: Response): Promise<AnalyticsError | undefined> => {
 	try {

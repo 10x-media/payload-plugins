@@ -1,21 +1,28 @@
-import type { SerializedCapabilities } from '../core/capabilities'
 import {
-	type AnalyticsFilter,
-	type AnalyticsQuery,
-	DIMENSION_KEYS,
-	type DimensionKey,
-	FILTER_OPERATORS,
-	type FilterOperator,
-	type Granularity,
-	type MetricKey,
+	filterOperatorsFor,
+	metricOutOfReach,
+	type SerializedCapabilities,
+} from '../core/capabilities'
+import type {
+	AnalyticsFilter,
+	AnalyticsQuery,
+	DateRange,
+	DimensionKey,
+	Granularity,
+	MetricKey,
 } from '../core/contract'
-import { GRANULARITY_ORDER } from '../core/granularity'
+import { supportsGranularity } from '../core/granularity'
+import { isDimensionKey, isFilterOperator, isGranularity, isMetricKey } from '../core/guards'
+import { servedName } from '../core/metricAliases'
+import { isOneOf, isRecord } from '../core/values'
+import { parseItemRef } from '../items/ref'
 import { type AnalyticsError, analyticsError } from '../plugin/errors'
+import { isTimeframePreset, TIMEFRAME_PRESETS, type TimeframePreset } from '../timeframe/presets'
 import { isValidTimeZone } from '../timeframe/tz'
-import { METRIC_KEYS } from '../translations/metricKeys'
 import { parseDayOrInstant } from './dates'
 import {
 	DEFAULT_QUERY_LIMIT,
+	exceedsRangeCap,
 	MAX_QUERY_DIMENSIONS,
 	MAX_QUERY_FILTER_VALUE_LENGTH,
 	MAX_QUERY_FILTERS,
@@ -34,23 +41,29 @@ import {
 export interface ParsedQuery {
 	query: AnalyticsQuery
 	compare: 'previous' | null
+	/**
+	 * The named timeframe the caller resolved `from` and `to` from, which lets the read be stored
+	 * for the warm task to repeat; null when the caller named none.
+	 */
+	timeframe: TimeframePreset | null
 }
 
 export type ParseResult = { ok: true; value: ParsedQuery } | { ok: false; error: AnalyticsError }
 
-export interface ParseQueryArgs {
+interface ParseQueryArgs {
 	capabilities: SerializedCapabilities
 	/** Reporting timezone the plugin resolved for this request; the `timezone` param overrides it. */
 	timezone: string
 }
 
-const KNOWN_METRICS = new Set<string>(Object.keys(METRIC_KEYS))
-const KNOWN_DIMENSIONS = new Set<string>(DIMENSION_KEYS)
-const KNOWN_OPERATORS = new Set<string>(FILTER_OPERATORS)
-const KNOWN_GRANULARITIES = new Set<string>(GRANULARITY_ORDER)
-const DAY_MS = 86_400_000
+type Failure = Extract<ParseResult, { ok: false }>
 
-const fail = (code: AnalyticsError['code'], message: string, param: string): ParseResult => ({
+/** One parameter's parsed value, or the failure that ends the parse. */
+type Parsed<T> = { ok: true; value: T } | Failure
+
+const parsed = <T>(value: T): Parsed<T> => ({ ok: true, value })
+
+const fail = (code: AnalyticsError['code'], message: string, param: string): Failure => ({
 	ok: false,
 	error: analyticsError(code, message, param),
 })
@@ -59,9 +72,8 @@ const fail = (code: AnalyticsError['code'], message: string, param: string): Par
 const echo = (value: string): string => (value.length > 40 ? `${value.slice(0, 40)}...` : value)
 
 /**
- * A trimmed non-empty parameter, or null when absent or blank. Exported so the handler
- * reads `source` and `scope` (which it must resolve before the parser can run) exactly
- * the way the parser reads everything else.
+ * A trimmed non-empty parameter, or null. Exported so the handler reads `source` and `scope`
+ * exactly as the parser reads everything else.
  */
 export const readParam = (params: URLSearchParams, name: string): string | null => {
 	const raw = params.get(name)?.trim()
@@ -76,110 +88,51 @@ const commaList = (raw: string): string[] =>
 
 const dedupe = <T extends string>(values: T[]): T[] => [...new Set(values)]
 
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === 'object' && value !== null && !Array.isArray(value)
-
-const parseFilters = (
-	raw: string,
-	capabilities: SerializedCapabilities
-): AnalyticsFilter[] | ParseResult => {
-	let decoded: unknown
-	try {
-		decoded = JSON.parse(raw)
-	} catch {
-		return fail('invalid_param', 'filters must be a JSON array', 'filters')
-	}
-	if (!Array.isArray(decoded)) {
-		return fail('invalid_param', 'filters must be a JSON array', 'filters')
-	}
-	if (decoded.length > MAX_QUERY_FILTERS) {
-		return fail('invalid_param', `at most ${MAX_QUERY_FILTERS} filters are allowed`, 'filters')
-	}
-	const filterable = new Set<string>(capabilities.filters)
-	const operators = new Set<string>(capabilities.filterOperators)
-	const parsed: AnalyticsFilter[] = []
-	for (const item of decoded) {
-		if (!isRecord(item)) {
-			return fail('invalid_param', 'each filter must be an object', 'filters')
-		}
-		const { dimension, operator, value } = item
-		if (typeof dimension !== 'string' || !KNOWN_DIMENSIONS.has(dimension)) {
-			return fail(
-				'invalid_param',
-				`unknown filter dimension: ${echo(String(dimension))}`,
-				'filters'
-			)
-		}
-		if (typeof operator !== 'string' || !KNOWN_OPERATORS.has(operator)) {
-			return fail('invalid_param', `unknown filter operator: ${echo(String(operator))}`, 'filters')
-		}
-		if (typeof value !== 'string') {
-			return fail('invalid_param', 'each filter value must be a string', 'filters')
-		}
-		const trimmed = value.trim()
-		if (trimmed.length < 1 || trimmed.length > MAX_QUERY_FILTER_VALUE_LENGTH) {
-			return fail(
-				'invalid_param',
-				`each filter value must be 1 to ${MAX_QUERY_FILTER_VALUE_LENGTH} characters`,
-				'filters'
-			)
-		}
-		if (!filterable.has(dimension)) {
-			return fail('unsupported_filter', `source cannot filter on ${dimension}`, 'filters')
-		}
-		if (!operators.has(operator)) {
-			return fail('unsupported_operator', `source does not support ${operator}`, 'filters')
-		}
-		parsed.push({
-			dimension: dimension as DimensionKey,
-			operator: operator as FilterOperator,
-			value: trimmed,
-		})
-	}
-	return parsed
-}
-
 /**
- * Validate a query string against a source's serialized capabilities. Rules are evaluated
- * in a fixed order and the first failure wins: timezone, metrics, dimensions, from/to,
- * granularity, filters, limit, order, compare, path, hostname. Within each, a value
- * outside the contract's own union is `invalid_param` and a contract value the source
- * lacks is its `unsupported_*` code. Unknown parameters are ignored; `source` and `scope`
- * pass through unvalidated, since only the handler knows whether they are trusted.
+ * Dimension list as the query parser reads it, for callers outside the query endpoint (document
+ * panel). Unknown names are dropped, not refused: the caller wants blocks to draw, not an error.
  */
-export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs): ParseResult => {
-	const rawTimezone = readParam(params, 'timezone')
-	if (rawTimezone !== null && !isValidTimeZone(rawTimezone)) {
-		return fail('invalid_param', `unknown timezone: ${echo(rawTimezone)}`, 'timezone')
-	}
-	const timezone = rawTimezone ?? args.timezone
+export const readDimensionList = (
+	raw: string | null,
+	max: number = MAX_QUERY_DIMENSIONS
+): DimensionKey[] => dedupe(commaList(raw ?? '').filter(isDimensionKey)).slice(0, max)
 
-	const rawMetrics = readParam(params, 'metrics')
-	const metricList = rawMetrics ? commaList(rawMetrics) : []
-	if (metricList.length === 0) {
+const parseMetrics = (
+	params: URLSearchParams,
+	capabilities: SerializedCapabilities
+): Parsed<MetricKey[]> => {
+	const listed = commaList(readParam(params, 'metrics') ?? '')
+	if (listed.length === 0) {
 		return fail('invalid_param', 'metrics is required', 'metrics')
 	}
-	const unknownMetric = metricList.find((m) => !KNOWN_METRICS.has(m))
-	if (unknownMetric !== undefined) {
-		return fail('invalid_param', `unknown metric: ${echo(unknownMetric)}`, 'metrics')
+	const unknown = listed.find((m) => !isMetricKey(m))
+	if (unknown !== undefined) {
+		return fail('invalid_param', `unknown metric: ${echo(unknown)}`, 'metrics')
 	}
-	const metrics = dedupe(metricList) as MetricKey[]
+	const metrics = dedupe(listed.filter(isMetricKey))
 	if (metrics.length > MAX_QUERY_METRICS) {
 		return fail('invalid_param', `at most ${MAX_QUERY_METRICS} metrics are allowed`, 'metrics')
 	}
-	const servedMetrics = new Set<string>(args.capabilities.metrics)
-	const unsupportedMetric = metrics.find((m) => !servedMetrics.has(m))
-	if (unsupportedMetric !== undefined) {
-		return fail('unsupported_metric', `source does not serve ${unsupportedMetric}`, 'metrics')
+	// A source serving one of `visits` and `sessions` answers the other under the name asked for.
+	const unsupported = metrics.find(
+		(m) => !capabilities.metrics.includes(servedName(m, capabilities.metrics))
+	)
+	if (unsupported !== undefined) {
+		return fail('unsupported_metric', `source does not serve ${unsupported}`, 'metrics')
 	}
+	return parsed(metrics)
+}
 
-	const rawDimensions = readParam(params, 'dimensions')
-	const dimensionList = rawDimensions ? commaList(rawDimensions) : []
-	const unknownDimension = dimensionList.find((d) => !KNOWN_DIMENSIONS.has(d))
-	if (unknownDimension !== undefined) {
-		return fail('invalid_param', `unknown dimension: ${echo(unknownDimension)}`, 'dimensions')
+const parseDimensions = (
+	params: URLSearchParams,
+	capabilities: SerializedCapabilities
+): Parsed<DimensionKey[]> => {
+	const listed = commaList(readParam(params, 'dimensions') ?? '')
+	const unknown = listed.find((d) => !isDimensionKey(d))
+	if (unknown !== undefined) {
+		return fail('invalid_param', `unknown dimension: ${echo(unknown)}`, 'dimensions')
 	}
-	const dimensions = dedupe(dimensionList) as DimensionKey[]
+	const dimensions = dedupe(listed.filter(isDimensionKey))
 	if (dimensions.length > MAX_QUERY_DIMENSIONS) {
 		return fail(
 			'invalid_param',
@@ -187,16 +140,18 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 			'dimensions'
 		)
 	}
-	const servedDimensions = new Set<string>(args.capabilities.dimensions)
-	const unsupportedDimension = dimensions.find((d) => !servedDimensions.has(d))
-	if (unsupportedDimension !== undefined) {
+	const unsupported = dimensions.find((d) => !capabilities.dimensions.includes(d))
+	if (unsupported !== undefined) {
 		return fail(
 			'unsupported_dimension',
-			`source does not break down by ${unsupportedDimension}`,
+			`source does not break down by ${unsupported}`,
 			'dimensions'
 		)
 	}
+	return parsed(dimensions)
+}
 
+const parseRange = (params: URLSearchParams, timezone: string): Parsed<DateRange> => {
 	const rawFrom = readParam(params, 'from')
 	const rawTo = readParam(params, 'to')
 	if (!rawFrom) {
@@ -216,70 +171,202 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 	if (end.getTime() < start.getTime()) {
 		return fail('invalid_param', 'to must not be before from', 'to')
 	}
-	if (end.getTime() - start.getTime() > MAX_QUERY_RANGE_DAYS * DAY_MS) {
+	if (exceedsRangeCap({ start, end })) {
 		return fail('range_too_long', `the range must not exceed ${MAX_QUERY_RANGE_DAYS} days`, 'to')
 	}
+	return parsed({ start, end })
+}
 
-	const rawGranularity = readParam(params, 'granularity')
-	if (rawGranularity !== null && !KNOWN_GRANULARITIES.has(rawGranularity)) {
-		return fail('invalid_param', `unknown granularity: ${echo(rawGranularity)}`, 'granularity')
+const parseGranularity = (
+	params: URLSearchParams,
+	capabilities: SerializedCapabilities
+): Parsed<Granularity | null> => {
+	const raw = readParam(params, 'granularity')
+	if (raw === null) {
+		return parsed(null)
 	}
-	const granularity = rawGranularity as Granularity | null
-	if (
-		granularity !== null &&
-		GRANULARITY_ORDER.indexOf(granularity) <
-			GRANULARITY_ORDER.indexOf(args.capabilities.minGranularity)
-	) {
+	if (!isGranularity(raw)) {
+		return fail('invalid_param', `unknown granularity: ${echo(raw)}`, 'granularity')
+	}
+	if (!supportsGranularity(capabilities, raw)) {
 		return fail(
 			'unsupported_granularity',
-			`source buckets no finer than ${args.capabilities.minGranularity}`,
+			`source buckets no finer than ${capabilities.minGranularity}`,
 			'granularity'
 		)
 	}
+	return parsed(raw)
+}
 
-	const rawFilters = readParam(params, 'filters')
-	const filters = rawFilters === null ? [] : parseFilters(rawFilters, args.capabilities)
-	if (!Array.isArray(filters)) {
-		return filters
+const parseFilters = (
+	params: URLSearchParams,
+	capabilities: SerializedCapabilities
+): Parsed<AnalyticsFilter[]> => {
+	const raw = readParam(params, 'filters')
+	if (raw === null) {
+		return parsed([])
 	}
-
-	const rawLimit = readParam(params, 'limit')
-	let limit = DEFAULT_QUERY_LIMIT
-	if (rawLimit !== null) {
-		if (!/^\d+$/.test(rawLimit)) {
-			return fail('invalid_param', `limit must be an integer: ${echo(rawLimit)}`, 'limit')
+	let decoded: unknown
+	try {
+		decoded = JSON.parse(raw)
+	} catch {
+		return fail('invalid_param', 'filters must be a JSON array', 'filters')
+	}
+	if (!Array.isArray(decoded)) {
+		return fail('invalid_param', 'filters must be a JSON array', 'filters')
+	}
+	if (decoded.length > MAX_QUERY_FILTERS) {
+		return fail('invalid_param', `at most ${MAX_QUERY_FILTERS} filters are allowed`, 'filters')
+	}
+	const filters: AnalyticsFilter[] = []
+	for (const item of decoded) {
+		if (!isRecord(item) || Array.isArray(item)) {
+			return fail('invalid_param', 'each filter must be an object', 'filters')
 		}
-		limit = Number(rawLimit)
-		if (limit < MIN_QUERY_LIMIT || limit > MAX_QUERY_LIMIT) {
+		const { dimension, operator, value } = item
+		if (!isDimensionKey(dimension)) {
 			return fail(
 				'invalid_param',
-				`limit must be between ${MIN_QUERY_LIMIT} and ${MAX_QUERY_LIMIT}`,
-				'limit'
+				`unknown filter dimension: ${echo(String(dimension))}`,
+				'filters'
+			)
+		}
+		if (!isFilterOperator(operator)) {
+			return fail('invalid_param', `unknown filter operator: ${echo(String(operator))}`, 'filters')
+		}
+		if (typeof value !== 'string') {
+			return fail('invalid_param', 'each filter value must be a string', 'filters')
+		}
+		const trimmed = value.trim()
+		if (trimmed.length < 1 || trimmed.length > MAX_QUERY_FILTER_VALUE_LENGTH) {
+			return fail(
+				'invalid_param',
+				`each filter value must be 1 to ${MAX_QUERY_FILTER_VALUE_LENGTH} characters`,
+				'filters'
+			)
+		}
+		// Per pair, not per list: a source can take `contains` on one dimension and not another.
+		const offered = filterOperatorsFor(capabilities, dimension)
+		if (offered.length === 0) {
+			return fail('unsupported_filter', `source cannot filter on ${dimension}`, 'filters')
+		}
+		if (!offered.includes(operator)) {
+			return fail(
+				'unsupported_operator',
+				`source cannot filter ${dimension} with ${operator}`,
+				'filters'
+			)
+		}
+		filters.push({ dimension, operator, value: trimmed })
+	}
+	return parsed(filters)
+}
+
+const parseLimit = (params: URLSearchParams): Parsed<number> => {
+	const raw = readParam(params, 'limit')
+	if (raw === null) {
+		return parsed(DEFAULT_QUERY_LIMIT)
+	}
+	if (!/^\d+$/.test(raw)) {
+		return fail('invalid_param', `limit must be an integer: ${echo(raw)}`, 'limit')
+	}
+	const limit = Number(raw)
+	if (limit < MIN_QUERY_LIMIT || limit > MAX_QUERY_LIMIT) {
+		return fail(
+			'invalid_param',
+			`limit must be between ${MIN_QUERY_LIMIT} and ${MAX_QUERY_LIMIT}`,
+			'limit'
+		)
+	}
+	return parsed(limit)
+}
+
+const parseOrder = (
+	params: URLSearchParams,
+	metrics: readonly MetricKey[]
+): Parsed<AnalyticsQuery['order']> => {
+	const raw = readParam(params, 'order')
+	if (raw === null) {
+		return parsed(undefined)
+	}
+	const parts = raw.split(':')
+	const metric = parts[0] ?? ''
+	const direction = parts[1] ?? ''
+	if (parts.length !== 2 || (direction !== 'asc' && direction !== 'desc')) {
+		return fail('invalid_param', 'order must be <metric>:<asc|desc>', 'order')
+	}
+	if (!isOneOf(metrics, metric)) {
+		return fail('invalid_param', `order metric is not in metrics: ${echo(metric)}`, 'order')
+	}
+	return parsed({ metric, direction })
+}
+
+/** The refusal of the first metric the source cannot read for a read of this shape. */
+const outOfReach = (
+	capabilities: SerializedCapabilities,
+	metrics: readonly MetricKey[],
+	shape: { dimensions: DimensionKey[]; filters: AnalyticsFilter[]; path: boolean }
+): Failure | undefined => {
+	for (const metric of metrics) {
+		const out = metricOutOfReach(capabilities, servedName(metric, capabilities.metrics), shape)
+		if (out !== null) {
+			return fail(
+				'unsupported_metric',
+				'breakdown' in out
+					? `source does not serve ${metric} by ${out.breakdown}`
+					: `source serves ${metric} only by ${out.needs} or filtered by it`,
+				'metrics'
 			)
 		}
 	}
+	return undefined
+}
 
-	const rawOrder = readParam(params, 'order')
-	let order: AnalyticsQuery['order']
-	if (rawOrder !== null) {
-		const parts = rawOrder.split(':')
-		const metric = parts[0] ?? ''
-		const direction = parts[1] ?? ''
-		if (parts.length !== 2 || (direction !== 'asc' && direction !== 'desc')) {
-			return fail('invalid_param', 'order must be <metric>:<asc|desc>', 'order')
-		}
-		const ordered = metrics.find((m) => m === metric)
-		if (ordered === undefined) {
-			return fail('invalid_param', `order metric is not in metrics: ${echo(metric)}`, 'order')
-		}
-		order = { metric: ordered, direction }
+/**
+ * First failing rule wins, in a fixed order: a value outside the contract is `invalid_param`, one
+ * the source lacks its `unsupported_*` code; `source` and `scope` pass unvalidated.
+ */
+export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs): ParseResult => {
+	const { capabilities } = args
+	const rawTimezone = readParam(params, 'timezone')
+	if (rawTimezone !== null && !isValidTimeZone(rawTimezone)) {
+		return fail('invalid_param', `unknown timezone: ${echo(rawTimezone)}`, 'timezone')
+	}
+	const timezone = rawTimezone ?? args.timezone
+	const metrics = parseMetrics(params, capabilities)
+	if (!metrics.ok) {
+		return metrics
+	}
+	const dimensions = parseDimensions(params, capabilities)
+	if (!dimensions.ok) {
+		return dimensions
+	}
+	const range = parseRange(params, timezone)
+	if (!range.ok) {
+		return range
+	}
+	const granularity = parseGranularity(params, capabilities)
+	if (!granularity.ok) {
+		return granularity
+	}
+	const filters = parseFilters(params, capabilities)
+	if (!filters.ok) {
+		return filters
+	}
+	const limit = parseLimit(params)
+	if (!limit.ok) {
+		return limit
+	}
+	const order = parseOrder(params, metrics.value)
+	if (!order.ok) {
+		return order
 	}
 
 	const rawCompare = readParam(params, 'compare')
 	if (rawCompare !== null && rawCompare !== 'previous') {
 		return fail('invalid_param', `compare must be "previous": ${echo(rawCompare)}`, 'compare')
 	}
-	if (rawCompare === 'previous' && !args.capabilities.comparison) {
+	if (rawCompare === 'previous' && !capabilities.comparison) {
 		return fail('invalid_param', 'source does not support comparison', 'compare')
 	}
 
@@ -296,20 +383,51 @@ export const parseQueryParams = (params: URLSearchParams, args: ParseQueryArgs):
 		)
 	}
 
+	const item = readParam(params, 'item')
+	if (item !== null && parseItemRef(item) === null) {
+		return fail('invalid_param', `item must be a <collection>:<id> ref: ${echo(item)}`, 'item')
+	}
+	if (item !== null && capabilities.perItemQuery !== true) {
+		return fail('invalid_param', 'source cannot read one item', 'item')
+	}
+
+	const unreachable = outOfReach(capabilities, metrics.value, {
+		dimensions: dimensions.value,
+		filters: filters.value,
+		path: path !== null,
+	})
+	if (unreachable) {
+		return unreachable
+	}
+
+	const rawTimeframe = readParam(params, 'timeframe')
+	if (rawTimeframe !== null && !isTimeframePreset(rawTimeframe)) {
+		return fail(
+			'invalid_param',
+			`timeframe must be one of ${TIMEFRAME_PRESETS.join(', ')}: ${echo(rawTimeframe)}`,
+			'timeframe'
+		)
+	}
+
 	const query: AnalyticsQuery = {
-		metrics,
-		dateRange: { start, end },
-		limit,
+		metrics: metrics.value,
+		dateRange: range.value,
+		limit: limit.value,
 		timezone,
-		...(dimensions.length > 0 ? { dimensions } : {}),
-		...(granularity !== null ? { granularity } : {}),
-		...(filters.length > 0 ? { filters } : {}),
-		...(order ? { order } : {}),
+		...(dimensions.value.length > 0 ? { dimensions: dimensions.value } : {}),
+		...(granularity.value !== null ? { granularity: granularity.value } : {}),
+		...(filters.value.length > 0 ? { filters: filters.value } : {}),
+		...(order.value ? { order: order.value } : {}),
 		...(path !== null ? { path } : {}),
 		...(hostname !== null ? { hostname } : {}),
+		...(item !== null ? { item } : {}),
 	}
 	return {
 		ok: true,
-		value: { query, compare: rawCompare === 'previous' ? 'previous' : null },
+		value: {
+			query,
+			compare: rawCompare === 'previous' ? 'previous' : null,
+			timeframe: isTimeframePreset(rawTimeframe) ? rawTimeframe : null,
+		},
 	}
 }

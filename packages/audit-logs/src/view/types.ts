@@ -42,12 +42,29 @@ export type Filters = {
 	operations?: string[]
 	tenants?: string[]
 	users?: string[]
+	/** Declared `view.filters` by name, each a list of values. Absent when none is set. */
+	custom?: Record<string, string[]>
+}
+
+/** A declared `view.filters` entry as the client needs it, label already translated. */
+export type CustomFilterOption = {
+	label: string
+	name: string
+	relationTo: string
 }
 
 export type SelectOption = { label: string; value: string }
 
 /** Server-rendered custom event bodies, keyed by entry id. */
 export type RenderedEvents = Record<string, ReactNode>
+
+/** The row slots `view.components` configures, rendered on the server for one entry. */
+export type RenderedRowSlots = {
+	afterDetails?: ReactNode
+	badges?: ReactNode
+	beforeDetails?: ReactNode
+	user?: ReactNode
+}
 
 export type AuditLogsClientProps = {
 	adminRoute: string
@@ -84,6 +101,13 @@ export type AuditLogsClientProps = {
 	/** Whether the archive job is configured (controls visibility of the Archive button). */
 	hasArchive?: boolean
 	renderedEvents?: RenderedEvents
+	/** Row slots by entry id, only for the slots that are configured. */
+	renderedRows?: Record<string, RenderedRowSlots>
+	/** `view.components.beforeList` and `afterList`, rendered once for the page. */
+	beforeList?: ReactNode
+	afterList?: ReactNode
+	/** Declared `view.filters`, offered under More filters. */
+	customFilters: CustomFilterOption[]
 	/** Custom event types for the Event filter and their badge labels. */
 	customEventTypes: SelectOption[]
 }

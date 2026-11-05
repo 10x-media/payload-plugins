@@ -22,9 +22,20 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	const userCount = await payload.count({ collection: 'users' })
 	if (userCount.totalDocs > 0) return
 
+	// Two departments the admin belongs to. `logs.extend` copies them onto every entry
+	// the admin writes, so the rows below carry department badges and the Department
+	// filter under More filters has something to match.
+	const sales = await payload.create({ collection: 'departments', data: { name: 'Sales' } })
+	const support = await payload.create({ collection: 'departments', data: { name: 'Support' } })
+
 	const user = await payload.create({
 		collection: 'users',
-		data: { email: DEV_EMAIL, password: DEV_PASSWORD, name: 'Dev Admin' },
+		data: {
+			email: DEV_EMAIL,
+			password: DEV_PASSWORD,
+			name: 'Dev Admin',
+			departments: [sales.id, support.id],
+		},
 	})
 	payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 
@@ -208,7 +219,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		req: groupedReq,
 	})
 
-	// A second auth collection makes `user` polymorphic. The customer places an order,
+	// A second auth collection, so the log names users of both. The customer places an order,
 	// so their entries sit next to the admin's in the list with their own pill.
 	const customer = await payload.create({
 		collection: 'customers',

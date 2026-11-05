@@ -1,16 +1,14 @@
 export type DeviceType = 'desktop' | 'mobile' | 'tablet'
 
 /**
- * The user agent server-side tracking stamps when the event has no browser request behind
- * it. There is no device to report, so events carrying it abstain from the device breakdown
- * rather than piling into `desktop` and skewing it.
+ * User agent stamped on server events with no browser request behind them; they abstain from the
+ * device breakdown rather than piling into `desktop`.
  */
 export const SERVER_USER_AGENT = 'analytics-server'
 
 /**
- * Coarse device class from a user-agent string, or undefined when the agent is not a device
- * at all. Tablets are checked before phones because an Android tablet UA lacks the `Mobile`
- * token an Android phone carries.
+ * Coarse device class, undefined for the server agent. Tablets are checked first because an
+ * Android tablet UA lacks the `Mobile` token an Android phone carries.
  */
 export const classifyDevice = (ua: string): DeviceType | undefined => {
 	if (ua === SERVER_USER_AGENT) {

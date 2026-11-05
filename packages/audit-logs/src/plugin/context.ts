@@ -10,7 +10,7 @@ import type { AuditPluginConfig, DataRetentionConfig, MultiTenancyConfig } from 
 export type PluginContext = {
 	collectIpAddress: boolean
 	collectUserAgent: boolean
-	/** What the `user` field on an audit log entry relates to. */
+	/** What the `createdBy` and `lastModifiedBy` audit fields relate to. */
 	defaultRelationTo: CollectionSlug | CollectionSlug[]
 	/** Key read off `req.context` to group entries written by one operation. */
 	groupContextKey: string | undefined
@@ -20,8 +20,6 @@ export type PluginContext = {
 	 * `registerLogsCollection`, because it depends on what `logs.override` returned.
 	 */
 	fastWrite: boolean
-	/** True when more than one auth collection exists, so `user` stores `{ relationTo, value }`. */
-	isUserPolymorphic: boolean
 	multiTenancy: MultiTenancyConfig | undefined
 	/** Whether entries carry an `impersonator` field. See `AuditPluginConfig.impersonation`. */
 	recordImpersonator: boolean
@@ -66,7 +64,6 @@ export const buildPluginContext = (
 			? (groupConfig !== true && groupConfig !== false && groupConfig?.contextKey) || 'auditGroup'
 			: undefined,
 		groupEnabled,
-		isUserPolymorphic: Array.isArray(defaultRelationTo),
 		multiTenancy,
 		recordImpersonator: pluginOptions.impersonation ?? Boolean(plugins['@10x-media/impersonation']),
 		retention: pluginOptions.retention,

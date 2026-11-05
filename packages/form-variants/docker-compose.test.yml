@@ -1,6 +1,7 @@
 services:
   mongo:
-    image: mongo:8
+    # Newer images refuse to start on Linux 6.19+, which GitHub runners use (SERVER-121912).
+    image: mongo:8.2.12
     command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
     ports:
       - '${MONGO_E2E_PORT:-37017}:27017'

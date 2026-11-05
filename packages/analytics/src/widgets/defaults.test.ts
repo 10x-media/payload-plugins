@@ -50,7 +50,7 @@ describe('analyticsDefaultWidgets', () => {
 	})
 
 	it('opens each breakdown on the metric its widget defaults to', () => {
-		const expected = new Map(
+		const expected = new Map<string, string>(
 			BREAKDOWN_SPECS.map((spec) => [spec.slug, spec.preferredDefault ?? 'pageviews'])
 		)
 		const metrics = analyticsDefaultWidgets()

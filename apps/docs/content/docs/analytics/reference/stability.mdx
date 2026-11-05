@@ -1,0 +1,87 @@
+---
+title: Stability
+description: What the plugin keeps stable between releases, what its release tags mean, and which unions may grow.
+---
+
+`@10x-media/analytics` follows semantic versioning from 1.0.0: within a major release nothing public is removed or renamed, and a change that would break an install waits for the next major. Until 1.0.0 the package is published as betas under the `beta` dist-tag, and a beta may change what this page calls public; each such change is listed, with what to do about it, on [Upgrading](/analytics/upgrading).
+
+## What is public
+
+Within a major release, these keep their names and their meaning:
+
+- **Exports.** Every export of every entry point that carries no `@beta` or `@internal` tag ([Entry points](/analytics/reference/entry-points) lists them, with their tags). `memoryAdapter` and `settleAnalytics` from `@10x-media/analytics/testing` are among them.
+- **Options.** Every path on [Options](/analytics/reference/options), with its type and its default, except the `@beta` ones: `view.Component`, everything under `widgets`, and `countryFlags`, which belong with the dashboard widgets and the view's building blocks.
+- **Component paths.** The [paths the plugin registers](#component-paths) in your import map.
+- **Styling.** The CSS classes and the `--analytics-*` tokens [Customizing](/analytics/customizing#styling) documents.
+- **Endpoints.** Every [endpoint](/analytics/reference/endpoints): its method, its path under `routes.base`, its parameters, its success shape (a release may add optional fields) and the error envelope `{ error: { code, message, param? } }`.
+- **Browser names.** The `analytics:exclude` storage key and the `analytics_exclude` query parameter.
+- **Collections you manage.** The goals, providers and sync collections: their default slugs and the fields they hold. A minor release may add a field to one, never remove or rename one.
+
+The other collections, `analytics-hits`, `analytics-aggregates`, `analytics-state` and `analytics-cache`, are the engine's and the cache's own storage. They are hidden, have no REST or GraphQL endpoints, and are not an interface: read them through the plugin's reads, not through `payload.find`. A minor release may change their fields and indexes.
+
+Whatever collection a release changes, its [Upgrading](/analytics/upgrading) page and its changelog say so. On Postgres and SQLite in migrate mode that takes a migration generated with `payload migrate:create`, with any edits the page lists; where stored rows have to move or go, the release ships a predefined migration or a helper in `@10x-media/analytics/migrations` for it.
+
+## Release tags
+
+Every export carries one of these in its declaration, and the API reports in the package's repository list them per entry:
+
+| Tag | Means |
+|---|---|
+| none | Stable: kept within a major. |
+| `@beta` | Public, and may change in a minor release. The dashboard widgets and everything around them (Payload marks its Modular Dashboard experimental): the built-in widget components, the `WidgetCard` family, the widget drawer's pickers, and the `widgets` option. The charts and counters a custom widget draws with: `BarList`, `TrendChart` (`maxTicks` included) and `RealtimeCounter`. The analytics view's exported sections and the `@beta` hooks of `@10x-media/analytics/client`, with `view.Component`. The flag seams: `countryFlags`, `HostCountryFlag` and `CountryFlagProps`. The toolkit an adapter built in `providers.resolve` uses: `createGuardedFetch`, `GuardedFetch`, `GuardedFetchOptions`, `resolveHostPolicy`, `CONNECTION_PATHS`, `SECRET_PATHS` and `ProviderFactoryContext`. The read principals `SYSTEM`, `ReadPrincipal` and `GatedScope`. The wire shapes `WireGoal`, `GoalsResponse`, `RawEventInput` and `HitType`. The structural GA4 types `Ga4Client`, `Ga4ReportResponse` and `Ga4ReportRow`. |
+| `@internal` | Exported only because Payload's import map names it: a component path the plugin registers, and the props it takes. Do not import it yourself. |
+| `@deprecated` | Exported for the rest of the major, and its documentation names what replaces it: the five picker paths 1.0.0-beta.11 registered, which keep working and name the server paths below; and `captureRewrites` and `posthogProxyRewrites` from `@10x-media/analytics/next`, which throw when called, since a Next rewrite forwards the visitor's cookies to the vendor (use [`captureRoute`](/analytics/proxy#a-route-handler-of-your-own)). |
+
+## Open unions
+
+These union types may gain members in a minor release, so code that switches over one handles a member it does not know, as a generic case of its kind, rather than exhausting it:
+
+`MetricKey`, `DimensionKey`, `TrafficChannel`, `AnalyticsErrorCode` (and its alias `QueryErrorCode`), `FilterOperator`, `Granularity`, `CaptureClientKind`, `ProviderId`, `TimeframePreset`, `GoalSource`, `BuiltInWidgetSlug`, `TranslationKey`, the read statuses `FieldReadStatus`, `WidgetReadStatus` and `WidgetRealtimeStatus`, and `SourceErrorKind`.
+
+A translation key is removed only in a major release, even one the plugin no longer reads: `pluginName` stays, and an override of it is still accepted. A key's text, in any language, may change in any release: a label is wording, not contract.
+
+These change only in a major release: `CaptureSlot` (`global` and `tenant`), the gate states (`GateStatus`: `pending`, `open`, `closed`), and the shape of every option but the `@beta` ones above.
+
+## Interfaces you implement or receive
+
+- **`AnalyticsAdapter`** and its capabilities may gain optional members in a minor release; an adapter of your own keeps compiling and working without them.
+- **The seams you implement**: `CacheStore` (`cache.store`), `GeoResolver` (`native({ geoResolver })`) and `ProvidersResolve` (`providers.resolve`). What the plugin passes them may gain optional fields in a minor release; what they must implement and answer changes only in a major.
+- **`Tracker`** may gain members in a minor release. Use the tracker `initTracker`, `createTracker`, `<AnalyticsScripts />` or `<AnalyticsProvider>` gives you; do not implement `Tracker` yourself.
+- A **result shape** (an endpoint's answer, a read helper's result, `AnalyticsResult.meta`) may gain optional fields.
+
+## Component paths
+
+The plugin and its field factories register these paths in your Payload config, and `payload generate:importmap` writes them into your import map. They are frozen for the 1.x line: a component that moves keeps its old path as a re-export.
+
+| Path | What it renders |
+|---|---|
+| `@10x-media/analytics/rsc#AnalyticsView` | The analytics view |
+| `@10x-media/analytics/rsc#AnalyticsMetricWidget` | The metric widget |
+| `@10x-media/analytics/rsc#AnalyticsTrendWidget` | The trend widget |
+| `@10x-media/analytics/rsc#AnalyticsRealtimeWidget` | The realtime widget |
+| `@10x-media/analytics/rsc#AnalyticsGoalsWidget` | The goals widget |
+| `@10x-media/analytics/rsc#AnalyticsBreakdownWidget` | Every breakdown widget |
+| `@10x-media/analytics/rsc#AnalyticsPanelField` | The Analytics tab's panel |
+| `@10x-media/analytics/rsc#AnalyticsStatField` | A stat field |
+| `@10x-media/analytics/rsc#MetricSelectFieldServer` | The widget drawer's metric picker |
+| `@10x-media/analytics/rsc#SourceSelectFieldServer` | The widget drawer's data source picker |
+| `@10x-media/analytics/rsc#FilterDimensionSelectFieldServer` | The widget filter's dimension picker |
+| `@10x-media/analytics/rsc#FilterOperatorSelectFieldServer` | The widget filter's operator picker |
+| `@10x-media/analytics/rsc#FilterValueFieldServer` | The widget filter's value field |
+| `@10x-media/analytics/rsc#GoalSelectFieldServer` | The `goalField()` picker |
+| `@10x-media/analytics/client#AnalyticsNavLink` | The view's nav link |
+| `@10x-media/analytics/client#DateRangeField` | The custom range picker |
+| `@10x-media/analytics/client#GoalAmountField` | The goal amount control |
+
+Five paths 1.0.0-beta.11 registered are kept as re-exports, so an import map generated before the upgrade still renders a working picker, keyed by the scope the page's cookies select rather than the server's: `@10x-media/analytics/client#SourceSelectField`, `#MetricSelectField`, `#FilterDimensionSelectField`, `#FilterOperatorSelectField` and `#GoalSelectField`. Each is `@deprecated`, naming its replacement (`@10x-media/analytics/rsc#SourceSelectFieldServer` and its siblings above), and stays frozen with the rest of this table. Regenerate the import map to move to the server paths.
+
+## Supported versions
+
+| | Supported |
+|---|---|
+| Payload | `^3.83.0` (`payload`, `@payloadcms/next`, `@payloadcms/ui`); the unit and MongoDB integration tests run every week against 3.83.0 and the newest 3.x |
+| Next.js | `^15.2.9` or `^16.2.6` |
+| React | `^19.0.0` |
+| Node.js | `22.18.0` or later |
+| Databases, for the native engine | MongoDB 5.0 or later, Postgres 12 or later, SQLite 3.35 or later on a database file; not Cloudflare D1, and not MongoDB-compatible services (Amazon DocumentDB, Azure Cosmos DB, Firestore) |
+| `@10x-media/fields` | `^0.1.0-beta.8`, a required peer |

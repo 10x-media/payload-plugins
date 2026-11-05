@@ -2,6 +2,9 @@ import type { Filters } from './types'
 
 export const GLOBAL_SENTINEL = '__global__'
 
+/** Prefix that keeps declared filters apart from the built-in keys in the URL. */
+export const CUSTOM_FILTER_PREFIX = 'f.'
+
 type Label = Record<string, string> | string | ((args: { i18n: unknown; t: unknown }) => string)
 
 /** A configured label as text: plain, per language, or a function. `false` and unset give nothing. */
@@ -73,66 +76,38 @@ export const apiBadgeClass = (payloadAPI: string): string =>
 export const apiLabel = (payloadAPI: string, labels: Record<string, string>): string =>
 	(Object.hasOwn(labels, payloadAPI) ? labels[payloadAPI] : undefined) ?? payloadAPI
 
-/**
- * A `user` or `impersonator` value as the row shows it. `slug` is missing only when
- * a bare id cannot be tied to a collection, which happens with several auth
- * collections and a value stored before the field went polymorphic.
- */
+/** A `user` or `impersonator` value as the row shows it. */
 export type ResolvedUser = {
 	deleted: boolean
 	id: string
 	label: string
-	slug?: string
-}
-
-const onlySlug = (userTitleFields: Record<string, string>): string | undefined => {
-	const slugs = Object.keys(userTitleFields)
-	return slugs.length === 1 ? slugs[0] : undefined
+	slug: string
 }
 
 const isId = (value: unknown): value is number | string =>
 	(typeof value === 'string' && value.length > 0) || typeof value === 'number'
 
-const fromDoc = (
-	doc: Record<string, unknown>,
-	slug: string | undefined,
-	userTitleFields: Record<string, string>
-): ResolvedUser | undefined => {
-	if (!isId(doc.id)) return undefined
-	const id = String(doc.id)
-	const titleField = slug ? userTitleFields[slug] : undefined
-	const title = titleField ? doc[titleField] : undefined
-	return { deleted: false, id, label: isId(title) ? String(title) : id, slug }
-}
-
 /**
- * The view reads with `overrideAccess`, so a relationship that comes back as a bare
- * id instead of a document points at a user that no longer exists.
+ * Reads a stored `{ relationTo, value }` pair after the view put the user document in
+ * `value`. A `value` still holding the id points at a user that no longer exists.
  */
 export const resolveUser = (
 	value: unknown,
 	userTitleFields: Record<string, string>
 ): ResolvedUser | undefined => {
-	if (isId(value)) {
-		return {
-			deleted: true,
-			id: String(value),
-			label: String(value),
-			slug: onlySlug(userTitleFields),
-		}
-	}
 	if (!value || typeof value !== 'object') return undefined
-	const record = value as Record<string, unknown>
-	if (typeof record.relationTo === 'string') {
-		const slug = record.relationTo
-		if (isId(record.value)) {
-			return { deleted: true, id: String(record.value), label: String(record.value), slug }
-		}
-		return record.value && typeof record.value === 'object'
-			? fromDoc(record.value as Record<string, unknown>, slug, userTitleFields)
-			: undefined
+	const { relationTo: slug, value: user } = value as Record<string, unknown>
+	if (typeof slug !== 'string') return undefined
+	if (isId(user)) {
+		return { deleted: true, id: String(user), label: String(user), slug }
 	}
-	return fromDoc(record, onlySlug(userTitleFields), userTitleFields)
+	if (!user || typeof user !== 'object') return undefined
+	const doc = user as Record<string, unknown>
+	if (!isId(doc.id)) return undefined
+	const id = String(doc.id)
+	const titleField = userTitleFields[slug]
+	const title = titleField ? doc[titleField] : undefined
+	return { deleted: false, id, label: isId(title) ? String(title) : id, slug }
 }
 
 export const formatDate = (iso: string): string => {
@@ -172,6 +147,9 @@ export const buildParams = (filters: Filters, page?: number, limit?: number): st
 	for (const ref of filters.users ?? []) params.append('userId', ref)
 	for (const group of filters.groups ?? []) params.append('group', group)
 	for (const api of filters.apis ?? []) params.append('api', api)
+	for (const [name, values] of Object.entries(filters.custom ?? {})) {
+		for (const value of values) params.append(`${CUSTOM_FILTER_PREFIX}${name}`, value)
+	}
 	if (filters.dateFrom) params.set('dateFrom', filters.dateFrom)
 	if (filters.dateTo) params.set('dateTo', filters.dateTo)
 	if (page && page > 1) params.set('page', String(page))

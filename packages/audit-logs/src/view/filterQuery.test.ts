@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 
 import { filterConditions, parseFilters, splitRef } from './filterQuery'
 
-const ctx = { userCollections: ['users'] }
+const ctx = {}
 
 describe('splitRef', () => {
 	it('splits a picked reference and keeps a typed id whole', () => {
@@ -49,14 +49,22 @@ describe('filterConditions', () => {
 		])
 	})
 
-	it('pairs users with their collection only when user is polymorphic', () => {
-		expect(filterConditions({ users: ['users:1', '2'] }, ctx)).toEqual([
-			{ user: { in: ['1', '2'] } },
-		])
-		expect(
-			filterConditions({ users: ['customers:1'] }, { userCollections: ['users', 'customers'] })
-		).toEqual([
+	it('pairs a picked user with its collection and matches a typed id in any', () => {
+		expect(filterConditions({ users: ['customers:1'] }, ctx)).toEqual([
 			{ and: [{ 'user.relationTo': { equals: 'customers' } }, { 'user.value': { equals: '1' } }] },
+		])
+		expect(filterConditions({ users: ['customers:1', '2'] }, ctx)).toEqual([
+			{
+				or: [
+					{
+						and: [
+							{ 'user.relationTo': { equals: 'customers' } },
+							{ 'user.value': { equals: '1' } },
+						],
+					},
+					{ 'user.value': { equals: '2' } },
+				],
+			},
 		])
 	})
 
@@ -103,5 +111,32 @@ describe('filterConditions', () => {
 		expect(filterConditions({ tenants: ['a'] }, { ...ctx, lockedTenantId: 'b' })).toEqual([
 			{ tenant: { equals: 'b' } },
 		])
+	})
+})
+
+describe('declared filters', () => {
+	const customFilters = [{ name: 'department', path: 'actorDepartments' }]
+
+	it('reads only declared names under the prefix', () => {
+		expect(
+			parseFilters(
+				{ 'f.department': ['a', 'b'], 'f.unknown': 'x' },
+				{ customFilterNames: ['department'] }
+			).custom
+		).toEqual({ department: ['a', 'b'] })
+	})
+
+	it('leaves custom unset when no declared filter has a value', () => {
+		expect(parseFilters({}, { customFilterNames: ['department'] }).custom).toBeUndefined()
+	})
+
+	it('matches the declared path with in, one value or several', () => {
+		expect(filterConditions({ custom: { department: ['a'] } }, { customFilters })).toEqual([
+			{ actorDepartments: { in: ['a'] } },
+		])
+	})
+
+	it('never builds a condition for a name that was not declared', () => {
+		expect(filterConditions({ custom: { other: ['a'] } }, { customFilters })).toEqual([])
 	})
 })

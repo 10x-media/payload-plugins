@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { MAX_REFERRER_LENGTH } from '../../query/limits'
-import { referrerHost, storedReferrer } from './referrer'
+import { isSelfReferral, isSiteReferral, referrerHost, storedReferrer } from './referrer'
 
 /** The event's own hostname in every case that is not about self-referrals. */
 const SELF = 'site.example'
@@ -51,9 +51,40 @@ describe('referrerHost', () => {
 		expect(referrerHost('https://blog.site.example/x', 'site.example')).toBe('blog.site.example')
 	})
 
+	it('excludes another hostname its scope records hits under, as the site’s own page', () => {
+		const siblings = new Set(['shop.example'])
+		expect(referrerHost('https://www.Shop.example/cart', 'site.example', siblings)).toBeUndefined()
+		expect(referrerHost('https://blog.site.example/x', 'site.example', siblings)).toBe(
+			'blog.site.example'
+		)
+		expect(isSiteReferral('https://shop.example/', 'site.example', siblings)).toBe(true)
+		expect(isSiteReferral('https://site.example/', 'site.example')).toBe(true)
+		expect(isSiteReferral('https://shop.example/', 'site.example')).toBe(false)
+		expect(isSiteReferral(undefined, 'site.example', siblings)).toBe(false)
+	})
+
 	it('caps an absurd host at the longest legal DNS name', () => {
 		const host = `${'a'.repeat(300)}.example`
 		expect(referrerHost(`https://${host}/`, SELF)).toHaveLength(253)
+	})
+})
+
+describe('isSelfReferral', () => {
+	it('recognizes a page of the same site, whatever its case or www prefix', () => {
+		expect(isSelfReferral('https://site.example/pricing?x=1', 'site.example')).toBe(true)
+		expect(isSelfReferral('https://WWW.Site.Example/', 'site.example')).toBe(true)
+		expect(isSelfReferral('http://site.example:8080/a', 'www.site.example')).toBe(true)
+	})
+
+	it('treats another site, even on the same registrable domain, as no self-referral', () => {
+		expect(isSelfReferral('https://blog.site.example/x', 'site.example')).toBe(false)
+		expect(isSelfReferral('https://google.com/', 'site.example')).toBe(false)
+	})
+
+	it('treats a missing, unparseable or hostless referrer as no self-referral', () => {
+		for (const raw of [undefined, '', 'not a url', 'about:blank', 42, {}]) {
+			expect(isSelfReferral(raw, 'site.example')).toBe(false)
+		}
 	})
 })
 

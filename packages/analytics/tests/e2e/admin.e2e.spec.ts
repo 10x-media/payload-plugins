@@ -1,6 +1,5 @@
 import { expect, test } from '@playwright/test'
-
-const DEV_ADMIN = { email: 'dev@10xmedia.de', password: 'password' }
+import { login } from './helpers'
 
 test('admin panel loads with analytics plugin enabled', async ({ page }) => {
 	const response = await page.goto('/admin')
@@ -14,15 +13,13 @@ test('payload health endpoint responds', async ({ request }) => {
 })
 
 test('dashboard shows an analytics metric widget with a non-zero value', async ({ page }) => {
-	const loginRes = await page.request.post('/api/users/login', { data: DEV_ADMIN })
-	expect(loginRes.ok()).toBeTruthy()
-
+	await login(page.request)
 	await page.goto('/admin')
 
 	const widget = page.locator('.analytics-metric-widget').first()
 	await expect(widget).toBeVisible()
-	const value = (await widget.locator('span').nth(1).innerText()).trim()
+	const value = (await widget.locator('.analytics-widget__value').innerText()).trim()
 	expect(value.length).toBeGreaterThan(0)
-	expect(value).not.toBe('–')
+	expect(value).not.toBe('-')
 	expect(Number.parseInt(value.replace(/[^0-9]/g, ''), 10)).toBeGreaterThan(0)
 })

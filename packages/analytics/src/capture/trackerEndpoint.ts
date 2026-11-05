@@ -1,31 +1,34 @@
 import type { Endpoint, PayloadHandler } from 'payload'
-import { TRACKER_PATH } from '../plugin/paths'
+import { analyticsError, errorResponse } from '../plugin/errors'
+import type { RoutePaths } from '../plugin/routes'
 import { getRuntime } from '../plugin/runtime'
-import { emptyTrackerConfig, resolveTrackerConfig } from './trackerConfig'
-
-export { TRACKER_PATH }
+import { draftModeCookie, emptyTrackerConfig } from '../site/getTrackerConfig'
+import { resolveTrackerConfig } from './trackerConfig'
 
 /**
- * Public GET serving the browser tracker its per-request configuration. Like the capture
- * proxy, it runs with no `req.user` and calls the host's `scopeResolver` on behalf of an
- * anonymous visitor: a resolver that throws or resolves nothing leaves the tenant slot
- * absent rather than failing the request, so a broken resolver degrades capture instead of
- * breaking the page.
- *
- * The response is per-visitor and hostname-derived, never shared: `private` with a short
- * max-age, `Vary: Host, Cookie` (a `scopeResolver` may read `req.user` or a tenant cookie,
- * which makes the body cookie-dependent), and no cookie of its own.
+ * Public GET serving the tracker its per-request config, resolved for an anonymous visitor even when
+ * an editor's browser sends credentials; a failing scope resolver drops the tenant slot only.
  */
 export const makeTrackerHandler = (): PayloadHandler => async (req) => {
 	const runtime = getRuntime(req.payload)
-	const config = runtime ? await resolveTrackerConfig({ runtime, req }) : emptyTrackerConfig(req)
-	return Response.json(config, {
-		headers: { 'cache-control': 'private, max-age=60', vary: 'Host, Cookie' },
-	})
+	// Read before the cookies are stripped, so a preview booted by `initTracker` goes uncounted.
+	const draft = draftModeCookie(req.headers)
+	try {
+		const config = runtime
+			? await resolveTrackerConfig({ runtime, req, draft })
+			: emptyTrackerConfig(req)
+		// The draft cookie changes the body, so the response is per visitor and never shared.
+		return Response.json(config, {
+			headers: { 'cache-control': 'private, max-age=60', vary: 'Host, Cookie' },
+		})
+	} catch (err) {
+		req.payload.logger?.error(`analytics: tracker config failed: ${String(err)}`)
+		return errorResponse(500, analyticsError('internal', 'analytics: tracker config failed'))
+	}
 }
 
-export const trackerEndpoint = (): Endpoint => ({
+export const trackerEndpoint = (routes: Pick<RoutePaths, 'config'>): Endpoint => ({
 	method: 'get',
-	path: TRACKER_PATH,
+	path: routes.config,
 	handler: makeTrackerHandler(),
 })

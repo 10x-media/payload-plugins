@@ -1,0 +1,81 @@
+---
+title: Upgrading
+description: Move an install to a newer beta, with the data edits each release needs.
+---
+
+Until 1.0.0, `@10x-media/audit-logs` is published as betas, and a beta may change how entries are stored. Each release that does is listed here with what to do about it.
+
+## From 0.1.0-beta.4
+
+`user` and `impersonator` are no longer relationship fields. Each is a group of two text fields, `relationTo` (the auth collection) and `value` (the id), in that shape whether the host has one auth collection or several:
+
+```ts
+// Before, one auth collection
+user: '6650f0c2a1b2c3d4e5f60718'
+// Before, several
+user: { relationTo: 'admins', value: '6650f0c2a1b2c3d4e5f60718' }
+// Now, always
+user: { relationTo: 'users', value: '6650f0c2a1b2c3d4e5f60718' }
+```
+
+Why: on Postgres and SQLite a relationship is a foreign key, and deleting the user cleared it from every entry they wrote (`set null` on a column, `cascade` on a `_rels` row). The person whose work an audit log is asked about is often exactly the one no longer there. Text also keeps the shape stable, so adding a second auth collection no longer changes the schema.
+
+What changes for you:
+
+- **Queries.** Filter on `user.value`, and on `user.relationTo` when the collection matters. `{ user: { equals: id } }` no longer matches anything. See [querying](/audit-logs/querying#common-shapes).
+- **Population.** `depth` no longer populates `user` or `impersonator`; they always come back as the pair. Fetch the user yourself when you need it. The admin view does this for you.
+- **Entries already cleared.** Rows whose user a foreign key already set to `null` cannot be recovered.
+
+### MongoDB
+
+Run once with the Node driver, right after deploying the new version:
+
+```js
+for (const field of ['user', 'impersonator']) {
+  // A plain id, stored with one auth collection: name the collection. Use your auth
+  // collection's slug if it is not `users`.
+  await db.collection('audit-logs').updateMany(
+    { [field]: { $exists: true, $ne: null, $not: { $type: 'object' } } },
+    [{ $set: { [field]: { relationTo: 'users', value: { $toString: `$${field}` } } } }],
+  )
+  // A polymorphic pair: keep the collection, store the id as text.
+  await db.collection('audit-logs').updateMany(
+    { [`${field}.value`]: { $exists: true, $not: { $type: 'string' } } },
+    [{ $set: { [`${field}.value`]: { $toString: `$${field}.value` } } }],
+  )
+}
+```
+
+The old `user` and `impersonator` indexes can be dropped; the plugin creates the new ones at boot.
+
+### Postgres
+
+Generate a migration with `pnpm payload migrate:create`. It adds `user_relation_to`, `user_value`, `impersonator_relation_to` and `impersonator_value`, and drops the old storage: the `user_id` and `impersonator_id` columns with one auth collection, the `audit_logs_rels` rows with several. Copy the data across in `up`, **after the columns are added and before anything is dropped**:
+
+With one auth collection (`users` here):
+
+```sql
+UPDATE audit_logs SET user_relation_to = 'users', user_value = user_id::text
+  WHERE user_id IS NOT NULL;
+UPDATE audit_logs SET impersonator_relation_to = 'users', impersonator_value = impersonator_id::text
+  WHERE impersonator_id IS NOT NULL;
+```
+
+With several, one pair of statements per auth collection (`users` and `admins` here):
+
+```sql
+UPDATE audit_logs a SET user_relation_to = 'users', user_value = r.users_id::text
+  FROM audit_logs_rels r WHERE r.parent_id = a.id AND r.path = 'user' AND r.users_id IS NOT NULL;
+UPDATE audit_logs a SET user_relation_to = 'admins', user_value = r.admins_id::text
+  FROM audit_logs_rels r WHERE r.parent_id = a.id AND r.path = 'user' AND r.admins_id IS NOT NULL;
+UPDATE audit_logs a SET impersonator_relation_to = 'users', impersonator_value = r.users_id::text
+  FROM audit_logs_rels r WHERE r.parent_id = a.id AND r.path = 'impersonator' AND r.users_id IS NOT NULL;
+UPDATE audit_logs a SET impersonator_relation_to = 'admins', impersonator_value = r.admins_id::text
+  FROM audit_logs_rels r WHERE r.parent_id = a.id AND r.path = 'impersonator' AND r.admins_id IS NOT NULL;
+```
+
+Leave out the `impersonator` statements when the log has no `impersonator` field. Review the generated file before running it: the order of `ADD COLUMN` and `DROP` is what decides whether the copy has anything to read.
+
+<Callout type="warn">
+On a development database that Payload pushes its schema to, the push drops the old columns on the first boot and the ids go with them. Copy the data, or take a backup, before booting the new version there.
+</Callout>

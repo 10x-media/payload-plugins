@@ -1,0 +1,139 @@
+---
+title: From 1.0.0-beta.14
+description: Everything 1.0.0-beta.15 changes for an install upgrading from 1.0.0-beta.14, and what to do about each change.
+---
+
+To keep 1.0.0-beta.14's behaviour exactly, set one option: `analytics({ capture: { withoutConsent: 'off' } })`. With it, a slot `capture.gate` holds sends nothing before consent and nothing after a refusal, and the tracker config and every snippet are what 1.0.0-beta.14 rendered.
+
+Without it, 1.0.0-beta.15 counts without consent by default. A slot that waits for your consent manager now counts cookielessly before the visitor answers and after a refusal, storing nothing on the device, where 1.0.0-beta.14 sent nothing until the visitor granted. GA4 stays strict unless you opt it in. Native can also store anonymous hits, with no visitor id, for what it counts without consent. No option was removed. On Postgres and SQLite in migrate mode, one migration adds four nullable columns. This page lists every change against 1.0.0-beta.14, grouped by theme, each with what to do. An install on 1.0.0-beta.13 reads it the same way: 1.0.0-beta.14 changed no option or column.
+
+## Before you start
+
+Work through these in order; each links to its details below. A step that names a kind of install applies to that kind only. The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+1. **Decide whether your site counts without consent, and set `capture.withoutConsent`.** `'off'` keeps 1.0.0-beta.14; leaving it unset, or `'cookieless'`, counts without consent ([Counting without consent by default](#counting-without-consent-by-default)). This is the operator's decision, not the plugin's: [Before you count without consent](#before-you-count-without-consent) has the checklist.
+2. **With a PostHog slot that counts without consent, turn on the project's Cookieless tracking setting**, or PostHog drops those events ([PostHog's project setting](#posthogs-project-setting)).
+3. **Behind a proxy, check `trustedProxyHops` or `trustedPlatform`.** Cookieless counting tells visitors apart by their address ([Trusted proxies](#trusted-proxies)).
+4. **On Postgres or SQLite in migrate mode, generate a migration** ([The migration](#the-migration)). Push mode and MongoDB need nothing.
+5. **Update a Content Security Policy that allows the PostHog or GA4 snippet by hash** ([Content Security Policy](#content-security-policy)).
+6. **On a rolling deploy, recount the days an old node counted while the new one was storing anonymous hits** ([Rolling deploys](#rolling-deploys)).
+7. **Code that implements `Tracker` or `AnalyticsApi` itself, such as a test double, adds `mode`** ([The tracker's `mode`](#the-trackers-mode)).
+
+## Capture
+
+### Counting without consent by default
+
+**Behavioral.** `capture.withoutConsent` is new and defaults to `'cookieless'`: a slot `capture.gate` holds counts without storing anything on the device before the visitor answers and after a refusal, at the level its adapter declares ([Measuring without consent](/analytics/consent#measuring-without-consent)). In 1.0.0-beta.14 such a slot sent nothing until `setGate(true)`. What changes per adapter on an install that sets nothing:
+
+| Slot | Before an answer and after a refusal |
+|---|---|
+| native | counts as it always did, which never stored anything on the device, with the same visitor id it gets once granted |
+| Plausible, Umami | its script loads before any answer and keeps counting after a refusal; it stores nothing |
+| PostHog | posthog-js starts in its cookieless mode and counts the first pageview without storing anything, then switches to full on a grant |
+| GA4 | nothing, as before: GA4 declares `off`, since its cookieless pings still reach Google |
+| a custom adapter | nothing, as before: it declares no way to count without consent |
+
+Every cookieless request still carries the visitor's IP address and user agent, to the vendor or to native ingest ([Privacy](/analytics/privacy#modes-without-consent)). A grant still runs the slot in full on the same page, a revoke returns it to its refused level, and a slot `capture.gate` does not hold runs in full as before. Your consent manager's bridge needs no change: `setGate(true)` and `setGate(false)` do what [Consent](/analytics/consent#recipe-c15t) now describes.
+
+An install that leaves the option unset while a held slot can count without consent logs, once per boot:
+
+```
+analytics: capture.withoutConsent is unset, so held slots measure cookielessly before consent and after a refusal. Set it to 'off' to send nothing without consent.
+```
+
+What to do: decide, then set the option, which also ends the line. `'off'` keeps 1.0.0-beta.14. `'cookieless'` keeps the new default; `{ pending: 'cookieless', refused: 'off' }` counts until a refusal and nothing after it; a function decides per slot and phase. Each adapter's own `withoutConsent` beats the install's for its slot.
+
+**Behavioral.** A held slot that counts before an answer renders its snippet with the page, in a cookieless variant, so the first pageview is counted; 1.0.0-beta.14 rendered nothing for a held slot ([Server render](/analytics/consent#server-render)).
+
+**Behavioral.** The tracker reads the exclusion flag, and deletes 1.0.0-beta.11's consent key, once some slot runs in full, where 1.0.0-beta.14 read it once a slot opened. A slot counting without consent therefore counts a staff member's browser until some slot runs in full there ([The flag](/analytics/capture#the-flag)).
+
+**Behavioral.** A page restored from the back/forward cache returns its held slots to their pending level rather than to a queue, and a vendor already running in full keeps running until the manager answers again, so PostHog no longer starts a new identity on every Back.
+
+**Behavioral.** On a revoke, GA4's sink expires `_ga` and `_ga_<measurementId without G->` when the page had granted them, strict GA4 slots included; 1.0.0-beta.14 left them. A revoke on a PostHog slot that counts without consent also removes `ph_<token>_window_id`, and leaves `__ph_opt_in_out_<token>` (`0`) as the only key behind ([Revoking](/analytics/consent#revoking)).
+
+### Before you count without consent
+
+The plugin makes no legal decision, and storing nothing on the device does not settle whether counting without consent is allowed: the guidance [Consent](/analytics/consent#measuring-without-consent) links can treat a script that sends device information as access even when nothing is stored. Before you ship the default:
+
+- **Update your privacy policy** to say what each slot sends and stores before consent and after a refusal ([Privacy](/analytics/privacy#modes-without-consent) and [What each vendor sends and stores](/analytics/consent#what-each-vendor-sends-and-stores) list it).
+- **Confirm the choice with your data protection officer**, or whoever decides such things for the site, per slot: a slot can be `'off'` while another counts.
+- **Review your consent manager's categories and banner text**, which may describe analytics as running only after consent.
+
+### GA4 stays strict
+
+**Additive.** GA4 sends nothing without consent unless opted in, with one line: `ga4({ ..., withoutConsent: 'cookieless' })`, or **Count without cookies** in a GA4 provider document's **Without consent** field. Opted in, its snippet sets consent mode defaults (all four signals denied) before `gtag('config')`, sends cookieless pings until consent, and grants `analytics_storage` alone on a grant; advertising signals stay denied unless your own bridge updates them ([GA4](/analytics/consent#ga4)).
+
+### Native's anonymous level
+
+**Additive.** `native({ withoutConsent: 'anonymous' })` stores what native counts without consent with no visitor id, no region or city, and no time on page, scroll or items seen. Those hits count toward pageviews, events, goals and most breakdowns, and toward no visitor, visit or bounce rate, and an erasure request naming a visitor cannot find them ([Anonymous hits](/analytics/native#anonymous-hits)).
+
+**Behavioral.** A server event recorded with `identity: 'none'` is stored with `mode` `a`, and no longer counts in `avgDuration`'s divisor, which it lowered before: time on page now averages over pageviews that have a visitor.
+
+### The ingest endpoint
+
+**Additive.** A beacon carries `m`, the mode the page measured it in: `'c'` cookieless, `'a'` anonymous, none or `'f'` for full. **Behavioral:** any other value of `m` answers `400 invalid_param` naming `m`, checked after `name` and before `revenue` ([The ingest endpoint](/analytics/native#the-ingest-endpoint)). A tracker from 1.0.0-beta.14 sends no `m`, which is stored as full.
+
+### Trusted proxies
+
+**Additive.** In production the boot warns when a held slot can count cookielessly while neither `trustedProxyHops` nor `trustedPlatform` is set: cookieless counting tells visitors apart by a hash of the client address, and a missing or wrong hop count hashes the proxy's address instead, merging visitors ([Trusted proxies](/analytics/proxy#trusted-proxies)).
+
+What to do: set `trustedPlatform` on Vercel or Cloudflare, or `trustedProxyHops` to the number of proxies in front of the app, and check the count.
+
+### Content Security Policy
+
+PostHog's and GA4's inline snippets have a second variant, rendered for a held slot that counts without consent: PostHog's carries `cookieless_mode: 'on_reject'` and `opt_out_capturing_by_default: true`, and stamps `scopeProperty` in `before_send`; GA4's carries the consent mode defaults and, started cookieless, no exclusion guard. A policy that allows them by hash needs the new hashes, read from a rendered page; a nonce policy needs nothing. Plausible's, Umami's and every strict slot's snippets are unchanged ([Content Security Policy](/analytics/capture#content-security-policy)).
+
+A site that loads the vendor scripts itself (`snippets={false}`) starts PostHog and GA4 with those options for a slot that counts without consent ([When the manager loads the vendor scripts itself](/analytics/consent#when-the-manager-loads-the-vendor-scripts-itself)).
+
+### The tracker's `mode`
+
+**Breaking.** `Tracker` and `AnalyticsApi` gain the required, read-only `mode`: each slot's `SlotMode` (`'off'`, `'cookieless'`, `'anonymous'` or `'full'`), from `tracker.mode` and `useAnalytics().mode`. Code that implements either itself, such as a test double, adds it ([The tracker](/analytics/reference/tracker#the-tracker)).
+
+## Providers
+
+### PostHog's project setting
+
+PostHog drops cookieless events at ingestion unless the project's **Cookieless tracking** setting (Settings, Web analytics) is on; they still show in Live events. What to do, for each PostHog project a held slot counts into without consent: turn the setting on, and give the read `apiKey` the `project:read` scope so the adapter can check it. While the setting is off, the admin says "PostHog is dropping visits counted without consent: enable Cookieless tracking in the project's Web analytics settings." where a read's notes show. The adapter checks at most once an hour, so the note can stay for up to about an hour after the setting is turned on, plus however long the read is cached ([Without consent](/analytics/providers#without-consent)).
+
+**Behavioral.** A PostHog read that finds cookieless pageviews counts visitors per day (`meta.visitorsAre: 'sumOfDaily'`) and reports them in `meta.withoutConsent` ([What the numbers lose](/analytics/consent#what-the-numbers-lose)).
+
+### The Without consent field
+
+**Additive.** A PostHog, Plausible, Umami or GA4 provider document has a **Without consent** select, stored as `withoutConsent`: **Count without cookies** or **Send nothing**. Left empty it follows `capture.withoutConsent`, and every existing document is empty ([What one document holds](/analytics/providers#what-one-document-holds)). `providers.collection.fields.withoutConsent` replaces it.
+
+## Reads and the admin
+
+**Additive.** `meta.withoutConsent` (`{ pageviews }`, native and PostHog), `meta.withoutVisitor` (`{ pageviews }`, native) and `meta.withoutConsentDropped` (PostHog) on a read's answer ([Response](/analytics/reference/endpoints#response)). The analytics view shows the share of pageviews counted without consent below its overview cards, and a read holding pageviews without a visitor says how many. Every new note and field label is translated in every built-in language.
+
+## Storage and the database
+
+### The migration
+
+1.0.0-beta.15 adds four nullable columns, under the default table names:
+
+| Table | Column | Holds |
+|---|---|---|
+| `analytics_hits` | `mode` | `f`, `c` or `a`; an existing hit is empty and reads as `f` |
+| `analytics_aggregates` | `pageviews_without_visitor`, `pageviews_without_consent` | the two new daily counts; a day counted before reads both as 0, and needs no recount |
+| `analytics_providers` | `without_consent` | the document's **Without consent** choice, on an install running the providers collection; on Postgres an enum of `cookieless` and `off` |
+
+- **MongoDB:** nothing to do. A document stored before reads as unset.
+- **Postgres and SQLite in push mode:** the push adds the columns on the next start.
+- **Postgres and SQLite in migrate mode:** generate a migration from the config you run in production, review it and run it:
+
+  ```sh
+  pnpm payload migrate:create analytics_consent_modes
+  pnpm payload migrate
+  ```
+
+  Every column is added empty, so no row is rewritten.
+
+  Coming straight from 1.0.0-beta.11 on SQLite, the one migration also rebuilds the providers table: apply [that page's edits](/analytics/upgrading/beta-12#edits-before-you-run-it), which remove `"without_consent"` from the rebuild's copy too.
+
+### Rolling deploys
+
+While old and new code run side by side, a node still on 1.0.0-beta.14 that counts a day holding anonymous hits writes that day's totals without the two new counts, which stay empty, and read as 0, until the day is counted again. What to do: once every node runs 1.0.0-beta.15, [rebuild](/analytics/native#rebuilding-days) the days counted during the deploy, or let maintenance count them again. Server events recorded with `identity: 'none'` count in both too, so this applies to an install without `'anonymous'` that records them.
+
+## Added
+
+For reference, what 1.0.0-beta.15 adds beside the changes above: `capture.withoutConsent`; `withoutConsent` on `native()`, `plausible()`, `umami()`, `posthog()` and `ga4()`; `providers.collection.fields.withoutConsent`; `mode` on `Tracker` and `AnalyticsApi`; `withoutConsent` on `TrackerSlotConfig`; `mode` and `withoutConsent` on a capture snippet's arguments (`SnippetArgs`), and `cookieless` and `withoutConsent` on `CaptureSupport`; `adapterCountsWithoutConsent` on `AdapterRegisterContext`; `meta.withoutConsent`, `meta.withoutVisitor` and `meta.withoutConsentDropped` on `AnalyticsResult`; the beacon's `m`; and the types `ConsentPhase`, `CookielessSupport`, `HeldSlotMode`, `HitMode`, `NativeWithoutConsent`, `SlotMode`, `SlotWithoutConsent`, `SnippetArgs`, `SnippetMode`, `WithoutConsentArgs`, `WithoutConsentFunction`, `WithoutConsentLevel` and `WithoutConsentOption`.

@@ -111,7 +111,7 @@ const main = async (): Promise<void> => {
 		const answer = await p.text({
 			message: 'Plugin slug (kebab-case, no @scope)',
 			placeholder: 'awesome-thing',
-			validate: (v) => (SLUG_RE.test(v) ? undefined : 'Use kebab-case, start with a letter.'),
+			validate: (v) => (SLUG_RE.test(v ?? '') ? undefined : 'Use kebab-case, start with a letter.'),
 		})
 		if (p.isCancel(answer)) process.exit(0)
 		slug = answer

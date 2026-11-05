@@ -105,8 +105,8 @@ describe('requestHostname', () => {
 	})
 })
 
-// Each distinct stored hostname starts a rollup bucket family, and nothing prunes those, so a
-// spelling this collapses is a write an unauthenticated client cannot repeat for free.
+// Each distinct stored hostname adds rows to every day's aggregates, which are kept, so a
+// spelling this collapses is one an unauthenticated client cannot multiply for free.
 describe('normalizeHostname spellings', () => {
 	it('collapses case, port and every trailing dot onto one hostname', () => {
 		for (const spelling of [

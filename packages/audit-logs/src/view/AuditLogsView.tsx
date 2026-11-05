@@ -2,20 +2,26 @@ import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
 import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
 import { redirect } from 'next/navigation'
-import type { AdminViewServerProps, CollectionSlug, Params, PopulateType, Where } from 'payload'
+import type { AdminViewServerProps, CollectionSlug, Params, Where } from 'payload'
 import { parseCookies } from 'payload'
 import { customEventTypeOptions, payloadAPILabels } from '../plugin/resolveOptions'
 import { keys } from '../translations'
 import { asTranslate } from '../translations/server'
-import type { AuditPluginConfig, CustomEventComponentProps } from '../types'
+import type {
+	AuditLogsListSlotProps,
+	AuditLogsRowSlotProps,
+	AuditLogsSlotServerProps,
+	AuditPluginConfig,
+	CustomEventComponentProps,
+} from '../types'
 import { resolveCustomEventComponent } from '../utilities/customEventComponents'
 import { isTenantGlobal, isTenantScoped } from '../utilities/tenantScope'
 import { AuditLogsClient } from './AuditLogsClient'
 import { authRedirectUrl } from './authRedirect'
 import { filterConditions, parseFilters, splitRef } from './filterQuery'
 import { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './internalEntities'
-import type { RenderedEvents, SelectOption } from './types'
-import { labelOf } from './utils'
+import type { RenderedEvents, RenderedRowSlots, SelectOption } from './types'
+import { CUSTOM_FILTER_PREFIX, labelOf, resolveUser } from './utils'
 
 export async function AuditLogsView({
 	initPageResult,
@@ -93,7 +99,11 @@ export async function AuditLogsView({
 
 	const page = Number(getString(sp.page)) || 1
 	const limit = Number(getString(sp.limit)) || configDefaultLimit
-	const filters = parseFilters(sp, { useTenant })
+	const customFilters = viewConfig?.filters ?? []
+	const filters = parseFilters(sp, {
+		customFilterNames: customFilters.map((f) => f.name),
+		useTenant,
+	})
 
 	const { collections: collectionConfigs, globals: globalConfigs = [] } = req.payload.config
 	const byLabel = (a: SelectOption, b: SelectOption) => a.label.localeCompare(b.label)
@@ -174,22 +184,10 @@ export async function AuditLogsView({
 		}))
 	}
 
-	const whereConditions = filterConditions(filters, {
-		lockedTenantId,
-		userCollections: Object.keys(userTitleFields),
-	})
+	const whereConditions = filterConditions(filters, { customFilters, lockedTenantId })
 	if (forceWhere) whereConditions.push(forceWhere)
 
 	const where: Where = whereConditions.length > 0 ? { and: whereConditions } : {}
-
-	// `depth: 1` alone returns every field of the related user, hashed password and
-	// sessions included, to render one label. Narrow it to the field actually shown.
-	// The tenant column populates too; the row only needs its id, the name comes from
-	// the tenant options already loaded for the filter.
-	const populate = Object.fromEntries([
-		...Object.entries(userTitleFields).map(([slug, titleField]) => [slug, { [titleField]: true }]),
-		...(multiTenancy ? [[tenantsSlug, { id: true }]] : []),
-	]) as PopulateType
 
 	// Names for the documents and users the filters name, so their pills read as
 	// names rather than ids. Bounded by what is selected, not by the log.
@@ -206,26 +204,36 @@ export async function AuditLogsView({
 				fallbackSlug: authSlugs.length === 1 ? authSlugs[0] : undefined,
 				ref,
 			})),
+			// Keyed `slug:id`, the way the filter's picker shows them.
+			...customFilters.flatMap((f) =>
+				(filters.custom?.[f.name] ?? []).map((id) => ({ ref: `${f.relationTo}:${id}` }))
+			),
 		],
 		titleFieldOf
 	)
 
+	// `depth: 0`: the tenant column needs only its id, the name comes from the tenant
+	// options already loaded for the filter, and the users are resolved just below.
 	const result = await req.payload.find({
 		collection: 'audit-logs',
-		depth: 1,
+		depth: 0,
 		sort: '-createdAt',
 		limit,
 		page,
-		populate,
 		where,
 		overrideAccess: true,
 	})
+	const docs = await populateUsers(
+		req,
+		result.docs as unknown as Record<string, unknown>[],
+		userTitleFields
+	)
 
 	// Rendered here rather than in the row: a renderer may be a server component, and
 	// only this page can hand it `payload` and `req`.
 	const customEvents = viewConfig?.components?.customEvents
 	const renderedEvents: RenderedEvents = {}
-	for (const doc of result.docs as unknown as Record<string, unknown>[]) {
+	for (const doc of docs) {
 		if (doc.operation !== 'custom') continue
 		const eventType = typeof doc.eventType === 'string' ? doc.eventType : undefined
 		const Component = resolveCustomEventComponent(customEvents, eventType)
@@ -249,6 +257,59 @@ export async function AuditLogsView({
 		if (node != null) renderedEvents[String(doc.id)] = node
 	}
 
+	const context = viewConfig?.loadContext
+		? await viewConfig.loadContext({ entries: docs, req })
+		: undefined
+	// "Filter by this" for the slots: the current query plus one value, back on page one.
+	const filterHref = (name: string, value: string): string => {
+		const params = new URLSearchParams()
+		for (const [key, raw] of Object.entries(sp)) {
+			for (const v of Array.isArray(raw) ? raw : raw != null ? [raw] : []) params.append(key, v)
+		}
+		const key = `${CUSTOM_FILTER_PREFIX}${name}`
+		if (!params.getAll(key).includes(value)) params.append(key, value)
+		params.delete('page')
+		return `?${params.toString()}`
+	}
+	const slotServerProps: AuditLogsSlotServerProps = { filterHref, payload: req.payload, req }
+	const slots = viewConfig?.components
+	const renderSlot = (
+		Component: Parameters<typeof RenderServerComponent>[0]['Component'] | undefined,
+		clientProps: AuditLogsListSlotProps | AuditLogsRowSlotProps
+	) =>
+		Component
+			? RenderServerComponent({
+					clientProps,
+					Component,
+					importMap: req.payload.importMap,
+					serverProps: slotServerProps,
+				})
+			: undefined
+
+	// Only the configured slots are rendered, and nothing at all when there are none, so
+	// a view without slots pays for none of this.
+	const renderedRows: Record<string, RenderedRowSlots> = {}
+	if (slots?.user || slots?.rowBadges || slots?.beforeRowDetails || slots?.afterRowDetails) {
+		for (const doc of docs) {
+			const user = resolveUser(doc.user, userTitleFields)
+			const impersonator = resolveUser(doc.impersonator, userTitleFields)
+			const props: AuditLogsRowSlotProps = {
+				context,
+				entry: doc,
+				...(impersonator && { impersonator }),
+				...(user && { user }),
+			}
+			renderedRows[String(doc.id)] = {
+				afterDetails: renderSlot(slots.afterRowDetails, props),
+				badges: renderSlot(slots.rowBadges, props),
+				beforeDetails: renderSlot(slots.beforeRowDetails, props),
+				// A pill only exists for an entry with a user.
+				user: user ? renderSlot(slots.user, props) : undefined,
+			}
+		}
+	}
+	const listProps: AuditLogsListSlotProps = { context, entries: docs }
+
 	return (
 		<DefaultTemplate
 			i18n={req.i18n}
@@ -266,7 +327,7 @@ export async function AuditLogsView({
 					adminRoute={req.payload.config.routes?.admin ?? '/admin'}
 					apiRoute={req.payload.config.routes?.api ?? '/api'}
 					collectionOptions={collectionOptions}
-					docs={result.docs as unknown as Record<string, unknown>[]}
+					docs={docs}
 					filters={filters}
 					globalOptions={globalOptions}
 					tenantGlobalOptions={tenantGlobalOptions}
@@ -288,6 +349,14 @@ export async function AuditLogsView({
 					debugMode={pluginOptions.debug === true && Boolean(pluginOptions.retention)}
 					hasArchive={Boolean(pluginOptions.retention?.archive)}
 					renderedEvents={renderedEvents}
+					renderedRows={renderedRows}
+					beforeList={renderSlot(slots?.beforeList, listProps)}
+					afterList={renderSlot(slots?.afterList, listProps)}
+					customFilters={customFilters.map((f) => ({
+						label: labelOf(f.label, req.i18n) ?? f.name,
+						name: f.name,
+						relationTo: f.relationTo,
+					}))}
 					customEventTypes={customEventTypeOptions(
 						pluginOptions.logs?.eventTypes,
 						viewConfig?.components?.customEvents
@@ -341,4 +410,74 @@ const resolveRefLabels = async (
 		})
 	)
 	return labels
+}
+
+const USER_REF_FIELDS = ['user', 'impersonator'] as const
+
+/**
+ * Puts each row's `user` and `impersonator` documents where a populated polymorphic
+ * relationship would have them, one query per auth collection on the page. They are
+ * stored as text, so Payload does not populate them. A user that no longer resolves
+ * keeps its id as `value`, which the row shows as deleted.
+ *
+ * Reads only the title field: a whole user document carries the hashed password and
+ * sessions, and the row renders one label.
+ */
+const populateUsers = async (
+	req: AdminViewServerProps['initPageResult']['req'],
+	docs: Record<string, unknown>[],
+	userTitleFields: Record<string, string>
+): Promise<Record<string, unknown>[]> => {
+	const idsBySlug = new Map<string, Set<string>>()
+	for (const doc of docs) {
+		for (const name of USER_REF_FIELDS) {
+			const ref = asUserRef(doc[name])
+			if (!ref || !Object.hasOwn(userTitleFields, ref.relationTo)) continue
+			idsBySlug.set(ref.relationTo, (idsBySlug.get(ref.relationTo) ?? new Set()).add(ref.value))
+		}
+	}
+
+	const found = new Map<string, Record<string, unknown>>()
+	await Promise.all(
+		[...idsBySlug].map(async ([slug, ids]) => {
+			const titleField = userTitleFields[slug] ?? 'id'
+			try {
+				const result = await req.payload.find({
+					collection: slug as CollectionSlug,
+					depth: 0,
+					limit: ids.size,
+					overrideAccess: true,
+					pagination: false,
+					select: titleField === 'id' ? {} : { [titleField]: true },
+					where: { id: { in: [...ids] } },
+				})
+				for (const user of result.docs as unknown as Record<string, unknown>[]) {
+					found.set(`${slug}:${String(user.id)}`, user)
+				}
+			} catch {
+				// An id of the wrong shape for this database; those users show as deleted.
+			}
+		})
+	)
+
+	return docs.map((doc) => {
+		const populated = { ...doc }
+		for (const name of USER_REF_FIELDS) {
+			const ref = asUserRef(doc[name])
+			if (!ref) continue
+			populated[name] = {
+				relationTo: ref.relationTo,
+				value: found.get(`${ref.relationTo}:${ref.value}`) ?? ref.value,
+			}
+		}
+		return populated
+	})
+}
+
+const asUserRef = (value: unknown): { relationTo: string; value: string } | undefined => {
+	if (!value || typeof value !== 'object') return undefined
+	const { relationTo, value: id } = value as Record<string, unknown>
+	return typeof relationTo === 'string' && typeof id === 'string' && id.length > 0
+		? { relationTo, value: id }
+		: undefined
 }

@@ -1,32 +1,23 @@
 'use client'
 
-import { useCallback, useEffect, useRef, useState } from 'react'
-import type { MetricKey } from '../core/contract'
+import { metricReaches } from '../core/capabilities'
+import { type DimensionKey, type MetricKey, PLATFORM_SCOPE } from '../core/contract'
 import { fetchQuery, type QueryRequest } from '../query/fetchQuery'
 import type { QueryResponse } from '../query/response'
-import { autoGranularity, canCompareRange, gate, resolveSource } from './gating'
+import { type RequestState, useRequest } from '../ui/data/useRequest'
+import { autoGranularity, canCompareRange, gate, RATE_DIMENSIONS, resolveSource } from './gating'
 import { coerceState, rangeFor, type ViewState } from './state'
 import type { AnalyticsViewClientProps } from './viewProps'
 
 /**
- * One section's read. `error` is a `QueryFetchError` whenever the endpoint answered.
+ * One section's read. `data` survives loading and errors while source and scope hold, so a range
+ * change dims the chart rather than blanking it; another source or scope starts from a skeleton.
  *
- * `data` survives into the next `loading` and into an `error`, so changing the range or
- * hitting a transient failure dims or annotates the chart it already shows instead of
- * blanking it; `isRefetching` is the loading half of that, and is the flag to render a
- * subtle busy affordance on. `status === 'loading'` with no `data` is the only real empty
- * load, and the only one that earns a skeleton. A section that stops being servable at all
- * drops its data, since it belongs to a source or tab the view is no longer showing.
+ * @beta
  */
-export interface QueryState<T> {
-	status: 'loading' | 'ok' | 'error'
-	/** May be the previous read's answer while `status` is `loading` or `error`. */
-	data?: T
-	error?: Error
-	isRefetching: boolean
-	refetch: () => void
-}
+export type QueryState<T> = RequestState<T>
 
+/** @beta */
 export interface ViewQueries {
 	cards: QueryState<QueryResponse>
 	trend: QueryState<QueryResponse>
@@ -43,22 +34,13 @@ export interface ViewRequests {
 	goals: QueryRequest | null
 }
 
-/**
- * `QueryState.error.message` for a section with nothing to ask for: the scope has no
- * readable source, or the source serves no metric or dimension the section needs. It is
- * never an endpoint failure, so a caller can tell the two apart without a `QueryFetchError`.
- */
-export const SECTION_UNAVAILABLE = 'analytics: this source serves no data for this section'
-
 const NO_REQUESTS: ViewRequests = { cards: null, trend: null, breakdown: null, goals: null }
 
 /**
- * Derives the four reads from the view state and the selected source's capabilities.
- * Pure and total: the state is coerced to what the source serves first, so no request
- * here can carry a metric, dimension, filter, bucket or comparison the endpoint would
- * reject. `now` is injected to keep callers deterministic.
+ * Four reads from view state and source capabilities. State is coerced to what the source serves
+ * first, so no request carries anything the endpoint would reject.
  */
-export const buildViewRequests = (
+const buildViewRequests = (
 	props: AnalyticsViewClientProps,
 	state: ViewState,
 	now: Date
@@ -80,25 +62,36 @@ export const buildViewRequests = (
 		to: range.to,
 		...(view.filters.length > 0 ? { filters: view.filters } : {}),
 		source: source.id,
+		// The bare marker: the token's tenant tag is the view's own bookkeeping, and whether the
+		// reader may read it is the endpoint's call alone, so a refusal comes from there.
+		...(view.scope === undefined ? {} : { scope: PLATFORM_SCOPE }),
 		timezone: props.timezone,
+		...(view.range === 'custom' ? {} : { timeframe: view.range }),
 	}
 	const compare =
 		view.compare && canCompareRange(served, range, { timezone: props.timezone, now })
 			? ({ compare: 'previous' } as const)
 			: {}
-	const breakdownMetrics: MetricKey[] = [
-		view.metric,
-		...(served.metrics.includes('visitors') && view.metric !== 'visitors'
-			? (['visitors'] as const)
-			: []),
-	]
 	// The coerced state only carries a `dim` the tab actually offers, so the picked one can
 	// be taken as-is and the tab's default is the fallback.
 	const dimension = view.dim ?? served.dimensionsFor(view.tab)[0]
+	const columns = dimension === undefined ? [] : served.metricsFor(dimension, view.metric)
+	// The rate column divides the row's own visitors by the site's, so the read carries
+	// visitors even where the breakdown does not show them as a column of their own.
+	const reachesUnder = (metric: MetricKey, under: DimensionKey): boolean =>
+		served.metrics.includes(metric) &&
+		metricReaches(source.capabilities, metric, { dimensions: [under] })
+	const needsVisitors =
+		dimension !== undefined &&
+		RATE_DIMENSIONS.includes(dimension) &&
+		reachesUnder('visitors', dimension)
+	const breakdownMetrics: MetricKey[] = [
+		...new Set([...columns, ...(needsVisitors ? (['visitors'] as const) : [])]),
+	]
 	const order: QueryRequest['order'] =
 		view.order !== undefined && breakdownMetrics.includes(view.order.metric)
 			? view.order
-			: { metric: view.metric, direction: 'desc' }
+			: { metric: columns[0] ?? view.metric, direction: 'desc' }
 	return {
 		cards: { metrics: served.metrics, ...shared, ...compare },
 		trend: {
@@ -121,8 +114,8 @@ export const buildViewRequests = (
 			? {
 					metrics: [
 						'conversions',
-						...(served.metrics.includes('revenue') ? (['revenue'] as const) : []),
-						...(served.metrics.includes('visitors') ? (['visitors'] as const) : []),
+						...(reachesUnder('revenue', 'goal') ? (['revenue'] as const) : []),
+						...(reachesUnder('visitors', 'goal') ? (['visitors'] as const) : []),
 					],
 					dimensions: ['goal'],
 					...shared,
@@ -131,89 +124,50 @@ export const buildViewRequests = (
 	}
 }
 
-const asError = (err: unknown): Error => (err instanceof Error ? err : new Error(String(err)))
-
-type SectionState = Omit<QueryState<QueryResponse>, 'isRefetching' | 'refetch'>
-
 /**
- * Runs one section's read. The request is keyed by its serialized form, so a state change
- * that leaves a section's query identical never refetches it, and one that changes it
- * aborts the in-flight read before issuing the new one.
+ * Identity of a section's answer (source and scope). A read under another identity starts empty,
+ * so a source switch never shows the last source's numbers under the new one's name.
  */
-const useQuerySection = (
-	apiRoute: string,
-	request: QueryRequest | null
-): QueryState<QueryResponse> => {
-	const [section, setSection] = useState<SectionState>({ status: 'loading' })
-	const pending = useRef<AbortController | null>(null)
-	const key = request === null ? null : JSON.stringify(request)
-
-	const run = useCallback(
-		(serialized: string | null) => {
-			pending.current?.abort()
-			if (serialized === null) {
-				pending.current = null
-				setSection({ status: 'error', error: new Error(SECTION_UNAVAILABLE) })
-				return
-			}
-			const controller = new AbortController()
-			pending.current = controller
-			// Returning `prev` unchanged makes the first read a no-op update rather than a
-			// second render; any later one keeps what is on screen until the answer lands.
-			setSection((prev) =>
-				prev.status === 'loading'
-					? prev
-					: { status: 'loading', ...(prev.data === undefined ? {} : { data: prev.data }) }
-			)
-			fetchQuery(apiRoute, JSON.parse(serialized) as QueryRequest, {
-				signal: controller.signal,
-			}).then(
-				(data) => {
-					if (!controller.signal.aborted) setSection({ status: 'ok', data })
-				},
-				(err: unknown) => {
-					// The failure is reported beside whatever is on screen: a transient 503 on a
-					// refetch shows a retry banner over the last good read instead of a blank panel.
-					if (!controller.signal.aborted) {
-						setSection((prev) => ({
-							status: 'error',
-							error: asError(err),
-							...(prev.data === undefined ? {} : { data: prev.data }),
-						}))
-					}
-				}
-			)
-		},
-		[apiRoute]
-	)
-
-	const refetch = useCallback(() => {
-		run(key)
-	}, [run, key])
-
-	useEffect(() => {
-		run(key)
-		return () => {
-			pending.current?.abort()
-		}
-	}, [run, key])
-
-	return {
-		...section,
-		isRefetching: section.status === 'loading' && section.data !== undefined,
-		refetch,
-	}
+export const answerIdentity = (
+	props: Pick<AnalyticsViewClientProps, 'sources' | 'scopeKey'>,
+	state: Pick<ViewState, 'source' | 'scope'>
+): string => {
+	const source = resolveSource(props.sources, state.source)
+	return `${source?.id ?? ''}|${state.scope ?? ''}|${props.scopeKey}`
 }
 
 /**
- * The view's four reads for one state, each with its own lifecycle: a section refetches
- * only when its own request changes, and an in-flight read is aborted when it does.
+ * One section's read through the query endpoint, keyed by its serialized request and the scope
+ * it reads for, which the request itself does not name.
  */
-export const useViewQueries = (props: AnalyticsViewClientProps, state: ViewState): ViewQueries => {
-	const requests = buildViewRequests(props, state, new Date())
-	const cards = useQuerySection(props.apiRoute, requests.cards)
-	const trend = useQuerySection(props.apiRoute, requests.trend)
-	const breakdown = useQuerySection(props.apiRoute, requests.breakdown)
-	const goals = useQuerySection(props.apiRoute, requests.goals)
+const useQuerySection = (
+	endpoint: string,
+	request: QueryRequest | null,
+	at: { keep: string; scope: string }
+): QueryState<QueryResponse> =>
+	useRequest({
+		key: request === null ? null : JSON.stringify([at.scope, request]),
+		run: ({ signal }) =>
+			request === null
+				? Promise.reject(new Error('no request'))
+				: fetchQuery(endpoint, request, { signal, scope: at.scope }),
+		keep: at.keep,
+	})
+
+/**
+ * The four reads, each with its own lifecycle: a section refetches only when its request changes,
+ * aborting any read in flight. `now` is the view's one clock, so reads cover the captioned days.
+ */
+export const useViewQueries = (
+	props: AnalyticsViewClientProps,
+	state: ViewState,
+	now: Date
+): ViewQueries => {
+	const requests = buildViewRequests(props, state, now)
+	const at = { keep: answerIdentity(props, state), scope: props.scopeKey }
+	const cards = useQuerySection(props.endpoints.query, requests.cards, at)
+	const trend = useQuerySection(props.endpoints.query, requests.trend, at)
+	const breakdown = useQuerySection(props.endpoints.query, requests.breakdown, at)
+	const goals = useQuerySection(props.endpoints.query, requests.goals, at)
 	return { cards, trend, breakdown, goals: requests.goals === null ? null : goals }
 }

@@ -1,6 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
-import { impersonatorRelationship } from './impersonator'
+import type { AuditLogsCustom } from '../plugin/registerLogsCollection'
+import { actingUserRef, impersonatorRef, userRef } from './userRef'
 import { writeAuditLog } from './writeAuditLog'
 
 export type CreateAuditEventOptions = {
@@ -18,8 +19,10 @@ export type CreateAuditEventOptions = {
 	 */
 	eventType: string
 	/**
-	 * Group identifier for this log entry. When provided, takes precedence over `req.context.auditGroup`.
-	 * Use this to associate the event with an ongoing workflow tracked by a shared group ID.
+	 * Group identifier for this log entry. When provided, takes precedence over
+	 * `req.context[contextKey]`, the key `logs.group.contextKey` configures (`auditGroup` by
+	 * default). Use this to associate the event with an ongoing workflow tracked by a shared
+	 * group ID.
 	 */
 	group?: string
 	/**
@@ -34,15 +37,29 @@ export type CreateAuditEventOptions = {
 	 * }
 	 */
 	metadata?: Record<string, unknown>
+	/**
+	 * The tenant the event belongs to, when `multiTenancy` is configured. Without it the entry
+	 * has no tenant, so only the all-tenants view lists it. Ignored with a warning when
+	 * `multiTenancy` is off.
+	 */
+	tenant?: number | string
+	/**
+	 * Who the event is attributed to, when it is not `req.user`: work a person started that
+	 * runs in a job, on a request without a user. Replaces `req.user` for the `user` field
+	 * only; `impersonator` is still read from `req`. `collection` is the user's auth
+	 * collection.
+	 */
+	user?: { collection: string; id: number | string }
 }
 
 /**
  * Creates a custom audit log entry. Use this for business-specific events that fall outside
  * of automatic create/update/delete tracking.
  *
- * `user`, `impersonator` and `locale` are auto-populated from `req`. The log `createdAt` reflects
- * when this function is called, use `metadata` to record any domain-specific timestamps
- * that differ (e.g. the date an infraction actually occurred).
+ * `user` (unless `options.user` is given), `impersonator` and `locale` are auto-populated
+ * from `req`. The log `createdAt` reflects when this function is called, use `metadata` to
+ * record any domain-specific timestamps that differ (e.g. the date an infraction actually
+ * occurred).
  *
  * @example
  * await createAuditEvent(req, {
@@ -61,24 +78,29 @@ export const createAuditEvent = async (
 	options: CreateAuditEventOptions
 ): Promise<void> => {
 	const auditLogsCollection = req.payload.config.collections.find((c) => c.slug === 'audit-logs')
-	const userField = auditLogsCollection?.fields.find((f) => 'name' in f && f.name === 'user')
-	const isPolymorphic = Array.isArray(
-		userField && 'relationTo' in userField ? userField.relationTo : undefined
-	)
-	const hasGroupField = auditLogsCollection?.fields.some((f) => 'name' in f && f.name === 'group')
-	const hasImpersonatorField = auditLogsCollection?.fields.some(
-		(f) => 'name' in f && f.name === 'impersonator'
-	)
-	const impersonator = hasImpersonatorField
-		? impersonatorRelationship(req.user, isPolymorphic)
-		: undefined
+	const hasField = (name: string) =>
+		auditLogsCollection?.fields.some((f) => 'name' in f && f.name === name) ?? false
+	const impersonator = hasField('impersonator') ? impersonatorRef(req.user) : undefined
 
-	// Group: explicit option wins; fall back to req.context.auditGroup if group field is enabled
+	// Group: explicit option wins; fall back to the configured context key, as the CRUD hooks do
+	const groupContextKey = (auditLogsCollection?.custom?.auditLogs as AuditLogsCustom | undefined)
+		?.groupContextKey
 	const group =
 		options.group ??
-		(hasGroupField
-			? ((req.context as Record<string, unknown>)?.auditGroup as string | undefined)
+		(hasField('group') && groupContextKey
+			? ((req.context as Record<string, unknown>)?.[groupContextKey] as string | undefined)
 			: undefined)
+
+	const hasTenantField = hasField('tenant')
+	if (options.tenant != null && !hasTenantField) {
+		req.payload.logger.warn(
+			`createAuditEvent: ignoring tenant for '${options.eventType}', multiTenancy is not configured`
+		)
+	}
+
+	const user = options.user
+		? userRef(options.user.collection, options.user.id)
+		: actingUserRef(req.user)
 
 	await writeAuditLog({
 		req,
@@ -90,14 +112,13 @@ export const createAuditEvent = async (
 			eventType: options.eventType,
 			relationTo: options.collection,
 			...(options.documentId != null && { documentId: String(options.documentId) }),
-			...(req.user && {
-				user: isPolymorphic ? { relationTo: req.user.collection, value: req.user.id } : req.user.id,
-			}),
+			...(user && { user }),
 			...(impersonator !== undefined && { impersonator }),
 			...(req.locale && { locale: req.locale }),
 			payloadAPI: req.payloadAPI,
 			...(options.metadata && { metadata: options.metadata }),
 			...(group && { group }),
+			...(options.tenant != null && hasTenantField && { tenant: options.tenant }),
 		},
 	})
 }

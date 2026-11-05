@@ -37,9 +37,8 @@ describe('serializeQuery', () => {
 		})
 	})
 
-	// The documented wire shape: a client reading the echo can tell a scope with no goals
-	// from one whose resolver failed, which is the difference between an empty table and a
-	// table that means nothing.
+	// The documented wire shape: a client must tell a scope with no goals from one whose resolver
+	// failed, an empty table from a meaningless one.
 	it('echoes each goal hint as the read carried it', () => {
 		expect(serializeQuery(query({ goalSlugs: ['signup'] })).goalSlugs).toEqual(['signup'])
 		expect(serializeQuery(query({ goalSlugs: [] })).goalSlugs).toEqual([])

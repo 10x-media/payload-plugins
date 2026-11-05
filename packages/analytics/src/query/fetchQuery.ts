@@ -1,8 +1,11 @@
 import type { AnalyticsFilter, DimensionKey, Granularity, MetricKey } from '../core/contract'
-import { readResponseError } from '../plugin/errors'
-import { QUERY_PATH, REFRESH_PATH } from '../plugin/paths'
-import type { QueryError } from './errors'
-import type { QueryResponse } from './response'
+import { isRecord } from '../core/values'
+import { DEFAULT_ROUTE_BASE, routePaths } from '../plugin/routes'
+import type { TimeframePreset } from '../timeframe/presets'
+import { requestJson, requestShaped } from '../ui/data/request'
+import { isQueryResponse, type QueryResponse } from './response'
+
+export { QueryFetchError } from '../ui/data/request'
 
 /** A client-side mirror of the parameters `parseQueryParams` reads off the request. */
 export interface QueryRequest {
@@ -23,155 +26,168 @@ export interface QueryRequest {
 	scope?: string
 	path?: string
 	hostname?: string
+	/** One content item's ref; only a source serving `perItemQuery` accepts it. */
+	item?: string
 	timezone?: string
+	/** The preset the range was resolved from, so the read can be kept warm; omitted when custom. */
+	timeframe?: TimeframePreset
 }
 
-const apiBase = (apiRoute: string): string =>
-	apiRoute.endsWith('/') ? apiRoute.slice(0, -1) : apiRoute
+const DEFAULT_ROUTES = routePaths(DEFAULT_ROUTE_BASE)
 
 /**
- * Builds the query endpoint URL from a fixed field order (not object insertion order),
- * so two `QueryRequest`s with the same values always produce the same URL string. That
- * determinism is what `fetchQuery`'s in-flight dedupe keys on.
+ * The endpoint a caller named: its own URL, which ends in the endpoint's segment whatever the
+ * base, or the API route alone (`/api`), which gets the default mount appended.
  */
-export const buildQueryUrl = (apiRoute: string, request: QueryRequest): string => {
-	const params = new URLSearchParams()
-	params.set('metrics', request.metrics.join(','))
-	if (request.dimensions && request.dimensions.length > 0) {
-		params.set('dimensions', request.dimensions.join(','))
-	}
-	params.set('from', request.from)
-	params.set('to', request.to)
-	if (request.granularity !== undefined) {
-		params.set('granularity', request.granularity)
-	}
-	if (request.filters && request.filters.length > 0) {
-		params.set('filters', JSON.stringify(request.filters))
-	}
-	if (request.limit !== undefined) {
-		params.set('limit', String(request.limit))
-	}
-	if (request.order !== undefined) {
-		params.set('order', `${request.order.metric}:${request.order.direction}`)
-	}
-	if (request.compare !== undefined) {
-		params.set('compare', request.compare)
-	}
-	if (request.source !== undefined) {
-		params.set('source', request.source)
-	}
-	if (request.scope !== undefined) {
-		params.set('scope', request.scope)
-	}
-	if (request.path !== undefined) {
-		params.set('path', request.path)
-	}
-	if (request.hostname !== undefined) {
-		params.set('hostname', request.hostname)
-	}
-	if (request.timezone !== undefined) {
-		params.set('timezone', request.timezone)
-	}
-	return `${apiBase(apiRoute)}${QUERY_PATH}?${params.toString()}`
+const endpointOf = (given: string, route: 'query' | 'refresh'): string => {
+	const trimmed = given.replace(/\/+$/, '')
+	return trimmed.endsWith(`/${route}`) ? trimmed : `${trimmed}${DEFAULT_ROUTES[route]}`
 }
-
-const isRecord = (value: unknown): value is Record<string, unknown> =>
-	typeof value === 'object' && value !== null
-
-/** Thrown by `fetchQuery` for any non-2xx response; `error` is set only when the body parsed as the endpoint's error shape. */
-export class QueryFetchError extends Error {
-	readonly status: number
-	readonly error?: QueryError
-	readonly retryAfter?: number
-
-	constructor(status: number, error?: QueryError, retryAfter?: number) {
-		super(error?.message ?? `analytics query request failed with status ${status}`)
-		this.name = 'QueryFetchError'
-		this.status = status
-		if (error !== undefined) this.error = error
-		if (retryAfter !== undefined) this.retryAfter = retryAfter
-	}
-}
-
-const readRetryAfter = (res: Response): number | undefined => {
-	const header = res.headers.get('Retry-After')
-	if (header === null) return undefined
-	// The HTTP-date form is not a number, so it yields no delay rather than a bogus one;
-	// a fractional delay floors, since callers schedule in whole seconds.
-	const seconds = Number(header)
-	return Number.isFinite(seconds) ? Math.floor(seconds) : undefined
-}
-
-const failure = async (res: Response): Promise<QueryFetchError> =>
-	new QueryFetchError(res.status, await readResponseError(res), readRetryAfter(res))
-
-const runFetch = async (url: string): Promise<QueryResponse> => {
-	const res = await fetch(url, {
-		credentials: 'include',
-		headers: { Accept: 'application/json' },
-	})
-	if (!res.ok) {
-		throw await failure(res)
-	}
-	return (await res.json()) as QueryResponse
-}
-
-const inFlight = new Map<string, Promise<QueryResponse>>()
 
 /**
- * Fetches `GET /analytics/query`, deduping concurrent identical requests (same URL) into
- * one underlying fetch; the entry clears on settle (success or failure), so a later call
- * always sees fresh data and a failed one retries instead of pinning the error.
- *
- * Dedupe means the shared fetch itself never carries a caller's `AbortSignal`, since
- * aborting it would also cancel every other caller sharing that in-flight request.
- * `init.signal` instead races the caller's own promise against the abort: aborting
- * rejects that caller without touching the shared fetch. Use distinct requests (varying
- * a param) when one caller's cancellation must actually stop the network call.
+ * The URL of one read, its fields in a fixed order so `fetchQuery`'s dedupe can key on it. Takes the
+ * endpoint's URL, or the API route alone, which reads from the default mount.
+ */
+export const buildQueryUrl = (endpoint: string, request: QueryRequest): string => {
+	const params = new URLSearchParams()
+	const put = (name: string, value: string | undefined): void => {
+		if (value !== undefined) {
+			params.set(name, value)
+		}
+	}
+	const { dimensions, filters, limit, order } = request
+	put('metrics', request.metrics.join(','))
+	put('dimensions', dimensions && dimensions.length > 0 ? dimensions.join(',') : undefined)
+	put('from', request.from)
+	put('to', request.to)
+	put('granularity', request.granularity)
+	put('filters', filters && filters.length > 0 ? JSON.stringify(filters) : undefined)
+	put('limit', limit === undefined ? undefined : String(limit))
+	put('order', order === undefined ? undefined : `${order.metric}:${order.direction}`)
+	put('compare', request.compare)
+	put('source', request.source)
+	put('scope', request.scope)
+	put('path', request.path)
+	put('hostname', request.hostname)
+	put('item', request.item)
+	put('timezone', request.timezone)
+	put('timeframe', request.timeframe)
+	return `${endpointOf(endpoint, 'query')}?${params.toString()}`
+}
+
+const runFetch = (url: string, signal: AbortSignal): Promise<QueryResponse> =>
+	requestShaped(url, isQueryResponse, { signal })
+
+/** One fetch every identical concurrent read shares, and who is still waiting on it. */
+interface SharedFetch {
+	promise: Promise<QueryResponse>
+	controller: AbortController
+	/** Callers that brought a signal and have neither aborted nor been answered. */
+	waiting: number
+	/** A caller brought no signal, so it can never abort: the fetch runs to its end. */
+	held: boolean
+}
+
+const inFlight = new Map<string, SharedFetch>()
+
+/** Drops `shared` from the map unless a newer fetch already took its key. */
+const forget = (key: string, shared: SharedFetch): void => {
+	if (inFlight.get(key) === shared) {
+		inFlight.delete(key)
+	}
+}
+
+const sharedFetch = (key: string, url: string): SharedFetch => {
+	const existing = inFlight.get(key)
+	if (existing) {
+		return existing
+	}
+	const controller = new AbortController()
+	const created: SharedFetch = {
+		controller,
+		waiting: 0,
+		held: false,
+		promise: runFetch(url, controller.signal).finally(() => forget(key, created)),
+	}
+	inFlight.set(key, created)
+	return created
+}
+
+export interface FetchQueryInit {
+	signal?: AbortSignal
+	/**
+	 * Reader's request scope (view's `scopeKey`, a picker's `useRequestScope`): reads of one URL for
+	 * different scopes never share a fetch, so a tenant switch cannot leak an answer.
+	 */
+	scope?: string
+}
+
+/**
+ * Shares one fetch among concurrent identical reads (same scope and URL) until it settles. An abort
+ * rejects only its caller; the fetch aborts once every sharer has and none lacks a signal.
  */
 export const fetchQuery = (
-	apiRoute: string,
+	endpoint: string,
 	request: QueryRequest,
-	init?: { signal?: AbortSignal }
+	init?: FetchQueryInit
 ): Promise<QueryResponse> => {
-	const url = buildQueryUrl(apiRoute, request)
-	let pending = inFlight.get(url)
-	if (!pending) {
-		pending = runFetch(url).finally(() => {
-			inFlight.delete(url)
-		})
-		inFlight.set(url, pending)
-	}
-
+	const url = buildQueryUrl(endpoint, request)
 	const signal = init?.signal
-	if (!signal) return pending
-	if (signal.aborted) return Promise.reject(signal.reason)
-
+	if (signal?.aborted) {
+		return Promise.reject(signal.reason)
+	}
+	const key = JSON.stringify([init?.scope ?? '', url])
+	const fetching = sharedFetch(key, url)
+	if (!signal) {
+		fetching.held = true
+		return fetching.promise
+	}
+	fetching.waiting += 1
 	return new Promise<QueryResponse>((resolve, reject) => {
-		const onAbort = () => reject(signal.reason)
+		let done = false
+		const settle = (): boolean => {
+			if (done) {
+				return false
+			}
+			done = true
+			fetching.waiting -= 1
+			signal.removeEventListener('abort', onAbort)
+			return true
+		}
+		const onAbort = (): void => {
+			if (!settle()) {
+				return
+			}
+			if (fetching.waiting === 0 && !fetching.held) {
+				forget(key, fetching)
+				fetching.controller.abort(signal.reason)
+			}
+			reject(signal.reason)
+		}
 		signal.addEventListener('abort', onAbort, { once: true })
-		pending.then(
+		fetching.promise.then(
 			(value) => {
-				signal.removeEventListener('abort', onAbort)
-				resolve(value)
+				if (settle()) {
+					resolve(value)
+				}
 			},
 			(err: unknown) => {
-				signal.removeEventListener('abort', onAbort)
-				reject(err)
+				if (settle()) {
+					reject(err)
+				}
 			}
 		)
 	})
 }
 
-/** What `POST /analytics/refresh` answers: the scope's epoch token after the bump. */
+/** What the refresh endpoint answers: the scope's epoch token after the bump. */
 export interface RefreshResponse {
 	epoch: string
 }
 
 export interface RefreshRequest {
 	/**
-	 * Refresh another scope. Platform readers only: the endpoint answers
-	 * `400 untrusted_scope` for any caller that may not read across scopes. Omitted, the
+	 * Refresh another scope (platform readers only; others get `400 untrusted_scope`). Omitted, the
 	 * request's own resolved scope is refreshed.
 	 */
 	scope?: string
@@ -179,26 +195,18 @@ export interface RefreshRequest {
 }
 
 /**
- * Raises the scope's cache epoch, so every later read of it misses the cache and reaches
- * the provider again. Not deduped, unlike `fetchQuery`: a reader pressing Refresh twice
- * means it twice, and the signal can go straight to the fetch because no other caller
- * shares it. Rejects with a `QueryFetchError` for any non-2xx answer, the same as a read.
+ * Raises the scope's cache epoch through the refresh endpoint (or the API route alone), never
+ * deduped: Refresh pressed twice means it twice. Rejects with a `QueryFetchError` on non-2xx.
  */
 export const refreshCache = async (
-	apiRoute: string,
+	endpoint: string,
 	request: RefreshRequest = {}
 ): Promise<RefreshResponse> => {
-	const res = await fetch(`${apiBase(apiRoute)}${REFRESH_PATH}`, {
+	const body = await requestJson(endpointOf(endpoint, 'refresh'), {
 		method: 'POST',
-		credentials: 'include',
-		headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-		body: JSON.stringify(request.scope === undefined ? {} : { scope: request.scope }),
+		body: request.scope === undefined ? {} : { scope: request.scope },
 		...(request.signal === undefined ? {} : { signal: request.signal }),
 	})
-	if (!res.ok) {
-		throw await failure(res)
-	}
-	const body: unknown = await res.json()
 	// The caller acts on the refresh having happened, not on the token, so an answer this
 	// client cannot read is reported as the initial token rather than typed into a lie.
 	return { epoch: isRecord(body) && typeof body.epoch === 'string' ? body.epoch : '0' }

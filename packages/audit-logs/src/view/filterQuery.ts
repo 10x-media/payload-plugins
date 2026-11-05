@@ -1,7 +1,7 @@
 import type { Where } from 'payload'
 
 import type { Filters } from './types'
-import { GLOBAL_SENTINEL } from './utils'
+import { CUSTOM_FILTER_PREFIX, GLOBAL_SENTINEL } from './utils'
 
 type Params = Record<string, string | string[] | undefined>
 
@@ -23,9 +23,28 @@ export const splitRef = (ref: string): { id: string; slug?: string } => {
 	return at > 0 ? { id: ref.slice(at + 1), slug: ref.slice(0, at) } : { id: ref }
 }
 
+/**
+ * Declared filters with a value, by name. Only the names given are read: anything else
+ * under the prefix is not a filter the host declared and is ignored.
+ */
+const parseCustom = (sp: Params, names: string[]): Filters['custom'] => {
+	const entries = names.flatMap((name) => {
+		const values = all(sp[`${CUSTOM_FILTER_PREFIX}${name}`])
+		return values.length ? [[name, values] as const] : []
+	})
+	return entries.length ? Object.fromEntries(entries) : undefined
+}
+
 /** The URL as `Filters`. Every list filter repeats its key, one value each. */
-export const parseFilters = (sp: Params, { useTenant = false } = {}): Filters => {
+export const parseFilters = (
+	sp: Params,
+	{
+		customFilterNames = [],
+		useTenant = false,
+	}: { customFilterNames?: string[]; useTenant?: boolean } = {}
+): Filters => {
 	return {
+		custom: parseCustom(sp, customFilterNames),
 		changedPaths: listOrUndefined(all(sp.changedPath)),
 		collections: listOrUndefined(all(sp.collection)),
 		dateFrom: one(sp.dateFrom),
@@ -71,17 +90,17 @@ const anyOf = (parts: Where[]): Where | undefined => {
 }
 
 type WhereContext = {
+	/** Declared `view.filters`: the field each matches against, by name. */
+	customFilters?: { name: string; path: string }[]
 	/** Locked by the tenant-scoped view; wins over the tenant filter. */
 	lockedTenantId?: string
-	/** Auth collections, which decide whether `user` is stored polymorphic. */
-	userCollections: string[]
 }
 
 /**
  * The conditions for `filters`, AND-ed by the caller. Values inside one filter
  * match any of them; collections and globals together also match either.
  */
-export const filterConditions = (filters: Filters, ctx: WhereContext): Where[] => {
+export const filterConditions = (filters: Filters, ctx: WhereContext = {}): Where[] => {
 	const conditions: Where[] = []
 	const push = (where: Where | undefined) => {
 		if (where) conditions.push(where)
@@ -120,26 +139,17 @@ export const filterConditions = (filters: Filters, ctx: WhereContext): Where[] =
 
 	if (filters.users?.length) {
 		const refs = filters.users.map(splitRef)
-		if (ctx.userCollections.length > 1) {
-			const bare = refs.filter((r) => !r.slug).map((r) => r.id)
-			push(
-				anyOf([
-					...refs.filter(hasSlug).map(
-						(r): Where => ({
-							and: [{ 'user.relationTo': { equals: r.slug } }, { 'user.value': { equals: r.id } }],
-						})
-					),
-					...(bare.length ? [inOrEquals('user.value', bare)] : []),
-				])
-			)
-		} else {
-			push(
-				inOrEquals(
-					'user',
-					refs.map((r) => r.id)
-				)
-			)
-		}
+		const bare = refs.filter((r) => !r.slug).map((r) => r.id)
+		push(
+			anyOf([
+				...refs.filter(hasSlug).map(
+					(r): Where => ({
+						and: [{ 'user.relationTo': { equals: r.slug } }, { 'user.value': { equals: r.id } }],
+					})
+				),
+				...(bare.length ? [inOrEquals('user.value', bare)] : []),
+			])
+		)
 	}
 
 	if (ctx.lockedTenantId) push({ tenant: { equals: ctx.lockedTenantId } })
@@ -148,6 +158,12 @@ export const filterConditions = (filters: Filters, ctx: WhereContext): Where[] =
 	if (filters.groups?.length) push(inOrEquals('group', filters.groups))
 	if (filters.apis?.length) push(inOrEquals('payloadAPI', filters.apis))
 	if (filters.changedPaths?.length) push({ changedPaths: { in: filters.changedPaths } })
+
+	// Always `in`: the field may be hasMany, where `equals` is not reliable on every adapter.
+	for (const { name, path } of ctx.customFilters ?? []) {
+		const values = filters.custom?.[name]
+		if (values?.length) push({ [path]: { in: values } })
+	}
 
 	if (filters.dateFrom) push({ createdAt: { greater_than_equal: filters.dateFrom } })
 	if (filters.dateTo) push({ createdAt: { less_than_equal: filters.dateTo } })

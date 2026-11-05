@@ -1,4 +1,5 @@
 import { ProviderHttpError } from '../adapters/http/fetchJson'
+import { readTime } from '../adapters/readTime'
 import type {
 	AdapterContext,
 	AnalyticsAdapter,
@@ -9,7 +10,7 @@ import type {
 	MetricKey,
 } from '../core/contract'
 
-interface MemoryEvent {
+export interface MemoryEvent {
 	path: string
 	timestamp: Date
 	visitor?: string
@@ -26,16 +27,14 @@ const metrics: ReadonlySet<MetricKey> = new Set([
 const dimensions: ReadonlySet<DimensionKey> = new Set(['page', 'referrer', 'country', 'device'])
 
 const capabilities: AnalyticsCapabilities = {
-	perPageQuery: true,
 	realtime: true,
 	realtimeWindowMinutes: 5,
 	minGranularity: 'minute',
 	maxLookbackDays: null,
 	metrics,
 	dimensions,
-	filters: new Set(['page']),
-	filterOperators: new Set(['eq']),
-	batchPageReport: true,
+	// Only `page` has a backing field on a recorded event, compared exactly.
+	filters: { page: ['eq'] },
 	rateLimit: null,
 	recommendedTtl: { realtime: 300, aggregate: 3600 },
 }
@@ -43,15 +42,18 @@ const capabilities: AnalyticsCapabilities = {
 export interface MemoryAnalyticsAdapter extends AnalyticsAdapter {
 	record(event: MemoryEvent): void
 	reset(): void
-	/** Test seam for engine resilience: the next query() call rejects with err, then resets. */
-	failNext(err?: Error): void
+	/**
+	 * Test seam for engine resilience: the next `times` query() calls (default 1) reject with err.
+	 * The engine retries an outage twice, so failing a whole read that way takes three.
+	 */
+	failNext(err?: Error, times?: number): void
 }
 
 export function memoryAdapter(): MemoryAnalyticsAdapter {
 	const events: MemoryEvent[] = []
 	let pendingFailure: Error | undefined
+	let failuresLeft = 0
 
-	// Only page has a backing MemoryEvent field; other declared dimensions drop as unsupported.
 	const matchesFilters = (e: MemoryEvent, q: AnalyticsQuery): boolean =>
 		(q.filters ?? []).every((filter) => {
 			if (filter.dimension !== 'page' || filter.operator !== 'eq') {
@@ -77,13 +79,18 @@ export function memoryAdapter(): MemoryAnalyticsAdapter {
 		reset: () => {
 			events.length = 0
 		},
-		failNext: (err) => {
+		failNext: (err, times = 1) => {
 			pendingFailure = err ?? new ProviderHttpError(500, 'memory', 'memory: injected failure')
+			failuresLeft = times
 		},
-		async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
-			if (pendingFailure) {
+		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
+			const fetchedAt = readTime(ctx)
+			if (pendingFailure && failuresLeft > 0) {
 				const err = pendingFailure
-				pendingFailure = undefined
+				failuresLeft--
+				if (failuresLeft === 0) {
+					pendingFailure = undefined
+				}
 				throw err
 			}
 			const matched = events.filter((e) => inRange(e, q))
@@ -112,7 +119,7 @@ export function memoryAdapter(): MemoryAnalyticsAdapter {
 				return {
 					rows,
 					totals: { pageviews: matched.length, visitors: countVisitors(matched) },
-					meta: { provider: 'memory', fetchedAt: q.dateRange.end.toISOString() },
+					meta: { provider: 'memory', fetchedAt },
 				}
 			}
 			const pageviews = matched.length
@@ -120,7 +127,7 @@ export function memoryAdapter(): MemoryAnalyticsAdapter {
 			return {
 				rows: [{ metrics: { pageviews, visitors } }],
 				totals: { pageviews, visitors },
-				meta: { provider: 'memory', fetchedAt: q.dateRange.end.toISOString() },
+				meta: { provider: 'memory', fetchedAt },
 			}
 		},
 	}

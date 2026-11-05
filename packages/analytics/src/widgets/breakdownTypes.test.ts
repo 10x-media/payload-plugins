@@ -3,8 +3,7 @@ import { DIMENSION_KEYS } from '../core/contract'
 import { BREAKDOWN_SPECS } from './breakdownTypes'
 
 describe('BREAKDOWN_SPECS', () => {
-	// 5 pre-existing (pages, sources, devices, countries, goals) + 5 from the spec's decision 3
-	// (referrers, browsers, os, campaigns, events) + channels.
+	// pages, sources, channels, devices, countries, goals, referrers, browsers, os, campaigns, events
 	it('has eleven entries', () => {
 		expect(BREAKDOWN_SPECS).toHaveLength(11)
 	})

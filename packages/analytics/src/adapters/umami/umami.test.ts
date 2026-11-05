@@ -1,8 +1,10 @@
 import { HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { filterableDimensions, filterOperatorsFor, metricReaches } from '../../core/capabilities'
 import type { AnalyticsQuery } from '../../core/contract'
-import { umami } from './umami'
+import type { FetchLike } from '../../core/fetch'
+import { umami, umamiEndpoints } from './umami'
 
 const server = setupServer()
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
@@ -10,7 +12,7 @@ afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
 
 const q = (over: Partial<AnalyticsQuery> = {}): AnalyticsQuery => ({
-	metrics: ['pageviews', 'visitors', 'visits', 'bounceRate', 'avgDuration'],
+	metrics: ['pageviews', 'visitors', 'visits', 'bounceRate', 'visitDuration'],
 	dateRange: { start: new Date('2026-01-01T00:00:00Z'), end: new Date('2026-01-31T00:00:00Z') },
 	...over,
 })
@@ -53,7 +55,7 @@ describe('umami adapter', () => {
 			visitors: 400,
 			visits: 500,
 			bounceRate: 50,
-			avgDuration: 10000,
+			visitDuration: 10000,
 		})
 		expect(result.meta.provider).toBe('umami')
 	})
@@ -104,8 +106,7 @@ describe('umami adapter', () => {
 		expect(result.rows).toEqual([{ dimensions: { page: '/a' }, metrics: { visitors: 12 } }])
 	})
 
-	// `event` is not a declared breakdown dimension, so only a direct adapter call reaches this
-	// branch; the goals read will.
+	// `event` is not a declared breakdown, so only a direct adapter call reaches this branch.
 	it('reports event-breakdown rows as events, since y counts occurrences', async () => {
 		server.use(
 			http.get('https://api.umami.is/v1/websites/w/metrics', ({ request }) => {
@@ -140,7 +141,7 @@ describe('umami adapter', () => {
 			const caps = umami({ websiteId: 'w', apiKey: 'k' }).capabilities
 			expect(caps.dimensions.has('goal')).toBe(true)
 			expect(caps.metrics.has('conversions')).toBe(true)
-			expect(caps.filters.has('goal')).toBe(false)
+			expect(filterOperatorsFor(caps, 'goal')).toEqual([])
 		})
 
 		it('reads goal rows from type=event, restricted to the hint by one eq. value list', async () => {
@@ -325,12 +326,14 @@ describe('umami adapter', () => {
 		})
 	})
 
-	it('declares every contract operator, and filters by an event it cannot group by', () => {
+	it('declares every contract operator per filter, and filters by an event it cannot group by', () => {
 		const caps = umami({ websiteId: 'w', apiKey: 'k' }).capabilities
-		expect(caps.filterOperators).toEqual(new Set(['eq', 'contains', 'matches']))
-		expect(caps.filters.has('event')).toBe(true)
+		for (const dimension of filterableDimensions(caps)) {
+			expect(filterOperatorsFor(caps, dimension)).toEqual(['eq', 'contains', 'matches'])
+		}
+		expect(filterOperatorsFor(caps, 'event')).toEqual(['eq', 'contains', 'matches'])
 		expect(caps.dimensions.has('event')).toBe(false)
-		expect([...caps.filters].filter((dimension) => dimension !== 'event')).toEqual(
+		expect(filterableDimensions(caps).filter((dimension) => dimension !== 'event')).toEqual(
 			[...caps.dimensions].filter((dimension) => dimension !== 'goal' && dimension !== 'channel')
 		)
 	})
@@ -339,7 +342,7 @@ describe('umami adapter', () => {
 		it('groups by channel but never filters by it, since umami has no channel filter param', () => {
 			const caps = umami({ websiteId: 'w', apiKey: 'k' }).capabilities
 			expect(caps.dimensions.has('channel')).toBe(true)
-			expect(caps.filters.has('channel')).toBe(false)
+			expect(filterOperatorsFor(caps, 'channel')).toEqual([])
 		})
 
 		it('reads channel rows from /metrics?type=channel, carrying the range and filters', async () => {
@@ -604,16 +607,34 @@ describe('umami adapter', () => {
 		expect(result.meta.unappliedFilters).toBeUndefined()
 	})
 
-	it('omits derived bounceRate and avgDuration when there are no visits', async () => {
+	it('reads derived bounceRate and visitDuration as null, not 0, when there are no visits', async () => {
 		server.use(
 			http.get('https://api.umami.is/v1/websites/w/stats', () =>
 				HttpResponse.json({ pageviews: 0, visitors: 0, visits: 0, bounces: 0, totaltime: 0 })
 			)
 		)
 		const result = await umami({ websiteId: 'w', apiKey: 'k' }).query(q(), {})
-		expect(result.totals).toEqual({ pageviews: 0, visitors: 0, visits: 0 })
-		expect(result.totals?.bounceRate).toBeUndefined()
-		expect(result.totals?.avgDuration).toBeUndefined()
+		expect(result.totals).toEqual({
+			pageviews: 0,
+			visitors: 0,
+			visits: 0,
+			bounceRate: null,
+			visitDuration: null,
+		})
+	})
+
+	it('offers time per visit, no time on page, and each per-row count only where /metrics has it', () => {
+		const { capabilities } = umami({ websiteId: 'w', apiKey: 'k' })
+		expect(capabilities.metrics.has('avgDuration')).toBe(false)
+		expect(capabilities.metrics.has('visitDuration')).toBe(true)
+		for (const metric of ['pageviews', 'visits', 'bounceRate', 'visitDuration'] as const) {
+			expect(metricReaches(capabilities, metric, {}), metric).toBe(true)
+			expect(metricReaches(capabilities, metric, { dimensions: ['page'] }), metric).toBe(false)
+		}
+		expect(metricReaches(capabilities, 'visitors', { dimensions: ['country'] })).toBe(true)
+		expect(metricReaches(capabilities, 'visitors', { dimensions: ['goal'] })).toBe(false)
+		expect(metricReaches(capabilities, 'conversions', { dimensions: ['goal'] })).toBe(true)
+		expect(metricReaches(capabilities, 'conversions', { dimensions: ['page'] })).toBe(false)
 	})
 
 	it('forwards the query timezone to the pageviews series endpoint', async () => {
@@ -657,14 +678,29 @@ describe('umami adapter', () => {
 			q({ metrics: ['pageviews', 'sessions', 'visitors'], granularity: 'day' }),
 			{}
 		)
-		// pageviews + sessions have a per-day source; visitors does not, so rows omit it.
+		// Only pageviews and sessions have a per-day source, so the rows omit visitors.
 		expect(result.rows).toEqual([
 			{ timestamp: '2026-01-01T00:00:00.000Z', metrics: { pageviews: 10, sessions: 4 } },
 			{ timestamp: '2026-01-02T00:00:00.000Z', metrics: { pageviews: 25, sessions: 9 } },
 		])
-		// the headline total stays correct for every metric, including visitors.
 		expect(result.totals?.pageviews).toBe(35)
 		expect(result.totals?.visitors).toBe(20)
+	})
+})
+
+describe('umami fetch', () => {
+	it('reads and proxies through the fetch it is given, the global one otherwise', async () => {
+		const urls: string[] = []
+		const fetch: FetchLike = async (input) => {
+			urls.push(String(input).split('?')[0] ?? '')
+			return Response.json({ pageviews: 9, visitors: 4, visits: 5, bounces: 1, totaltime: 10 })
+		}
+		const adapter = umami({ websiteId: 'w', apiKey: 'k', fetch })
+		const result = await adapter.query(q(), {})
+		expect(result.totals?.pageviews).toBe(9)
+		expect(urls).toEqual(['https://api.umami.is/v1/websites/w/stats'])
+		expect(adapter.capture?.proxy.fetch).toBe(fetch)
+		expect(umami({ websiteId: 'w', apiKey: 'k' }).capture?.proxy.fetch).toBeUndefined()
 	})
 })
 
@@ -672,8 +708,8 @@ describe('umami capture', () => {
 	it('builds the two proxy routes against the cloud script/collector hosts by default', () => {
 		const capture = umami({ websiteId: 'w', apiKey: 'k' }).capture
 		expect(capture?.proxy.routes).toEqual([
-			{ source: '/script.js', upstream: 'https://cloud.umami.is/script.js' },
-			{ source: '/api/send', upstream: 'https://gateway.umami.is/api/send' },
+			{ source: '/script.js', upstream: 'https://cloud.umami.is/script.js', kind: 'script' },
+			{ source: '/api/send', upstream: 'https://gateway.umami.is/api/send', kind: 'data' },
 		])
 	})
 
@@ -684,8 +720,8 @@ describe('umami capture', () => {
 			host: 'https://analytics.example.com/api',
 		}).capture
 		expect(capture?.proxy.routes).toEqual([
-			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js' },
-			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send' },
+			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js', kind: 'script' },
+			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send', kind: 'data' },
 		])
 	})
 
@@ -696,8 +732,8 @@ describe('umami capture', () => {
 			host: 'https://analytics.example.com',
 		}).capture
 		expect(capture?.proxy.routes).toEqual([
-			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js' },
-			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send' },
+			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js', kind: 'script' },
+			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send', kind: 'data' },
 		])
 	})
 
@@ -708,8 +744,8 @@ describe('umami capture', () => {
 			host: 'https://analytics.example.com/api/',
 		}).capture
 		expect(capture?.proxy.routes).toEqual([
-			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js' },
-			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send' },
+			{ source: '/script.js', upstream: 'https://analytics.example.com/script.js', kind: 'script' },
+			{ source: '/api/send', upstream: 'https://analytics.example.com/api/send', kind: 'data' },
 		])
 	})
 
@@ -726,9 +762,76 @@ describe('umami capture', () => {
 		})
 	})
 
+	// Nothing to escape: Umami boots from attributes React renders, so no value of its is ever
+	// embedded in script source. The assertion pins that, since an inline would need escaping.
+	it('renders no inline script at all', () => {
+		const capture = umami({ websiteId: 'w</script>', apiKey: 'k' }).capture
+
+		expect(capture?.snippet({ path: '/um</script>' }).scripts.some((s) => s.inline)).toBe(false)
+	})
+
 	it('client carries only the kind, no api key or token', () => {
 		const capture = umami({ websiteId: 'w', apiKey: 'secret', token: 'also-secret' }).capture
 		expect(capture?.client).toEqual({ kind: 'umami' })
 		expect(JSON.parse(JSON.stringify(capture?.client))).toEqual({ kind: 'umami' })
+	})
+})
+
+describe('umami host', () => {
+	const cloud = {
+		api: 'https://api.umami.is/v1',
+		script: 'https://cloud.umami.is/script.js',
+		send: 'https://gateway.umami.is/api/send',
+	}
+
+	it('reads Umami Cloud with no host, and for Umami Cloud named by either of its addresses', () => {
+		for (const host of [
+			undefined,
+			'',
+			'  ',
+			'https://api.umami.is/v1',
+			'https://cloud.umami.is/',
+		]) {
+			expect(umamiEndpoints(host), String(host)).toEqual(cloud)
+		}
+	})
+
+	it('reads the app address, the API under /api, whether or not the host already ends in it', () => {
+		const app = {
+			api: 'https://umami.example.com/api',
+			script: 'https://umami.example.com/script.js',
+			send: 'https://umami.example.com/api/send',
+		}
+		for (const host of [
+			'https://umami.example.com',
+			'https://umami.example.com/',
+			'https://umami.example.com/api',
+			'https://umami.example.com/api/',
+		]) {
+			expect(umamiEndpoints(host), host).toEqual(app)
+		}
+	})
+
+	it('keeps the base path of an Umami served under one', () => {
+		expect(umamiEndpoints('https://example.com/umami/')).toEqual({
+			api: 'https://example.com/umami/api',
+			script: 'https://example.com/umami/script.js',
+			send: 'https://example.com/umami/api/send',
+		})
+	})
+
+	it('queries the API under the app address it was given', async () => {
+		const urls: string[] = []
+		server.use(
+			http.get('https://example.com/umami/api/websites/w/stats', ({ request }) => {
+				urls.push(request.url)
+				return HttpResponse.json({ pageviews: 1, visitors: 1, visits: 1, bounces: 0, totaltime: 0 })
+			})
+		)
+		await umami({ websiteId: 'w', token: 't', host: 'https://example.com/umami' }).query(
+			q({ metrics: ['pageviews'] }),
+			{}
+		)
+		expect(urls).toHaveLength(1)
 	})
 })

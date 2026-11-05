@@ -72,7 +72,7 @@ describe('direct write', () => {
 
 		expect(log?.operation).toBe('create')
 		expect(log?.relationTo).toBe('posts')
-		expect(log?.user).toBeTruthy()
+		expect(log?.user).toEqual({ relationTo: 'users', value: String(req.user?.id) })
 		expect(log?.payloadAPI).toBeTruthy()
 		expect(log?.snapshot?.title).toBe('Direct')
 	})
@@ -110,10 +110,12 @@ describe('direct write', () => {
 		expect(await readLogs(booted.payload, { changedPaths: { contains: 'views' } })).toHaveLength(1)
 	})
 
-	it('still resolves the user relationship well enough to query it', async () => {
+	it('stores the user so a query by it finds the entry', async () => {
 		const userId = String((req.user as { id: unknown }).id)
 
-		expect((await readLogs(booted.payload, { user: { equals: userId } })).length).toBeGreaterThan(0)
+		expect(
+			(await readLogs(booted.payload, { 'user.value': { equals: userId } })).length
+		).toBeGreaterThan(0)
 	})
 
 	it('writes auth entries the same way', async () => {

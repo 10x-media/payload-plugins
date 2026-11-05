@@ -4,11 +4,8 @@ import { GOAL_ACTION_TYPE, trackGoalAction } from '../../src/goals/trackGoalActi
 export const ACTION_HOST_SLUG = 'action-host'
 
 /**
- * A stand-in for the form collection form-builder builds from its action registry: one
- * `blocks` field whose only block carries this action's own type as its slug and its config
- * as its fields. Booting it proves the config survives Payload's sanitization under that
- * slug (the goal picker's custom Field component, the number `min`, the currency
- * `validate`), which on Postgres also means the block gets a usable table name.
+ * Stand-in for form-builder's action blocks: booting it proves the action's config survives
+ * Payload's sanitization under its type as block slug (and gets a usable Postgres table name).
  */
 export const actionHost = (): CollectionConfig => ({
 	slug: ACTION_HOST_SLUG,

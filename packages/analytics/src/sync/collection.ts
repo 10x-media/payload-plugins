@@ -1,48 +1,71 @@
-import type { CollectionConfig, Field, TextFieldSingleValidation } from 'payload'
-import type { ProviderAccessArgs } from '../providers/access'
-import { providerRowAccess } from '../providers/access'
+import type {
+	Access,
+	CollectionConfig,
+	Field,
+	PayloadRequest,
+	TextFieldSingleValidation,
+} from 'payload'
+import { type ProviderAccessArgs, providerRowAccess } from '../providers/access'
+import { keys } from '../translations/keys'
+import { labelForKey } from '../translations/server'
+import { builtInStaticLabel, type StaticLabelFor } from '../translations/staticLabel'
 
-export const SYNC_DEFAULT_SLUG = 'analytics-daily'
+/** The sync collection's slug unless `sync.collection.slug` names another. */
+export const SYNC_SLUG = 'analytics-daily'
 
 export const METRIC_FIELDS = [
 	'pageviews',
 	'visitors',
 	'sessions',
 	'avgDuration',
+	'visitDuration',
 	'bounceRate',
 	'events',
 ] as const
 
 export type SyncMetric = (typeof METRIC_FIELDS)[number]
 
-/**
- * The sync tier's queryable collection: one row per (source, date) of a provider's daily
- * metrics. It is read-only and machine-written (writes are locked to the sync job, which
- * uses overrideAccess), and hidden from the admin nav by default because it is a query
- * substrate for custom reporting rather than something to browse and edit; pass
- * `sync: { hidden: false }` to surface it. `admin.hidden` only hides the nav entry, so
- * the collection stays fully queryable through the REST/local API either way. The unique
- * (source, date, scope) index makes re-syncs idempotent and is cross-DB clean (all key
- * columns are required, so NOT NULL on Postgres, which would otherwise treat repeated rows
- * as distinct). Metric fields are nullable so a provider that omits a metric is
- * distinguishable from a real zero. Read access reuses `providerRowAccess`: unscoped
- * installs keep the any-authenticated-user behavior, scoped installs constrain reads to the
- * request's resolved scope (or lift the constraint for a platform-read grant). Writes stay
- * locked to the sync job, which writes with `overrideAccess: true`.
- */
-export const syncCollection = (
-	slug: string,
-	hidden: boolean,
+export type SyncCollectionArgs = {
+	hidden: boolean
 	access: ProviderAccessArgs
-): CollectionConfig => ({
+	/** `access.read`, which every analytics read passes first, these rows included. */
+	read: (args: { req: PayloadRequest }) => boolean | Promise<boolean>
+	/** The install's static labels; the built-in strings alone when absent. */
+	staticLabel?: StaticLabelFor
+}
+
+/**
+ * '' is the deliberate sentinel for "no scope"; Payload's default text validator treats it as
+ * failing `required`, so any string passes.
+ */
+const validateScope: TextFieldSingleValidation = (value) =>
+	typeof value === 'string' ? true : 'invalid scope'
+
+/** The rows `access.read` and the scope's row access both let the request read. */
+const syncReadAccess = (args: SyncCollectionArgs): Access => {
+	const rows = providerRowAccess(args.access)
+	return async (accessArgs) =>
+		(await args.read({ req: accessArgs.req })) ? rows(accessArgs) : false
+}
+
+/**
+ * One machine-written row per (source, date, scope) of a provider's daily metrics, hidden from the
+ * nav but queryable; readers pass `access.read`, then the scope's row access.
+ */
+export const syncCollection = (slug: string, args: SyncCollectionArgs): CollectionConfig => ({
 	slug,
+	labels: {
+		singular: labelForKey(keys.syncCollectionSingular),
+		plural: labelForKey(keys.syncCollectionPlural),
+	},
 	admin: {
-		hidden,
+		hidden: args.hidden,
+		group: (args.staticLabel ?? builtInStaticLabel)(keys.adminGroup),
 		useAsTitle: 'source',
 		defaultColumns: ['source', 'date', 'pageviews', 'visitors'],
 	},
 	access: {
-		read: providerRowAccess(access),
+		read: syncReadAccess(args),
 		create: () => false,
 		update: () => false,
 		delete: () => false,
@@ -56,10 +79,7 @@ export const syncCollection = (
 			required: true,
 			defaultValue: '',
 			index: true,
-			// '' is the deliberate sentinel for "no scope"; Payload's default text
-			// validator treats it as failing `required`, so accept any string.
-			validate: ((value) =>
-				typeof value === 'string' ? true : 'invalid scope') as TextFieldSingleValidation,
+			validate: validateScope,
 		},
 		...METRIC_FIELDS.map((name): Field => ({ name, type: 'number' })),
 		{ name: 'syncedAt', type: 'date' },

@@ -8,11 +8,8 @@ const DNS_NAME = /^[a-z0-9_-]+(\.[a-z0-9_-]+)*$/
 const IPV6 = /^[0-9a-f]{0,4}(:[0-9a-f]{0,4}){2,7}$/
 
 /**
- * The one shape a hostname has anywhere in this plugin: config entries, `platformHostnames`,
- * the host a request carried and a resolver's answer are all held to it. A host that can only
- * be spelled one way can only open one rollup bucket family, and nothing prunes those, so a
- * public endpoint that accepted several spellings of one name would hand a client an unbounded
- * write.
+ * The one hostname shape everywhere in this plugin: a public endpoint accepting several spellings
+ * of one name would hand a client an unbounded write of daily totals.
  */
 export const isHostname = (value: string): boolean =>
 	value.length > 0 &&
@@ -30,9 +27,8 @@ const stripPort = (value: string): string => {
 }
 
 /**
- * A hostname as it is stored and compared: lowercased, without port, brackets or trailing root
- * dots. Null for anything that is not {@link isHostname} afterwards, so a caller drops it
- * rather than opening a rollup bucket family for junk.
+ * Hostname as stored and compared: lowercased, without port, brackets or trailing dots. Null for
+ * junk, so a caller drops it rather than opening a family of daily totals.
  */
 export const normalizeHostname = (value: string | null | undefined): string | null => {
 	const raw = value?.trim().toLowerCase()
@@ -40,38 +36,31 @@ export const normalizeHostname = (value: string | null | undefined): string | nu
 		return null
 	}
 	// Every trailing dot rather than one: `example.com.` and `example.com..` name the same
-	// host, and each extra spelling left standing would be its own bucket family.
+	// host, and each extra spelling left standing would be its own family of daily totals.
 	const host = stripPort(raw).replace(/\.+$/, '')
 	return isHostname(host) ? host : null
 }
 
-export interface RequestHostnameOptions {
+interface RequestHostnameOptions {
 	/** Trusted proxies in front of the app; `x-forwarded-host` is only read at one or more. */
 	trustedProxyHops?: number
 }
 
+/** A comma-separated header's entries (`x-forwarded-for`), trimmed, empty ones dropped. */
+export const headerEntries = (headers: Headers, name: string): string[] =>
+	(headers.get(name) ?? '')
+		.split(',')
+		.map((entry) => entry.trim())
+		.filter(Boolean)
+
 /**
- * The host the request itself carries: the `x-forwarded-host` entry `n` from the right where
- * `n` proxy hops are trusted, which is the value the outermost trusted proxy wrote, else the
- * `Host` header. Counting from the left would read the attacker-controlled end, since a proxy
- * that appends rather than replaces keeps whatever the client sent ahead of its own value.
- *
- * `Host` is the fallback whenever the forwarded chain yields nothing usable, whether it is
- * shorter than the trusted count or carries junk: the peer is still the trusted proxy, so
- * `Host` is what that proxy sent.
- *
- * The `Origin` header is deliberately never read: a scripted client can pair a valid `Host`
- * with any `Origin` it likes and mint unlimited hostnames inside one scope, which is the hole
- * request attribution exists to close. A split deployment whose page host differs from its API
- * host validates `Origin` itself, through the `hostname` resolver form.
+ * `x-forwarded-host` entry `n` from the right under `n` trusted hops (the left is client-written),
+ * else `Host`. Never `Origin`: a scripted client can send any, minting unlimited hostnames.
  */
 export const requestHostname = (headers: Headers, opts: RequestHostnameOptions): string | null => {
 	const hops = opts.trustedProxyHops ?? 0
 	if (hops >= 1) {
-		const chain = (headers.get('x-forwarded-host') ?? '')
-			.split(',')
-			.map((entry) => entry.trim())
-			.filter(Boolean)
+		const chain = headerEntries(headers, 'x-forwarded-host')
 		const forwarded = normalizeHostname(chain[chain.length - hops])
 		if (forwarded) {
 			return forwarded

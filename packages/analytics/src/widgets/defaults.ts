@@ -6,13 +6,10 @@ const TIMEFRAME = 'last30days'
 const BREAKDOWN_DATA = { metric: 'pageviews', timeframe: TIMEFRAME, limit: 5 } as const
 
 /**
- * Default analytics widget instances to spread into an app's own
- * `admin.dashboard.defaultLayout`: every built-in widget, headline numbers first, then the
- * trend, the goals table, the realtime counter and one card per breakdown. A plugin must
- * never set `defaultLayout` itself (Payload applies it with `??=`, so any setter would
- * clobber the app's layout). Each slug is spelled out rather than mapped from
- * `BREAKDOWN_SPECS`, because an app's generated types narrow `widgetSlug` to its own
- * registered widgets; `defaults.test.ts` is what keeps the list complete.
+ * Every built-in widget, for the app to spread into its own `admin.dashboard.defaultLayout`.
+ * Slugs stay literal (not mapped from `BREAKDOWN_SPECS`) so app-narrowed `widgetSlug` types fit.
+ *
+ * @beta
  */
 export const analyticsDefaultWidgets = (): WidgetInstance[] => [
 	{

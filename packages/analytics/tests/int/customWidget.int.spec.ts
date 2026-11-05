@@ -1,6 +1,6 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { analytics } from '../../src/index'
+import { analytics, type CustomWidgetDef } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 
 const slugs = (booted: BootedPayload): string[] =>
@@ -11,38 +11,29 @@ const slugs = (booted: BootedPayload): string[] =>
 describeForDb('custom widget registration', {}, (db) => {
 	let supported: BootedPayload
 	let gatedOut: BootedPayload
-	beforeAll(async () => {
-		supported = await bootPayload({
+
+	const bootRegistering = (widget: CustomWidgetDef): Promise<BootedPayload> =>
+		bootPayload({
 			plugin: analytics({
 				adapters: [native()],
-				widgets: {
-					register: [
-						{
-							slug: 'myapp-sources',
-							component: '@10x-media/analytics/rsc#AnalyticsBreakdownWidget',
-							label: 'My sources',
-							requires: { dimensions: ['source'] },
-						},
-					],
-				},
+				capture: { gate: 'off' },
+				widgets: { register: [widget] },
 			}),
 			db,
 		})
-		gatedOut = await bootPayload({
-			plugin: analytics({
-				adapters: [native()],
-				widgets: {
-					register: [
-						{
-							slug: 'myapp-bounce',
-							component: '@/x#default',
-							label: 'Bounce rate',
-							requires: { metrics: ['bounceRate'] },
-						},
-					],
-				},
-			}),
-			db,
+
+	beforeAll(async () => {
+		supported = await bootRegistering({
+			slug: 'myapp-sources',
+			component: '@10x-media/analytics/rsc#AnalyticsBreakdownWidget',
+			label: 'My sources',
+			requires: { dimensions: ['source'] },
+		})
+		gatedOut = await bootRegistering({
+			slug: 'myapp-visits',
+			component: '@/x#default',
+			label: 'Visits',
+			requires: { metrics: ['visits'] },
 		})
 	})
 	afterAll(async () => {
@@ -54,6 +45,6 @@ describeForDb('custom widget registration', {}, (db) => {
 		expect(slugs(supported)).toContain('myapp-sources')
 	})
 	it('does not register a custom widget gated out by capabilities', () => {
-		expect(slugs(gatedOut)).not.toContain('myapp-bounce')
+		expect(slugs(gatedOut)).not.toContain('myapp-visits')
 	})
 })

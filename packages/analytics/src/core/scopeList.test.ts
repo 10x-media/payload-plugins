@@ -32,7 +32,7 @@ describe('resolveScopeList', () => {
 		const list = await resolveScopeList(scopes, { logger: { warn } } as unknown as Payload)
 		expect(list).toEqual([null])
 		expect(warn).toHaveBeenCalledTimes(1)
-		expect(warn.mock.calls[0]?.[0]).toMatch(/scopes/i)
+		expect(warn.mock.calls[0]?.[0]).toMatch(/scope\.list/)
 	})
 
 	it('degrades to [null] and warns when the resolver rejects', async () => {

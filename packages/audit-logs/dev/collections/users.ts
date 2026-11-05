@@ -5,5 +5,8 @@ export const users: CollectionConfig = {
 	slug: 'users',
 	auth: true,
 	admin: { useAsTitle: 'email', group: 'Support' },
-	fields: [{ name: 'name', type: 'text' }],
+	fields: [
+		{ name: 'name', type: 'text' },
+		{ name: 'departments', type: 'relationship', relationTo: 'departments', hasMany: true },
+	],
 }

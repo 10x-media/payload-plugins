@@ -1,121 +1,196 @@
-import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { PayloadRequest, WidgetInstance } from 'payload'
+import {
+	type BootedPayload,
+	bootPayload,
+	describeForDb,
+	installTestClock,
+	type TestClock,
+} from '@10x-media/payload-test-harness'
+import type { Endpoint, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { analytics } from '../../src/index'
-import { flushBatch } from '../../src/native/ingest/flushBatch'
-import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
-import { CHANNEL_TAXONOMY_VERSION } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
+import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { getRuntime } from '../../src/plugin/runtime'
-import { WARM_TASK_SLUG, warmTask } from '../../src/plugin/warmTask'
+import { WARM_TASK_SLUG, type WarmTaskOutput, warmTask } from '../../src/plugin/warmTask'
+import type { CacheStore, ReadRecipe } from '../../src/surfacing/cacheStore'
+import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { resolveTimeframe } from '../../src/timeframe/presets'
+import { zonedCalendarDay } from '../../src/timeframe/tz'
 import { readForWidget } from '../../src/widgets/readForWidget'
+import { readerRequest } from './readerRequest'
+
+const routes = routePaths(DEFAULT_ROUTE_BASE)
+
+const MINUTE = 60_000
+
+/** The view's request for `last30days` at `at`: its first and last calendar day in UTC. */
+const viewDays = (at: Date): string => {
+	const window = resolveTimeframe('last30days', at, 'UTC')
+	return `from=${zonedCalendarDay(window.start, 'UTC')}&to=${zonedCalendarDay(window.end, 'UTC')}`
+}
 
 interface RegisteredTask {
 	slug?: string
-	schedule?: Array<{ cron?: string }>
+	schedule?: Array<{ cron?: string; queue?: string }>
 }
 
-const layout: WidgetInstance[] = [
-	{
-		widgetSlug: 'analytics-metric',
-		width: 'small',
-		data: { metric: 'pageviews', timeframe: 'last30days' },
-	},
-	{
-		widgetSlug: 'analytics-breakdown-pages',
-		width: 'medium',
-		data: { metric: 'pageviews', timeframe: 'last30days', limit: 5 },
-	},
-	{
-		widgetSlug: 'analytics-realtime',
-		width: 'small',
-		data: { metric: 'visitors', windowMinutes: 30 },
-	},
-]
-
-describeForDb('analytics scheduled warm-cache', {}, (db) => {
+describeForDb('analytics warm task', {}, (db) => {
 	let booted: BootedPayload
+	let clock: TestClock
+	const vendor = memoryAdapter()
 
 	beforeAll(async () => {
+		// Far from the wall clock, so a read that took its "now" from anywhere but Payload's clock
+		// would store no recipe for its timeframe.
+		clock = installTestClock(new Date('2026-03-10T12:00:00.000Z'))
+		vendor.record({ path: '/pricing', timestamp: new Date(Date.now() - 2 * 86_400_000) })
 		booted = await bootPayload({
-			plugin: analytics({ adapters: [native()], cache: { warm: true } }),
+			plugin: analytics({
+				adapters: [vendor, native()],
+				defaultAdapter: 'memory',
+				capture: { gate: 'off' },
+				cache: { warm: { windowHours: 24, maxReads: 50 } },
+				jobs: { queue: 'analytics' },
+				collections: { pages: { pathField: 'slug' } },
+			}),
 			db,
-			configOverrides: {
-				admin: {
-					importMap: { autoGenerate: false },
-					dashboard: { widgets: [], defaultLayout: layout },
-				},
-			},
+			collections: [{ slug: 'pages', fields: [{ name: 'slug', type: 'text' }] }],
 		})
-	})
+	}, 240_000)
 
 	afterAll(async () => {
+		clock.reset()
 		await booted.stop()
 	})
 
-	const reqOf = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
+	const storeOf = (): CacheStore => {
+		const store = getRuntime(booted.payload)?.cache?.store
+		if (!store) {
+			throw new Error('runtime read cache missing after boot')
+		}
+		return store
+	}
 
-	it('registers the warm-cache task with the configured cron schedule', () => {
+	const recipes = async (): Promise<ReadRecipe[]> =>
+		storeOf().recentRecipes(new Date(clock.now().getTime() - 3_600_000), 50)
+
+	const endpoint = async (path: string, query: string): Promise<Response> => {
+		const found = (booted.payload.config.endpoints ?? []).find(
+			(each): each is Endpoint => typeof each === 'object' && each.path === path
+		)
+		if (!found || typeof found.handler !== 'function') {
+			throw new Error(`${path} is not registered`)
+		}
+		return found.handler(
+			readerRequest(booted.payload, { url: `http://localhost/api${path}?${query}` })
+		)
+	}
+
+	const runWarm = async (): Promise<WarmTaskOutput> => {
+		const handler = warmTask({
+			schedule: { queue: 'analytics', cron: '*/30 * * * *', intervalMs: 30 * MINUTE },
+			windowHours: 24,
+			maxReads: 50,
+		}).handler
+		if (typeof handler !== 'function') {
+			throw new Error('warm task handler must be a function')
+		}
+		const result = await handler({
+			req: { payload: booted.payload } as PayloadRequest,
+		} as unknown as Parameters<typeof handler>[0])
+		if (!('output' in result) || !result.output) {
+			throw new Error('the warm task answers an output')
+		}
+		return result.output
+	}
+
+	it(`registers analytics-warm on the jobs queue at its default schedule on ${db}`, () => {
 		const tasks =
 			(booted.payload.config as unknown as { jobs?: { tasks?: RegisteredTask[] } }).jobs?.tasks ??
 			[]
-		const task = tasks.find((t) => t.slug === WARM_TASK_SLUG)
-		expect(task).toBeDefined()
-		expect(task?.schedule?.[0]?.cron).toBe('*/30 * * * *')
+		const task = tasks.find((each) => each.slug === WARM_TASK_SLUG)
+		expect(task?.schedule).toEqual([
+			expect.objectContaining({ cron: '*/30 * * * *', queue: 'analytics' }),
+		])
 	})
 
-	it('warms the dashboard reads, and a warmed tuple is then served from cache', async () => {
-		const event: StoredEvent = {
-			timestamp: new Date(Date.now() - 86_400_000),
-			type: 'pageview',
-			path: '/p',
-			hostname: 'h',
-			visitorHash: 'v1',
-			sessionId: 'v1',
-			channel: 'direct',
-			channelVersion: CHANNEL_TAXONOMY_VERSION,
-		}
-		await flushBatch(booted.payload, [event])
-
-		const task = warmTask('*/30 * * * *', layout)
-		const handler = task.handler
-		if (typeof handler !== 'function') {
-			throw new Error('warm task handler must be a function')
-		}
-		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
-		const output = (result as { output: { warmed: number; failed: number } }).output
-		expect(output.failed).toBe(0)
-		expect(output.warmed).toBeGreaterThan(0)
-
-		// The warm run populated the cache under the day-snapped key; a live read for the
-		// same metric tuple must hit it without calling the adapter again.
-		const adapter = getRuntime(booted.payload)?.registry.default()
-		if (!adapter) {
-			throw new Error('runtime adapter missing after boot')
-		}
-		const spy = vi.spyOn(adapter, 'query')
-		const live = await readForWidget({
-			req: reqOf(),
+	it(`records how to repeat a widget's, the view's and the panel's reads on ${db}`, async () => {
+		const widget = await readForWidget({
+			req: readerRequest(booted.payload),
 			metrics: ['pageviews'],
-			timeframe: 'last30days',
-			now: new Date(),
+			timeframe: 'last7days',
+			now: clock.now(),
 		})
-		expect(live.status).toBe('ok')
-		expect(live.metrics.pageviews).toBe(1)
-		expect(spy).not.toHaveBeenCalled()
+		expect(widget.status).toBe('ok')
+		const view = await endpoint(
+			routes.query,
+			`metrics=visitors&${viewDays(clock.now())}&timeframe=last30days&compare=previous&timezone=UTC`
+		)
+		expect(view.status).toBe(200)
+		const page = await booted.payload.create({
+			collection: 'pages' as never,
+			data: { slug: 'pricing' } as never,
+		})
+		const panel = await endpoint(
+			routes.document,
+			`collection=pages&id=${String((page as { id: string | number }).id)}&metrics=sessions&timeframe=last90days`
+		)
+		expect(panel.status).toBe(200)
+		// Each answer and its recipe are written in the background, after the read answered.
+		await getRuntime(booted.payload)?.engine.idle?.()
+		const recorded = await recipes()
+		const pick = (metric: string) =>
+			recorded
+				.filter((recipe) => recipe.query.metrics.includes(metric as never))
+				.map((recipe) => [recipe.timeframe, recipe.window])
+		expect(pick('pageviews')).toEqual(expect.arrayContaining([['last7days', 'live']]))
+		expect(pick('visitors')).toEqual(
+			expect.arrayContaining([
+				['last30days', 'days'],
+				['last30days', 'previous'],
+			])
+		)
+		expect(pick('sessions')).toEqual(expect.arrayContaining([['last90days', 'live']]))
+		expect(recorded.every((recipe) => recipe.adapterRef === 'memory')).toBe(true)
 	})
 
-	it('returns 0/0 without throwing when the layout function throws', async () => {
-		const task = warmTask('*/30 * * * *', () => {
-			throw new Error('boom')
+	it(`refreshes only the recent reads whose entry expires before its next run on ${db}`, async () => {
+		const query = vi.spyOn(vendor, 'query')
+		const recorded = (await recipes()).length
+		const first = await runWarm()
+		expect(first).toMatchObject({ ran: true, refreshed: 0, failed: 0 })
+		expect(first.fresh).toBeGreaterThan(0)
+		expect(query).not.toHaveBeenCalled()
+
+		// The memory source's answers stay fresh for an hour: 40 minutes on, each expires before the
+		// next run half an hour away.
+		clock.advance(40 * MINUTE)
+		const second = await runWarm()
+		expect(second).toMatchObject({ ran: true, fresh: 0, failed: 0, refreshed: first.fresh })
+		expect(query).toHaveBeenCalledTimes(first.fresh)
+		// A refresh leaves each entry's recipe and read time as the reader left them.
+		expect(await recipes()).toHaveLength(recorded)
+
+		query.mockClear()
+		const again = await readForWidget({
+			req: readerRequest(booted.payload),
+			metrics: ['pageviews'],
+			timeframe: 'last7days',
+			now: clock.now(),
 		})
-		const handler = task.handler
-		if (typeof handler !== 'function') {
-			throw new Error('warm task handler must be a function')
-		}
-		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
-		expect((result as { output: { warmed: number; failed: number } }).output).toEqual({
-			warmed: 0,
+		expect(again.status).toBe('ok')
+		expect(query).not.toHaveBeenCalled()
+		query.mockRestore()
+	})
+
+	it(`lets reads nobody asked for in windowHours go cold on ${db}`, async () => {
+		clock.advance(25 * 60 * MINUTE)
+		expect(await runWarm()).toEqual({
+			ran: true,
+			finished: true,
+			refreshed: 0,
+			fresh: 0,
+			skipped: 0,
 			failed: 0,
 		})
 	})

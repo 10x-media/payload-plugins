@@ -98,6 +98,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.refPlaceholder]: 'Виберіть або введіть ID',
 	[keys.impersonated]: 'імперсонація',
 	[keys.impersonatedBy]: 'Від імені користувача діяв',
+	[keys.aboutUser]: 'Про користувача',
 	[keys.deletedUser]: 'Видалений користувач',
 	[keys.toggleDetails]: 'Показати або сховати деталі',
 	[keys.sectionSnapshot]: 'Знімок',

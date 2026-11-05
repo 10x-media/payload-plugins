@@ -1,0 +1,401 @@
+---
+title: Attach goals to your own components
+description: The plugin ships no frontend components. Here is how to mark a conversion on a CMS link, a Lexical link, a form, a button and a content item you already own.
+---
+
+**The plugin ships no frontend components.** No `<AnalyticsLink>`, no `<TrackedButton>`, no block you have to adopt. It ships small pieces you attach to the markup you already have:
+
+| Piece | Entry | What it needs |
+|---|---|---|
+| `goalAttributes()`, `eventAttributes()`, `itemAttributes()`, `itemRef()` | `@10x-media/analytics/attributes` | Nothing. No Payload, no React, no tracker. |
+| `analyticsLinkFields()`, `goalField()`, `goalSlug()` | `@10x-media/analytics` | Payload: the fields at config time, `goalSlug()` where a document is read. The entry pulls Payload in, so call them on the server. |
+| `signItemRef()`, `itemAttributesFor()` | `@10x-media/analytics` | A Payload instance on the server, whose secret signs the ref. |
+| `useAnalytics().trackGoal`, `.purchase` | `@10x-media/analytics/react` | A client component under `<AnalyticsScripts />` (`@10x-media/analytics/site`). |
+| `trackServerEvent()`, `purchase()`, `refund()` | `@10x-media/analytics` | A Payload instance on the server. |
+
+## Which one to reach for
+
+**Use the attributes when the conversion is a click or a submit on markup you render.** They cost no client JavaScript at all: auto-capture already listens on `document` for both, so a server component that spreads them is enough. This is the right default.
+
+**Use the hook when there is no element to mark.** A conversion that happens after an API call resolves, or in a drawer that never rendered an anchor, has nothing to attach an attribute to.
+
+**Use the server call when the browser is not the source of truth.** A payment webhook, a job, a server action. It is also the only path that may record a refund. See [Revenue](/analytics/revenue).
+
+The attributes entry is dependency-free by design, so it is safe to import from a Lexical JSX converter, a shared package, or anywhere that must not pull Payload into the bundle.
+
+## 1. A CMS link field
+
+Add the analytics fields to whatever link group your project already has. `analyticsLinkFields()` returns plain `Field[]`, so it spreads in beside the fields you own:
+
+```ts title="payload/fields/link.ts"
+import { analyticsLinkFields } from '@10x-media/analytics'
+import type { Field } from 'payload'
+
+export const link: Field = {
+  name: 'link',
+  type: 'group',
+  fields: [
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'type',
+          type: 'radio',
+          defaultValue: 'reference',
+          options: [
+            { label: 'Internal link', value: 'reference' },
+            { label: 'Custom URL', value: 'custom' },
+          ],
+          admin: { layout: 'horizontal', width: '50%' },
+        },
+        {
+          name: 'newTab',
+          type: 'checkbox',
+          defaultValue: false,
+          admin: { style: { alignSelf: 'flex-end' }, width: '50%' },
+        },
+      ],
+    },
+    {
+      type: 'row',
+      fields: [
+        {
+          name: 'reference',
+          type: 'relationship',
+          relationTo: 'pages',
+          required: true,
+          admin: { condition: (_, sibling) => sibling?.type === 'reference', width: '50%' },
+        },
+        {
+          name: 'url',
+          type: 'text',
+          required: true,
+          admin: { condition: (_, sibling) => sibling?.type === 'custom', width: '50%' },
+        },
+      ],
+    },
+    { name: 'label', type: 'text', required: true },
+    ...analyticsLinkFields(),
+  ],
+}
+```
+
+Editors now get a **Goal** picker on every link, listing the goals their scope can see. The picker is a client component, so regenerate the import map and the types after adding it.
+
+Then spread the attributes where the link renders. This is a server component: nothing below is client code.
+
+```tsx title="components/cms-link.tsx"
+import { goalAttributes } from '@10x-media/analytics/attributes'
+import Link from 'next/link'
+
+type LinkProps = {
+  type?: 'reference' | 'custom'
+  reference?: { slug?: string } | null
+  url?: string | null
+  label: string
+  newTab?: boolean | null
+  goal?: string | null
+}
+
+export const CMSLink = ({ link }: { link: LinkProps }) => {
+  const href = link.type === 'custom' ? (link.url ?? '#') : `/${link.reference?.slug ?? ''}`
+  return (
+    <Link
+      href={href}
+      {...(link.newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+      {...goalAttributes(link.goal)}
+    >
+      {link.label}
+    </Link>
+  )
+}
+```
+
+A link whose goal was never set, or was cleared, spreads to nothing: `goalAttributes` returns an empty object rather than an empty attribute. A click on the rendered anchor completes the goal, because auto-capture reads `data-analytics-goal` from the nearest ancestor carrying it.
+
+Pass `analyticsLinkFields({ value: true })` to add a per-link **Goal value** as well, for a link whose worth differs from the goal's own. Vendor slots always receive it; native counts it only for a goal without a fixed value, or for any goal under [`revenue.browserAmounts: 'trust'`](/analytics/revenue#amounts-from-the-browser), since an amount on a page is one anyone can edit. Read it back the same way:
+
+```tsx partial
+{...goalAttributes(link.goal, { value: link.goalValue ?? undefined })}
+```
+
+## 2. A Lexical link
+
+Payload's `LinkFeature` takes a `fields` function that receives the defaults and returns the set to use. Append the analytics fields to it. The goal picker registers a component path here too, so regenerate the import map and the types afterwards:
+
+```ts title="payload/lexical/editor.ts"
+import { analyticsLinkFields } from '@10x-media/analytics'
+import { LinkFeature, lexicalEditor } from '@payloadcms/richtext-lexical'
+
+export const editor = lexicalEditor({
+  features: ({ defaultFeatures }) => [
+    ...defaultFeatures,
+    LinkFeature({
+      enabledCollections: ['pages'],
+      fields: ({ defaultFields }) => [...defaultFields, ...analyticsLinkFields()],
+    }),
+  ],
+})
+```
+
+The picked slug lands in the link node's own `fields`, so the JSX converter that already renders links adds the attributes:
+
+```tsx title="richtext/link-converter.tsx"
+import { goalAttributes } from '@10x-media/analytics/attributes'
+import type { SerializedAutoLinkNode, SerializedLinkNode } from '@payloadcms/richtext-lexical'
+import type { JSXConverters } from '@payloadcms/richtext-lexical/react'
+import Link from 'next/link'
+import type { ReactNode } from 'react'
+
+const anchor = (fields: { url?: string; newTab?: boolean; goal?: string }, children: ReactNode) => (
+  <Link
+    href={fields.url ?? '#'}
+    {...(fields.newTab ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+    {...goalAttributes(fields.goal)}
+  >
+    {children}
+  </Link>
+)
+
+// Both node types, because Lexical stores an editor-made link and an auto-detected URL as
+// two different nodes and only the first one has a goal to carry.
+export const linkConverter: JSXConverters<SerializedAutoLinkNode | SerializedLinkNode> = {
+  autolink: ({ node, nodesToJSX }) =>
+    anchor(node.fields, nodesToJSX({ nodes: node.children })),
+  link: ({ node, nodesToJSX }) =>
+    anchor(
+      node.fields as { url?: string; newTab?: boolean; goal?: string },
+      nodesToJSX({ nodes: node.children })
+    ),
+}
+```
+
+`goalAttributes` imports nothing, which is what makes this work: a converter module that pulled Payload in would drag it into every page that renders rich text.
+
+A converter with more than one `return` needs the attributes on each of them. A link to a document the site suppresses often renders a `<span>` rather than an anchor, and that one has nothing to attach to and nothing to click, so it stays as it is.
+
+## If your link field is a factory
+
+The example above is a plain `Field` object, so the analytics fields spread straight into its `fields` array. Most real projects have outgrown that: the link is produced by a factory, `link({ appearances: false, disableLabel: true })`, and its call sites pass overrides rather than field lists. Three places then have to be taught about the new field, and none of them is the factory's override bag.
+
+**The overrides do not get you there.** A factory that deep-merges its `overrides` almost always *replaces* arrays rather than concatenating them, which is the sane default for a merge helper and the wrong one here: passing `overrides: { fields: analyticsLinkFields() }` discards every field the factory built and leaves only the goal picker. Add the fields inside the factory instead, where the array is assembled:
+
+```ts title="payload/fields/link/link.ts" partial
+import { analyticsLinkFields } from '@10x-media/analytics'
+
+export const link: LinkType = ({ overrides = {}, ...options } = {}) => {
+  const built = { name: 'link', type: 'group', fields: [/* ... */] }
+  built.fields.push(...analyticsLinkFields())
+  return deepMerge(built, overrides)
+}
+```
+
+Check the merge helper before assuming: if it concatenates arrays, or if the factory takes a function-shaped override (`overrides: ({ field }) => field`), the call site can add the fields without touching the factory.
+
+**A render helper with a closed return type has to be taught the field.** Projects usually funnel a link through one function that picks the props an anchor needs, `getLinkProps(link)` returning `{ href, target, rel, 'aria-label' }`. That return type is a closed shape: a goal attribute assigned onto it is a type error, and an extra key on the input is dropped on the floor rather than passed through. Both halves need the edit:
+
+```ts title="lib/utils/getLinkProps.ts" partial
+import { goalAttributes } from '@10x-media/analytics/attributes'
+
+interface LinkProps {
+  // ...
+  goal?: string | null
+}
+
+interface ReturnLinkProps {
+  href: string
+  target?: '_blank'
+  rel?: 'noopener noreferrer'
+  'aria-label'?: string
+  'data-analytics-goal'?: string
+}
+
+export const getLinkProps = (link: LinkProps): ReturnLinkProps => {
+  const props: ReturnLinkProps = { href: hrefFor(link), ...goalAttributes(link.goal) }
+  // ...
+  return props
+}
+```
+
+Watch for early returns. A helper that answers `{ href: '#' }` for a link that opens a modal never reaches the prop-building code, so that branch needs the attributes of its own.
+
+**A button component that enumerates its props has to spread them.** A `CMSLinkButton` that destructures `{ link, className, iconLeft, iconRight }` with no `...rest` passes on exactly what it names. As long as it spreads the helper's whole return onto the anchor, the goal attribute rides along with `href`:
+
+```tsx partial
+<LinkButton className={className} {...getLinkProps(link)}>{link.label}</LinkButton>
+```
+
+**A Lexical link feature configured with an explicit field list needs the field added by hand.** A `fields` callback that cherry-picks the defaults by name and returns a hand-built array drops anything it does not name, including this:
+
+```ts partial
+LinkFeature({
+  fields: ({ defaultFields }) => [...pickedFrom(defaultFields), ...analyticsLinkFields()],
+})
+```
+
+More than one editor can be configured, and only the ones with an explicit list get the field. An editor calling `LinkFeature()` bare keeps Payload's defaults and gains nothing here.
+
+Then regenerate the types, so the generated link type carries `goal` and the render helpers typecheck against it.
+
+## 3. A form
+
+`@10x-media/form-builder` submissions go through an action rather than an attribute, because the conversion is the submission landing on the server, not the click:
+
+```ts title="payload.config.ts"
+import { GOAL_ACTION_TYPE, trackGoalAction } from '@10x-media/analytics'
+import { formBuilder } from '@10x-media/form-builder'
+
+formBuilder({
+  actions: { [GOAL_ACTION_TYPE]: trackGoalAction({ hostname: 'example.com' }) },
+})
+```
+
+Every form then gets a **Track analytics goal** block under its Actions tab, with the same goal picker. See [Goals](/analytics/goals#3-track-a-form-submission) for what the action records and where its hostname comes from.
+
+For a form you wrote yourself, the attribute is enough. Tag the form, and auto-capture completes its goal on the submit, once per submission, whatever inside it was clicked before ([Tag the element](/analytics/goals#1-tag-the-element)):
+
+```html
+<form data-analytics-goal="newsletter-signup">
+  <input name="email" type="email" />
+  <button type="submit">Subscribe</button>
+</form>
+```
+
+## 4. A button with no element to mark
+
+When the conversion is not a click on an anchor, call it yourself. This is the only case that needs a client component:
+
+```tsx title="components/save-quote.tsx"
+'use client'
+
+import { useAnalytics } from '@10x-media/analytics/react'
+
+export const SaveQuote = ({ quoteId }: { quoteId: string }) => {
+  const { trackGoal } = useAnalytics()
+
+  const onSave = async () => {
+    const res = await fetch(`/api/quotes/${quoteId}/save`, { method: 'POST' })
+    // Only a saved quote is a conversion, which no attribute could have known.
+    if (res.ok) trackGoal('save-quote')
+  }
+
+  return (
+    <button onClick={onSave} type="button">
+      Save this quote
+    </button>
+  )
+}
+```
+
+`useAnalytics()` needs `<AnalyticsScripts />` from `@10x-media/analytics/site` (or `<AnalyticsProvider>`) somewhere above it; see [Capture](/analytics/capture). The same hook carries `purchase` for a checkout, covered in [Revenue](/analytics/revenue).
+
+## 5. Content shown on your pages
+
+An offer, a banner or a product card is a [content item](/analytics/items): what matters is how often it is seen and clicked wherever it appears, not the traffic of a page of its own. Bind its collection with `item: true`, then mark the element that renders it with a ref your server signed: `itemAttributesFor(payload, ...)` where the element renders on the server, or `itemAttributes({ ref })` with a ref from `signItemRef` anywhere else (see [signed refs](/analytics/items#signed-refs)). Native drops a ref it cannot verify.
+
+### In a link component
+
+A CMS link that can point at a document of an item collection marks itself as that item, so a click on the link counts for the offer, and a goal on the same link is credited to it:
+
+```tsx title="components/cms-link.tsx"
+import { itemAttributesFor } from '@10x-media/analytics'
+import { goalAttributes } from '@10x-media/analytics/attributes'
+import config from '@payload-config'
+import Link from 'next/link'
+import { getPayload } from 'payload'
+
+type LinkProps = {
+  reference?: { relationTo: string; value: { id: string; slug?: string; title?: string } } | null
+  label: string
+  goal?: string | null
+}
+
+// Collections bound with `item: true` in the analytics config.
+const ITEM_COLLECTIONS = new Set(['offers'])
+
+export const CMSLink = async ({ link }: { link: LinkProps }) => {
+  const target = link.reference
+  const item =
+    target && ITEM_COLLECTIONS.has(target.relationTo)
+      ? itemAttributesFor(await getPayload({ config }), {
+          collection: target.relationTo,
+          id: target.value.id,
+          name: target.value.title,
+        })
+      : {}
+  return (
+    <Link href={`/${target?.value.slug ?? ''}`} {...item} {...goalAttributes(link.goal)}>
+      {link.label}
+    </Link>
+  )
+}
+```
+
+A view needs most of the element on screen for a second, so a small inline link is seen less readily than a whole card. Where the item renders as a card, mark the card instead and leave the link inside it unmarked: a click anywhere on the card counts.
+
+### In a Lexical converter
+
+A Lexical link to an internal document stores the target in `fields.doc` as `{ relationTo, value }`, so the link converter can mark it the same way. A converter runs synchronously, so build it with the Payload instance the rich text renders with, on the server. Populate the relationship (`depth` on the read that renders the rich text) to have the title for vendor slots; the ref needs only the id:
+
+```tsx title="richtext/link-converter.tsx"
+import { itemAttributesFor } from '@10x-media/analytics'
+import { goalAttributes } from '@10x-media/analytics/attributes'
+import type { SerializedLinkNode } from '@payloadcms/richtext-lexical'
+import type { JSXConverters } from '@payloadcms/richtext-lexical/react'
+import Link from 'next/link'
+import type { Payload } from 'payload'
+
+type InternalDoc = { relationTo: string; value: string | { id: string; title?: string } }
+
+export const linkConverter = (payload: Payload): JSXConverters<SerializedLinkNode> => {
+  const itemOf = (doc: InternalDoc | undefined) => {
+    if (doc?.relationTo !== 'offers') {
+      return {}
+    }
+    const value = typeof doc.value === 'string' ? { id: doc.value } : doc.value
+    return itemAttributesFor(payload, { collection: doc.relationTo, id: value.id, name: value.title })
+  }
+  return {
+    link: ({ node, nodesToJSX }) => {
+      const fields = node.fields as { url?: string; doc?: InternalDoc; goal?: string }
+      return (
+        <Link href={fields.url ?? '#'} {...itemOf(fields.doc)} {...goalAttributes(fields.goal)}>
+          {nodesToJSX({ nodes: node.children })}
+        </Link>
+      )
+    },
+  }
+}
+```
+
+The server component that renders the rich text passes `linkConverter(await getPayload({ config }))` with its other converters.
+
+A block that renders a whole offer card from rich text is marked the same way, on the card's outer element. [Content items](/analytics/items) has what counts as a view and a click, and what the reports show.
+
+## Custom events, not goals
+
+The same two shapes exist for events that are not conversions:
+
+```tsx partial
+import { eventAttributes } from '@10x-media/analytics/attributes'
+
+<button {...eventAttributes('cta_click', { plan: 'pro' })} type="button">Choose Pro</button>
+```
+
+That is `track('cta_click', { plan: 'pro' })` on click, with no client JavaScript of your own. Props ride along as `data-analytics-prop-*`, capped at the same twenty short scalars the ingest endpoint keeps. A goal attribute and an event attribute on the same element are read independently, so an element can do both.
+
+## The attribute names
+
+Exported as constants, for a host that builds the attribute object itself:
+
+| Constant | Attribute |
+|---|---|
+| `GOAL_ATTRIBUTE` | `data-analytics-goal` |
+| `VALUE_ATTRIBUTE` | `data-analytics-value` |
+| `CURRENCY_ATTRIBUTE` | `data-analytics-currency` |
+| `EVENT_ATTRIBUTE` | `data-analytics-event` |
+| `EVENT_PROP_PREFIX` | `data-analytics-prop-` |
+| `ITEM_ATTRIBUTE` | `data-analytics-item` |
+| `ITEM_NAME_ATTRIBUTE` | `data-analytics-item-name` |
+
+Auto-capture reads all of them from the nearest ancestor carrying them, so wrapping a whole card works. A form carrying them answers its submit rather than the clicks inside it. A blank or non-numeric `data-analytics-value` is treated as absent rather than zero, so an unfilled template slot never books a zero-revenue conversion. Turn the goal and event hookup off with `capture.autoCapture.goalAttribute: false`, and the item one with `capture.autoCapture.items: false`.

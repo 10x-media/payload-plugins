@@ -77,6 +77,7 @@ export interface Config {
     media: Media;
     users: User;
     customers: Customer;
+    departments: Department;
     tenants: Tenant;
     notes: Note;
     'tenant-settings': TenantSetting;
@@ -99,6 +100,7 @@ export interface Config {
     media: MediaSelect<false> | MediaSelect<true>;
     users: UsersSelect<false> | UsersSelect<true>;
     customers: CustomersSelect<false> | CustomersSelect<true>;
+    departments: DepartmentsSelect<false> | DepartmentsSelect<true>;
     tenants: TenantsSelect<false> | TenantsSelect<true>;
     notes: NotesSelect<false> | NotesSelect<true>;
     'tenant-settings': TenantSettingsSelect<false> | TenantSettingsSelect<true>;
@@ -259,6 +261,7 @@ export interface Tag {
 export interface User {
   id: string;
   name?: string | null;
+  departments?: (string | Department)[] | null;
   tenants?:
     | {
         tenant: string | Tenant;
@@ -283,6 +286,16 @@ export interface User {
     | null;
   password?: string | null;
   collection: 'users';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "departments".
+ */
+export interface Department {
+  id: string;
+  name: string;
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -505,24 +518,14 @@ export interface AuditLog {
   eventType?: string | null;
   relationTo: string;
   documentId?: string | null;
-  user?:
-    | ({
-        relationTo: 'users';
-        value: string | User;
-      } | null)
-    | ({
-        relationTo: 'customers';
-        value: string | Customer;
-      } | null);
-  impersonator?:
-    | ({
-        relationTo: 'users';
-        value: string | User;
-      } | null)
-    | ({
-        relationTo: 'customers';
-        value: string | Customer;
-      } | null);
+  user?: {
+    relationTo?: string | null;
+    value?: string | null;
+  };
+  impersonator?: {
+    relationTo?: string | null;
+    value?: string | null;
+  };
   locale?: string | null;
   payloadAPI?: string | null;
   ipAddress?: string | null;
@@ -558,6 +561,7 @@ export interface AuditLog {
   group?: string | null;
   archivedAt?: string | null;
   tenant?: (string | null) | Tenant;
+  actorDepartments?: string[] | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -592,7 +596,6 @@ export interface ImpersonationSession {
   mode: 'swap' | 'parallel';
   targetSid: string;
   impersonatorSid: string;
-  impersonatorTenantCookie?: string | null;
   startedAt: string;
   endedAt?: string | null;
   endedBy?: ('exit' | 'logout' | 'terminated' | 'expired' | 'impersonatorGone' | 'targetGone' | 'failed') | null;
@@ -765,6 +768,10 @@ export interface PayloadLockedDocument {
     | ({
         relationTo: 'customers';
         value: string | Customer;
+      } | null)
+    | ({
+        relationTo: 'departments';
+        value: string | Department;
       } | null)
     | ({
         relationTo: 'tenants';
@@ -982,6 +989,7 @@ export interface MediaSelect<T extends boolean = true> {
  */
 export interface UsersSelect<T extends boolean = true> {
   name?: T;
+  departments?: T;
   tenants?:
     | T
     | {
@@ -1030,6 +1038,15 @@ export interface CustomersSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "departments_select".
+ */
+export interface DepartmentsSelect<T extends boolean = true> {
+  name?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "tenants_select".
  */
 export interface TenantsSelect<T extends boolean = true> {
@@ -1073,8 +1090,18 @@ export interface AuditLogsSelect<T extends boolean = true> {
   eventType?: T;
   relationTo?: T;
   documentId?: T;
-  user?: T;
-  impersonator?: T;
+  user?:
+    | T
+    | {
+        relationTo?: T;
+        value?: T;
+      };
+  impersonator?:
+    | T
+    | {
+        relationTo?: T;
+        value?: T;
+      };
   locale?: T;
   payloadAPI?: T;
   ipAddress?: T;
@@ -1086,6 +1113,7 @@ export interface AuditLogsSelect<T extends boolean = true> {
   group?: T;
   archivedAt?: T;
   tenant?: T;
+  actorDepartments?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1103,7 +1131,6 @@ export interface ImpersonationSessionsSelect<T extends boolean = true> {
   mode?: T;
   targetSid?: T;
   impersonatorSid?: T;
-  impersonatorTenantCookie?: T;
   startedAt?: T;
   endedAt?: T;
   endedBy?: T;

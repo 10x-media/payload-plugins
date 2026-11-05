@@ -99,14 +99,14 @@ describe('trackGoalAction: shape', () => {
 		expect(goal.type).toBe('text')
 		expect(goal.required).toBe(true)
 		expect((goal.admin?.components?.Field as { path: string }).path).toBe(
-			'@10x-media/analytics/client#GoalSelectField'
+			'@10x-media/analytics/rsc#GoalSelectFieldServer'
 		)
 
 		const value = fieldNamed(fields, 'value') as NumberField
 		expect(value.type).toBe('number')
 		expect(value.min).toBe(0)
 		expect(value.required).toBeUndefined()
-		expect(resolveLabel(value)).toBe(keys.goalFieldValue)
+		expect(resolveLabel(value)).toBe(keys.goalFieldAmount)
 
 		const valueFrom = fieldNamed(fields, 'valueFrom') as TextField
 		expect(valueFrom.type).toBe('text')
@@ -115,6 +115,28 @@ describe('trackGoalAction: shape', () => {
 		const currency = fieldNamed(fields, 'currency') as TextField
 		expect(currency.type).toBe('text')
 		expect(resolveLabel(currency)).toBe(keys.goalFieldCurrency)
+	})
+
+	it('edits the amount and its sibling currency in one Amount control', () => {
+		const fields = trackGoalAction().config
+		const value = fieldNamed(fields, 'value') as NumberField
+		expect(value.admin?.components?.Field).toEqual({
+			path: '@10x-media/analytics/client#GoalAmountField',
+			clientProps: { currencyPath: 'currency' },
+		})
+		// Hidden, not removed: the control writes it, and the form still saves it.
+		expect((fieldNamed(fields, 'currency') as TextField).admin?.hidden).toBe(true)
+	})
+
+	it('hands the control a default currency, and refuses one that is no code', () => {
+		const value = fieldNamed(
+			trackGoalAction({ defaultCurrency: 'EUR' }).config,
+			'value'
+		) as NumberField
+		expect(value.admin?.components?.Field).toMatchObject({
+			clientProps: { currencyPath: 'currency', defaultCurrency: 'EUR' },
+		})
+		expect(() => trackGoalAction({ defaultCurrency: 'euro' })).toThrow(/defaultCurrency/)
 	})
 
 	it('accepts a three-letter currency and refuses anything else', () => {
@@ -129,6 +151,23 @@ describe('trackGoalAction: shape', () => {
 		expect(validate(null, options)).toBe(true)
 		expect(validate('eur', options)).toBe(keys.goalErrorCurrency)
 		expect(validate('EURO', options)).toBe(keys.goalErrorCurrency)
+	})
+
+	it('asks for a currency once the action carries an amount', () => {
+		const currency = fieldNamed(trackGoalAction().config, 'currency') as TextField
+		const validate = currency.validate as TextFieldSingleValidation
+		const options = (siblingData: Record<string, unknown>) =>
+			({
+				req: { t: (key: string) => key },
+				data: {},
+				siblingData,
+			}) as unknown as Parameters<TextFieldSingleValidation>[1]
+
+		expect(validate('', options({ value: 25 }))).toBe(keys.goalErrorCurrencyRequired)
+		expect(validate(null, options({ value: 0 }))).toBe(keys.goalErrorCurrencyRequired)
+		expect(validate('EUR', options({ value: 25 }))).toBe(true)
+		// An amount read from an answer is in the reporting currency unless one is chosen.
+		expect(validate('', options({ value: null, valueFrom: 'budget' }))).toBe(true)
 	})
 
 	it('is assignable to form-builder’s ActionDefinition', () => {
@@ -263,9 +302,8 @@ describe('trackGoalAction: hostname', () => {
 		expect(tracked[0]?.event.hostname).toBe('cms.example')
 	})
 
-	// Deliberately neither a throw nor an empty hostname: with no option, no request host and
-	// no serverURL there is no site to attribute the completion to, and an empty one is a
-	// hostname `trackServerEvent` refuses anyway. The submission is what matters.
+	// Neither a throw nor an empty hostname: with no site to credit the completion is skipped, and the
+	// submission is what matters.
 	it('records nothing and warns once when no hostname resolves at all', async () => {
 		const warn = vi.fn()
 		const logged = { config: {}, logger: { warn } } as unknown as Payload
@@ -306,6 +344,41 @@ describe('trackGoalAction: scope', () => {
 			scope: async (args) => `tenant-${args.form.id}`,
 		}).run(runArgs())
 		expect(tracked[0]?.event.scope).toBe('tenant-7')
+	})
+})
+
+describe('trackGoalAction: identity', () => {
+	it("leaves identity to trackServerEvent's default when the option is unset", async () => {
+		await trackGoalAction({ hostname: 'shop.example' }).run(runArgs())
+		expect(tracked[0]?.opts && 'identity' in tracked[0].opts).toBe(false)
+	})
+
+	it('passes a literal identity with the submission request', async () => {
+		const args = runArgs(withHost('shop.example'))
+		await trackGoalAction({ identity: 'none' }).run(args)
+		expect(tracked[0]?.opts).toEqual({ req: args.req, identity: 'none' })
+	})
+
+	it('awaits an identity decided per submission from the run args', async () => {
+		const decide = vi.fn(async (args: GoalActionRunArgs) =>
+			args.req?.headers.get('cookie')?.includes('measured=1') ? 'request' : 'none'
+		)
+		const action = trackGoalAction({ hostname: 'shop.example', identity: decide })
+		await action.run(
+			runArgs({
+				req: { headers: new Headers({ cookie: 'measured=1' }) } as GoalActionRunArgs['req'],
+			})
+		)
+		await action.run(runArgs())
+		expect(tracked.map((entry) => entry.opts?.identity)).toEqual(['request', 'none'])
+		expect(decide).toHaveBeenCalledTimes(2)
+	})
+
+	it('decides nothing when no hostname resolves and nothing is recorded', async () => {
+		const decide = vi.fn(() => 'none' as const)
+		await trackGoalAction({ identity: decide }).run(runArgs())
+		expect(decide).not.toHaveBeenCalled()
+		expect(tracked).toHaveLength(0)
 	})
 })
 

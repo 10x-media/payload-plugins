@@ -1,46 +1,74 @@
 ---
 title: Analytics
-description: Adapter-based analytics for Payload v3, with dashboard widgets and per-document stats.
+description: Adapter-based analytics for Payload v3, with a self-hosted engine, dashboard widgets and per-document stats.
 ---
 
-`@10x-media/analytics` puts web analytics inside the Payload admin. One adapter contract covers a self-hosted native engine and the major providers (GA4, Plausible, Umami, PostHog), so the same dashboard widgets and per-document stat fields work regardless of where the numbers come from, and switching providers is a config change.
+`@10x-media/analytics` puts web analytics inside the Payload admin. One adapter contract covers a self-hosted native engine and the major providers (GA4, Plausible, Umami, PostHog), so the same view, dashboard widgets and per-document stat fields work wherever the numbers come from, and switching providers is a config change.
 
 ```ts title="payload.config.ts"
-import { buildConfig } from 'payload'
 import { analytics, analyticsDefaultWidgets } from '@10x-media/analytics'
 import { native } from '@10x-media/analytics/adapters/native'
+import { mongooseAdapter } from '@payloadcms/db-mongodb'
+import { buildConfig } from 'payload'
 
 export default buildConfig({
+  db: mongooseAdapter({ url: process.env.DATABASE_URL ?? '' }),
+  secret: process.env.PAYLOAD_SECRET ?? '',
   admin: {
-    dashboard: { defaultLayout: [...analyticsDefaultWidgets()] },
+    dashboard: { widgets: [], defaultLayout: [...analyticsDefaultWidgets()] },
   },
   plugins: [
     analytics({
       adapters: [native()],
+      // Required, and your decision: 'off' captures at once, 'all' holds every capture slot
+      // until your consent manager calls setGate (see Consent), so it counts nothing without one.
+      capture: { gate: 'off' },
       collections: {
-        pages: { path: (doc) => (doc.slug ? `/${doc.slug}` : null) },
+        pages: { path: (doc) => (typeof doc.slug === 'string' ? `/${doc.slug}` : null) },
       },
     }),
   ],
 })
 ```
 
-## How it fits together
+## What it is, and what it is not
 
-Everything reads through one [adapter contract](/analytics/adapters) with a capabilities model: run the [native engine](/analytics/native), a provider, or several at once, and every surface hides what the active adapter cannot answer. The native engine gives you self-hosted, cookieless analytics stored in Payload collections, with atomic rollups, exact daily uniques, [geo resolution](/analytics/geo), [bot filtering](/analytics/native#bot-filtering) on by default, retention pruning of events, the seen ledger and the daily visitor salts, with rollups pruned only once you set a window of their own, and optional write batching.
+It is:
 
-Getting the events in is part of the package too: a dependency-free browser [tracker](/analytics/capture) with consent gating, auto-capture and an [exclusion link](/analytics/capture#excluding-your-own-visits) that keeps a staff browser out of the numbers, and a [first-party proxy](/analytics/proxy) so a vendor's own SDK loads through your origin instead of theirs. [Privacy](/analytics/privacy) states, column by column, what a stored event holds and what it never holds. [Goals](/analytics/goals) turn conversions and revenue into readable metrics, completed from a data attribute, a `goalField()` picker in your own blocks, a form-builder action, or `trackServerEvent` from server code, and declared in config or in an opt-in collection editors manage themselves.
+- **An adapter layer.** Every surface reads through one [adapter contract](/analytics/reference/adapter-contract) with a capabilities model: run the [native engine](/analytics/native), a [provider](/analytics/providers), or several at once, and every surface hides what the active source cannot answer.
+- **A self-hosted engine.** The native engine stores analytics in your own Payload database, on MongoDB, Postgres or SQLite: raw hits counted into exact daily totals, 30-minute visits with bounce rate and time per visit, [geo resolution](/analytics/geo), [bot filtering](/analytics/native#bot-filtering), and daily visitor salts deleted within days. It sets no cookie.
+- **A capture pipeline.** A dependency-free browser [tracker](/analytics/capture), a [first-party proxy](/analytics/proxy) so a vendor's own SDK loads through your origin (GA4's tag excepted, which loads from Google), [goals](/analytics/goals) and [revenue](/analytics/revenue) from markup, form submissions and server code, and a signed [exclusion link](/analytics/capture#excluding-your-own-visits) that keeps staff out of the numbers.
+- **Admin surfaces.** The [analytics view](/analytics/analytics-view) at `/admin/analytics`, whose whole state is in its URL; [dashboard widgets](/analytics/widgets) on Payload's Modular Dashboard; and [display fields](/analytics/display-fields) that put a document's own numbers on your collections. Nothing is injected into your schema.
+- **An API.** An authenticated [query endpoint](/analytics/reference/endpoints#query-endpoint) over any configured source, with [cached](/analytics/cache) reads served stale while they refresh, and an opt-in [sync tier](/analytics/sync) that copies vendor numbers into a collection.
 
-The numbers surface in three places. The [analytics view](/analytics/analytics-view) at `/admin/analytics` is the full report: overview cards, a trend, breakdown tabs with click-to-filter, goals and realtime, with its whole state in the URL so a report is a link. [Dashboard widgets](/analytics/widgets) (metric, trend, breakdown, and realtime, plus a public API for your own) render on Payload's Modular Dashboard. [Display fields](/analytics/display-fields) put per-document stats on your own collections through factories such as `analyticsStat` and `analyticsTab`; nothing is auto-injected into your schema.
+It is not:
 
-Anything else you want to build reads through the same contract: an authenticated `GET /api/analytics/query` endpoint over any configured [data source](/analytics/data-sources), capability-validated, scope-gated, with coded errors and a `fetchQuery` helper for admin code.
-
-Underneath, reads are [cached](/analytics/cache) in `payload.kv` with request coalescing and optional scheduled warming, and an opt-in [sync tier](/analytics/sync) persists provider daily metrics into a queryable Payload collection. Admin strings are [typed translations](/analytics/i18n) following the shared plugin pattern.
+- **A consent manager.** The plugin stores no consent state and decides nothing about consent. Whether a site may measure before a visitor answers, and under which category, is the site operator's decision, made in a consent manager such as c15t. What the plugin gives that manager is a [gate](/analytics/consent) in front of each capture slot, which it opens and closes with `setGate`.
+- **A tag manager.** It boots the tracker of the vendors it has adapters for, and nothing else.
+- **A legal assessment.** [Privacy](/analytics/privacy) states what a stored hit holds and how long it is kept; whether an install needs a notice or a legal basis is yours to decide.
 
 ## When to use it
 
-Use the native engine when you want analytics without a third-party service: no cookies, data in your own database, one dependency. Use a provider adapter when the numbers already live in GA4, Plausible, Umami, or PostHog and you want them surfaced next to the content they describe. Mixing works too: multiple adapters can be registered and chosen per widget or field.
+Use the native engine when you want analytics without a third-party service: no cookies, data in your own database, no account to manage. Use a provider adapter when the numbers already live in GA4, Plausible, Umami or PostHog and you want them next to the content they describe. Mixing works too: several adapters can be registered and chosen per widget or field, and on a [multi-tenant install](/analytics/multi-tenancy) each tenant can bring its own.
 
 ## Requirements
 
-Payload `^3.82.0`, React 19. Dashboard widgets use Payload's Modular Dashboard, an experimental feature. Optional peers you install only if used: `@google-analytics/data` (GA4), `maxmind` (MaxMind geo lookup), `@payloadcms/db-postgres` (already present on Postgres projects).
+| | |
+|---|---|
+| Payload | `^3.83.0`, with `@payloadcms/next` and `@payloadcms/ui` at the same range |
+| Next.js | `^15.2.9` or `^16.2.6` |
+| React | 19 |
+| Node.js | 22.18 or later |
+| `@10x-media/fields` | required peer: the providers collection seals its keys with its encrypted fields |
+| Optional peers | `@google-analytics/data` (GA4) and `maxmind` (MaxMind geo lookup) |
+| Native engine | MongoDB 5.0, Postgres 12 or SQLite 3.35 or later, SQLite on a database file; not Cloudflare D1, and not MongoDB-compatible services such as Amazon DocumentDB, Azure Cosmos DB or Firestore |
+
+Dashboard widgets use Payload's Modular Dashboard, an experimental Payload feature, so they are marked `@beta` here too ([Stability](/analytics/reference/stability)).
+
+## Where to go next
+
+- Install it and see numbers: [Quick start](/analytics/quick-start).
+- Learn the ideas the rest of these pages use: [Concepts](/analytics/concepts).
+- Wire your consent manager to the gate: [Consent](/analytics/consent).
+- Look up an option, an endpoint or an export: [Options](/analytics/reference/options), [Endpoints](/analytics/reference/endpoints), [Entry points](/analytics/reference/entry-points).
+- Coming from an earlier beta: [Upgrading](/analytics/upgrading).

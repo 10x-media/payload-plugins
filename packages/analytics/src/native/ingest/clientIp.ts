@@ -1,35 +1,65 @@
+import { PLATFORM_HEADERS, type TrustedPlatform } from '../../net/platform'
+import { headerEntries } from './requestHost'
+
 export interface ClientIpOptions {
 	/**
-	 * Trusted proxies in front of the app, counted from the right of `x-forwarded-for`: the
-	 * address the outermost trusted proxy saw. Unset reads the leftmost entry, which is correct
-	 * for honest traffic and is whatever the client wrote for the rest, so an install behind a
-	 * proxy it controls should set it. There is no default of 1: an install behind a CDN plus a
-	 * proxy would then read the CDN's address for every visitor, collapsing geo and the visitor
-	 * hash onto one value, which is worse than a spoofable one.
+	 * Trusted proxies counted from the right of `x-forwarded-for`; unset reads the leftmost entry.
+	 * No default of 1: behind a CDN plus a proxy it would collapse every visitor onto the CDN.
 	 */
 	trustedProxyHops?: number
+	/**
+	 * The platform whose edge header carries the address instead: `x-real-ip` on Vercel,
+	 * `cf-connecting-ip` on Cloudflare. Never set together with `trustedProxyHops`.
+	 */
+	trustedPlatform?: TrustedPlatform
 }
 
+const forwardedChain = (headers: Headers): string[] => headerEntries(headers, 'x-forwarded-for')
+
 /**
- * The originating client IP a proxy chain reported: the first hop of `x-forwarded-for`, else
- * `x-real-ip`. Null when the request carries neither, so callers can omit the value instead of
- * forwarding a fabricated one.
- *
- * With `trustedProxyHops >= 1` the forwarded chain is the only source, counted from the right,
- * and a chain shorter than the count answers null rather than falling back to a header the
- * client could have written.
+ * First hop of `x-forwarded-for`, else `x-real-ip`, else null. With trusted hops or a platform set,
+ * only that source counts: a short chain or missing header answers null, never a fallback.
  */
 export const clientIpFromHeaders = (
 	headers: Headers,
 	opts: ClientIpOptions = {}
 ): string | null => {
-	const chain = (headers.get('x-forwarded-for') ?? '')
-		.split(',')
-		.map((entry) => entry.trim())
-		.filter(Boolean)
+	if (opts.trustedPlatform !== undefined) {
+		return headers.get(PLATFORM_HEADERS[opts.trustedPlatform].ip)?.trim() || null
+	}
+	const chain = forwardedChain(headers)
 	const hops = opts.trustedProxyHops ?? 0
 	if (hops >= 1) {
 		return chain[chain.length - hops] ?? null
 	}
 	return chain[0] ?? (headers.get('x-real-ip')?.trim() || null)
+}
+
+/**
+ * Whether `headers` came through two or more proxies while the install trusts none of them, so
+ * the address read from them is the one the visitor wrote.
+ */
+export const forwardedUntrusted = (headers: Headers, opts: ClientIpOptions): boolean =>
+	opts.trustedPlatform === undefined &&
+	(opts.trustedProxyHops ?? 0) === 0 &&
+	forwardedChain(headers).length >= 2
+
+/**
+ * `headers` as if the request came from `ip`, written where {@link clientIpFromHeaders} reads it.
+ * Platform location headers are dropped: they describe the request's own address.
+ */
+export const overlayClientIp = (headers: Headers, ip: string, opts: ClientIpOptions): Headers => {
+	const out = new Headers(headers)
+	for (const platform of Object.values(PLATFORM_HEADERS)) {
+		out.delete(platform.ip)
+		out.delete(platform.country)
+		out.delete(platform.region)
+		out.delete(platform.city)
+	}
+	if (opts.trustedPlatform !== undefined) {
+		out.set(PLATFORM_HEADERS[opts.trustedPlatform].ip, ip)
+	}
+	const hops = Math.max(1, opts.trustedProxyHops ?? 0)
+	out.set('x-forwarded-for', Array.from({ length: hops }, () => ip).join(', '))
+	return out
 }

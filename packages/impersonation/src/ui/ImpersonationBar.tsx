@@ -13,8 +13,8 @@ import {
 import type { ImpersonationStatus } from '../getImpersonation'
 import { CLIENT_FETCH_TIMEOUT_MS } from '../plugin/constants'
 import { keys } from '../translations/keys'
-import { fillTemplate, messageFor } from '../translations/lookup'
-import { errorKey, goAfterSwitch, postImpersonation } from './api'
+import { messageFor } from '../translations/lookup'
+import { errorKey, type FailureCode, goAfterSwitch, postImpersonation } from './api'
 import {
 	anchorsFor,
 	type BarEdge,
@@ -25,6 +25,7 @@ import {
 	readViewport,
 	writeBarPlacement,
 } from './barPlacement'
+import { sessionEndsLabel } from './sessionEnds'
 import { useImpersonation } from './useImpersonation'
 import './impersonation.css'
 
@@ -35,30 +36,18 @@ const SESSION_GONE = new Set([
 	'notImpersonating',
 ])
 
-const formatCountdown = (expiresAt: string, now: number): string | null => {
-	const remaining = new Date(expiresAt).getTime() - now
-	if (!Number.isFinite(remaining) || remaining <= 0) {
-		return '0s'
-	}
-	const totalSeconds = Math.floor(remaining / 1000)
-	const hours = Math.floor(totalSeconds / 3600)
-	const minutes = Math.floor((totalSeconds % 3600) / 60)
-	const seconds = totalSeconds % 60
-	if (hours > 0) {
-		return `${hours}h ${String(minutes).padStart(2, '0')}m ${String(seconds).padStart(2, '0')}s`
-	}
-	if (minutes > 0) {
-		return `${minutes}m ${String(seconds).padStart(2, '0')}s`
-	}
-	return `${seconds}s`
-}
-
 export type ImpersonationBarProps = {
 	actingAs: string
 	adminRoute: string
 	apiPath: string
 	frontendUrl?: string
 	impersonatorLocale?: null | string
+	/** Resolved by the provider from the config's translations, so overrides reach the client. */
+	messages?: {
+		collapseBar: string
+		errors: Partial<Record<FailureCode, string>>
+		expandBar: string
+	}
 	openWebsite: string
 	pluginName: string
 	returnTo: string
@@ -77,6 +66,7 @@ export const ImpersonationBar = ({
 	apiPath,
 	frontendUrl,
 	impersonatorLocale,
+	messages,
 	openWebsite,
 	pluginName,
 	returnTo,
@@ -99,7 +89,7 @@ export const ImpersonationBar = ({
 		typeof document === 'undefined' ? { height: 800, width: 1200 } : readViewport()
 	)
 	const [dragPoint, setDragPoint] = useState<null | Point>(null)
-	const [now, setNow] = useState(() => Date.now())
+	const [now, setNow] = useState<null | number>(null)
 	const chipRef = useRef<HTMLDivElement>(null)
 	const expiredProbe = useRef(false)
 	const dragOffset = useRef<null | Point>(null)
@@ -160,6 +150,7 @@ export const ImpersonationBar = ({
 			return
 		}
 		expiredProbe.current = false
+		setNow(Date.now())
 		const timer = window.setInterval(() => {
 			const next = Date.now()
 			setNow(next)
@@ -182,7 +173,8 @@ export const ImpersonationBar = ({
 		try {
 			const result = await postImpersonation(`${apiPath}/exit`, {})
 			if (!result.ok) {
-				toast.error(messageFor(impersonatorLocale, errorKey(result.error ?? 'failed')))
+				const code = result.error ?? 'failed'
+				toast.error(messages?.errors[code] ?? messageFor(impersonatorLocale, errorKey(code)))
 				if (result.error && SESSION_GONE.has(result.error)) {
 					setStatus({ active: false })
 					setVisible(false)
@@ -333,7 +325,7 @@ export const ImpersonationBar = ({
 			>
 				<span className="impersonation-chip__name">{targetName}</span>
 				<button
-					aria-label={messageFor(impersonatorLocale, keys.expandBar)}
+					aria-label={messages?.expandBar ?? messageFor(impersonatorLocale, keys.expandBar)}
 					className="impersonation-bar__icon"
 					onClick={(event) => {
 						if (dragged.current) {
@@ -350,17 +342,12 @@ export const ImpersonationBar = ({
 		)
 	}
 
-	const countdown = sessionEndsAt ? formatCountdown(sessionEndsAt, now) : null
-	const endsLabel =
-		countdown && countdown !== '0s'
-			? fillTemplate(sessionEndsInTemplate, '{{countdown}}', countdown)
-			: sessionEndsAt && countdown !== '0s'
-				? fillTemplate(
-						sessionEndsAtTemplate,
-						'{{time}}',
-						new Date(sessionEndsAt).toLocaleTimeString(impersonatorLocale ?? undefined)
-					)
-				: null
+	const endsLabel = sessionEndsLabel({
+		endsAt: sessionEndsAt,
+		locale: impersonatorLocale,
+		now,
+		templates: { endsAt: sessionEndsAtTemplate, endsIn: sessionEndsInTemplate },
+	})
 
 	return (
 		<div
@@ -377,7 +364,9 @@ export const ImpersonationBar = ({
 					</Pill>
 					<span>{actingAs}</span>
 				</div>
-				{endsLabel ? <div className="impersonation-bar__time">{endsLabel}</div> : null}
+				{sessionEndsAt ? (
+					<div className="impersonation-bar__time">{endsLabel ?? '\u00a0'}</div>
+				) : null}
 			</div>
 			<div className="impersonation-bar__actions">
 				{showFrontendLink && frontendUrl ? (
@@ -395,7 +384,7 @@ export const ImpersonationBar = ({
 					{returnTo}
 				</Button>
 				<button
-					aria-label={messageFor(impersonatorLocale, keys.collapseBar)}
+					aria-label={messages?.collapseBar ?? messageFor(impersonatorLocale, keys.collapseBar)}
 					className="impersonation-bar__icon"
 					onClick={collapse}
 					type="button"

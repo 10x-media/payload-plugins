@@ -1,4 +1,6 @@
+export type { MaxmindReader, MaxmindSdk } from '../core/sdks'
 export { composeGeoResolvers } from '../native/geo/composeGeoResolvers'
 export type { Geo, GeoResolver, GeoResolverOptions } from '../native/geo/geoResolver'
 export { noopResolver, platformHeaderResolver } from '../native/geo/geoResolver'
 export { type MaxmindOptions, maxmindResolver } from '../native/geo/maxmindResolver'
+export type { TrustedPlatform } from '../net/platform'

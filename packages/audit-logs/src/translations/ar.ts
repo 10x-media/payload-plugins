@@ -93,6 +93,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.refPlaceholder]: 'اختر أو اكتب معرّفًا',
 	[keys.impersonated]: 'منتحَل',
 	[keys.impersonatedBy]: 'انتحل الهوية',
+	[keys.aboutUser]: 'عن هذا المستخدم',
 	[keys.deletedUser]: 'مستخدم محذوف',
 	[keys.toggleDetails]: 'إظهار التفاصيل أو إخفاؤها',
 	[keys.sectionSnapshot]: 'لقطة',

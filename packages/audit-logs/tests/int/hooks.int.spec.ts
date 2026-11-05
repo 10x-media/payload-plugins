@@ -188,7 +188,7 @@ describe('host hooks on an audited collection', () => {
 			and: [{ relationTo: { equals: 'orders' } }, { documentId: { equals: String(doc.id) } }],
 		})
 
-		expect(String(log?.user)).toBe(userId)
+		expect(log?.user?.value).toBe(userId)
 	})
 })
 

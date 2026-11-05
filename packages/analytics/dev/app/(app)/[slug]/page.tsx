@@ -1,9 +1,9 @@
+import { goalSlug } from '@10x-media/analytics'
 import config from '@payload-config'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { getPayload } from 'payload'
-import { goalSlug } from '../../../../src/index'
-import type { Page } from '../../../payload-types'
+import { OfferCard } from '../../../components/OfferCard'
 
 export const dynamic = 'force-dynamic'
 
@@ -11,11 +11,11 @@ export default async function DevPage({ params }: { params: Promise<{ slug: stri
 	const { slug } = await params
 	const payload = await getPayload({ config })
 	const result = await payload.find({
-		collection: 'pages' as never,
+		collection: 'pages',
 		where: { slug: { equals: slug } },
 		limit: 1,
 	})
-	const page = result.docs[0] as Page | undefined
+	const page = result.docs[0]
 	if (!page) {
 		notFound()
 	}
@@ -40,6 +40,7 @@ export default async function DevPage({ params }: { params: Promise<{ slug: stri
 					</button>
 				</section>
 			))}
+			<OfferCard />
 		</main>
 	)
 }

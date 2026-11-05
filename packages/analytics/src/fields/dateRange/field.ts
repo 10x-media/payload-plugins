@@ -1,20 +1,8 @@
 import type { GroupField } from 'payload'
-import type { DateRangeFieldArgs } from './types'
+import { DATE_RANGE_FIELD_COMPONENT } from '../componentPaths'
+import type { DateRangeFieldArgs, DateRangeFieldOptions } from './types'
 
-/**
- * Utility to create a Date Range field: a group with `from` / `to` date subfields
- * rendered as a single range picker in the admin UI.
- *
- * @example
- * ```ts
- * dateRangeField({
- *   name: 'eventDates',
- *   label: 'Event Dates',
- *   pickerAppearance: 'dayOnly',
- *   timezone: true,
- * })
- * ```
- */
+/** Group with hidden `from`/`to` date subfields, rendered as one range picker in the admin. */
 export const dateRangeField = (args: DateRangeFieldArgs): GroupField => {
 	const {
 		name,
@@ -23,6 +11,7 @@ export const dateRangeField = (args: DateRangeFieldArgs): GroupField => {
 		required,
 		pickerAppearance = 'default',
 		timezone = false,
+		untilToday = false,
 		overrides,
 	} = args
 
@@ -56,20 +45,17 @@ export const dateRangeField = (args: DateRangeFieldArgs): GroupField => {
 			description,
 			components: {
 				Field: {
-					path: '@10x-media/analytics/client#DateRangeField',
+					path: DATE_RANGE_FIELD_COMPONENT,
 					clientProps: {
 						pickerAppearance,
 						timezone,
-					} satisfies import('./types').DateRangeFieldOptions,
+						...(untilToday ? { untilToday } : {}),
+					} satisfies DateRangeFieldOptions,
 				},
 			},
 		},
 		fields: childFields,
 	}
 
-	if (typeof overrides === 'function') {
-		return overrides(baseField)
-	}
-
-	return baseField
+	return typeof overrides === 'function' ? overrides(baseField) : baseField
 }

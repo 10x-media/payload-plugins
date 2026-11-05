@@ -5,13 +5,15 @@ import { useMemo } from 'react'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { fieldPaths } from '../fieldPaths'
-import type { Filters, SelectOption } from '../types'
+import { splitRef } from '../filterQuery'
+import type { CustomFilterOption, Filters, SelectOption } from '../types'
 import { labelOf } from '../utils'
 import { RefPicker, ValuesInput } from './RefPicker'
 import type { EditorProps } from './types'
 
 type Props = EditorProps & {
 	apiOptions: SelectOption[]
+	customFilters: CustomFilterOption[]
 	documentCollections: string[]
 	labels: Record<string, string>
 	onLabel: (ref: string, label: string) => void
@@ -21,6 +23,7 @@ type Props = EditorProps & {
 /** The rare filters, all on one screen, each taking several values. */
 export function MoreFilters({
 	apiOptions,
+	customFilters,
 	documentCollections,
 	labels,
 	onLabel,
@@ -64,6 +67,15 @@ export function MoreFilters({
 	const set = (field: 'apis' | 'changedPaths' | 'documents' | 'groups') => (values?: string[]) =>
 		setStaged((f): Filters => ({ ...f, [field]: values }))
 
+	// One collection per filter, so the URL holds bare ids, which is what the entry
+	// stores. The picker works in `slug:id` refs, so they are converted both ways.
+	const setCustom = (name: string) => (refs?: string[]) =>
+		setStaged((f): Filters => {
+			const { [name]: _, ...rest } = f.custom ?? {}
+			const custom = refs?.length ? { ...rest, [name]: refs.map((r) => splitRef(r).id) } : rest
+			return { ...f, custom: Object.keys(custom).length ? custom : undefined }
+		})
+
 	return (
 		<div className="al-panel-grid">
 			<RefPicker
@@ -96,6 +108,18 @@ export function MoreFilters({
 				placeholder={t(keys.apiPlaceholder)}
 				values={staged.apis ?? []}
 			/>
+			{customFilters.map((filter) => (
+				<RefPicker
+					collections={[filter.relationTo]}
+					key={filter.name}
+					label={filter.label}
+					labels={labels}
+					onChange={setCustom(filter.name)}
+					onLabel={onLabel}
+					refs={(staged.custom?.[filter.name] ?? []).map((id) => `${filter.relationTo}:${id}`)}
+					titleFields={titleFields}
+				/>
+			))}
 		</div>
 	)
 }

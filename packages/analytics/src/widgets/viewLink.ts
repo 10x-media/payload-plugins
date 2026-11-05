@@ -1,9 +1,12 @@
-import type { PayloadRequest } from 'payload'
+import type { WidgetServerProps } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 import type { AnalyticsFilter, DateRange, DimensionKey, MetricKey } from '../core/contract'
+import type { AnalyticsCountryFlags } from '../core/options'
 import { MAX_QUERY_RANGE_DAYS } from '../query/limits'
 import type { TimeframePreset } from '../timeframe/presets'
-import { zonedCalendarDay } from '../timeframe/tz'
+import { DAY_MS, DEFAULT_TIMEZONE, zonedCalendarDay } from '../timeframe/tz'
+import { keys } from '../translations/keys'
+import type { Translate } from '../translations/server'
 import { BREAKDOWN_TABS, type BreakdownTab, TAB_DIMENSIONS } from '../view/gating'
 import {
 	DEFAULT_VIEW_LIMIT,
@@ -14,20 +17,39 @@ import {
 	type ViewDefaults,
 	type ViewState,
 } from '../view/state'
+import type { WidgetWindow } from './widgetWindow'
 
 /**
- * The view as a widget sees it: where it mounts and what it opens on, or false when the
- * app turned it off. The defaults travel with the path because a link must leave out
- * exactly what the view would have defaulted to anyway.
+ * The view as a widget sees it, or false when the app turned it off. Defaults travel with the
+ * path because a link must leave out exactly what the view would default to.
+ *
+ * @beta
  */
 export type WidgetView =
 	| { path: string; defaultRange: TimeframePreset; defaultMetric: MetricKey }
 	| false
 
-/** What `registerWidgets` adds to every built-in widget's server props. */
+/**
+ * What the plugin adds to every built-in widget's server props, and to a widget override's: a
+ * server component in a widget's place receives them beside Payload's own widget props.
+ *
+ * @beta
+ */
 export interface WidgetViewProps {
 	view?: WidgetView
+	/**
+	 * The install's `countryFlags`, which a widget draws whether or not the view is on: the host's
+	 * component, when it set one, is rendered once per row.
+	 */
+	countryFlags?: boolean | AnalyticsCountryFlags
 }
+
+/**
+ * What a built-in widget is rendered with: Payload's widget props and the plugin's own.
+ *
+ * @beta
+ */
+export type AnalyticsWidgetProps = WidgetServerProps & WidgetViewProps
 
 export interface ViewHrefArgs {
 	adminRoute: string
@@ -44,9 +66,8 @@ export interface ViewHrefArgs {
 	metric?: MetricKey
 	tab?: BreakdownTab
 	/**
-	 * The dimension the widget ranks, so the view opens on the same grouping rather than on
-	 * whatever its tab defaults to. Dropped when it is that default, which keeps the link short
-	 * and unchanged for every widget whose dimension already leads its tab.
+	 * Dimension the widget ranks, so the view opens on the same grouping. Dropped when it is the
+	 * tab's default, which keeps the link short.
 	 */
 	dim?: DimensionKey
 	/** The widget's own filter, carried as the view's filter state. */
@@ -57,13 +78,9 @@ export interface ViewHrefArgs {
 const fallbackRange = (defaults: ViewDefaults): TimeframePreset =>
 	defaults.range === 'allTime' ? DEFAULT_VIEW_RANGE : defaults.range
 
-const DAY_MS = 86_400_000
-
 /**
- * The widest custom window the view will accept, as a start day. `parseViewState` drops a
- * wider one and opens on the default range instead, silently, so a widget on a longer
- * window links to the last `MAX_QUERY_RANGE_DAYS` days of it: the most of what the widget
- * shows that the view can show back.
+ * Start day of the widest window the view accepts: `parseViewState` silently drops a wider one,
+ * so a longer widget window links to its last `MAX_QUERY_RANGE_DAYS` days.
  */
 const clampStartDay = (from: string, to: string): string => {
 	const start = Date.parse(`${from}T00:00:00.000Z`)
@@ -77,9 +94,8 @@ const clampStartDay = (from: string, to: string): string => {
 }
 
 /**
- * The widget's window as the view's toolbar can hold it. A preset the toolbar does not
- * offer (`allTime`, `thisMonth`, `thisYear`) would select nothing there, so the link drops
- * the range instead and the view opens on its own default.
+ * The widget's window as the view's toolbar can hold it. A preset the toolbar lacks (`allTime`,
+ * `thisMonth`, `thisYear`) would select nothing, so the link drops it for the view's default.
  */
 const rangeOf = (
 	args: ViewHrefArgs,
@@ -102,9 +118,8 @@ const rangeOf = (
 }
 
 /**
- * A relative admin link opening the analytics view on what the widget shows. Nothing is
- * coerced against the source's capabilities here: the view does that on open, so a link
- * naming something the selected source cannot serve still lands on a working view.
+ * Relative admin link opening the view on what the widget shows. Capabilities go unchecked: the
+ * view coerces on open, so a link it cannot serve still lands on a working view.
  */
 export const viewHref = (args: ViewHrefArgs): string => {
 	const defaults: ViewDefaults = { range: args.defaultRange, metric: args.defaultMetric }
@@ -132,28 +147,44 @@ export const viewHref = (args: ViewHrefArgs): string => {
 }
 
 /**
- * The same link for a built-in widget, or nothing at all when the view is off. Omitting
- * `timeframe` opens the view on its configured range, for a widget (realtime) whose own
- * rolling window is no range the view can hold.
+ * A built-in card's footer link into the view, opened on what the card shows; no `href` when the
+ * view is off. Without a `window` it opens on the view's configured range, as a rolling window
+ * (realtime) is none the view can hold.
  */
-export const widgetViewHref = (
-	view: WidgetView | undefined,
-	req: PayloadRequest,
-	args: Omit<
-		ViewHrefArgs,
-		'adminRoute' | 'viewPath' | 'defaultRange' | 'defaultMetric' | 'timeframe'
-	> & { timeframe?: TimeframePreset | 'custom' }
-): string | undefined =>
-	view
-		? viewHref({
-				...args,
-				timeframe: args.timeframe ?? view.defaultRange,
-				adminRoute: req.payload.config.routes.admin,
-				viewPath: view.path,
-				defaultRange: view.defaultRange,
-				defaultMetric: view.defaultMetric,
-			})
-		: undefined
+export const widgetLink = (
+	props: Pick<AnalyticsWidgetProps, 'view' | 'req'>,
+	t: Translate,
+	{
+		window,
+		adapterId,
+		...args
+	}: Pick<ViewHrefArgs, 'compare' | 'metric' | 'tab' | 'dim' | 'filters'> & {
+		window?: WidgetWindow
+		/**
+		 * The adapter that answered, which on a scoped or runtime-provider install is not always
+		 * the one the widget asked for.
+		 */
+		adapterId: string
+	}
+): { href?: string; label: string } => {
+	const view = props.view
+	const label = t(keys.widgetOpenInView)
+	if (!view) {
+		return { label }
+	}
+	const href = viewHref({
+		...args,
+		adminRoute: props.req.payload.config.routes.admin,
+		viewPath: view.path,
+		defaultRange: view.defaultRange,
+		defaultMetric: view.defaultMetric,
+		timeframe: window?.saved ?? view.defaultRange,
+		timezone: window?.timezone ?? DEFAULT_TIMEZONE,
+		...(window?.range ? { range: window.range } : {}),
+		...(adapterId ? { source: adapterId } : {}),
+	})
+	return { href, label }
+}
 
 /** The breakdown tab that offers a dimension; every contract dimension belongs to one. */
 export const viewTabForDimension = (dimension: DimensionKey): BreakdownTab | undefined =>

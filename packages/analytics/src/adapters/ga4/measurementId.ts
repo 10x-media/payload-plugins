@@ -6,9 +6,8 @@ import { asTranslate } from '../../translations/server'
 export const MEASUREMENT_ID_PATTERN = /^[A-Za-z0-9-]+$/
 
 /**
- * Its own module so the providers collection can validate the id on the same terms the
- * adapter admits it, without importing the adapter and its `@google-analytics/data` peer.
- * Empty is allowed: the id is optional and only turns capture on.
+ * Validates the id as the adapter admits it, without loading the adapter's `@google-analytics/data`
+ * peer. Empty passes: the id is optional and only turns capture on.
  */
 export const validateMeasurementId: TextFieldSingleValidation = (value, { req }) =>
 	!value || MEASUREMENT_ID_PATTERN.test(value)

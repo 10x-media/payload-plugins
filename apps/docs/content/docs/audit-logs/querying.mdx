@@ -7,9 +7,9 @@ Entries are an ordinary Payload collection, so `payload.find` is the whole API. 
 
 ## What is indexed
 
-`operation`, `eventType`, `relationTo`, `documentId`, `user`, `impersonator`, `changedPaths`, `group`, `tenant` and `archivedAt` each carry their own index, and Payload indexes `createdAt` for you.
+`operation`, `eventType`, `relationTo`, `documentId`, `impersonator.value`, `changedPaths`, `group`, `tenant` and `archivedAt` each carry their own index, and Payload indexes `createdAt` for you.
 
-On top of those there are three compound indexes, because a single-field index cannot serve a filter and a sort at once: `[relationTo, documentId, createdAt]`, `[user, createdAt]`, and `[tenant, createdAt]` when multi-tenancy is on. Sorting by `-createdAt` while filtering on one of those leading fields is an index read rather than a sort in memory.
+On top of those there are three compound indexes, because a single-field index cannot serve a filter and a sort at once: `[relationTo, documentId, createdAt]`, `[user.value, user.relationTo, createdAt]`, and `[tenant, createdAt]` when multi-tenancy is on. Sorting by `-createdAt` while filtering on one of those leading fields is an index read rather than a sort in memory.
 
 The list is deliberately short. Every index is paid for on each write, and this collection is almost all writes.
 
@@ -49,13 +49,15 @@ await payload.find({
 ```ts
 await payload.find({
   collection: 'audit-logs',
-  where: { user: { equals: userId } },
+  where: {
+    and: [{ 'user.relationTo': { equals: 'users' } }, { 'user.value': { equals: String(userId) } }],
+  },
   sort: '-createdAt',
   overrideAccess: true,
 })
 ```
 
-With more than one auth collection the field is polymorphic, so query `user.value` and, if it matters, `user.relationTo`.
+`user` and `impersonator` are stored as `{ relationTo, value }` with the id as text, whatever the number of auth collections, so they survive the user being deleted. They are not relationships: `depth` does not populate them, so fetch the user yourself when you need more than the id.
 
 **A global's history**
 

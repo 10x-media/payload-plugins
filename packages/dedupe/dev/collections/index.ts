@@ -1,0 +1,17 @@
+/** One definition for the dev app and the integration tests, so the two never drift. */
+
+export { articles } from './articles'
+export { companies } from './companies'
+export { customers } from './customers'
+export { leads } from './leads'
+export { media } from './media'
+export { memberships } from './memberships'
+export { notes } from './notes'
+export { orders } from './orders'
+export { products } from './products'
+export { showcases } from './showcases'
+export { specimens } from './specimens'
+export { staff } from './staff'
+export { tenants } from './tenants'
+export { trips } from './trips'
+export { users } from './users'

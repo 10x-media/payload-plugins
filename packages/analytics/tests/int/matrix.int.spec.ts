@@ -1,36 +1,93 @@
-import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { Config, Endpoint, Payload, PayloadRequest } from 'payload'
+import {
+	type BootedPayload,
+	bootPayload,
+	describeForDb,
+	installTestClock,
+	type TestClock,
+} from '@10x-media/payload-test-harness'
+import type { PayloadRequest, Where } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { DimensionKey } from '../../src/core/contract'
+import { DEFAULT_JOBS } from '../../src/core/jobs'
+import { resolveRequestedScope } from '../../src/core/scopedRead'
 import { readForField } from '../../src/fields/readForDocument'
 import { GOALS_SLUG } from '../../src/goals/collection'
 import { GOAL_ACTION_TYPE } from '../../src/goals/trackGoalAction'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
-import { EVENTS_SLUG } from '../../src/native/collections/events'
-import { ROLLUPS_SLUG, rollupsCollection } from '../../src/native/collections/rollups'
-import { SEEN_SLUG, seenCollection } from '../../src/native/collections/seen'
-import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
-import { makeIngestHandler } from '../../src/native/ingest/endpoint'
-import { flushBatch } from '../../src/native/ingest/flushBatch'
-import type { StoredEvent } from '../../src/native/ingest/normalizeEvent'
+import type { NormalizedEvent } from '../../src/native/ingest/normalizeEvent'
 import { CHANNEL_TAXONOMY_VERSION, type TrafficChannel } from '../../src/native/ingest/source'
 import { native } from '../../src/native/nativeAdapter'
-import { applyRollupDeltas } from '../../src/native/rollups/applyRollupDeltas'
-import { bucketKey } from '../../src/native/rollups/bucketKey'
-import { bumpRollup } from '../../src/native/rollups/bumpRollup'
-import { bumpRollups } from '../../src/native/rollups/bumpRollups'
-import { computeRollupDeltas, type RollupInc } from '../../src/native/rollups/deltas'
-import { insertIfNew } from '../../src/native/rollups/insertIfNew'
-import { insertManyIfNew } from '../../src/native/rollups/insertManyIfNew'
+import { getRuntime } from '../../src/plugin/runtime'
 import { MAX_GEO_LENGTH } from '../../src/query/limits'
-import { SYNC_TASK_SLUG, syncTask } from '../../src/sync/syncTask'
+import { SYNC_SLUG } from '../../src/sync/collection'
+import {
+	SYNC_TASK_SLUG,
+	type SyncTaskOptions,
+	type SyncTaskOutput,
+	syncTask,
+} from '../../src/sync/syncTask'
 import { type MemoryAnalyticsAdapter, memoryAdapter } from '../../src/testing/memoryAdapter'
-import { startOfDayInTz } from '../../src/timeframe/tz'
+import { calendarDayOf } from '../../src/timeframe/calendar'
+import { DAY_MS, startOfDayInTz } from '../../src/timeframe/tz'
 import { resolveCustomRange } from '../../src/widgets/range'
 import { readForWidget } from '../../src/widgets/readForWidget'
 import { ACTION_HOST_SLUG, actionHost } from './actionHost'
-import { INGEST_HOST, ingestRequest } from './ingestRequest'
+import { INGEST_HOST } from './ingestRequest'
+import {
+	aroundNow,
+	ingestDirect,
+	nativeOf,
+	postBeacon,
+	storedHits,
+	storeEvents,
+} from './nativeHelpers'
+import { readerRequest } from './readerRequest'
+
+/** Posts a beacon to the mounted ingest endpoint and expects it taken (202). */
+const ingestAccepted = async (
+	booted: BootedPayload,
+	body: Record<string, unknown>,
+	headers: Record<string, string> = {}
+): Promise<void> => {
+	expect((await postBeacon(booted.payload, body, headers)).status).toBe(202)
+}
+
+/** Pageviews per value of one dimension, read through the adapter around now. */
+const breakdownOf = async (
+	booted: BootedPayload,
+	adapter: ReturnType<typeof native>,
+	dimension: DimensionKey
+): Promise<Record<string, number>> => {
+	const result = await adapter.query(
+		{ metrics: ['pageviews'], dimensions: [dimension], dateRange: aroundNow() },
+		{ payload: booted.payload }
+	)
+	return Object.fromEntries(
+		result.rows.map((row) => [String(row.dimensions?.[dimension]), row.metrics.pageviews ?? 0])
+	)
+}
+
+/** The local day start, in `tz`, of the one stored hit on `path`. */
+const hitDayStart = async (booted: BootedPayload, path: string, tz: string): Promise<string> => {
+	const [hit] = await storedHits(booted.payload, { path: { equals: path } })
+	return startOfDayInTz(new Date(String(hit?.ts)), tz).toISOString()
+}
+
+/** The day start of every day a series read of `path` counted pageviews on. */
+const seriesDays = async (
+	booted: BootedPayload,
+	adapter: ReturnType<typeof native>,
+	query: { path: string; scope?: string; timezone?: string }
+): Promise<string[]> => {
+	const result = await adapter.query(
+		{ ...query, metrics: ['pageviews'], granularity: 'day', dateRange: aroundNow() },
+		{ payload: booted.payload }
+	)
+	return result.rows
+		.filter((row) => (row.metrics.pageviews ?? 0) > 0)
+		.map((row) => String(row.timestamp))
+}
 
 describeForDb('analytics cross-db', {}, (db) => {
 	let booted: BootedPayload
@@ -49,548 +106,51 @@ describeForDb('analytics cross-db', {}, (db) => {
 	})
 })
 
-const actionGoals: Goal[] = [{ slug: 'book-demo', name: 'Book a demo', match: { kind: 'goal' } }]
-
-const rollupInc = (over: Partial<RollupInc> = {}): RollupInc => ({
-	pageviews: 0,
-	events: 0,
-	durationMs: 0,
-	samples: 0,
-	conversions: 0,
-	revenue: 0,
-	scrollDepthSum: 0,
-	scrollSamples: 0,
-	...over,
-})
-
-const rollupsOnly = (config: Config): Config => {
-	config.collections = [...(config.collections ?? []), rollupsCollection()]
-	return config
-}
-
-const seenOnly = (config: Config): Config => {
-	config.collections = [...(config.collections ?? []), seenCollection()]
-	return config
-}
-
-/**
- * Inserts one rollup row via the raw DB driver (mirroring `bumpRollup`'s access pattern),
- * bypassing Payload's field validation so a genuine duplicate hits the storage-level unique
- * index rather than the app-level `required` check on the '' sentinel dimension/hostname
- * fields.
- */
-const rawInsertRollup = async (payload: Payload, row: Record<string, unknown>): Promise<void> => {
-	if (payload.db.name === 'mongoose') {
-		const db = payload.db as unknown as {
-			collections: Record<string, { collection: { insertOne: (doc: object) => Promise<unknown> } }>
-		}
-		await db.collections[ROLLUPS_SLUG]?.collection.insertOne(row)
-		return
-	}
-	const db = payload.db as unknown as {
-		drizzle: { insert: (t: unknown) => { values: (v: unknown) => Promise<unknown> } }
-		tables: Record<string, Record<string, unknown>>
-		tableNameMap: Map<string, string>
-	}
-	const tableName = db.tableNameMap.get('analytics_rollups')
-	const table = tableName ? db.tables[tableName] : undefined
-	if (!table) {
-		throw new Error('analytics: drizzle table "analytics_rollups" not found')
-	}
-	await db.drizzle.insert(table).values(row)
-}
-
-describeForDb('native rollup atomic apply', {}, (db) => {
-	let booted: BootedPayload
-	beforeAll(async () => {
-		booted = await bootPayload({ plugin: rollupsOnly, db })
-	})
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	it(`upserts then atomically increments the same bucket on ${db}`, async () => {
-		const key = {
-			granularity: 'day' as const,
-			period: new Date('2026-01-10T00:00:00Z'),
-			path: '/p',
-			dimension: '',
-			dimvalue: '',
-			hostname: '',
-		}
-		const delta = { key, inc: rollupInc({ pageviews: 1, durationMs: 100, samples: 1 }) }
-		await applyRollupDeltas(booted.payload, [delta])
-		await applyRollupDeltas(booted.payload, [delta])
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/p' } },
-			pagination: false,
-		})
-		expect(docs).toHaveLength(1)
-		expect(docs[0]?.pageviews).toBe(2)
-		expect(docs[0]?.durationMs).toBe(200)
-		expect(docs[0]?.samples).toBe(2)
-	})
-})
-
-describeForDb('native bumpRollup baseline', {}, (db) => {
-	let booted: BootedPayload
-	beforeAll(async () => {
-		booted = await bootPayload({ plugin: rollupsOnly, db })
-	})
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	it(`initializes the full metric baseline when a partial bump creates the row on ${db}`, async () => {
-		const key = {
-			granularity: 'day' as const,
-			period: new Date('2026-03-01T00:00:00Z'),
-			path: '/baseline',
-			dimension: '',
-			dimvalue: '',
-			hostname: '',
-		}
-		await bumpRollup(booted.payload, key, { visitors: 1 })
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/baseline' } },
-			pagination: false,
-		})
-		const row = docs[0] as { visitors: number; sessions: number; pageviews: number } | undefined
-		expect(row?.visitors).toBe(1)
-		expect(row?.sessions).toBe(0)
-		expect(row?.pageviews).toBe(0)
-	})
-})
-
-describeForDb('native insertIfNew dedup', {}, (db) => {
-	let booted: BootedPayload
-	beforeAll(async () => {
-		booted = await bootPayload({ plugin: seenOnly, db })
-	})
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	it(`returns true once then false for the same key on ${db}`, async () => {
-		const key = {
-			bucket: 'b1',
-			kind: 'visitor',
-			value: 'v1',
-			period: new Date('2026-01-10T00:00:00Z'),
-		}
-		expect(await insertIfNew(booted.payload, SEEN_SLUG, key)).toBe(true)
-		expect(await insertIfNew(booted.payload, SEEN_SLUG, key)).toBe(false)
-	})
-
-	it(`treats distinct values as new and a repeat as seen on ${db}`, async () => {
-		const period = new Date('2026-01-10T00:00:00Z')
-		expect(
-			await insertIfNew(booted.payload, SEEN_SLUG, {
-				bucket: 'b2',
-				kind: 'visitor',
-				value: 'vA',
-				period,
-			})
-		).toBe(true)
-		expect(
-			await insertIfNew(booted.payload, SEEN_SLUG, {
-				bucket: 'b2',
-				kind: 'visitor',
-				value: 'vB',
-				period,
-			})
-		).toBe(true)
-		expect(
-			await insertIfNew(booted.payload, SEEN_SLUG, {
-				bucket: 'b2',
-				kind: 'visitor',
-				value: 'vA',
-				period,
-			})
-		).toBe(false)
-	})
-
-	// A pageview and a goal event arriving together race on one ledger row. The loser can come
-	// back as a driver duplicate-key error rather than a quiet no-op, which used to escape the
-	// ingest handler as a 500; enough concurrent writers reaches that branch on either adapter.
-	it(`answers "already seen" to every writer that loses a crowded race on ${db}`, async () => {
-		const key = {
-			bucket: 'crowded',
-			kind: 'visitor',
-			value: 'v',
-			period: new Date('2026-01-10T00:00:00Z'),
-		}
-		const results = await Promise.all(
-			Array.from({ length: 24 }, () => insertIfNew(booted.payload, SEEN_SLUG, key))
-		)
-		expect(results.filter(Boolean)).toHaveLength(1)
-	})
-})
-
-describeForDb('native batched ledger primitives', {}, (db) => {
-	let booted: BootedPayload
-	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
-	})
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	const period = new Date('2026-08-01T00:00:00Z')
-	const seenRow = (value: string, bucket = 'batch') => ({ bucket, kind: 'visitor', value, period })
-
-	it(`answers new or seen per row, in order, on ${db}`, async () => {
-		expect(await insertManyIfNew(booted.payload, SEEN_SLUG, [seenRow('a'), seenRow('b')])).toEqual([
-			true,
-			true,
-		])
-		expect(
-			await insertManyIfNew(booted.payload, SEEN_SLUG, [seenRow('b'), seenRow('c'), seenRow('a')])
-		).toEqual([false, true, false])
-	})
-
-	it(`counts a row repeated inside one call once on ${db}`, async () => {
-		expect(
-			await insertManyIfNew(booted.payload, SEEN_SLUG, [seenRow('d'), seenRow('d'), seenRow('e')])
-		).toEqual([true, false, true])
-		const { totalDocs } = await booted.payload.count({
-			collection: SEEN_SLUG,
-			where: { value: { equals: 'd' } },
-		})
-		expect(totalDocs).toBe(1)
-	})
-
-	it(`takes an empty batch as a no-op on ${db}`, async () => {
-		expect(await insertManyIfNew(booted.payload, SEEN_SLUG, [])).toEqual([])
-		await expect(bumpRollups(booted.payload, [])).resolves.toBeUndefined()
-	})
-
-	const bucket = (dimvalue: string) => ({
-		granularity: 'day' as const,
-		period,
-		path: '',
-		dimension: 'country',
-		dimvalue,
-		hostname: '',
-	})
-
-	it(`upserts several buckets in one call, then increments them again on ${db}`, async () => {
-		await bumpRollups(booted.payload, [
-			{ key: bucket('US'), inc: { pageviews: 2, samples: 2 } },
-			{ key: bucket('DE'), inc: { pageviews: 1, samples: 1 } },
-		])
-		await bumpRollups(booted.payload, [
-			{ key: bucket('US'), inc: { pageviews: 1, visitors: 1 } },
-			// Two entries for one bucket in a single call must sum rather than collide: on
-			// Postgres a repeated conflict target in one statement is an error, not an upsert.
-			{ key: bucket('DE'), inc: { visitors: 1 } },
-			{ key: bucket('DE'), inc: { sessions: 1 } },
-		])
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { dimension: { equals: 'country' }, period: { equals: period.toISOString() } },
-			pagination: false,
-		})
-		const byValue = new Map(
-			(docs as unknown as Array<{ dimvalue: string; [metric: string]: unknown }>).map((d) => [
-				d.dimvalue,
-				d,
-			])
-		)
-		expect(byValue.get('US')).toMatchObject({ pageviews: 3, samples: 2, visitors: 1, sessions: 0 })
-		expect(byValue.get('DE')).toMatchObject({ pageviews: 1, samples: 1, visitors: 1, sessions: 1 })
-	})
-})
-
 describeForDb('native distinct counting', {}, (db) => {
+	const adapter = native()
 	let booted: BootedPayload
+	/** Every hit's instant: a visitor seen on two days counts on each, so all land on one. */
+	let at: Date
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], capture: { gate: 'off' } }),
+			db,
+		})
+		at = new Date()
 	})
 	afterAll(async () => {
 		await booted.stop()
 	})
 
-	// Through flushBatch, which is the write path every ingest actually takes.
-	const hit = (visitorHash: string, country?: string): Promise<void> =>
-		flushBatch(booted.payload, [
-			{
-				timestamp: new Date('2026-02-01T10:00:00Z'),
-				type: 'pageview',
-				path: '/d',
-				hostname: 'h',
-				visitorHash,
-				sessionId: `sess-${visitorHash}`,
-				channel: 'direct',
-				channelVersion: CHANNEL_TAXONOMY_VERSION,
-				country,
-				durationMs: 100,
-			},
+	// Through the store, which is the one write every ingest ends in.
+	const hit = (visitorId: string): Promise<unknown> =>
+		storeEvents(booted.payload, [
+			{ timestamp: at, type: 'pageview', path: '/d', hostname: 'h', visitorId, durationMs: 100 },
 		])
+
+	const totals = async () =>
+		(
+			await adapter.query(
+				{ path: '/d', metrics: ['pageviews', 'visitors', 'sessions'], dateRange: aroundNow() },
+				{ payload: booted.payload }
+			)
+		).totals
 
 	it(`counts a repeat visitor once but pageviews twice on ${db}`, async () => {
 		await hit('vv1')
 		await hit('vv1')
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/d' }, dimension: { equals: '' } },
-			pagination: false,
-		})
-		const row = docs[0] as { pageviews: number; visitors: number; sessions: number } | undefined
-		expect(row?.pageviews).toBe(2)
-		expect(row?.visitors).toBe(1)
-		expect(row?.sessions).toBe(1)
+		expect(await totals()).toEqual({ pageviews: 2, visitors: 1, sessions: 1 })
 	})
 
 	it(`counts two distinct visitors as two on ${db}`, async () => {
 		await hit('vv2')
 		await hit('vv3')
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/d' }, dimension: { equals: '' } },
-			pagination: false,
-		})
-		const row = docs[0] as { visitors: number } | undefined
-		// vv1 (prior test) + vv2 + vv3 all share the '/d' path bucket: 3 distinct visitors.
-		expect(row?.visitors).toBe(3)
+		// vv1 (prior test) + vv2 + vv3 all share the '/d' path: 3 distinct visitors.
+		expect((await totals())?.visitors).toBe(3)
 	})
 })
 
-describeForDb('native flushBatch parity with the serial write path', {}, (db) => {
-	let booted: BootedPayload
-	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
-	})
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	/**
-	 * The write path as it was before the batched primitives: one upsert per bucket, one
-	 * insert-if-new per visitor and session per bucket, one more upsert per new one. Kept here
-	 * as the reference the batched path has to match row for row.
-	 */
-	const serialWrite = async (events: StoredEvent[]): Promise<void> => {
-		for (const event of events) {
-			const deltas = computeRollupDeltas(event)
-			await applyRollupDeltas(booted.payload, deltas)
-			for (const delta of deltas) {
-				const bucket = bucketKey(delta.key)
-				const period = delta.key.period
-				for (const [kind, value, metric] of [
-					['visitor', event.visitorHash, 'visitors'],
-					['session', event.sessionId, 'sessions'],
-				] as const) {
-					if (await insertIfNew(booted.payload, SEEN_SLUG, { bucket, kind, value, period })) {
-						await bumpRollup(booted.payload, delta.key, { [metric]: 1 })
-					}
-				}
-			}
-		}
-	}
-
-	// A batch with everything that makes counting interesting: two visitors sharing a session
-	// hash of their own, a repeat hit, two paths, two hostnames, a custom event, a goal with
-	// revenue, a scroll depth, and every classified dimension.
-	const fixture = (day: string): StoredEvent[] => [
-		{
-			timestamp: new Date(`${day}T10:00:00Z`),
-			type: 'pageview',
-			path: '/a',
-			hostname: 'one.example',
-			visitorHash: 'p-v1',
-			sessionId: 'p-s1',
-			durationMs: 1000,
-			scrollDepth: 60,
-			country: 'US',
-			region: 'CA',
-			city: 'San Francisco',
-			device: 'desktop',
-			browser: 'chrome',
-			os: 'macos',
-			language: 'en-us',
-			source: 'example.org',
-			channel: 'referral',
-			channelVersion: CHANNEL_TAXONOMY_VERSION,
-			referrerHost: 'example.org',
-			utmSource: 'newsletter',
-			utmCampaign: 'spring',
-		},
-		{
-			timestamp: new Date(`${day}T10:05:00Z`),
-			type: 'pageview',
-			path: '/a',
-			hostname: 'one.example',
-			visitorHash: 'p-v1',
-			sessionId: 'p-s1',
-			durationMs: 500,
-			country: 'US',
-			device: 'desktop',
-			browser: 'chrome',
-			os: 'macos',
-			channel: 'direct',
-			channelVersion: CHANNEL_TAXONOMY_VERSION,
-		},
-		{
-			timestamp: new Date(`${day}T11:00:00Z`),
-			type: 'pageview',
-			path: '/b',
-			hostname: 'two.example',
-			visitorHash: 'p-v2',
-			sessionId: 'p-s2',
-			durationMs: 250,
-			country: 'DE',
-			device: 'mobile',
-			browser: 'firefox',
-			os: 'android',
-			language: 'de-de',
-			channel: 'direct',
-			channelVersion: CHANNEL_TAXONOMY_VERSION,
-		},
-		{
-			timestamp: new Date(`${day}T11:10:00Z`),
-			type: 'event',
-			name: 'signup',
-			path: '/b',
-			hostname: 'two.example',
-			visitorHash: 'p-v2',
-			sessionId: 'p-s2',
-			channel: 'direct',
-			channelVersion: CHANNEL_TAXONOMY_VERSION,
-		},
-		{
-			timestamp: new Date(`${day}T11:20:00Z`),
-			type: 'goal',
-			name: 'purchase',
-			path: '/checkout',
-			hostname: 'two.example',
-			visitorHash: 'p-v3',
-			sessionId: 'p-s3',
-			channel: 'direct',
-			channelVersion: CHANNEL_TAXONOMY_VERSION,
-			goals: [{ slug: 'purchase', value: 25.5 }],
-		},
-	]
-
-	/** Every rollup row for one day, comparable across days: id and period dropped. */
-	const rowsFor = async (period: Date) => {
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { period: { equals: period.toISOString() } },
-			pagination: false,
-			limit: 1000,
-			overrideAccess: true,
-		})
-		return (docs as unknown as Array<Record<string, number | string>>)
-			.map((d) => ({
-				path: d.path,
-				dimension: d.dimension,
-				dimvalue: d.dimvalue,
-				hostname: d.hostname,
-				pageviews: d.pageviews,
-				events: d.events,
-				durationMs: d.durationMs,
-				samples: d.samples,
-				visitors: d.visitors,
-				sessions: d.sessions,
-				conversions: d.conversions,
-				revenue: d.revenue,
-				scrollDepthSum: d.scrollDepthSum,
-				scrollSamples: d.scrollSamples,
-			}))
-			.sort((a, b) =>
-				`${a.hostname}|${a.path}|${a.dimension}|${a.dimvalue}`.localeCompare(
-					`${b.hostname}|${b.path}|${b.dimension}|${b.dimvalue}`
-				)
-			)
-	}
-
-	it(`writes exactly what the serial path wrote, bucket for bucket, on ${db}`, async () => {
-		// Two days apart so both paths write their own buckets and ledger rows in one database.
-		await flushBatch(booted.payload, fixture('2026-07-01'))
-		await serialWrite(fixture('2026-07-02'))
-
-		const batched = await rowsFor(new Date('2026-07-01T00:00:00Z'))
-		const serial = await rowsFor(new Date('2026-07-02T00:00:00Z'))
-		expect(batched).toEqual(serial)
-		expect(batched.length).toBeGreaterThan(20)
-
-		// And the numbers are the right ones, not merely the same wrong ones on both paths.
-		const site = batched.find((r) => r.path === '' && r.dimension === '' && r.hostname === '')
-		expect(site).toMatchObject({
-			pageviews: 3,
-			events: 2,
-			samples: 5,
-			visitors: 3,
-			sessions: 3,
-			durationMs: 1750,
-			conversions: 1,
-			revenue: 25.5,
-			scrollDepthSum: 60,
-			scrollSamples: 1,
-		})
-		const pageA = batched.find((r) => r.path === '/a' && r.hostname === '')
-		expect(pageA).toMatchObject({ pageviews: 2, visitors: 1, sessions: 1 })
-		const chrome = batched.find((r) => r.dimension === 'browser' && r.hostname === '')
-		expect(chrome).toMatchObject({ dimvalue: 'chrome', pageviews: 2, visitors: 1 })
-		const scopedHost = batched.find(
-			(r) => r.hostname === 'two.example' && r.path === '' && r.dimension === ''
-		)
-		expect(scopedHost).toMatchObject({ pageviews: 1, events: 2, visitors: 2, sessions: 2 })
-	})
-})
-
-describeForDb('native flushBatch coalescing', {}, (db) => {
-	let booted: BootedPayload
-	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
-	})
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	const event = (visitorHash: string, path: string): StoredEvent => ({
-		timestamp: new Date('2026-04-01T10:00:00Z'),
-		type: 'pageview',
-		path,
-		hostname: 'h',
-		visitorHash,
-		sessionId: `sess-${visitorHash}`,
-		durationMs: 100,
-		channel: 'direct',
-		channelVersion: CHANNEL_TAXONOMY_VERSION,
-	})
-
-	it(`coalesces a batch into correct per-page rollups on ${db}`, async () => {
-		await flushBatch(booted.payload, [event('v1', '/x'), event('v1', '/x'), event('v2', '/x')])
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/x' }, dimension: { equals: '' } },
-			pagination: false,
-		})
-		const row = docs[0] as { pageviews: number; visitors: number; sessions: number } | undefined
-		expect(row?.pageviews).toBe(3)
-		expect(row?.visitors).toBe(2)
-		expect(row?.sessions).toBe(2)
-	})
-
-	it(`matches the per-event path across flushes on ${db}`, async () => {
-		await flushBatch(booted.payload, [event('v3', '/y')])
-		await flushBatch(booted.payload, [event('v3', '/y')])
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/y' }, dimension: { equals: '' } },
-			pagination: false,
-		})
-		const row = docs[0] as { pageviews: number; visitors: number } | undefined
-		expect(row?.pageviews).toBe(2)
-		expect(row?.visitors).toBe(1)
-	})
-})
-
-describeForDb('native goal rollups', {}, (db) => {
+describeForDb('native goals', {}, (db) => {
 	const goals: Goal[] = [
 		{ slug: 'purchase', name: 'Purchase', match: { kind: 'goal' } },
 		{ slug: 'thanks', name: 'Thanks', match: { kind: 'path', pattern: '/thank-you' } },
@@ -598,11 +158,18 @@ describeForDb('native goal rollups', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 
+	const ingest = (body: Record<string, unknown>): Promise<void> =>
+		ingestAccepted(booted, { hostname: 'h', ...body })
+
 	// Both assertions read the same two events, so they are ingested once here rather than
 	// by the first test, which would leave the second unable to run on its own.
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: analytics({ adapters: [adapter], goals: { defaults: goals, collection: true } }),
+			plugin: analytics({
+				adapters: [adapter],
+				capture: { gate: 'off' },
+				goals: { defaults: goals, collection: true },
+			}),
 			db,
 		})
 		await ingest({ type: 'pageview', path: '/thank-you' })
@@ -619,51 +186,22 @@ describeForDb('native goal rollups', {}, (db) => {
 		await booted.stop()
 	})
 
-	const ingest = async (body: Record<string, unknown>): Promise<void> => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('ingest endpoint not registered')
-		}
-		const res = await endpoint.handler(ingestRequest(booted.payload, { hostname: 'h', ...body }))
-		expect(res.status).toBe(202)
-	}
-
-	const rollupRow = async (where: Record<string, unknown>) => {
-		const { docs } = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: where as never,
-			pagination: false,
-			overrideAccess: true,
-		})
-		return docs[0] as unknown as { conversions: number; revenue: number } | undefined
-	}
+	const totalsOf = async (goal?: string) =>
+		(
+			await adapter.query(
+				{
+					metrics: ['conversions', 'revenue'],
+					dateRange: aroundNow(),
+					...(goal ? { filters: [{ dimension: 'goal', operator: 'eq', value: goal }] } : {}),
+				},
+				{ payload: booted.payload }
+			)
+		).totals
 
 	it(`counts conversions and revenue site-wide and per goal on ${db}`, async () => {
-		const site = await rollupRow({
-			path: { equals: '' },
-			dimension: { equals: '' },
-			hostname: { equals: '' },
-		})
-		expect(site?.conversions).toBe(2)
-		expect(site?.revenue).toBe(25.5)
-
-		const purchase = await rollupRow({
-			dimension: { equals: 'goal' },
-			dimvalue: { equals: 'purchase' },
-			hostname: { equals: '' },
-		})
-		expect(purchase?.conversions).toBe(1)
-		expect(purchase?.revenue).toBe(25.5)
-
-		const thanks = await rollupRow({
-			dimension: { equals: 'goal' },
-			dimvalue: { equals: 'thanks' },
-			hostname: { equals: '' },
-		})
-		expect(thanks?.conversions).toBe(1)
-		expect(thanks?.revenue).toBe(0)
+		expect(await totalsOf()).toEqual({ conversions: 2, revenue: 25.5 })
+		expect(await totalsOf('purchase')).toEqual({ conversions: 1, revenue: 25.5 })
+		expect(await totalsOf('thanks')).toEqual({ conversions: 1, revenue: 0 })
 	})
 
 	it(`keeps one goal document per slug on ${db}`, async () => {
@@ -676,14 +214,9 @@ describeForDb('native goal rollups', {}, (db) => {
 	})
 
 	it(`returns one breakdown row per goal through the adapter on ${db}`, async () => {
-		const now = new Date()
 		const result = await adapter.query(
-			{
-				metrics: ['conversions', 'revenue'],
-				dimensions: ['goal'],
-				dateRange: { start: new Date(now.getTime() - 86_400_000), end: now },
-			},
-			{}
+			{ metrics: ['conversions', 'revenue'], dimensions: ['goal'], dateRange: aroundNow() },
+			{ payload: booted.payload }
 		)
 		const byGoal = Object.fromEntries(result.rows.map((row) => [row.dimensions?.goal, row.metrics]))
 		expect(byGoal.purchase).toEqual({ conversions: 1, revenue: 25.5 })
@@ -696,8 +229,8 @@ describeForDb('native dimension columns and breakdowns', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 
-	// One ingest carrying every attribute the new dimensions are derived from, so each
-	// breakdown has exactly one row to find on either database.
+	// One ingest carrying every attribute the derived dimensions come from, so each breakdown
+	// has exactly one row to find on every database.
 	const attributed = {
 		'user-agent':
 			'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
@@ -722,29 +255,28 @@ describeForDb('native dimension columns and breakdowns', {}, (db) => {
 	]
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+		booted = await bootPayload({
+			// The fixture carries Vercel's location headers, which only a Vercel install reads.
+			plugin: analytics({
+				adapters: [adapter],
+				capture: { gate: 'off' },
+				trustedPlatform: 'vercel',
+			}),
+			db,
+		})
+		await ingestAccepted(
+			booted,
+			{
+				type: 'pageview',
+				path: '/dims',
+				hostname: 'site.com',
+				referrer: 'https://www.example.org/path?x=1',
+				query:
+					'utm_source=newsletter&utm_medium=email&utm_campaign=spring&utm_content=hero&utm_term=shoes',
+				durationMs: 100,
+			},
+			attributed
 		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('ingest endpoint not registered')
-		}
-		const res = await endpoint.handler(
-			ingestRequest(
-				booted.payload,
-				{
-					type: 'pageview',
-					path: '/dims',
-					hostname: 'site.com',
-					referrer: 'https://www.example.org/path?x=1',
-					query:
-						'utm_source=newsletter&utm_medium=email&utm_campaign=spring&utm_content=hero&utm_term=shoes',
-					durationMs: 100,
-				},
-				attributed
-			)
-		)
-		expect(res.status).toBe(202)
 	})
 
 	afterAll(async () => {
@@ -752,14 +284,9 @@ describeForDb('native dimension columns and breakdowns', {}, (db) => {
 	})
 
 	it(`stores every derived dimension column on ${db}`, async () => {
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/dims' } } as never,
-			pagination: false,
-			overrideAccess: true,
-		})
+		const docs = await storedHits(booted.payload, { path: { equals: '/dims' } })
 		expect(docs[0]).toMatchObject({
-			referrerHost: 'example.org',
+			ref: 'example.org',
 			region: 'CA',
 			city: 'San Francisco',
 			browser: 'chrome',
@@ -773,27 +300,25 @@ describeForDb('native dimension columns and breakdowns', {}, (db) => {
 		})
 	})
 
-	it(`serves a rollup and a raw-event breakdown per new dimension on ${db}`, async () => {
-		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
+	it(`serves a breakdown per derived dimension, and the same with a filter on it on ${db}`, async () => {
 		for (const [dimension, value] of expected) {
-			const rollups = await adapter.query(
-				{ metrics: ['pageviews'], dimensions: [dimension], dateRange: range },
-				{}
+			const plain = await adapter.query(
+				{ metrics: ['pageviews'], dimensions: [dimension], dateRange: aroundNow() },
+				{ payload: booted.payload }
 			)
-			expect(rollups.rows).toEqual([
+			expect(plain.rows).toEqual([
 				{ dimensions: { [dimension]: value }, metrics: { pageviews: 1 } },
 			])
-			// A filter forces the raw-event path, which must agree with the rollups.
-			const events = await adapter.query(
+			const filtered = await adapter.query(
 				{
 					metrics: ['pageviews'],
 					dimensions: [dimension],
-					dateRange: range,
+					dateRange: aroundNow(),
 					filters: [{ dimension, operator: 'eq', value }],
 				},
-				{}
+				{ payload: booted.payload }
 			)
-			expect(events.rows).toEqual(rollups.rows)
+			expect(filtered.rows).toEqual(plain.rows)
 		}
 	})
 })
@@ -808,9 +333,8 @@ describeForDb('native channels and sources', {}, (db) => {
 		query?: string
 	}
 
-	// One hit per channel, each reaching the classifier through the real ingest endpoint, so
-	// every bucket the `channel` dimension can hold is written and read back on either
-	// database, beside the named origin the same hit puts in `source`.
+	// One hit per channel, each its own visitor and visit, through the real ingest endpoint, so
+	// every `channel` value is written and read back on each database beside its `source`.
 	const hits: ReadonlyArray<readonly [TrafficChannel, string, Hit]> = [
 		['direct', 'direct', { path: '/direct' }],
 		[
@@ -863,22 +387,16 @@ describeForDb('native channels and sources', {}, (db) => {
 	]
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('ingest endpoint not registered')
-		}
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], capture: { gate: 'off' } }),
+			db,
+		})
 		for (const [, , hit] of hits) {
-			const res = await endpoint.handler(
-				ingestRequest(
-					booted.payload,
-					{ type: 'pageview', hostname: 'site.com', durationMs: 100, ...hit },
-					{ 'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0' }
-				)
+			await ingestAccepted(
+				booted,
+				{ type: 'pageview', hostname: 'site.com', durationMs: 100, ...hit },
+				{ 'user-agent': `Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/126.0.0.0 ${hit.path}` }
 			)
-			expect(res.status).toBe(202)
 		}
 	})
 
@@ -888,67 +406,46 @@ describeForDb('native channels and sources', {}, (db) => {
 
 	it(`stores the channel beside the named origin on ${db}`, async () => {
 		for (const [channel, source, hit] of hits) {
-			const { docs } = await booted.payload.find({
-				collection: EVENTS_SLUG as never,
-				where: { path: { equals: hit.path } } as never,
-				pagination: false,
-				overrideAccess: true,
-			})
+			const docs = await storedHits(booted.payload, { path: { equals: hit.path } })
 			expect(docs).toHaveLength(1)
 			expect(docs[0]).toMatchObject({ channel, source, channelVersion: CHANNEL_TAXONOMY_VERSION })
 		}
 	})
 
-	it(`serves a rollup and a raw-event breakdown per channel on ${db}`, async () => {
-		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
-		const rollups = await adapter.query(
-			{ metrics: ['pageviews'], dimensions: ['channel'], dateRange: range },
-			{}
+	it(`serves a breakdown per channel, and the same with a filter on it on ${db}`, async () => {
+		expect(await breakdownOf(booted, adapter, 'channel')).toEqual(
+			Object.fromEntries(hits.map(([channel]) => [channel, 1]))
 		)
-		expect(
-			Object.fromEntries(
-				rollups.rows.map((row) => [row.dimensions?.channel, row.metrics.pageviews])
-			)
-		).toEqual(Object.fromEntries(hits.map(([channel]) => [channel, 1])))
 		for (const [channel] of hits) {
-			// A filter forces the raw-event path, which must agree with the rollups.
-			const events = await adapter.query(
+			const filtered = await adapter.query(
 				{
 					metrics: ['pageviews'],
 					dimensions: ['channel'],
-					dateRange: range,
+					dateRange: aroundNow(),
 					filters: [{ dimension: 'channel', operator: 'eq', value: channel }],
 				},
-				{}
+				{ payload: booted.payload }
 			)
-			expect(events.rows).toEqual([{ dimensions: { channel }, metrics: { pageviews: 1 } }])
+			expect(filtered.rows).toEqual([{ dimensions: { channel }, metrics: { pageviews: 1 } }])
 		}
 	})
 
 	it(`breaks the same hits down by their named origin on ${db}`, async () => {
-		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
 		const expected: Record<string, number> = {}
 		for (const [, source] of hits) {
 			expected[source] = (expected[source] ?? 0) + 1
 		}
-		const rollups = await adapter.query(
-			{ metrics: ['pageviews'], dimensions: ['source'], dateRange: range },
-			{}
-		)
-		expect(
-			Object.fromEntries(rollups.rows.map((row) => [row.dimensions?.source, row.metrics.pageviews]))
-		).toEqual(expected)
+		expect(await breakdownOf(booted, adapter, 'source')).toEqual(expected)
 	})
 
 	it(`filters channels with contains as well as eq on ${db}`, async () => {
-		const range = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
 		const paid = await adapter.query(
 			{
 				metrics: ['pageviews'],
-				dateRange: range,
+				dateRange: aroundNow(),
 				filters: [{ dimension: 'channel', operator: 'contains', value: 'paid-' }],
 			},
-			{}
+			{ payload: booted.payload }
 		)
 		// paid-search, paid-social, paid-video and paid-other, and no organic row with them.
 		expect(paid.totals).toEqual({ pageviews: 4 })
@@ -971,67 +468,12 @@ describeForDb('native geo caps', {}, (db) => {
 	let booted: BootedPayload
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
-	})
-
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	// A geo header is client-settable, and its value becomes a rollup dimvalue and part of a
-	// seen-ledger key. Uncapped, an oversized one blows past Postgres's 2704-byte btree key
-	// limit and fails the write while Mongo accepts it, so the databases would disagree about
-	// whether the hit counted at all. The fixture has to be incompressible: Postgres compresses
-	// index values, so 3 KB of one repeated character would fit the key and prove nothing.
-	it(`truncates an oversized geo header instead of failing the write on ${db}`, async () => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('ingest endpoint not registered')
-		}
-		const res = await endpoint.handler(
-			ingestRequest(
-				booted.payload,
-				{ type: 'pageview', path: '/geo', hostname: 'site.com', durationMs: 100 },
-				{ 'user-agent': 'UA', 'x-vercel-ip-city': noise(3000) }
-			)
-		)
-		expect(res.status).toBe(202)
-
-		const { docs } = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/geo' } } as never,
-			pagination: false,
-			overrideAccess: true,
-		})
-		expect((docs[0] as unknown as { city: string }).city).toHaveLength(MAX_GEO_LENGTH)
-
-		const rows = await adapter.query(
-			{
-				metrics: ['pageviews', 'visitors'],
-				dimensions: ['city'],
-				dateRange: { start: new Date('2020-01-01'), end: new Date('2030-01-01') },
-			},
-			{}
-		)
-		expect(rows.rows).toEqual([
-			{
-				dimensions: { city: noise(3000).slice(0, MAX_GEO_LENGTH) },
-				metrics: { pageviews: 1, visitors: 1 },
-			},
-		])
-	})
-})
-
-describeForDb('analytics per-document read', {}, (db) => {
-	let booted: BootedPayload
-
-	beforeAll(async () => {
 		booted = await bootPayload({
+			// The cap guards what a trusted platform header can still carry.
 			plugin: analytics({
-				adapters: [native()],
-				collections: { pages: { path: (doc) => (doc.slug as string) ?? null } },
+				adapters: [adapter],
+				capture: { gate: 'off' },
+				trustedPlatform: 'vercel',
 			}),
 			db,
 		})
@@ -1041,25 +483,78 @@ describeForDb('analytics per-document read', {}, (db) => {
 		await booted.stop()
 	})
 
+	// A client-settable geo header keys daily totals; uncapped it breaks Postgres's 2704-byte btree
+	// limit. Fixture is incompressible: Postgres compresses index values, so repeats would fit.
+	it(`truncates an oversized geo header instead of failing the write on ${db}`, async () => {
+		await ingestAccepted(
+			booted,
+			{ type: 'pageview', path: '/geo', hostname: 'site.com', durationMs: 100 },
+			{ 'user-agent': 'UA', 'x-vercel-ip-city': noise(3000) }
+		)
+
+		const docs = await storedHits(booted.payload, { path: { equals: '/geo' } })
+		expect(String(docs[0]?.city)).toHaveLength(MAX_GEO_LENGTH)
+
+		const rows = await adapter.query(
+			{ metrics: ['pageviews', 'visitors'], dimensions: ['city'], dateRange: aroundNow() },
+			{ payload: booted.payload }
+		)
+		expect(rows.rows).toEqual([
+			{
+				dimensions: { city: noise(3000).slice(0, MAX_GEO_LENGTH) },
+				metrics: { pageviews: 1, visitors: 1 },
+			},
+		])
+
+		// The day's totals are keyed by the capped value too, on every database.
+		const { engine, store } = nativeOf(booted.payload)
+		const day = calendarDayOf(new Date(String(docs[0]?.ts)), 'UTC')
+		expect(await engine.snapshot({ scope: '', day, tz: 'UTC' })).toMatchObject({
+			outcome: 'completed',
+		})
+		const cities = await store.readAggregates({ days: [[day, day]], dim: 'city', groupBy: 'value' })
+		expect(cities.map((row) => row.value)).toEqual([noise(3000).slice(0, MAX_GEO_LENGTH)])
+	})
+})
+
+describeForDb('analytics per-document read', {}, (db) => {
+	let booted: BootedPayload
+	let clock: TestClock
+
+	beforeAll(async () => {
+		clock = installTestClock(new Date('2026-06-15T12:00:00.000Z'))
+		booted = await bootPayload({
+			plugin: analytics({
+				adapters: [native()],
+				capture: { gate: 'off' },
+				collections: { pages: { path: (doc) => (doc.slug as string) ?? null } },
+			}),
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+		clock.reset()
+	})
+
 	const ingest = (path: string) =>
-		makeIngestHandler({ geoResolver: platformHeaderResolver })(
-			ingestRequest(
-				booted.payload,
-				{ type: 'pageview', path, hostname: 'h', durationMs: 200 },
-				{ 'x-vercel-ip-country': 'US' }
-			)
+		ingestDirect(
+			booted.payload,
+			{ type: 'pageview', path, hostname: 'h', durationMs: 200 },
+			{ 'x-vercel-ip-country': 'US' }
 		)
 
 	it(`reads per-document totals through the engine on ${db}`, async () => {
 		await ingest('/matrix-doc')
 		await ingest('/matrix-doc')
 		const result = await readForField({
-			req: { payload: booted.payload, locale: undefined } as unknown as PayloadRequest,
+			req: readerRequest(booted.payload, { locale: undefined }),
 			collectionSlug: 'pages',
 			data: { slug: '/matrix-doc' },
 			metrics: ['pageviews', 'visitors'],
 			timeframe: 'last30days',
-			now: new Date(),
+			now: clock.now(),
 		})
 		expect(result.status).toBe('ok')
 		expect(result.metrics.pageviews).toBe(2)
@@ -1068,14 +563,16 @@ describeForDb('analytics per-document read', {}, (db) => {
 })
 
 describeForDb('native scoped ingest and reads', {}, (db) => {
+	const adapter = native({ platformHostnames: [INGEST_HOST] })
 	let booted: BootedPayload
 
 	beforeAll(async () => {
 		booted = await bootPayload({
 			plugin: analytics({
-				adapters: [native({ platformHostnames: [INGEST_HOST] })],
-				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
-				access: { platformRead: ({ req }) => Boolean(req.user) },
+				adapters: [adapter],
+				capture: { gate: 'off' },
+				scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant') },
+				access: { crossScope: ({ req }) => req.user?.id === 'admin' },
 			}),
 			db,
 		})
@@ -1087,72 +584,49 @@ describeForDb('native scoped ingest and reads', {}, (db) => {
 
 	// A scoped install drops what resolves no scope, so the tenant-less case rides in on the
 	// platform hostname this install declares, which is the null scope by design.
-	const ingest = async (tenant: string | null, path: string, ua = 'UA'): Promise<void> => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+	const ingest = (tenant: string | null, path: string, ua = 'UA'): Promise<void> =>
+		ingestAccepted(
+			booted,
+			{ type: 'pageview', path, durationMs: 100 },
+			{ 'user-agent': ua, ...(tenant ? { 'x-tenant': tenant } : {}) }
 		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('ingest endpoint not registered')
-		}
-		const res = await endpoint.handler(
-			ingestRequest(
-				booted.payload,
-				{ type: 'pageview', path, durationMs: 100 },
-				{ 'user-agent': ua, ...(tenant ? { 'x-tenant': tenant } : {}) }
-			)
-		)
-		expect(res.status).toBe(202)
-	}
 
-	const widgetReq = (tenant?: string, user?: object): PayloadRequest =>
+	const totalsIn = async (scope: string, path: string) =>
+		(
+			await adapter.query(
+				{ scope, path, metrics: ['pageviews', 'visitors'], dateRange: aroundNow() },
+				{ payload: booted.payload }
+			)
+		).totals
+
+	const widgetReq = (tenant?: string, user: { id: string } = { id: 'reader' }): PayloadRequest =>
 		({
 			payload: booted.payload,
 			headers: new Headers(tenant ? { 'x-tenant': tenant } : {}),
-			user: user ?? null,
+			user: { ...user, collection: 'users' },
 		}) as unknown as PayloadRequest
 
-	it(`stamps ingested events and rollups with the resolved scope on ${db}`, async () => {
+	it(`stamps ingested hits with the resolved scope, and reads each scope apart on ${db}`, async () => {
 		await ingest('t1', '/scoped')
 		await ingest('t1', '/scoped', 'UA-second-visitor')
 		await ingest('t2', '/scoped')
 		await ingest(null, '/scoped')
 
-		const rollups = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/scoped' }, dimension: { equals: '' } },
-			pagination: false,
-			overrideAccess: true,
-		})
-		const byScope = new Map(
-			(
-				rollups.docs as unknown as Array<{ scope: string; pageviews: number; visitors: number }>
-			).map((d) => [d.scope, d])
+		const scopes = (await storedHits(booted.payload, { path: { equals: '/scoped' } })).map(
+			(hit) => hit.scope
 		)
-		expect(byScope.get('t1')?.pageviews).toBe(2)
-		expect(byScope.get('t1')?.visitors).toBe(2)
-		expect(byScope.get('t2')?.pageviews).toBe(1)
-		expect(byScope.get('')?.pageviews).toBe(1)
+		expect(scopes.sort()).toEqual(['', 't1', 't1', 't2'])
+		expect(await totalsIn('t1', '/scoped')).toEqual({ pageviews: 2, visitors: 2 })
+		expect(await totalsIn('t2', '/scoped')).toEqual({ pageviews: 1, visitors: 1 })
+		expect(await totalsIn('', '/scoped')).toEqual({ pageviews: 1, visitors: 1 })
 	})
 
 	it(`keeps the same visitor distinct per scope on ${db}`, async () => {
 		await ingest('t1', '/dedupe', 'UA-shared')
 		await ingest('t1', '/dedupe', 'UA-shared')
 		await ingest('t2', '/dedupe', 'UA-shared')
-		const rollups = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/dedupe' } },
-			pagination: false,
-			overrideAccess: true,
-		})
-		const byScope = new Map(
-			(
-				rollups.docs as unknown as Array<{ scope: string; pageviews: number; visitors: number }>
-			).map((d) => [d.scope, d])
-		)
-		expect(byScope.get('t1')?.pageviews).toBe(2)
-		expect(byScope.get('t1')?.visitors).toBe(1)
-		expect(byScope.get('t2')?.pageviews).toBe(1)
-		expect(byScope.get('t2')?.visitors).toBe(1)
+		expect(await totalsIn('t1', '/dedupe')).toEqual({ pageviews: 2, visitors: 1 })
+		expect(await totalsIn('t2', '/dedupe')).toEqual({ pageviews: 1, visitors: 1 })
 	})
 
 	it(`filters widget reads by the request's scope on ${db}`, async () => {
@@ -1175,34 +649,38 @@ describeForDb('native scoped ingest and reads', {}, (db) => {
 	})
 
 	it(`aggregates across scopes only for permitted platform reads on ${db}`, async () => {
-		const denied = await readForWidget({
-			req: widgetReq('t1'),
-			metrics: ['pageviews'],
-			timeframe: 'last7days',
-			now: new Date(),
-			scope: '*',
-		})
-		expect(denied.status).toBe('unavailable')
+		const runtime = getRuntime(booted.payload)
+		if (!runtime) {
+			throw new Error('runtime missing')
+		}
+		const denied = await resolveRequestedScope({ runtime, req: widgetReq('t1'), raw: '*' })
+		expect(denied.ok).toBe(false)
 
+		const admin = widgetReq('t1', { id: 'admin' })
+		const granted = await resolveRequestedScope({ runtime, req: admin, raw: '*' })
+		if (!granted.ok) {
+			throw new Error('the aggregate was refused to the platform reader')
+		}
 		const allowed = await readForWidget({
-			req: widgetReq('t1', { id: 'admin' }),
+			req: admin,
 			metrics: ['pageviews'],
 			timeframe: 'last7days',
 			now: new Date(),
-			scope: '*',
+			scope: granted.gated,
 		})
 		expect(allowed.status).toBe('ok')
 		expect(allowed.metrics.pageviews).toBe(7)
 	})
 })
 
-describeForDb('native reporting timezone bucketing', {}, (db) => {
+describeForDb('native reporting timezone days', {}, (db) => {
 	const TZ = 'America/New_York'
+	const adapter = native()
 	let booted: BootedPayload
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: analytics({ adapters: [native()], reportingTimezone: TZ }),
+			plugin: analytics({ adapters: [adapter], capture: { gate: 'off' }, reportingTimezone: TZ }),
 			db,
 		})
 	})
@@ -1211,68 +689,36 @@ describeForDb('native reporting timezone bucketing', {}, (db) => {
 		await booted.stop()
 	})
 
-	const ingest = async (): Promise<void> => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('ingest endpoint not registered')
-		}
-		const res = await endpoint.handler(
-			ingestRequest(booted.payload, {
-				type: 'pageview',
-				path: '/tz',
-				hostname: 'h',
-				durationMs: 100,
-			})
-		)
-		expect(res.status).toBe(202)
-	}
-
-	it(`buckets the rollup period at the reporting timezone's local day on ${db}`, async () => {
-		await ingest()
-		const events = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: '/tz' } },
-			pagination: false,
-			overrideAccess: true,
-		})
-		const eventTs = new Date((events.docs[0] as unknown as { timestamp: string }).timestamp)
-		const rollups = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/tz' }, dimension: { equals: '' } },
-			pagination: false,
-			overrideAccess: true,
-		})
-		const period = new Date((rollups.docs[0] as unknown as { period: string }).period)
-		expect(period.toISOString()).toBe(startOfDayInTz(eventTs, TZ).toISOString())
+	it(`counts a hit on the reporting timezone's local day on ${db}`, async () => {
+		await ingestAccepted(booted, { type: 'pageview', path: '/tz', hostname: 'h', durationMs: 100 })
+		expect(await seriesDays(booted, adapter, { path: '/tz' })).toEqual([
+			await hitDayStart(booted, '/tz', TZ),
+		])
 	})
 })
 
 describeForDb('custom range end bound', {}, (db) => {
 	const TZ = 'Europe/Berlin'
+	// Every raw hit read, however old: the fixture's days are further back than the default 90.
+	const adapter = native({ retention: { rawDays: null } })
 	let booted: BootedPayload
 
 	// Jun 23 in Berlin ends at 2026-06-23T21:59:59.999Z, so 23:30 local is the last event
 	// inside the picked window and 00:30 the next morning is the first one outside it.
-	const pageview = (timestamp: string, visitor: string): StoredEvent => ({
+	const pageview = (timestamp: string, visitorId: string): NormalizedEvent => ({
 		timestamp: new Date(timestamp),
 		type: 'pageview',
 		path: '/cr',
 		hostname: 'h',
-		visitorHash: visitor,
-		sessionId: `${visitor}-s`,
-		channel: 'direct',
-		channelVersion: CHANNEL_TAXONOMY_VERSION,
-		timezone: TZ,
+		visitorId,
 	})
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: analytics({ adapters: [native()], reportingTimezone: TZ }),
+			plugin: analytics({ adapters: [adapter], capture: { gate: 'off' }, reportingTimezone: TZ }),
 			db,
 		})
-		await flushBatch(booted.payload, [
+		await storeEvents(booted.payload, [
 			pageview('2026-06-23T21:30:00.000Z', 'in'),
 			pageview('2026-06-23T22:30:00.000Z', 'out'),
 		])
@@ -1285,7 +731,7 @@ describeForDb('custom range end bound', {}, (db) => {
 	it(`includes the final picked day up to its last instant on ${db}`, async () => {
 		const range = resolveCustomRange('custom', { from: '2026-06-01', to: '2026-06-23' }, TZ)
 		expect(range?.end.toISOString()).toBe('2026-06-23T21:59:59.999Z')
-		const req = { payload: booted.payload } as unknown as PayloadRequest
+		const req = readerRequest(booted.payload)
 		const args = {
 			req,
 			metrics: ['pageviews' as const],
@@ -1294,14 +740,14 @@ describeForDb('custom range end bound', {}, (db) => {
 			range,
 			timezone: TZ,
 		}
-		// Day rollups, whose period is bucketed on the reporting timezone's day.
-		const rollups = await readForWidget(args)
-		expect(rollups.status).toBe('ok')
-		expect(rollups.metrics.pageviews).toBe(1)
-		// And raw events, where the adapter compares the end instant itself.
+		// The days' aggregate rows, each counted in the reporting timezone.
+		const aggregated = await readForWidget(args)
+		expect(aggregated.status).toBe('ok')
+		expect(aggregated.metrics.pageviews).toBe(1)
+		// And raw hits, which a `contains` filter reads, where the engine compares the end instant.
 		const raw = await readForWidget({
 			...args,
-			filters: [{ dimension: 'page', operator: 'eq', value: '/cr' }],
+			filters: [{ dimension: 'page', operator: 'contains', value: '/cr' }],
 		})
 		expect(raw.status).toBe('ok')
 		expect(raw.metrics.pageviews).toBe(1)
@@ -1313,13 +759,15 @@ describeForDb('reportingTimezone resolver (per-tenant)', {}, (db) => {
 	const TZ_B = 'Asia/Tokyo'
 	const TENANT_A = 'tenant-a'
 	const TENANT_B = 'tenant-b'
+	const adapter = native({ platformHostnames: [INGEST_HOST] })
 	let booted: BootedPayload
 
 	beforeAll(async () => {
 		booted = await bootPayload({
 			plugin: analytics({
-				adapters: [native({ platformHostnames: [INGEST_HOST] })],
-				scopeResolver: ({ req }) => req.headers.get('x-tenant-id'),
+				adapters: [adapter],
+				capture: { gate: 'off' },
+				scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant-id') },
 				reportingTimezone: ({ scope }) => {
 					if (scope === TENANT_A) return TZ_A
 					if (scope === TENANT_B) return TZ_B
@@ -1334,89 +782,49 @@ describeForDb('reportingTimezone resolver (per-tenant)', {}, (db) => {
 		await booted.stop()
 	})
 
-	const ingest = async (tenantId: string, path: string): Promise<void> => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+	const ingest = (tenantId: string | null, path: string): Promise<void> =>
+		ingestAccepted(
+			booted,
+			{ type: 'pageview', path, durationMs: 100 },
+			tenantId === null ? {} : { 'x-tenant-id': tenantId }
 		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('ingest endpoint not registered')
-		}
-		const res = await endpoint.handler(
-			ingestRequest(
-				booted.payload,
-				{ type: 'pageview', path, durationMs: 100 },
-				{ 'x-tenant-id': tenantId }
-			)
-		)
-		expect(res.status).toBe(202)
-	}
 
-	const rollupPeriodFor = async (path: string): Promise<Date> => {
-		const rollups = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: path }, dimension: { equals: '' } },
-			pagination: false,
-			overrideAccess: true,
-		})
-		return new Date((rollups.docs[0] as unknown as { period: string }).period)
-	}
-
-	const eventTimestampFor = async (path: string): Promise<Date> => {
-		const events = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: path } },
-			pagination: false,
-			overrideAccess: true,
-		})
-		return new Date((events.docs[0] as unknown as { timestamp: string }).timestamp)
-	}
-
-	it(`buckets tenant-a events at ${TZ_A} local day on ${db}`, async () => {
+	it(`counts tenant-a hits on the ${TZ_A} local day on ${db}`, async () => {
 		await ingest(TENANT_A, '/tz-a')
-		const ts = await eventTimestampFor('/tz-a')
-		const period = await rollupPeriodFor('/tz-a')
-		expect(period.toISOString()).toBe(startOfDayInTz(ts, TZ_A).toISOString())
+		expect(await seriesDays(booted, adapter, { path: '/tz-a', scope: TENANT_A })).toEqual([
+			await hitDayStart(booted, '/tz-a', TZ_A),
+		])
 	})
 
-	it(`buckets tenant-b events at ${TZ_B} local day on ${db}`, async () => {
+	it(`counts tenant-b hits on the ${TZ_B} local day on ${db}`, async () => {
 		await ingest(TENANT_B, '/tz-b')
-		const ts = await eventTimestampFor('/tz-b')
-		const period = await rollupPeriodFor('/tz-b')
-		expect(period.toISOString()).toBe(startOfDayInTz(ts, TZ_B).toISOString())
+		expect(await seriesDays(booted, adapter, { path: '/tz-b', scope: TENANT_B })).toEqual([
+			await hitDayStart(booted, '/tz-b', TZ_B),
+		])
 	})
 
-	it(`falls back to UTC when resolver returns null (no tenant header) on ${db}`, async () => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('ingest endpoint not registered')
-		}
-		const res = await endpoint.handler(
-			ingestRequest(booted.payload, {
-				type: 'pageview',
-				path: '/tz-fallback',
-				hostname: 'h',
-				durationMs: 100,
-			})
-		)
-		expect(res.status).toBe(202)
-		const ts = await eventTimestampFor('/tz-fallback')
-		const period = await rollupPeriodFor('/tz-fallback')
-		expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
+	it(`counts in UTC when the resolver returns null (no tenant header) on ${db}`, async () => {
+		await ingest(null, '/tz-fallback')
+		expect(await seriesDays(booted, adapter, { path: '/tz-fallback', scope: '' })).toEqual([
+			await hitDayStart(booted, '/tz-fallback', 'UTC'),
+		])
 	})
 })
 
 describeForDb('reportingTimezone invalid/null/throwing → UTC fallback', {}, (db) => {
+	const adapter = native()
 	let booted: BootedPayload
 
 	beforeAll(async () => {
 		booted = await bootPayload({
 			plugin: analytics({
-				adapters: [native()],
-				// Resolver returns null for unknown scopes and throws for 'bad-scope'.
-				reportingTimezone: ({ scope }) => {
-					if (scope === 'bad-scope') throw new Error('simulated resolver failure')
+				adapters: [adapter],
+				capture: { gate: 'off' },
+				// Answers null, and throws for a beacon that names the bad tenant.
+				reportingTimezone: ({ req }) => {
+					if (req.headers.get('x-tenant-id') === 'bad-scope') {
+						throw new Error('simulated resolver failure')
+					}
 					return null
 				},
 			}),
@@ -1428,107 +836,151 @@ describeForDb('reportingTimezone invalid/null/throwing → UTC fallback', {}, (d
 		await booted.stop()
 	})
 
-	const ingestViaEndpoint = async (tenantId: string | null, path: string): Promise<void> => {
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
+	const ingest = (tenantId: string | null, path: string): Promise<void> =>
+		ingestAccepted(
+			booted,
+			{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
+			tenantId === null ? {} : { 'x-tenant-id': tenantId }
 		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('ingest endpoint not registered')
-		}
-		const res = await endpoint.handler(
-			ingestRequest(
-				booted.payload,
-				{ type: 'pageview', path, hostname: 'h', durationMs: 100 },
-				tenantId !== null ? { 'x-tenant-id': tenantId } : {}
-			)
-		)
-		expect(res.status).toBe(202)
-	}
 
-	const rollupPeriodFor = async (path: string): Promise<Date> => {
-		const rollups = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: path }, dimension: { equals: '' } },
-			pagination: false,
-			overrideAccess: true,
-		})
-		return new Date((rollups.docs[0] as unknown as { period: string }).period)
-	}
-
-	const eventTimestampFor = async (path: string): Promise<Date> => {
-		const events = await booted.payload.find({
-			collection: EVENTS_SLUG as never,
-			where: { path: { equals: path } },
-			pagination: false,
-			overrideAccess: true,
-		})
-		return new Date((events.docs[0] as unknown as { timestamp: string }).timestamp)
-	}
-
-	it(`buckets in UTC when resolver returns null on ${db}`, async () => {
-		await ingestViaEndpoint(null, '/tz-null')
-		const ts = await eventTimestampFor('/tz-null')
-		const period = await rollupPeriodFor('/tz-null')
-		expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
+	it(`counts in UTC when the resolver returns null on ${db}`, async () => {
+		await ingest(null, '/tz-null')
+		expect(await seriesDays(booted, adapter, { path: '/tz-null' })).toEqual([
+			await hitDayStart(booted, '/tz-null', 'UTC'),
+		])
 	})
 
-	it(`buckets in UTC and does not throw when resolver throws on ${db}`, async () => {
-		await ingestViaEndpoint('bad-scope', '/tz-throw')
-		const ts = await eventTimestampFor('/tz-throw')
-		const period = await rollupPeriodFor('/tz-throw')
-		expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
+	it(`stores the hit, counted in UTC, when the resolver throws on ${db}`, async () => {
+		await ingest('bad-scope', '/tz-throw')
+		expect(await seriesDays(booted, adapter, { path: '/tz-throw' })).toEqual([
+			await hitDayStart(booted, '/tz-throw', 'UTC'),
+		])
 	})
 
-	it(`buckets in UTC for an invalid IANA string on ${db}`, async () => {
+	// A string option is checked at boot; a resolver's answer can only be checked as it arrives.
+	it(`counts in UTC when the resolver answers an invalid IANA name on ${db}`, async () => {
+		const invalid = native()
 		let booted2: BootedPayload | undefined
 		try {
 			booted2 = await bootPayload({
-				plugin: analytics({ adapters: [native()], reportingTimezone: 'Not/ATimezone' }),
+				plugin: analytics({
+					adapters: [invalid],
+					capture: { gate: 'off' },
+					reportingTimezone: () => 'Not/ATimezone',
+				}),
 				db,
 			})
-			const endpoint = (booted2.payload.config.endpoints ?? []).find(
-				(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
-			)
-			if (!endpoint || typeof endpoint.handler !== 'function') throw new Error('no endpoint')
-			const res = await endpoint.handler(
-				ingestRequest(booted2.payload, {
-					type: 'pageview',
-					path: '/tz-invalid',
-					hostname: 'h',
-					durationMs: 100,
-				})
-			)
-			expect(res.status).toBe(202)
-			const rollups = await booted2.payload.find({
-				collection: ROLLUPS_SLUG,
-				where: { path: { equals: '/tz-invalid' }, dimension: { equals: '' } },
-				pagination: false,
-				overrideAccess: true,
+			await ingestAccepted(booted2, {
+				type: 'pageview',
+				path: '/tz-invalid',
+				hostname: 'h',
+				durationMs: 100,
 			})
-			const events = await booted2.payload.find({
-				collection: EVENTS_SLUG as never,
-				where: { path: { equals: '/tz-invalid' } },
-				pagination: false,
-				overrideAccess: true,
-			})
-			const ts = new Date((events.docs[0] as unknown as { timestamp: string }).timestamp)
-			const period = new Date((rollups.docs[0] as unknown as { period: string }).period)
-			expect(period.toISOString()).toBe(startOfDayInTz(ts, 'UTC').toISOString())
+			expect(await seriesDays(booted2, invalid, { path: '/tz-invalid' })).toEqual([
+				await hitDayStart(booted2, '/tz-invalid', 'UTC'),
+			])
 		} finally {
 			await booted2?.stop()
 		}
 	})
 })
 
+describeForDb('native hostname families', {}, (db) => {
+	const adapter = native()
+	let booted: BootedPayload
+
+	beforeAll(async () => {
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], capture: { gate: 'off' } }),
+			db,
+		})
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+	})
+
+	const ingest = (path: string, hostname: string, ua: string) =>
+		ingestDirect(
+			booted.payload,
+			{ type: 'pageview', path, durationMs: 100 },
+			{ 'user-agent': ua, host: hostname }
+		)
+
+	const pageviewsOn = async (hostname?: string): Promise<number | null | undefined> =>
+		(
+			await adapter.query(
+				{
+					path: '/hf',
+					metrics: ['pageviews'],
+					dateRange: aroundNow(),
+					...(hostname ? { hostname } : {}),
+				},
+				{ payload: booted.payload }
+			)
+		).totals?.pageviews
+
+	it(`reads each hostname exactly, and every hostname together on ${db}`, async () => {
+		await ingest('/hf', 'a.example', 'UA-A1')
+		await ingest('/hf', 'b.example', 'UA-B1')
+
+		expect(await pageviewsOn()).toBe(2)
+		expect(await pageviewsOn('a.example')).toBe(1)
+		expect(await pageviewsOn('b.example')).toBe(1)
+	})
+})
+
+/** One run of the sync task as the jobs runner calls it, over the last three days. */
+const runSync = async (
+	booted: BootedPayload,
+	scopes?: SyncTaskOptions['scopes']
+): Promise<SyncTaskOutput> => {
+	const { handler } = syncTask({
+		schedule: DEFAULT_JOBS.sync,
+		lookbackDays: 3,
+		collectionSlug: SYNC_SLUG,
+		...(scopes ? { scopes } : {}),
+	})
+	if (typeof handler !== 'function') {
+		throw new Error('sync handler must be a function')
+	}
+	const result = await handler({
+		req: { payload: booted.payload },
+	} as unknown as Parameters<typeof handler>[0])
+	return (result as { output: SyncTaskOutput }).output
+}
+
+interface SyncedRow {
+	source: string
+	scope: string
+	date: string
+	pageviews: number
+	visitors: number
+}
+
+/** The synced rows `where` selects, read past access control. */
+const syncedRows = async (booted: BootedPayload, where: Where = {}): Promise<SyncedRow[]> =>
+	(
+		await booted.payload.find({
+			collection: SYNC_SLUG as never,
+			where,
+			limit: 100,
+			overrideAccess: true,
+		})
+	).docs as unknown as SyncedRow[]
+
+const syncedCount = async (booted: BootedPayload): Promise<number> =>
+	(await booted.payload.find({ collection: SYNC_SLUG as never, limit: 0, overrideAccess: true }))
+		.totalDocs
+
 describeForDb('analytics sync tier', {}, (db) => {
-	const DAY = 86_400_000
 	const mem = memoryAdapter()
 	let booted: BootedPayload
 
 	beforeAll(async () => {
 		booted = await bootPayload({ plugin: analytics({ adapters: [native(), mem], sync: true }), db })
 		for (let offset = 0; offset < 3; offset++) {
-			const t = new Date(Date.now() - offset * DAY)
+			const t = new Date(Date.now() - offset * DAY_MS)
 			mem.record({ path: '/p', timestamp: t, visitor: 'a' })
 			mem.record({ path: '/p', timestamp: t, visitor: 'b' })
 		}
@@ -1538,138 +990,41 @@ describeForDb('analytics sync tier', {}, (db) => {
 		await booted.stop()
 	})
 
-	const reqOf = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
-
-	const runSync = async (): Promise<{ synced: number; failed: number }> => {
-		const task = syncTask({
-			cron: '0 */6 * * *',
-			lookbackDays: 3,
-			collectionSlug: 'analytics-daily',
-		})
-		const handler = task.handler
-		if (typeof handler !== 'function') {
-			throw new Error('sync handler must be a function')
-		}
-		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
-		return (result as { output: { synced: number; failed: number } }).output
-	}
-
 	it('registers the analytics-daily collection and the sync task with its cron', () => {
 		const config = booted.payload.config as unknown as {
 			collections?: Array<{ slug?: string }>
 			jobs?: { tasks?: Array<{ slug?: string; schedule?: Array<{ cron?: string }> }> }
 		}
-		expect((config.collections ?? []).some((c) => c.slug === 'analytics-daily')).toBe(true)
+		expect((config.collections ?? []).some((c) => c.slug === SYNC_SLUG)).toBe(true)
 		const task = (config.jobs?.tasks ?? []).find((t) => t.slug === SYNC_TASK_SLUG)
 		expect(task?.schedule?.[0]?.cron).toBe('0 */6 * * *')
 	})
 
 	it('upserts one row per (provider source, day) and excludes native', async () => {
-		const out = await runSync()
+		const out = await runSync(booted)
 		expect(out.failed).toBe(0)
 		expect(out.synced).toBe(3)
-		const docs = await booted.payload.find({
-			collection: 'analytics-daily' as never,
-			limit: 100,
-			sort: 'date',
-			overrideAccess: true,
-		})
-		expect(docs.docs.length).toBe(3)
-		for (const doc of docs.docs as unknown as Array<{
-			source: string
-			pageviews: number
-			visitors: number
-			date: string
-			scope: string
-		}>) {
-			expect(doc.source).toBe('memory')
-			expect(doc.pageviews).toBe(2)
-			expect(doc.visitors).toBe(2)
-			expect(doc.date).toBeTruthy()
-			expect(doc.scope).toBe('')
+		const rows = await syncedRows(booted)
+		expect(rows.length).toBe(3)
+		for (const row of rows) {
+			expect(row.source).toBe('memory')
+			expect(row.pageviews).toBe(2)
+			expect(row.visitors).toBe(2)
+			expect(row.date).toBeTruthy()
+			expect(row.scope).toBe('')
 		}
 	})
 
 	it('is idempotent: a second run updates in place with no duplicates', async () => {
-		const before = await booted.payload.find({
-			collection: 'analytics-daily' as never,
-			limit: 0,
-			overrideAccess: true,
-		})
-		await runSync()
-		const after = await booted.payload.find({
-			collection: 'analytics-daily' as never,
-			limit: 0,
-			overrideAccess: true,
-		})
-		expect(after.totalDocs).toBe(before.totalDocs)
-		expect(after.totalDocs).toBe(3)
-	})
-})
-
-describeForDb('native hostname family uniqueness', {}, (db) => {
-	let booted: BootedPayload
-
-	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
-	})
-
-	afterAll(async () => {
-		await booted.stop()
-	})
-
-	const ingest = (path: string, hostname: string, ua: string) =>
-		makeIngestHandler({ geoResolver: platformHeaderResolver })(
-			ingestRequest(
-				booted.payload,
-				{ type: 'pageview', path, durationMs: 100 },
-				{ 'user-agent': ua, host: hostname }
-			)
-		)
-
-	it(`keeps per-hostname rollup buckets exact and separate from the merged family on ${db}`, async () => {
-		await ingest('/hf', 'a.example', 'UA-A1')
-		await ingest('/hf', 'b.example', 'UA-B1')
-
-		const rollups = await booted.payload.find({
-			collection: ROLLUPS_SLUG,
-			where: { path: { equals: '/hf' }, dimension: { equals: '' } },
-			pagination: false,
-			overrideAccess: true,
-		})
-		const byHostname = new Map(
-			(rollups.docs as unknown as Array<{ hostname: string; pageviews: number }>).map((d) => [
-				d.hostname,
-				d,
-			])
-		)
-		expect(byHostname.get('')?.pageviews).toBe(2)
-		expect(byHostname.get('a.example')?.pageviews).toBe(1)
-		expect(byHostname.get('b.example')?.pageviews).toBe(1)
-	})
-
-	it(`rejects a raw duplicate-bucket insert, proving the widened unique index on ${db}`, async () => {
-		const row = {
-			granularity: 'day',
-			period: new Date('2026-05-01T00:00:00Z'),
-			path: '/dup',
-			dimension: '',
-			dimvalue: '',
-			hostname: 'a.example',
-			pageviews: 1,
-			events: 0,
-			durationMs: 0,
-			visitors: 0,
-			sessions: 0,
-			samples: 0,
-		}
-		await rawInsertRollup(booted.payload, row)
-		await expect(rawInsertRollup(booted.payload, row)).rejects.toThrow()
+		const before = await syncedCount(booted)
+		await runSync(booted)
+		const after = await syncedCount(booted)
+		expect(after).toBe(before)
+		expect(after).toBe(3)
 	})
 })
 
 describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
-	const DAY = 86_400_000
 	let booted: BootedPayload
 	let memRoot: MemoryAnalyticsAdapter
 	let memT1: MemoryAnalyticsAdapter
@@ -1680,16 +1035,19 @@ describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 		memRoot = { ...memoryAdapter(), id: 'memory:root' }
 		memT1 = { ...memoryAdapter(), id: 'memory:t1' }
 		memT2 = { ...memoryAdapter(), id: 'memory:t2' }
-		// A CONFIG adapter (declared in `adapters`, not resolved per scope) that never
-		// declares scopedQueries: it cannot narrow its own query to one tenant, so the
-		// sync loop must only pull it for the install-wide (null) pass.
+		// A config adapter without `scopedQueries` cannot narrow its query to one tenant, so sync
+		// must pull it only for the install-wide (null) pass.
 		memShared = { ...memoryAdapter(), id: 'shared' }
 		booted = await bootPayload({
 			plugin: analytics({
 				adapters: [native(), memShared],
+				capture: { gate: 'off' },
 				sync: true,
-				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
-				scopes: () => ['t1', 't2'],
+				scope: {
+					member: () => true,
+					resolve: ({ req }) => req.headers.get('x-tenant'),
+					list: () => ['t1', 't2'],
+				},
 				providers: {
 					resolve: ({ scope }) => {
 						if (scope === 't1') return [memT1]
@@ -1700,54 +1058,28 @@ describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 			}),
 			db,
 		})
-		const t = new Date(Date.now() - DAY)
-		memRoot.record({ path: '/p', timestamp: t, visitor: 'a' })
-		memRoot.record({ path: '/p', timestamp: t, visitor: 'b' })
-		memT1.record({ path: '/p', timestamp: t, visitor: 'a' })
-		memT2.record({ path: '/p', timestamp: t, visitor: 'a' })
-		memT2.record({ path: '/p', timestamp: t, visitor: 'b' })
-		memT2.record({ path: '/p', timestamp: t, visitor: 'c' })
-		memShared.record({ path: '/p', timestamp: t, visitor: 'a' })
-		memShared.record({ path: '/p', timestamp: t, visitor: 'b' })
-		memShared.record({ path: '/p', timestamp: t, visitor: 'c' })
-		memShared.record({ path: '/p', timestamp: t, visitor: 'd' })
-		memShared.record({ path: '/p', timestamp: t, visitor: 'e' })
+		const t = new Date(Date.now() - DAY_MS)
+		const visit = (adapter: MemoryAnalyticsAdapter, visitors: string[]): void => {
+			for (const visitor of visitors) {
+				adapter.record({ path: '/p', timestamp: t, visitor })
+			}
+		}
+		visit(memRoot, ['a', 'b'])
+		visit(memT1, ['a'])
+		visit(memT2, ['a', 'b', 'c'])
+		visit(memShared, ['a', 'b', 'c', 'd', 'e'])
 	})
 
 	afterAll(async () => {
 		await booted.stop()
 	})
 
-	const reqOf = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
-
-	const runSync = async (): Promise<{ synced: number; failed: number }> => {
-		const task = syncTask({
-			cron: '0 */6 * * *',
-			lookbackDays: 3,
-			collectionSlug: 'analytics-daily',
-			scopes: () => ['t1', 't2'],
-		})
-		const handler = task.handler
-		if (typeof handler !== 'function') {
-			throw new Error('sync handler must be a function')
-		}
-		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
-		return (result as { output: { synced: number; failed: number } }).output
-	}
-
 	it(`syncs one row per scope, each reading that scope's own resolved provider on ${db}`, async () => {
-		const out = await runSync()
+		const out = await runSync(booted, () => ['t1', 't2'])
 		expect(out.failed).toBe(0)
 		expect(out.synced).toBe(4)
-		const docs = await booted.payload.find({
-			collection: 'analytics-daily' as never,
-			limit: 100,
-			overrideAccess: true,
-		})
 		const byScope = new Map(
-			(docs.docs as unknown as Array<{ scope: string; source: string; pageviews: number }>)
-				.filter((d) => d.source !== 'shared')
-				.map((d) => [d.scope, d])
+			(await syncedRows(booted)).filter((d) => d.source !== 'shared').map((d) => [d.scope, d])
 		)
 		expect(byScope.get('')?.pageviews).toBe(2)
 		expect(byScope.get('t1')?.pageviews).toBe(1)
@@ -1755,49 +1087,34 @@ describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 	})
 
 	it(`only ever syncs a shared (non-scoped) config adapter into the install-wide scope on ${db}`, async () => {
-		const docs = await booted.payload.find({
-			collection: 'analytics-daily' as never,
-			where: { source: { equals: 'shared' } },
-			limit: 100,
-			overrideAccess: true,
-		})
-		const rows = docs.docs as unknown as Array<{ scope: string; pageviews: number }>
+		const rows = await syncedRows(booted, { source: { equals: 'shared' } })
 		expect(rows).toHaveLength(1)
 		expect(rows[0]?.scope).toBe('')
 		expect(rows[0]?.pageviews).toBe(5)
 	})
 
 	it(`is idempotent across scopes: a second run updates in place with no duplicates on ${db}`, async () => {
-		const before = await booted.payload.find({
-			collection: 'analytics-daily' as never,
-			limit: 0,
-			overrideAccess: true,
-		})
-		await runSync()
-		const after = await booted.payload.find({
-			collection: 'analytics-daily' as never,
-			limit: 0,
-			overrideAccess: true,
-		})
-		expect(after.totalDocs).toBe(before.totalDocs)
-		expect(after.totalDocs).toBe(4)
+		const before = await syncedCount(booted)
+		await runSync(booted, () => ['t1', 't2'])
+		const after = await syncedCount(booted)
+		expect(after).toBe(before)
+		expect(after).toBe(4)
 	})
 
 	it(`a tenant's find with overrideAccess: false returns only their scope's rows on ${db}`, async () => {
 		const { docs } = await booted.payload.find({
-			collection: 'analytics-daily' as never,
+			collection: SYNC_SLUG as never,
 			limit: 100,
 			overrideAccess: false,
 			user: { id: 'u1' },
 			req: { headers: new Headers({ 'x-tenant': 't1' }) } as unknown as PayloadRequest,
 		})
 		expect(docs.length).toBeGreaterThan(0)
-		expect((docs as unknown as Array<{ scope: string }>).every((d) => d.scope === 't1')).toBe(true)
+		expect((docs as unknown as SyncedRow[]).every((d) => d.scope === 't1')).toBe(true)
 	})
 })
 
 describeForDb('analytics sync tier: per-scope resolution isolation', {}, (db) => {
-	const DAY = 86_400_000
 	let booted: BootedPayload
 	let memT2: MemoryAnalyticsAdapter
 
@@ -1806,9 +1123,13 @@ describeForDb('analytics sync tier: per-scope resolution isolation', {}, (db) =>
 		booted = await bootPayload({
 			plugin: analytics({
 				adapters: [native()],
+				capture: { gate: 'off' },
 				sync: true,
-				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
-				scopes: () => ['t1', 't2'],
+				scope: {
+					member: () => true,
+					resolve: ({ req }) => req.headers.get('x-tenant'),
+					list: () => ['t1', 't2'],
+				},
 				providers: {
 					resolve: ({ scope }) => {
 						if (scope === 't1') throw new Error('boom')
@@ -1819,38 +1140,18 @@ describeForDb('analytics sync tier: per-scope resolution isolation', {}, (db) =>
 			}),
 			db,
 		})
-		const t = new Date(Date.now() - DAY)
-		memT2.record({ path: '/p', timestamp: t, visitor: 'a' })
+		memT2.record({ path: '/p', timestamp: new Date(Date.now() - DAY_MS), visitor: 'a' })
 	})
 
 	afterAll(async () => {
 		await booted.stop()
 	})
 
-	const reqOf = (): PayloadRequest => ({ payload: booted.payload }) as unknown as PayloadRequest
-
 	it(`a registry resolution failure for one scope does not abort the others on ${db}`, async () => {
-		const task = syncTask({
-			cron: '0 */6 * * *',
-			lookbackDays: 3,
-			collectionSlug: 'analytics-daily',
-			scopes: () => ['t1', 't2'],
-		})
-		const handler = task.handler
-		if (typeof handler !== 'function') {
-			throw new Error('sync handler must be a function')
-		}
-		const result = await handler({ req: reqOf() } as unknown as Parameters<typeof handler>[0])
-		const out = (result as { output: { synced: number; failed: number } }).output
+		const out = await runSync(booted, () => ['t1', 't2'])
 		expect(out.failed).toBeGreaterThanOrEqual(1)
 		expect(out.synced).toBeGreaterThanOrEqual(1)
-		const docs = await booted.payload.find({
-			collection: 'analytics-daily' as never,
-			where: { scope: { equals: 't2' } },
-			limit: 100,
-			overrideAccess: true,
-		})
-		expect(docs.docs.length).toBeGreaterThanOrEqual(1)
+		expect((await syncedRows(booted, { scope: { equals: 't2' } })).length).toBeGreaterThanOrEqual(1)
 	})
 })
 
@@ -1859,7 +1160,11 @@ describeForDb('form-builder action block composition', {}, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: analytics({ adapters: [native()], goals: { defaults: actionGoals } }),
+			plugin: analytics({
+				adapters: [native()],
+				capture: { gate: 'off' },
+				goals: { defaults: [{ slug: 'book-demo', name: 'Book a demo', match: { kind: 'goal' } }] },
+			}),
 			collections: [actionHost()],
 			db,
 		})

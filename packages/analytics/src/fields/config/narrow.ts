@@ -1,7 +1,13 @@
-import type { CapabilityRequirement, SerializedCapabilities } from '../../core/capabilities'
+import {
+	type CapabilityRequirement,
+	meetsFilter,
+	metricsReach,
+	type SerializedCapabilities,
+} from '../../core/capabilities'
+import { isMetricKey } from '../../core/guards'
 import type { WireSource } from './fetchSources'
 
-export interface SelectOption {
+interface SelectOption {
 	value: string
 	label: unknown
 }
@@ -12,34 +18,32 @@ export const satisfiesSerialized = (
 	req: CapabilityRequirement
 ): boolean => {
 	if (req.realtime && !caps.realtime) return false
-	if (req.perPageQuery && !caps.perPageQuery) return false
+	if (req.perItemQuery && caps.perItemQuery !== true) return false
 	if (req.metrics?.some((m) => !caps.metrics.includes(m))) return false
 	if (req.dimensions?.some((d) => !caps.dimensions.includes(d))) return false
-	if (req.filters?.some((d) => !caps.filters.includes(d))) return false
-	if (req.filterOperators?.some((op) => !caps.filterOperators.includes(op))) return false
-	return true
+	if (req.filters?.some((wanted) => !meetsFilter(caps, wanted))) return false
+	return metricsReach(caps, req)
 }
 
 /**
- * Options for the metric picker, narrowed to what the selected source can
- * serve. An unknown source id (a stale value, a source the endpoint could not
- * list) keeps the full static list, mirroring the server-side filterOptions
- * fallback, and a source that cannot meet the widget's extra requirements at
- * all falls back to the full list rather than an empty picker.
+ * Metric options narrowed to what the selected source serves. An unknown source, or one that
+ * cannot meet `requires` at all, keeps the full list rather than an empty picker.
  */
-export const narrowMetricOptions = (args: {
-	options: SelectOption[]
+export const narrowMetricOptions = <O extends SelectOption>(args: {
+	options: O[]
 	sources: WireSource[]
 	sourceId: string | undefined
 	requires?: Omit<CapabilityRequirement, 'metrics'>
-}): SelectOption[] => {
+}): O[] => {
 	const src = args.sourceId ? args.sources.find((s) => s.id === args.sourceId) : undefined
 	if (!src) return args.options
 	if (args.requires && !satisfiesSerialized(src.capabilities, args.requires)) {
 		return args.options
 	}
-	const narrowed = args.options.filter((o) =>
-		satisfiesSerialized(src.capabilities, { ...args.requires, metrics: [o.value as never] })
+	const narrowed = args.options.filter(
+		(o) =>
+			isMetricKey(o.value) &&
+			satisfiesSerialized(src.capabilities, { ...args.requires, metrics: [o.value] })
 	)
 	return narrowed.length > 0 ? narrowed : args.options
 }

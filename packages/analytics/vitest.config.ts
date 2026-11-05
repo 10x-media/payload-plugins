@@ -1,17 +1,29 @@
 import { sharedVitestConfig } from '@10x-media/vitest-config/vitest.shared'
 import { defineConfig, mergeConfig } from 'vitest/config'
 
-// Cross-DB runs (DB_MATRIX set) forcibly SIGKILL their database, so the driver
-// emits a benign teardown rejection after the tests have already passed. Ignore
-// unhandled errors only then; the default `test` path and unit tests stay strict.
 // biome-ignore lint/plugin/noProcessEnv: vitest config env boundary
 const dbMatrix = process.env.DB_MATRIX ?? ''
-const isMatrixRun = Boolean(dbMatrix)
+const matrixDbs = dbMatrix.split(',').map((db) => db.trim())
+const sqliteLane = matrixDbs.includes('sqlite')
+
+// Mongo and Postgres lanes kill their database at teardown, so the driver emits a benign
+// rejection after the tests passed; only there are unhandled errors ignored. SQLite has no
+// server to kill, so its lanes stay as strict as the default `test` path and the unit tests.
+const ignoreTeardownRejections = Boolean(dbMatrix) && !sqliteLane
 
 // One Postgres server serves the whole run, and every worker boots Payload against it. A
 // many-core machine otherwise opens enough connections at once to push that server into
 // recovery mode, which fails specs that changed nothing.
 const POSTGRES_MAX_WORKERS = 4
+
+// Every Mongo boot starts an in-memory replica set of its own, so a many-core machine otherwise
+// runs one mongod per core at once.
+const MONGO_MAX_WORKERS = 3
+
+const workerCaps = [
+	...(matrixDbs.includes('postgres') ? [POSTGRES_MAX_WORKERS] : []),
+	...(matrixDbs.includes('mongo') ? [MONGO_MAX_WORKERS] : []),
+]
 
 /** Browser-only modules; everything else runs in the node project. */
 const JSDOM_TESTS = ['src/tracker/**/*.test.ts', 'src/**/*.test.tsx']
@@ -24,6 +36,7 @@ export default mergeConfig(
 	sharedVitestConfig,
 	defineConfig({
 		test: {
+			setupFiles: ['./tests/setup/clock.ts'],
 			projects: [
 				{
 					extends: true,
@@ -34,8 +47,13 @@ export default mergeConfig(
 						// a no-op unless DB_MATRIX asks for Postgres. Scoped to this project
 						// because a root globalSetup is loaded and run once per project.
 						globalSetup: ['./tests/setup/sharedPostgres.ts'],
-						dangerouslyIgnoreUnhandledErrors: isMatrixRun,
-						...(dbMatrix.includes('postgres') ? { maxWorkers: POSTGRES_MAX_WORKERS } : {}),
+						setupFiles: ['./tests/setup/release.ts'],
+						dangerouslyIgnoreUnhandledErrors: ignoreTeardownRejections,
+						...(workerCaps.length > 0 ? { maxWorkers: Math.min(...workerCaps) } : {}),
+						// Vitest ends a worker thread with `terminate()`, and libsql's native code aborts the
+						// whole run (SIGABRT) when that lands mid-statement; a forked worker is killed by a
+						// signal instead, which ends that worker alone.
+						...(sqliteLane ? { pool: 'forks' } : {}),
 						include: ['tests/int/**/*.int.spec.ts', 'src/**/*.test.ts'],
 						exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**', ...JSDOM_TESTS],
 						// The admin view's server shell pulls in Payload's own admin chrome, whose

@@ -1,12 +1,18 @@
 import type { Access, PayloadRequest } from 'payload'
-import type { PlatformReadAccess } from '../core/options'
+import { isAdminUser } from '../access/adminUser'
+import { isScopeMember } from '../access/membership'
+import type { CrossScopeAccess, ScopeMemberAccess } from '../core/options'
 
 export interface ProviderAccessArgs {
-	/** True when the install configured a scopeResolver. */
+	/** True when the install configured `scope.resolve`. */
 	scoped: boolean
 	scopeField: string
+	/** The plugin's `scope.resolve` at the `admin` call site. */
 	resolveScope: (req: PayloadRequest) => Promise<string | null>
-	platformRead: PlatformReadAccess
+	/** `scope.member`: whether the request's user belongs to the scope it resolved. */
+	member?: ScopeMemberAccess
+	/** `access.crossScope.named`: acting on a scope other than the request's own. */
+	crossScope: CrossScopeAccess
 }
 
 const resolveOrNull = async (
@@ -22,34 +28,56 @@ const resolveOrNull = async (
 }
 
 /**
- * Row access (read/update/delete) for the provider collection. Unscoped
- * installs keep the historical any-authenticated-user behavior. Scoped
- * installs constrain every row operation to the request's resolved scope via
- * a where clause (so list views filter instead of erroring); the platformRead
- * gate lifts the constraint for platform admins. A null or unresolvable scope
- * fails closed.
+ * The request's resolved scope while its user belongs to it, else null, so a tenant selector
+ * pointed at someone else's tenant opens nothing.
  */
-export const providerRowAccess = (args: ProviderAccessArgs): Access => {
-	return async ({ req }) => {
-		if (!req.user) return false
-		if (!args.scoped) return true
-		if (await args.platformRead({ req })) return true
-		const scope = await resolveOrNull(args, req)
-		if (scope === null) return false
-		return { [args.scopeField]: { equals: scope } }
+export const memberScopeOf = async (
+	args: ProviderAccessArgs,
+	req: PayloadRequest
+): Promise<string | null> => {
+	const scope = await resolveOrNull(args, req)
+	if (scope === null) {
+		return null
 	}
+	return (await isScopeMember(args.member, req, scope)) ? scope : null
 }
 
 /**
- * Create access: any authenticated user in unscoped installs; in scoped
- * installs the requester needs a resolved scope (the stamp hook writes it) or
- * the platform grant (install-wide providers have no scope to resolve).
+ * What every operation shares: admin-collection users only, everything on an unscoped install or
+ * under the cross-scope grant; undefined leaves it to the request's member scope.
  */
-export const providerCreateAccess = (args: ProviderAccessArgs): Access => {
-	return async ({ req }) => {
-		if (!req.user) return false
-		if (!args.scoped) return true
-		if (await args.platformRead({ req })) return true
-		return (await resolveOrNull(args, req)) !== null
-	}
+const sharedVerdict = async (
+	args: ProviderAccessArgs,
+	req: PayloadRequest
+): Promise<boolean | undefined> => {
+	if (!isAdminUser({ req })) return false
+	if (!args.scoped) return true
+	if (await args.crossScope({ req })) return true
+	return undefined
 }
+
+/**
+ * Admin-collection users only. Scoped installs constrain rows to the request's member scope with a
+ * where clause (list views filter, not error) unless the cross-scope grant lifts it.
+ */
+export const providerRowAccess =
+	(args: ProviderAccessArgs): Access =>
+	async ({ req }) => {
+		const verdict = await sharedVerdict(args, req)
+		if (verdict !== undefined) return verdict
+		const scope = await memberScopeOf(args, req)
+		if (scope === null) return false
+		return { [args.scopeField]: { equals: scope } }
+	}
+
+/**
+ * Admin-collection users only. Scoped installs need a member scope (the stamp hook writes it) or
+ * the cross-scope grant, since install-wide providers have no scope to resolve.
+ */
+export const providerCreateAccess =
+	(args: ProviderAccessArgs): Access =>
+	async ({ req }) => {
+		const verdict = await sharedVerdict(args, req)
+		if (verdict !== undefined) return verdict
+		return (await memberScopeOf(args, req)) !== null
+	}

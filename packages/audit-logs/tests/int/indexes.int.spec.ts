@@ -38,7 +38,7 @@ describe('audit-logs indexes', () => {
 		const keys = await readIndexKeys(booted)
 
 		expect(keys).toContain('relationTo,documentId,createdAt')
-		expect(keys).toContain('user,createdAt')
+		expect(keys).toContain('user.value,user.relationTo,createdAt')
 	})
 
 	it('leaves the tenant pair out when multi-tenancy is off', async () => {

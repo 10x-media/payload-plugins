@@ -2,11 +2,12 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { posthog } from '../../src/adapters/posthog/posthog'
-import { getTrackerConfig } from '../../src/capture/getTrackerConfig'
-import type { TrackerConfig } from '../../src/capture/trackerConfig'
+import { publicDigest } from '../../src/capture/exclusionToken'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
+import { getTrackerConfig, NEXT_DRAFT_COOKIE } from '../../src/site/getTrackerConfig'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import type { TrackerConfig } from '../../src/tracker/config'
 
 const SECRET = 'phx_private_query_key'
 
@@ -35,12 +36,15 @@ describeForDb('analytics tracker endpoint', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [native({ ingestPath: '/analytics/collect' })],
-				scopeResolver: ({ req }) => {
-					const host = req.host?.split(':')[0] ?? null
-					if (host === 'boom.test') {
-						throw new Error('scope resolution exploded')
-					}
-					return host?.endsWith('.test') ? host : null
+				scope: {
+					member: () => true,
+					resolve: ({ req }) => {
+						const host = req.host?.split(':')[0] ?? null
+						if (host === 'boom.test') {
+							throw new Error('scope resolution exploded')
+						}
+						return host?.endsWith('.test') ? host : null
+					},
 				},
 				providers: {
 					resolve: ({ scope }) =>
@@ -52,7 +56,7 @@ describeForDb('analytics tracker endpoint', {}, (db) => {
 									? [readOnlyVendor()]
 									: [],
 				},
-				capture: { slots: { tenant: 'vendor' } },
+				capture: { gate: ({ kind }) => kind !== 'native', slots: { tenant: 'vendor' } },
 				goals: [{ slug: 'signup', name: 'Signup', match: { kind: 'goal' } }],
 			}),
 		})
@@ -66,7 +70,7 @@ describeForDb('analytics tracker endpoint', {}, (db) => {
 		handleEndpoints({
 			config: booted.payload.config,
 			payloadInstanceCacheKey: booted.cacheKey,
-			request: new Request(`${origin}/api/analytics/tracker`),
+			request: new Request(`${origin}/api/_x/config`),
 		})
 
 	const body = async (origin?: string): Promise<TrackerConfig> => {
@@ -82,15 +86,41 @@ describeForDb('analytics tracker endpoint', {}, (db) => {
 		expect(config.slots.map((s) => [s.slot, s.adapterId, s.kind])).toEqual([
 			['global', 'native', 'native'],
 		])
-		expect(config.slots[0]?.requiresConsent).toBe(false)
+		expect(config.slots[0]?.gated).toBe(false)
 		expect(config.ingestPath).toBe('/api/analytics/collect')
+		// No collection is bound as items here, so no page watches for them.
 		expect(config.autoCapture).toEqual({
 			scrollDepth: false,
 			outboundLinks: true,
 			fileDownloads: true,
 			goalAttribute: true,
 			query: true,
+			items: { impressions: false, clicks: false, pages: false },
 		})
+		expect(config.admin).toEqual({ path: publicDigest('/admin') })
+		expect(config).not.toHaveProperty('skip')
+		expect(config).not.toHaveProperty('draft')
+	})
+
+	// A preview booted by `initTracker` is left uncounted like a rendered one, and the cookie
+	// that says so is read before the request reaches any resolver without its cookies.
+	it("says draft for a request carrying Next's draft mode cookie", async () => {
+		const res = await handleEndpoints({
+			config: booted.payload.config,
+			payloadInstanceCacheKey: booted.cacheKey,
+			request: new Request('http://site-a.test/api/_x/config', {
+				headers: { cookie: `theme=dark; ${NEXT_DRAFT_COOKIE}=preview-id` },
+			}),
+		})
+		const config = (await res.json()) as TrackerConfig
+		expect(config.draft).toBe(true)
+		expect(config.slots.map((s) => s.slot)).toEqual(['global', 'tenant'])
+	})
+
+	it('names no admin address in the public response', async () => {
+		const text = await (await request()).text()
+		expect(text).not.toContain('"/admin')
+		expect(text).not.toContain('localhost:3000/admin')
 	})
 
 	it('carries the config goals without their admin-facing names', async () => {
@@ -98,10 +128,11 @@ describeForDb('analytics tracker endpoint', {}, (db) => {
 		expect(config.goals).toEqual([{ slug: 'signup', match: { kind: 'goal' } }])
 	})
 
-	it('caches per host and sets no cookie', async () => {
+	it('caches per host and cookie, and sets no cookie', async () => {
 		const res = await request()
 		expect(res.headers.get('cache-control')).toBe('private, max-age=60')
-		// Cookie is in the Vary because a scopeResolver may read req.user or a tenant cookie.
+		// No cookie reaches the resolver at a capture call site; the draft mode cookie alone
+		// changes the body, and it is read before the cookies are stripped.
 		expect(res.headers.get('vary')).toBe('Host, Cookie')
 		expect(res.headers.getSetCookie()).toEqual([])
 		expect(res.headers.get('set-cookie')).toBeNull()
@@ -113,10 +144,10 @@ describeForDb('analytics tracker endpoint', {}, (db) => {
 		expect(tenant).toMatchObject({
 			adapterId: 'vendor',
 			kind: 'posthog',
-			path: '/api/analytics/p/tenant',
-			requiresConsent: true,
+			path: '/api/_x/p/tenant',
+			gated: true,
 		})
-		expect(tenant?.snippet.scripts[0]?.inline).toContain('api_host:"/api/analytics/p/tenant"')
+		expect(tenant?.snippet.scripts[0]?.inline).toContain('api_host:"/api/_x/p/tenant"')
 	})
 
 	it("omits the tenant slot when the scope's adapter declares no capture", async () => {
@@ -135,7 +166,7 @@ describeForDb('analytics tracker endpoint', {}, (db) => {
 	})
 
 	// The tracker endpoint and the capture proxy are the first unauthenticated callers of
-	// the host's scopeResolver: a throwing resolver must fail closed, never 500.
+	// the host's scope.resolve: a throwing resolver must fail closed, never 500.
 	it('answers 200 without the tenant slot when the scope resolver throws', async () => {
 		const res = await request('http://boom.test')
 		expect(res.status).toBe(200)
@@ -168,7 +199,7 @@ describeForDb('analytics tracker endpoint with query capture off', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [native()],
-				capture: { autoCapture: { query: false } },
+				capture: { gate: 'off', autoCapture: { query: false } },
 			}),
 		})
 	}, 240_000)
@@ -177,15 +208,13 @@ describeForDb('analytics tracker endpoint with query capture off', {}, (db) => {
 		await booted.stop()
 	})
 
-	// The tracker reads this one key to decide whether a pageview carries its query string at
-	// all, so an install that opts out of campaign capture has to see `false` arrive over the
-	// wire: the guard is `=== false`, and an option that never reached the config would read as
-	// the default and keep sending it.
+	// The tracker sends the query string unless this key arrives as exactly `false`, so an opt-out
+	// that never reached the public config would silently keep sending it.
 	it('carries the disabled toggle into the public tracker config', async () => {
 		const res = await handleEndpoints({
 			config: booted.payload.config,
 			payloadInstanceCacheKey: booted.cacheKey,
-			request: new Request('http://localhost:3000/api/analytics/tracker'),
+			request: new Request('http://localhost:3000/api/_x/config'),
 		})
 		expect(res.status).toBe(200)
 		const config = (await res.json()) as TrackerConfig

@@ -6,12 +6,8 @@ import type {
 } from 'payload'
 
 /**
- * Document data as seen by a binding resolver. With generated types augmented
- * (a consumer project after `payload generate:types`) this is the collection's
- * generated document type, so a resolver written inline under `collections.<slug>`
- * receives that collection's typed doc. Without augmentation (this repo, or before
- * first generation) it degrades to a plain `Record<string, unknown>` rather than
- * the `any`-indexed fallback Payload would otherwise supply.
+ * A collection's generated document type once types are generated, else `Record<string, unknown>`
+ * rather than Payload's `any`-indexed fallback.
  */
 export type BindingDoc<TSlug extends CollectionSlug = CollectionSlug> =
 	keyof GeneratedTypes extends never ? Record<string, unknown> : DataFromCollectionSlug<TSlug>
@@ -22,15 +18,8 @@ export type BindingContext = {
 }
 
 /**
- * Maps a document to the URL pathname its analytics were recorded under, e.g.
- * `/blog/my-post`. The resolved path is what every display field and per-document
- * read filters adapter queries by, so it must match the paths your tracking
- * reports. Runs on the server for each document view that renders an analytics
- * field (memoized once per document per request) and again for warm-cache reads.
- * `ctx.req` is the current `PayloadRequest`, so related documents can be looked
- * up through `ctx.req.payload`. Return null when the document has no URL yet
- * (for example unsaved or unpublished); the field then renders its empty state
- * instead of querying.
+ * Maps a document to the pathname its analytics were recorded under (`/blog/my-post`), which must
+ * match what tracking reports. Memoized per document per request; null renders the empty state.
  */
 export type PathResolver<TSlug extends CollectionSlug = CollectionSlug> = (
 	doc: BindingDoc<TSlug>,
@@ -38,17 +27,8 @@ export type PathResolver<TSlug extends CollectionSlug = CollectionSlug> = (
 ) => string | null | Promise<string | null>
 
 /**
- * Maps a document to the hostname its analytics were recorded under, for
- * multi-domain setups where one Payload instance serves several sites. The
- * resolved hostname is passed to the adapter alongside the path; adapters that
- * expose a host filter (PostHog `properties.$host`, GA4 `hostName`, Plausible
- * `event:hostname`) narrow the query to that site's traffic, and the hostname
- * always partitions the cache key. Adapters without a native host filter (umami,
- * and the native engine, whose rollups are not yet keyed by hostname) ignore it.
- * Runs on the server right before each per-document adapter read, with the same
- * `(doc, ctx)` as {@link PathResolver}. Return null (or omit `hostname` entirely)
- * to apply no hostname filter. A static string works for single-domain-per-collection
- * setups; sync one-argument functions remain supported.
+ * Hostname a document's analytics were recorded under, for one Payload serving several sites: it
+ * narrows a host-filtered source and always partitions the cache key. Null filters nothing.
  */
 export type HostnameResolver<TSlug extends CollectionSlug = CollectionSlug> = (
 	doc: BindingDoc<TSlug>,
@@ -56,15 +36,25 @@ export type HostnameResolver<TSlug extends CollectionSlug = CollectionSlug> = (
 ) => string | null | Promise<string | null>
 
 /**
- * Per-collection binding. `path` is the primary resolver; `pathField` is an explicit
- * field fallback used only when `path` is absent or returns null. At least one of the
- * two must be provided (validated at config resolve time).
+ * `path` wins over `pathField`; `item: true` counts documents as content shown elsewhere under ref
+ * `<slug>:<id>`. At least one of the three is required; a path and `item` bind both reports.
  */
 export type AnalyticsBinding<TSlug extends CollectionSlug = CollectionSlug> = {
 	path?: PathResolver<TSlug>
 	pathField?: string
 	hostname?: string | HostnameResolver<TSlug>
+	item?: boolean
+	/**
+	 * Top-level field holding a document's scope, so its panel reports that tenant, not the selected
+	 * one; `false` reads the request's. Default `'tenant'` when scoped; boot fails if missing.
+	 */
+	scopeField?: string | false
 }
 
-/** A binding after option resolution; identical shape, kept distinct for intent. */
-export type ResolvedBinding = AnalyticsBinding
+/** Where a document's scope is read from; `false` reads the request's own. */
+export type DocumentScopeField = string | false
+
+/** A binding after option resolution, with the document's scope field filled. */
+export type ResolvedBinding = Omit<AnalyticsBinding, 'scopeField'> & {
+	scopeField: DocumentScopeField
+}

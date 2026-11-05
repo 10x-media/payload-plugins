@@ -1,29 +1,27 @@
 import type { Payload } from 'payload'
-import type { ScopesResolver } from './options'
+import type { ScopeListResolver } from './options'
 
 /**
- * Resolves the scopes a cron tier (warm, sync) fans out over: the install-wide
- * null scope first, then each tenant scope from `scopes()`, deduplicated (an
- * empty string folds into null). A throwing or rejecting resolver degrades to
- * the null-only pass so one tenant-enumeration bug does not block the whole run.
+ * The scopes the sync task fans out over: null first, then each tenant from `scope.list`,
+ * deduplicated. A failing resolver degrades to the null-only pass rather than blocking the run.
  */
 export const resolveScopeList = async (
-	scopes: ScopesResolver | undefined,
+	list: ScopeListResolver | undefined,
 	payload: Payload
 ): Promise<Array<string | null>> => {
-	if (!scopes) {
+	if (!list) {
 		return [null]
 	}
 	let raw: string[]
 	try {
-		const result = await scopes({ payload })
+		const result = await list({ payload })
 		if (!Array.isArray(result)) {
-			throw new Error('scopes() must resolve to an array of scope ids')
+			throw new Error('scope.list must resolve to an array of scope ids')
 		}
 		raw = result
 	} catch (err) {
 		payload.logger.warn(
-			`analytics: scopes() failed, falling back to the install-wide scope: ${String(err)}`
+			`analytics: scope.list failed, falling back to the install-wide scope: ${String(err)}`
 		)
 		return [null]
 	}

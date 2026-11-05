@@ -7,8 +7,8 @@ import type {
 import { AuthenticationError, LockedAuth, UnverifiedEmail } from 'payload'
 
 import type { FailedLoginOptions, FailedLoginReason } from '../types'
-import { impersonatorRelationship } from '../utilities/impersonator'
 import { getClientIP, getUserAgent } from '../utilities/request'
+import { impersonatorRef, userRef } from '../utilities/userRef'
 import { writeAuditLog } from '../utilities/writeAuditLog'
 
 export type AuthAuditOptions = {
@@ -17,7 +17,6 @@ export type AuthAuditOptions = {
 	fastWrite: boolean
 	collectUserAgent: boolean
 	groupContextKey?: string
-	isUserPolymorphic: boolean
 	/** False when the log collection has no `impersonator` field. */
 	recordImpersonator: boolean
 }
@@ -64,12 +63,8 @@ export const loginIdentifier = (req: PayloadRequest): string | undefined => {
 export const afterLoginAuditLog =
 	(options: AuthAuditOptions): CollectionAfterLoginHook =>
 	async ({ req, user }) => {
-		const userValue = options.isUserPolymorphic
-			? { relationTo: options.collectionSlug, value: user.id }
-			: user.id
-		const impersonator = options.recordImpersonator
-			? impersonatorRelationship(user, options.isUserPolymorphic)
-			: undefined
+		const userValue = userRef(options.collectionSlug, user.id)
+		const impersonator = options.recordImpersonator ? impersonatorRef(user) : undefined
 
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined

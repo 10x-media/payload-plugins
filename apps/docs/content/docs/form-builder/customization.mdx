@@ -236,7 +236,7 @@ Keep the stored value a `PollOption.value` string whatever component renders it:
 
 ## Redirect response fields
 
-When an author sets the [response](/form-builder/rendering#the-form-document) to **Redirect**, the `response.redirect` group holds where to send the visitor: a `url` text field, plus a polymorphic `reference` relationship when [`redirectRelationships`](/form-builder/rendering#redirecting-to-an-internal-document) is set. Most projects already have a custom link field (choose a URL or pick a linkable document, like the rich-text link element), and the `response.redirect.fields` option lets you drop it in as a one-liner. It mirrors [`buttons.fields`](#form-level-buttons) and [`poll.outcomeFields`](#poll-outcome-fields): you receive the default fields and return the group's final field array, so prepend your own link group, swap `url` for your picker, reorder, or filter:
+When an author sets the [response](/form-builder/rendering#form) to **Redirect**, the `response.redirect` group holds where to send the visitor: a `url` text field, plus a polymorphic `reference` relationship when [`redirectRelationships`](/form-builder/rendering#redirecting-to-an-internal-document) is set. Most projects already have a custom link field (choose a URL or pick a linkable document, like the rich-text link element), and the `response.redirect.fields` option lets you drop it in as a one-liner. It mirrors [`buttons.fields`](#form-level-buttons) and [`poll.outcomeFields`](#poll-outcome-fields): you receive the default fields and return the group's final field array, so prepend your own link group, swap `url` for your picker, reorder, or filter:
 
 ```ts title="payload.config.ts"
 formBuilder({

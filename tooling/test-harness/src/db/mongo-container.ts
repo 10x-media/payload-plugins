@@ -8,7 +8,7 @@ export interface MongoContainerDb {
 }
 
 /**
- * Boots a real `mongo:8` container configured as a single-node replica set.
+ * Boots a real `mongo:8.2.12` container configured as a single-node replica set.
  * Required for Payload transaction tests that need multi-connection semantics
  * the in-process replSet cannot faithfully simulate.
  *
@@ -17,7 +17,7 @@ export interface MongoContainerDb {
  */
 export const startMongoContainer = async (): Promise<MongoContainerDb> => {
 	const dbName = `test_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`
-	const container: StartedTestContainer = await new GenericContainer('mongo:8')
+	const container: StartedTestContainer = await new GenericContainer('mongo:8.2.12')
 		.withCommand(['mongod', '--replSet', 'rs0', '--bind_ip_all', '--port', '27017'])
 		.withExposedPorts(27017)
 		.withWaitStrategy(Wait.forLogMessage(/Waiting for connections/))

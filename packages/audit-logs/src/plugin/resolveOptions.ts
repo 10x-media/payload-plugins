@@ -22,7 +22,7 @@ export const DEFAULT_AUDIT_LOG_OPERATIONS: Array<'create' | 'delete' | 'update'>
 
 /**
  * A single-entry `relationTo` array still stores a plain id, so only two or more
- * collections make the `user` field polymorphic.
+ * collections make a `createdBy` or `lastModifiedBy` field polymorphic.
  */
 export const isPolymorphicRelationTo = (relationTo: CollectionSlug | CollectionSlug[]): boolean =>
 	Array.isArray(relationTo) && relationTo.length > 1

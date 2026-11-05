@@ -1,5 +1,28 @@
 # @10x-media/audit-logs
 
+## 0.1.0-beta.6
+
+### Minor Changes
+
+- Store your own context on entries, render it in the view, and filter by it.
+
+  - Added: `logs.extend` adds fields to every entry before it is written, CRUD, auth and custom events alike. It runs inside the plugin's own write, so entries keep the direct database write that a hook in `logs.override` would turn off. A key the plugin sets itself (`user`, `diff`, `operation` and the rest) is ignored, so it cannot rewrite who acted or what changed.
+  - Added: view slots in `logs.view.components`. `user` is a popover on the user pill, opened from a chevron segment of its own, after the `impersonated` mark when there is one; `rowBadges` adds badges after the built-in ones; `beforeRowDetails` and `afterRowDetails` add sections to an expanded row; `beforeList` and `afterList` sit around the list. Server components also receive `payload`, `req` and `filterHref`, and every slot is registered under `config.admin.dependencies` for `generate:importmap`.
+  - Added: `logs.view.loadContext` runs once per page and hands its result to every slot as `context`, so a slot needs no query per row.
+  - Added: `useAuditLogRow` from `@10x-media/audit-logs/client` gives a client component in a row slot its entry and whether the row is expanded, so it can defer work until the row opens.
+  - Added: `logs.view.filters` declares filters over your own fields. A `relationship` filter is picked like the User filter (drawer or typed id), sits under More filters, lives in the URL as `?f.<name>=<id>` and matches with `in`, so text, hasMany text and relationship fields all work. The plugin refuses to start when a filter's `path` is not a field on the collection.
+  - New public types: `AuditLogUser`, `AuditLogRowState`, `AuditLogsRowSlotProps`, `AuditLogsListSlotProps`, `AuditLogsSlotServerProps`, `AuditLogsViewContext`, `ExtendEntryFunction`, `FilterHrefFunction`, `LoadViewContextFunction`, `RelationshipViewFilter` and `ViewFilter`.
+
+## 0.1.0-beta.5
+
+### Minor Changes
+
+- `createAuditEvent` takes a `tenant` and a `user`. `tenant` puts the entry in that tenant's view when `multiTenancy` is on, and is ignored with a warning when it is off. `user` attributes the event to someone other than `req.user`, for work a person started that runs in a job; `impersonator` is still read from `req`.
+
+  **Fixed: a custom event joins the group of the operation around it under a configured `logs.group.contextKey`.** Without an explicit `group` it read `req.context.auditGroup` whatever the key, while the automatic entries read the configured one.
+
+- **Breaking: `user` and `impersonator` are stored as text, `{ relationTo, value }`, whatever the number of auth collections.** They were relationships, and on Postgres and SQLite a relationship's foreign key cleared them from every entry once the user was deleted (`set null` on a column, `cascade` on a `_rels` row). The entry now keeps the user it names after the user is gone, adding a second auth collection no longer changes the schema, and the plugin boots on Postgres with several auth collections, which a `user, createdAt` index on a polymorphic relationship used to prevent. Query `user.value` and `user.relationTo` instead of `user`; `depth` no longer populates either field, so fetch the user yourself when you need more than the id. Existing entries need a one-off data edit on MongoDB and a migration on Postgres, both on the new [upgrading](https://docs.10xmedia.de/audit-logs/upgrading) page.
+
 ## 0.1.0-beta.4
 
 ### Minor Changes

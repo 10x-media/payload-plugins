@@ -8,13 +8,14 @@ import { FilterOperatorSelectField } from './FilterOperatorSelectField'
 import type { SourcesResponse, WireSource } from './fetchSources'
 
 const mocks = vi.hoisted(() => ({
+	dimension: undefined as string | undefined,
 	mergeFieldStyles: vi.fn(() => ({ width: '50%' })),
 	path: 'filter.operator',
 	setValue: vi.fn(),
 	sourceId: undefined as string | undefined,
 	useFieldArgs: [] as Array<Record<string, unknown>>,
 	userId: 'user-0',
-	value: 'eq',
+	value: undefined as string | undefined,
 	withCondition: vi.fn((component: unknown) => component),
 }))
 
@@ -96,7 +97,12 @@ vi.mock('@payloadcms/ui', () => {
 			}
 		},
 		useFormFields: (selector: (state: [Record<string, { value: unknown }>]) => unknown) =>
-			selector([{ dataSource: { value: mocks.sourceId } }]),
+			selector([
+				{
+					dataSource: { value: mocks.sourceId },
+					'filter.dimension': { value: mocks.dimension },
+				},
+			]),
 		useTranslation: () => ({ i18n: { language: 'en' }, t: (key: string) => key }),
 		withCondition: mocks.withCondition,
 	}
@@ -105,10 +111,8 @@ vi.mock('@payloadcms/ui', () => {
 const caps = (over: Partial<SerializedCapabilities> = {}): SerializedCapabilities => ({
 	metrics: ['pageviews'],
 	dimensions: ['page'],
-	filters: ['page'],
-	filterOperators: ['eq'],
+	filters: { page: ['eq'] },
 	realtime: false,
-	perPageQuery: false,
 	comparison: true,
 	minGranularity: 'day',
 	maxLookbackDays: null,
@@ -132,8 +136,8 @@ const answer = (body: SourcesResponse) =>
 const twoSources: SourcesResponse = {
 	defaultId: 'alpha',
 	sources: [
-		source('alpha', { filterOperators: ['eq'] }),
-		source('beta', { filterOperators: ['eq', 'contains', 'matches'] }),
+		source('alpha', { filters: { page: ['eq'] } }),
+		source('beta', { filters: { page: ['eq', 'contains'], country: ['eq', 'matches'] } }),
 	],
 }
 
@@ -153,7 +157,9 @@ beforeEach(() => {
 	mocks.userId = `op-user-${userSeq}`
 	mocks.path = 'filter.operator'
 	mocks.sourceId = undefined
-	mocks.value = 'eq'
+	mocks.dimension = undefined
+	// Nothing stored, so no option renders before the sources answer and every find waits for them.
+	mocks.value = undefined
 	mocks.setValue.mockClear()
 	mocks.useFieldArgs.length = 0
 	fetchMock.mockReset()
@@ -198,6 +204,28 @@ describe('FilterOperatorSelectField', () => {
 		expect(screen.queryByRole('option', { name: keys.filterOperatorMatches })).toBeNull()
 	})
 
+	it('narrows to what the chosen source takes for the dimension beside it', async () => {
+		answer(twoSources)
+		mocks.sourceId = 'beta'
+		mocks.dimension = 'country'
+
+		render(<FilterOperatorSelectField {...props()} />)
+
+		expect(await screen.findByRole('option', { name: keys.filterOperatorMatches })).toBeDefined()
+		expect(screen.getByRole('option', { name: keys.filterOperatorEq })).toBeDefined()
+		expect(screen.queryByRole('option', { name: keys.filterOperatorContains })).toBeNull()
+	})
+
+	it('reads the dimension from the path it is given', async () => {
+		answer(twoSources)
+		mocks.sourceId = 'beta'
+		mocks.dimension = 'country'
+
+		render(<FilterOperatorSelectField {...props({ dimensionFieldPath: 'elsewhere.dimension' })} />)
+
+		expect(await screen.findByRole('option', { name: keys.filterOperatorContains })).toBeDefined()
+	})
+
 	it('stores the plain operator when one is picked', async () => {
 		answer(twoSources)
 
@@ -229,7 +257,7 @@ describe('FilterOperatorSelectField', () => {
 	})
 
 	it('says the source cannot filter when it supports no operator', async () => {
-		answer({ defaultId: 'flat', sources: [source('flat', { filterOperators: [] })] })
+		answer({ defaultId: 'flat', sources: [source('flat', { filters: {} })] })
 		mocks.sourceId = 'flat'
 
 		render(<FilterOperatorSelectField {...props()} />)

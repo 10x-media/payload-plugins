@@ -1,9 +1,25 @@
-import type { Access, CollectionConfig, CollectionSlug, RelationshipField } from 'payload'
+import type { Access, CollectionConfig, CollectionSlug, GroupField } from 'payload'
 
-// biome-ignore lint/complexity/useMaxParams: the collection shape is driven by seven independent plugin options; an options object is queued as a port follow-up
+/**
+ * Who acted, as the auth collection and the id, both plain text. Not a relationship: a
+ * relationship's foreign key clears the entry when the user is deleted on Postgres and
+ * SQLite (`set null` on a column, `cascade` on a `_rels` row), which is exactly the
+ * person an audit log is asked about. Text also keeps one shape whether the host has
+ * one auth collection or several, so adding one needs no migration.
+ */
+const userRefField = (name: 'impersonator' | 'user', indexValue: boolean): GroupField => ({
+	name,
+	type: 'group',
+	admin: { position: 'sidebar' },
+	fields: [
+		{ name: 'relationTo', type: 'text' },
+		{ name: 'value', type: 'text', index: indexValue },
+	],
+})
+
+// biome-ignore lint/complexity/useMaxParams: the collection shape is driven by six independent plugin options; an options object is queued as a port follow-up
 export const buildAuditLogsCollection = (
 	hidden = true,
-	userRelationTo: CollectionSlug | CollectionSlug[] = 'users',
 	access?: { create?: Access; delete?: Access; read?: Access; update?: Access },
 	tenantsSlug?: string,
 	archiveEnabled = false,
@@ -27,7 +43,7 @@ export const buildAuditLogsCollection = (
 		 */
 		indexes: [
 			{ fields: ['relationTo', 'documentId', 'createdAt'] },
-			{ fields: ['user', 'createdAt'] },
+			{ fields: ['user.value', 'user.relationTo', 'createdAt'] },
 			...(tenantsSlug ? [{ fields: ['tenant', 'createdAt'] }] : []),
 		],
 		access: {
@@ -79,34 +95,11 @@ export const buildAuditLogsCollection = (
 				},
 			},
 
-			{
-				name: 'user',
-				type: 'relationship',
-				relationTo: userRelationTo,
-				hasMany: false,
-				admin: {
-					position: 'sidebar',
-				},
-				index: true,
-			} as RelationshipField,
-			...(impersonatorEnabled
-				? [
-						{
-							/**
-							 * Set when the acting user was reached through impersonation.
-							 * Copied from `req.user._impersonation` at write time.
-							 */
-							name: 'impersonator',
-							type: 'relationship',
-							relationTo: userRelationTo,
-							hasMany: false,
-							admin: {
-								position: 'sidebar',
-							},
-							index: true,
-						} as RelationshipField,
-					]
-				: []),
+			// Indexed through the `user.value` compound above.
+			userRefField('user', false),
+			// Set when the acting user was reached through impersonation. Copied from
+			// `req.user._impersonation` at write time.
+			...(impersonatorEnabled ? [userRefField('impersonator', true)] : []),
 			{
 				name: 'locale',
 				type: 'text',

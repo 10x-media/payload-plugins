@@ -1,16 +1,25 @@
 /**
- * IANA-timezone day math, built on `Intl.DateTimeFormat` so there is no dependency.
- * All reporting boundaries (timeframe windows, series axes, native rollup buckets,
- * cache-key day snaps) resolve through these helpers. `startOfDayInTz(d, 'UTC')` is
- * exactly the previous `Date.UTC(...)` day floor, so the default path is unchanged.
+ * IANA-timezone day math on `Intl.DateTimeFormat`, with no dependency. Every reporting boundary
+ * (windows, series axes, engine days, cache-key snaps) resolves through it.
  */
 
 export const DEFAULT_TIMEZONE = 'UTC'
 
-interface ZonedParts {
+/** Milliseconds in a UTC day; a local day across a DST change is an hour longer or shorter. */
+export const DAY_MS = 86_400_000
+
+export const HOUR_MS = 3_600_000
+
+export const MINUTE_MS = 60_000
+
+/** A wall-clock date, `month` and `day` counted from 1. */
+export interface CalendarDate {
 	year: number
 	month: number
 	day: number
+}
+
+interface ZonedParts extends CalendarDate {
 	hour: number
 	minute: number
 	second: number
@@ -38,7 +47,6 @@ const partsFormatter = (tz: string): Intl.DateTimeFormat => {
 	return formatter
 }
 
-/** Wall-clock parts `date` maps to in `tz`. */
 const zonedParts = (date: Date, tz: string): ZonedParts => {
 	const map: Record<string, string> = {}
 	for (const part of partsFormatter(tz).formatToParts(date)) {
@@ -64,26 +72,22 @@ const offsetMs = (date: Date, tz: string): number => {
 	return asUtc - Math.floor(date.getTime() / 1000) * 1000
 }
 
-const sameLocalDay = (
-	date: Date,
-	ymd: { year: number; month: number; day: number },
-	tz: string
-): boolean => {
+const sameLocalDay = (date: Date, ymd: CalendarDate, tz: string): boolean => {
 	const p = zonedParts(date, tz)
 	return p.year === ymd.year && p.month === ymd.month && p.day === ymd.day
 }
 
-/**
- * The first instant of a wall-clock calendar date in `tz`. Usually local midnight; when a
- * spring-forward transition lands exactly at midnight (Chile, Cuba) the 00:00 wall clock
- * does not exist and the refinement below oscillates between the pre- and post-transition
- * offsets, so the candidate that still falls on `ymd` (the transition instant, local
- * 01:00) is taken instead of the refined one that fell back onto the previous day.
- */
-export const startOfCalendarDayInTz = (
-	ymd: { year: number; month: number; day: number },
-	tz: string = DEFAULT_TIMEZONE
-): Date => {
+/** Zones found valid: checking one builds a formatter, and a read checks every scope's. */
+const validZones = new Set<string>()
+
+const MAX_VALID_ZONES = 1_000
+
+/** Day starts by zone and date: a read over many scopes asks for the same few again and again. */
+const dayStarts = new Map<string, number>()
+
+const MAX_DAY_STARTS = 20_000
+
+const dayStartOf = (ymd: CalendarDate, tz: string): Date => {
 	const asUtc = Date.UTC(ymd.year, ymd.month - 1, ymd.day)
 	const guess = new Date(asUtc - offsetMs(new Date(asUtc), tz))
 	const refined = new Date(asUtc - offsetMs(guess, tz))
@@ -96,41 +100,65 @@ export const startOfCalendarDayInTz = (
 	// Neither candidate lands on ymd (the calendar date was skipped entirely, e.g. a
 	// dateline change): fall forward to the later candidate's day start.
 	const later = refined.getTime() > guess.getTime() ? refined : guess
-	return startOfCalendarDayInTz(zonedParts(later, tz), tz)
+	return dayStartOf(zonedParts(later, tz), tz)
 }
 
-/** Start of `date`'s local day in `tz`. */
+/**
+ * First instant of a wall-clock date in `tz`: usually local midnight, but where spring-forward
+ * skips 00:00 (Chile, Cuba) it is the transition instant, local 01:00.
+ */
+export const startOfCalendarDayInTz = (ymd: CalendarDate, tz: string = DEFAULT_TIMEZONE): Date => {
+	const key = `${tz} ${ymd.year}-${ymd.month}-${ymd.day}`
+	const known = dayStarts.get(key)
+	if (known !== undefined) {
+		return new Date(known)
+	}
+	const start = dayStartOf(ymd, tz)
+	if (dayStarts.size >= MAX_DAY_STARTS) {
+		dayStarts.clear()
+	}
+	dayStarts.set(key, start.getTime())
+	return start
+}
+
 export const startOfDayInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date => {
 	const p = zonedParts(date, tz)
 	return startOfCalendarDayInTz(p, tz)
 }
 
-/** Start of `date`'s local month in `tz`. */
+/**
+ * Derived from the zoned minute and second, not a UTC hour floor, so half- and quarter-hour zones
+ * (India, Nepal, Chatham) bucket on their own hours.
+ */
+export const startOfHourInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date => {
+	const p = zonedParts(date, tz)
+	const ms = date.getTime()
+	const intoHour = (p.minute * 60 + p.second) * 1000 + (((ms % 1000) + 1000) % 1000)
+	return new Date(ms - intoHour)
+}
+
 export const startOfMonthInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date => {
 	const p = zonedParts(date, tz)
 	return startOfCalendarDayInTz({ year: p.year, month: p.month, day: 1 }, tz)
 }
 
-/** Start of `date`'s local year in `tz`. */
 export const startOfYearInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date => {
 	const p = zonedParts(date, tz)
 	return startOfCalendarDayInTz({ year: p.year, month: 1, day: 1 }, tz)
 }
 
 /**
- * Add `days` calendar days to `date`'s local day in `tz`, returning the resulting day
- * start. The +12h buffer before re-flooring absorbs 23/25-hour DST days so stepping
- * never lands short of, or past, the intended calendar day.
+ * Day start `days` calendar days from `date`'s local day in `tz`. The +12h buffer before
+ * re-flooring absorbs 23/25-hour DST days.
  */
 export const addDaysInTz = (date: Date, days: number, tz: string = DEFAULT_TIMEZONE): Date => {
 	const start = startOfDayInTz(date, tz)
-	return startOfDayInTz(new Date(start.getTime() + days * 86_400_000 + 43_200_000), tz)
+	return startOfDayInTz(new Date(start.getTime() + days * DAY_MS + DAY_MS / 2), tz)
 }
 
 /**
- * Start of the ISO week (Monday) containing `date`'s local day in `tz`. The weekday of a
- * calendar Y-M-D is timezone-independent, so it is derived from the zoned date and the
- * step back to Monday runs through `addDaysInTz` to stay DST-safe.
+ * Start of the ISO week (Monday) holding `date`'s local day in `tz`, stepped back through
+ * `addDaysInTz` to stay DST-safe.
  */
 export const startOfWeekInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date => {
 	const p = zonedParts(date, tz)
@@ -139,28 +167,35 @@ export const startOfWeekInTz = (date: Date, tz: string = DEFAULT_TIMEZONE): Date
 	return addDaysInTz(startOfDayInTz(date, tz), -mondayIndex, tz)
 }
 
-/** ISO string of `date`'s local day start in `tz`; the canonical day-bucket key. */
-export const zonedDayIso = (date: Date, tz: string = DEFAULT_TIMEZONE): string =>
-	startOfDayInTz(date, tz).toISOString()
-
-/**
- * `date`'s local calendar date in `tz` as `YYYY-MM-DD`, the form day-granular provider APIs
- * take. Not `zonedDayIso(...).slice(0, 10)`: that returns the UTC spelling of the local day
- * start, which names the previous calendar day for every zone east of UTC.
- */
-export const zonedCalendarDay = (date: Date, tz: string = DEFAULT_TIMEZONE): string => {
+export const zonedDate = (date: Date, tz: string = DEFAULT_TIMEZONE): CalendarDate => {
 	const p = zonedParts(date, tz)
-	const month = String(p.month).padStart(2, '0')
-	const day = String(p.day).padStart(2, '0')
-	return `${String(p.year).padStart(4, '0')}-${month}-${day}`
+	return { year: p.year, month: p.month, day: p.day }
 }
 
-/** True when `tz` is a resolvable IANA identifier. */
+/** A date as `YYYY-MM-DD`. */
+export const formatYmd = ({ year, month, day }: CalendarDate): string =>
+	`${String(year).padStart(4, '0')}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+
+/**
+ * `date`'s local date in `tz` as `YYYY-MM-DD`. Not the local day start's ISO prefix: that is the
+ * UTC spelling, a day early for every zone east of UTC.
+ */
+export const zonedCalendarDay = (date: Date, tz: string = DEFAULT_TIMEZONE): string =>
+	formatYmd(zonedParts(date, tz))
+
+/** Whether the runtime's `Intl` knows `tz` as a time zone. */
 export const isValidTimeZone = (tz: string): boolean => {
+	if (formatterCache.has(tz) || validZones.has(tz)) {
+		return true
+	}
 	try {
 		new Intl.DateTimeFormat('en-US', { timeZone: tz })
-		return true
 	} catch {
 		return false
 	}
+	if (validZones.size >= MAX_VALID_ZONES) {
+		validZones.clear()
+	}
+	validZones.add(tz)
+	return true
 }

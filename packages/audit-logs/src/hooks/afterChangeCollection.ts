@@ -5,9 +5,9 @@ import { REDACTED } from '../types'
 import { anonymizeDoc } from '../utilities/anonymize'
 import type { FieldMap } from '../utilities/buildFieldMap'
 import { computeDiff, normalizeSnapshot } from '../utilities/diff'
-import { impersonatorRelationship } from '../utilities/impersonator'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
+import { actingUserRef, impersonatorRef } from '../utilities/userRef'
 import { writeAuditLog } from '../utilities/writeAuditLog'
 
 export type AuditLogAfterChangeOptions = {
@@ -20,7 +20,6 @@ export type AuditLogAfterChangeOptions = {
 	excludeFields?: string[]
 	fieldMap?: FieldMap
 	groupContextKey?: string
-	isUserPolymorphic: boolean
 	/** False when the log collection has no `impersonator` field. */
 	recordImpersonator: boolean
 	isSelfTenant?: boolean
@@ -75,14 +74,8 @@ export const afterChangeCollectionAuditLog =
 		if (options.drafts === 'ignore' && operation !== 'create' && doc._status === 'draft') return
 
 		const documentId = String(doc.id)
-		const userValue = req.user
-			? options.isUserPolymorphic
-				? { relationTo: req.user.collection, value: req.user.id }
-				: req.user.id
-			: undefined
-		const impersonator = options.recordImpersonator
-			? impersonatorRelationship(req.user, options.isUserPolymorphic)
-			: undefined
+		const userValue = actingUserRef(req.user)
+		const impersonator = options.recordImpersonator ? impersonatorRef(req.user) : undefined
 		const ipAddress = options.collectIpAddress ? getClientIP(req) : undefined
 		const userAgent = options.collectUserAgent ? getUserAgent(req) : undefined
 		const group = options.groupContextKey

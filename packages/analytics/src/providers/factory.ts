@@ -2,10 +2,24 @@ import { ga4 } from '../adapters/ga4/ga4'
 import { plausible } from '../adapters/plausible/plausible'
 import { posthog } from '../adapters/posthog/posthog'
 import { umami } from '../adapters/umami/umami'
-import type { AnalyticsAdapter } from '../core/contract'
+import { WITHOUT_CONSENT_LEVELS } from '../capture/withoutConsent'
+import type { AnalyticsAdapter, AnalyticsResult } from '../core/contract'
+import type { FetchLike } from '../core/fetch'
+import type { AnalyticsSdks } from '../core/sdks'
+import { HostRefusedError } from '../core/sourceErrors'
+import { withFixedLabel } from '../core/sourceLabel'
+import { isOneOf, isRecord } from '../core/values'
+import type { WithoutConsentLevel } from '../tracker/config'
+import { checkDocumentHost, type DocumentHost, type ProviderHostPolicy } from './hosts'
 
-export const PROVIDER_IDS = ['plausible', 'umami', 'ga4', 'posthog'] as const
-export type ProviderId = (typeof PROVIDER_IDS)[number]
+export type ProviderId = 'native' | 'plausible' | 'umami' | 'ga4' | 'posthog'
+export const PROVIDER_IDS = [
+	'native',
+	'plausible',
+	'umami',
+	'ga4',
+	'posthog',
+] as const satisfies readonly ProviderId[]
 
 /** The provider-settings document shape the adapter factory reads (depth 0, secrets revealed). */
 export type ProviderDoc = {
@@ -14,6 +28,8 @@ export type ProviderDoc = {
 	provider?: string | null
 	enabled?: boolean | null
 	scope?: string | null
+	/** A vendor document's own level without consent; unset or blank follows the install. */
+	withoutConsent?: string | null
 	plausible?: {
 		siteId?: string | null
 		apiKey?: string | null
@@ -34,6 +50,7 @@ export type ProviderDoc = {
 		privateKey?: string | null
 		projectId?: string | null
 		measurementId?: string | null
+		currency?: string | null
 	} | null
 	posthog?: {
 		projectId?: string | null
@@ -41,10 +58,17 @@ export type ProviderDoc = {
 		host?: string | null
 		projectToken?: string | null
 		region?: string | null
+		scopeProperty?: string | null
 	} | null
 }
 
+/** A stored blank reads as unset. */
 const orUndefined = (value: string | null | undefined): string | undefined => value || undefined
+
+/** An unset or unrecognized stored level follows `capture.withoutConsent`. */
+const documentWithoutConsent = (
+	value: string | null | undefined
+): WithoutConsentLevel | undefined => (isOneOf(WITHOUT_CONSENT_LEVELS, value) ? value : undefined)
 
 /** An unset or unrecognized stored region falls back to host-derived detection. */
 const posthogRegion = (value: string | null | undefined): 'us' | 'eu' | undefined =>
@@ -58,39 +82,104 @@ export const normalizePrivateKey = (key: string): string => key.replace(/\\n/g, 
 
 const shortId = (id: number | string): string => String(id).slice(-6)
 
-/** Runtime adapters carry a per-document instance id so two projects of one provider type never collide in a registry; config adapters keep their plain ids. */
+/** The registry id of a provider document's adapter, which grants and stand-ins must match. */
+export const documentAdapterId = (provider: unknown, id: unknown): string =>
+	`${String(provider)}:${String(id)}`
+
+/** A lent `native` adapter under the document's name, so a source reads as its tenant named it. */
+const withDocumentLabel = (adapter: AnalyticsAdapter, doc: ProviderDoc): AnalyticsAdapter =>
+	doc.name ? withFixedLabel(adapter, doc.name) : adapter
+
+/** Per-document ids keep two projects of one provider type apart in a registry. */
 const withInstanceIdentity = (adapter: AnalyticsAdapter, doc: ProviderDoc): AnalyticsAdapter => {
 	if (doc.id === undefined || doc.id === null || doc.id === '') {
 		return adapter
 	}
 	return {
-		...adapter,
-		id: `${doc.provider}:${doc.id}`,
-		label: doc.name || `${adapter.label} ${shortId(doc.id)}`,
+		...withFixedLabel(adapter, doc.name || `${adapter.label} ${shortId(doc.id)}`),
+		id: documentAdapterId(doc.provider, doc.id),
 	}
 }
 
-const buildBaseAdapter = (doc: ProviderDoc): AnalyticsAdapter | null => {
+/**
+ * Keeps `shape`'s identity, capabilities and `isConfigured` (configured when absent) so the source
+ * still lists, but every read throws `error()` and it declares no capture, so its proxy mount 404s.
+ */
+export const failingAdapter = (
+	shape: Pick<AnalyticsAdapter, 'id' | 'label' | 'capabilities' | 'realtime'> &
+		Partial<Pick<AnalyticsAdapter, 'isConfigured'>>,
+	error: () => Error
+): AnalyticsAdapter => {
+	const fail = async (): Promise<AnalyticsResult> => {
+		throw error()
+	}
+	return {
+		id: shape.id,
+		label: shape.label,
+		capabilities: shape.capabilities,
+		isConfigured: shape.isConfigured ?? (() => true),
+		query: fail,
+		...(shape.realtime ? { realtime: fail } : {}),
+	}
+}
+
+/**
+ * Builds a hosted vendor's adapter on the address its host check allowed, none being the vendor's
+ * cloud; a refused host builds one whose reads fail with a `HostRefusedError`.
+ */
+const onDocumentHost = (
+	verdict: DocumentHost,
+	build: (host: string | undefined) => AnalyticsAdapter
+): AnalyticsAdapter => {
+	if (verdict.ok) {
+		return build(verdict.address ?? undefined)
+	}
+	const { host, reason } = verdict
+	return failingAdapter(build(undefined), () => new HostRefusedError(host, reason))
+}
+
+const buildBaseAdapter = (
+	doc: ProviderDoc,
+	ctx: ProviderFactoryContext
+): AnalyticsAdapter | null => {
+	// Saying off where the slot would resolve off anyway keeps the adapter from acting (or warning)
+	// as if it might count without consent.
+	const withoutConsent =
+		ctx.heldWithoutConsent === false
+			? 'off'
+			: (documentWithoutConsent(doc.withoutConsent) ??
+				(ctx.followingCountsWithoutConsent === false ? 'off' : undefined))
+	const consent = withoutConsent ? { withoutConsent } : {}
 	switch (doc.provider) {
+		case 'native':
+			return ctx.native ?? null
 		case 'plausible': {
 			const cfg = doc.plausible ?? {}
-			return plausible({
-				siteId: cfg.siteId ?? '',
-				apiKey: cfg.apiKey ?? '',
-				host: orUndefined(cfg.host),
-				domain: orUndefined(cfg.domain),
-				scriptId: orUndefined(cfg.scriptId),
-				revenueCurrency: orUndefined(cfg.revenueCurrency),
-			})
+			return onDocumentHost(checkDocumentHost('plausible', cfg.host, ctx.hosts), (host) =>
+				plausible({
+					siteId: cfg.siteId ?? '',
+					apiKey: cfg.apiKey ?? '',
+					host,
+					domain: orUndefined(cfg.domain),
+					scriptId: orUndefined(cfg.scriptId),
+					revenueCurrency: orUndefined(cfg.revenueCurrency),
+					fetch: ctx.fetch,
+					...consent,
+				})
+			)
 		}
 		case 'umami': {
 			const cfg = doc.umami ?? {}
-			return umami({
-				websiteId: cfg.websiteId ?? '',
-				apiKey: orUndefined(cfg.apiKey),
-				token: orUndefined(cfg.token),
-				host: orUndefined(cfg.host),
-			})
+			return onDocumentHost(checkDocumentHost('umami', cfg.host, ctx.hosts), (host) =>
+				umami({
+					websiteId: cfg.websiteId ?? '',
+					apiKey: orUndefined(cfg.apiKey),
+					token: orUndefined(cfg.token),
+					host,
+					fetch: ctx.fetch,
+					...consent,
+				})
+			)
 		}
 		case 'ga4': {
 			const cfg = doc.ga4 ?? {}
@@ -102,17 +191,25 @@ const buildBaseAdapter = (doc: ProviderDoc): AnalyticsAdapter | null => {
 				},
 				projectId: orUndefined(cfg.projectId),
 				measurementId: orUndefined(cfg.measurementId),
+				currency: orUndefined(cfg.currency),
+				...(ctx.sdks?.ga4 ? { sdk: ctx.sdks.ga4 } : {}),
+				...consent,
 			})
 		}
 		case 'posthog': {
 			const cfg = doc.posthog ?? {}
-			return posthog({
-				projectId: cfg.projectId ?? '',
-				apiKey: cfg.apiKey ?? '',
-				host: orUndefined(cfg.host),
-				projectToken: orUndefined(cfg.projectToken),
-				region: posthogRegion(cfg.region),
-			})
+			return onDocumentHost(checkDocumentHost('posthog', cfg.host, ctx.hosts), (host) =>
+				posthog({
+					projectId: cfg.projectId ?? '',
+					apiKey: cfg.apiKey ?? '',
+					host,
+					projectToken: orUndefined(cfg.projectToken),
+					region: posthogRegion(cfg.region),
+					scopeProperty: orUndefined(cfg.scopeProperty?.trim()),
+					fetch: ctx.fetch,
+					...consent,
+				})
+			)
 		}
 		default:
 			return null
@@ -120,12 +217,58 @@ const buildBaseAdapter = (doc: ProviderDoc): AnalyticsAdapter | null => {
 }
 
 /**
- * Build an adapter instance from a provider-settings document using the same
- * constructors as config-time adapters. Missing credentials are passed through as
- * empty strings so the adapter reports `isConfigured() === false` instead of the
- * factory throwing; an unknown provider value returns null and is skipped.
+ * What the factory needs to build a document's adapter: `fetch` and `hosts` keep a stored key on a
+ * host the install allows.
+ *
+ * @beta
  */
-export const adapterFromProviderDoc = (doc: ProviderDoc): AnalyticsAdapter | null => {
-	const base = buildBaseAdapter(doc)
-	return base ? withInstanceIdentity(base, doc) : null
+export interface ProviderFactoryContext {
+	/** The guarded fetch `providers.resolve` receives, or one from `createGuardedFetch`. */
+	fetch: FetchLike
+	/**
+	 * The policy `providers.resolve` receives, or one from `resolveHostPolicy`: a host outside it
+	 * builds an adapter that reads as `source_misconfigured` and captures nothing.
+	 */
+	hosts: ProviderHostPolicy
+	/**
+	 * The install's config native adapter, which a `native` document grants rather than building a
+	 * second one.
+	 */
+	native?: AnalyticsAdapter
+	/** The plugin's `sdks`: a GA4 document's adapter reads through `sdks.ga4`. */
+	sdks?: AnalyticsSdks
+	/**
+	 * False when no slot `capture.gate` holds can fall to a document's adapter: it is then off
+	 * without consent, whatever the document says.
+	 */
+	heldWithoutConsent?: boolean
+	/** False when `capture.withoutConsent` is `'off'` in both phases: a document following it is off. */
+	followingCountsWithoutConsent?: boolean
+}
+
+/** Checked at runtime: a JavaScript caller can leave the guards out, which would go out unguarded. */
+const isGuarded = (ctx: unknown): ctx is ProviderFactoryContext =>
+	isRecord(ctx) &&
+	typeof ctx.fetch === 'function' &&
+	isRecord(ctx.hosts) &&
+	Array.isArray(ctx.hosts.allow)
+
+/**
+ * Builds a provider document's adapter: missing credentials read as `isConfigured() === false`, an
+ * unknown provider as null, and a `native` document lends the config adapter under its label.
+ */
+export const adapterFromProviderDoc = (
+	doc: ProviderDoc,
+	ctx: ProviderFactoryContext
+): AnalyticsAdapter | null => {
+	if (!isGuarded(ctx)) {
+		throw new Error(
+			'analytics: adapterFromProviderDoc needs { fetch, hosts }: pass the ones providers.resolve receives'
+		)
+	}
+	const base = buildBaseAdapter(doc, ctx)
+	if (!base) {
+		return null
+	}
+	return doc.provider === 'native' ? withDocumentLabel(base, doc) : withInstanceIdentity(base, doc)
 }

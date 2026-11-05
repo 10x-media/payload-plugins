@@ -11,23 +11,20 @@ const plain = (slug: string): CollectionConfig =>
 const config = (collections: CollectionConfig[]): Config => ({ collections }) as Config
 
 describe('buildPluginContext', () => {
-	describe('what the user field points at', () => {
-		it('one auth collection stores a plain id', () => {
+	describe('what the audit fields point at', () => {
+		it('one auth collection is named alone', () => {
 			const ctx = buildPluginContext(config([auth('users'), plain('posts')]), {})
 			expect(ctx.defaultRelationTo).toBe('users')
-			expect(ctx.isUserPolymorphic).toBe(false)
 		})
 
-		it('several auth collections make it polymorphic', () => {
+		it('several auth collections are listed together', () => {
 			const ctx = buildPluginContext(config([auth('users'), auth('admins')]), {})
 			expect(ctx.defaultRelationTo).toEqual(['users', 'admins'])
-			expect(ctx.isUserPolymorphic).toBe(true)
 		})
 
 		it('no auth collection falls back to the conventional slug', () => {
 			const ctx = buildPluginContext(config([plain('posts')]), {})
 			expect(ctx.defaultRelationTo).toBe('users')
-			expect(ctx.isUserPolymorphic).toBe(false)
 		})
 	})
 

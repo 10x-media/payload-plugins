@@ -55,10 +55,10 @@ describe('clampDayRange', () => {
 describe('dayRangeCaption', () => {
 	it('names the picked days in the reporting timezone', () => {
 		expect(dayRangeCaption({ from: '2026-06-01', to: '2026-06-23' }, 'en', 'Europe/Berlin')).toBe(
-			'Jun 1, 2026 - Jun 23, 2026'
+			'Jun 1 \u2013 23, 2026'
 		)
 		expect(dayRangeCaption({ from: '2026-06-01', to: '2026-06-23' }, 'en', 'UTC')).toBe(
-			'Jun 1, 2026 - Jun 23, 2026'
+			'Jun 1 \u2013 23, 2026'
 		)
 	})
 

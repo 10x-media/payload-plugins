@@ -1,9 +1,13 @@
 'use client'
 
-import { useAuth, useConfig } from '@payloadcms/ui'
+import { useConfig } from '@payloadcms/ui'
 import { useEffect, useState } from 'react'
+import { apiPath } from '../plugin/apiPath'
+import { analyticsRoutes } from '../plugin/routes'
+import { useRequestScope } from '../ui/data/useRequestScope'
 import { fetchGoals, type GoalsResponse } from './fetchGoals'
 
+/** @beta */
 export interface AnalyticsGoals {
 	/** Null until the fetch settles, and on a failed one: not the same thing as none. */
 	goals: GoalsResponse['goals'] | null
@@ -16,42 +20,37 @@ const EMPTY: AnalyticsGoals = { collection: null, error: false, goals: null }
 const FAILED: AnalyticsGoals = { collection: null, error: true, goals: null }
 
 /**
- * Fetches the caller-scope goal list for the admin goal picker. `goals` stays null while
- * the fetch is in flight, when it fails, and when there is no authenticated user yet, so
- * a picker can tell "still loading" from "this scope has no goals". Goals fetched for a
- * previous user are never returned while a new user's fetch is pending.
+ * The caller scope's goals for an admin picker: `goals` is null while loading, failed or signed out,
+ * so "loading" differs from "none". Another scope's goals never show while this one loads.
+ *
+ * @beta
  */
 export const useAnalyticsGoals = (): AnalyticsGoals => {
-	const { user } = useAuth()
-	const {
-		config: {
-			routes: { api },
-			serverURL,
-		},
-	} = useConfig()
-	const userKey = String(user?.id ?? '')
+	const { config } = useConfig()
+	const url = apiPath(config, analyticsRoutes(config).goals)
+	const scope = useRequestScope()
 	const [state, setState] = useState<{ key: string; data: AnalyticsGoals }>({
 		data: EMPTY,
 		key: '',
 	})
 
 	useEffect(() => {
-		if (!userKey) {
+		if (!scope) {
 			setState({ data: EMPTY, key: '' })
 			return
 		}
 		let cancelled = false
-		fetchGoals(serverURL ?? '', api, userKey)
+		fetchGoals(url, scope)
 			.then(({ collection, goals }) => {
-				if (!cancelled) setState({ data: { collection, error: false, goals }, key: userKey })
+				if (!cancelled) setState({ data: { collection, error: false, goals }, key: scope })
 			})
 			.catch(() => {
-				if (!cancelled) setState({ data: FAILED, key: userKey })
+				if (!cancelled) setState({ data: FAILED, key: scope })
 			})
 		return () => {
 			cancelled = true
 		}
-	}, [api, serverURL, userKey])
+	}, [url, scope])
 
-	return state.key === userKey ? state.data : EMPTY
+	return state.key === scope ? state.data : EMPTY
 }

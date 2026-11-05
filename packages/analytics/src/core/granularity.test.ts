@@ -3,15 +3,12 @@ import type { AnalyticsCapabilities, Granularity } from './contract'
 import { supportsGranularity } from './granularity'
 
 const caps = (minGranularity: Granularity): AnalyticsCapabilities => ({
-	perPageQuery: true,
 	realtime: false,
 	minGranularity,
 	maxLookbackDays: null,
 	metrics: new Set(),
 	dimensions: new Set(),
-	filters: new Set(),
-	filterOperators: new Set(['eq']),
-	batchPageReport: false,
+	filters: {},
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },
 })

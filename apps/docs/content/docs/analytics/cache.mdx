@@ -1,53 +1,103 @@
 ---
 title: Caching and warming
-description: How reads are cached in payload.kv, and the opt-in warm job for provider-backed dashboards.
+description: Where reads are cached and for how long, how an expired read is served while it refreshes, how reads reach their sources (lanes, priorities, retries, the circuit breaker, the cold-read budget), the analytics-cache collection, plugging in your own store, the afterRead hook and the opt-in warm job.
 ---
 
-Every read (widgets, display fields, sync) goes through a surfacing engine that caches in `payload.kv`, coalesces concurrent identical requests into one in-flight read, bounds concurrency, and backs off exponentially on provider errors. The engine is built for the dashboard's worst case: one page load fires many widget reads at once, and several providers bill per query. Caching absorbs repeat reads across requests; coalescing absorbs them within one, so a burst of identical queries costs a single provider call. Unconfigured adapters and provider outages degrade to empty states, never crashes.
+Every read (widgets, display fields, the analytics view, sync, warming) goes through a surfacing engine that caches what a source answered, coalesces concurrent identical requests into one in-flight read, and reaches each source through a [lane](#reaching-the-sources) of its own that bounds concurrency, keeps to the vendor's limits and backs off on its errors. The engine is built for the dashboard's worst case: one page load fires many widget reads at once, and several providers bill per query. Caching absorbs repeat reads across requests; coalescing absorbs them within one, so a burst of identical queries costs a single provider call. Unconfigured adapters and provider outages degrade to a state that says so, with a retry for an outage, never a crash.
+
+## What is cached where
+
+| Layer | What it holds | How long | Seen by |
+|---|---|---|---|
+| Memory of the Payload instance | The 500 reads it used most recently | 15 seconds for a read, the realtime TTL for a live count | That instance alone |
+| The cache store, the `analytics-cache` collection unless [you plug in another](#your-own-store) | Every read a source answered | Its TTL, then up to a day more while it is [served stale](#stale-serving) | Every instance |
+
+A read first asks the instance's memory, then the store, and only then the source. Live counts (the realtime widget, the active-visitor counter on a document) are kept in memory alone and never written to the store: a number that changes by the minute is not worth a database write on every poll. Each instance of a deployment therefore asks the source for a live count once per realtime TTL.
 
 ## TTLs
 
-Cache entries are keyed per adapter and query and snapped to the day of the [reporting timezone](/analytics/timezone) (UTC by default). Two reads on the same day therefore share a cached result, and reads in different timezones never collide. Two TTLs apply:
+Two TTLs apply:
 
 ```ts
 analytics({
   adapters: [/* ... */],
+  capture: { gate: 'all' },
   cache: {
     ttl: {
       aggregate: 3600, // seconds; historical reads.
-      realtime: 300,   // seconds; realtime reads.
+      realtime: 300,   // seconds; live counts, and reads still being completed.
     },
   },
 })
 ```
 
-Each adapter recommends its own TTLs through its capabilities (GA4 suggests 6 hours because its quota is token-billed; the native engine suggests short TTLs because reads are local). Those recommendations are the default. A value you set in `cache.ttl` overrides the adapter recommendation for every adapter; leave a value unset to keep each adapter's own recommendation.
+Each adapter recommends its own TTLs through its capabilities (GA4 suggests 6 hours because its quota is token-billed; the native engine suggests short TTLs because reads are local). Those recommendations are the default. A value you set in `cache.ttl` overrides the adapter recommendation for every adapter; leave a value unset to keep each adapter's own recommendation. Each is a whole number of seconds, `0` or more; anything else fails the boot.
+
+A native read whose window reaches into today is fresh for 10 seconds at most, whatever `cache.ttl` says (native's `recommendedTtl.today`). Once such an entry expires it is read again before the read answers, rather than [served stale](#stale-serving) while it refreshes; the expired copy stands in only when that read fails or the scope has too many reads waiting. Vendor sources declare no such bound, so their reads follow the two TTLs alone.
+
+Ten seconds is how long the cache keeps the answer, not how far behind the hits it is. The native engine reads today live from its hits while the day holds at most 2,000 of them (5,000 on Postgres); past that it answers today from a snapshot taken in the background, which by default is served for about a minute up to 50,000 hits and for up to five minutes on a busier day, and the read's `meta.asOf` says when it was taken ([How a read is answered](/analytics/native#how-a-read-is-answered)).
+
+A native read of a total, or of a day series, with no breakdown and only event counts (`pageviews`, `events`, `conversions`, `revenue`, `impressions`, `interactions`) that runs from a closed day into today is read as two parts: its closed days, cached for the aggregate TTL like any historical read, and today, read again as often as above. The two add back up to the whole exactly. Visitors, visits and the averages do not add up across such a cut, so a read asking for any of them reads its whole window as one, under today's bound.
+
+A read that came back incomplete is kept for the realtime TTL instead, so it is asked again soon: one whose goal numbers could not be resolved, one cut in UTC because the reporting timezone did not resolve, and one with `meta.partial` (days still being counted). A read with `meta.capped` or `meta.failed` stays so and is kept as long as any other.
+
+## Stale serving
+
+An entry is fresh until its TTL runs out. For a day after that it is still served, a native read of today aside ([above](#ttls)): a read answers at once with the stored value and starts one refresh in the background, which replaces the entry when the source answers. Concurrent reads of an expired entry on one instance share that refresh, and it runs at [background priority](#readers-before-background-work). Inside a request it is handed to Next's `after()`, so a serverless function stays alive until it finishes, and so is every cache write and a [display field](/analytics/display-fields)'s read still running when the page is sent. `after()` is loaded on first use and only in a process Next serves requests in (`NEXT_RUNTIME` is set): a job worker, a script or a test never imports `next/server`, and a Next older than 15.1, which has no `after()`, is named once in the log. Elsewhere the instance tracks the work itself, and `payload.destroy()` waits for it; a runtime replaced by a reload starts no new refresh or write. Past the day, the entry is gone and the read waits for the source, within [`cache.timeoutMs`](#timeout).
+
+A value served this way carries `meta.stale: true` and `meta.asOf`, the instant it was fetched, so callers can tell it apart from a fresh read. The analytics view, the widgets and the document fields show it as saved data and say how long ago it was updated. A refresh that fails leaves the entry in place, so the stale value keeps being served until its day is up, and every failed refresh is logged with the adapter id, never the underlying credentials. While the source's [breaker](#circuit-breaker) is open no refresh is tried at all; the first read after it lets a request through again sends the refresh as its probe.
+
+How the refresh failed decides what the saved value is worth:
+
+| The refresh failed as | The saved value |
+|---|---|
+| an outage (`unavailable`) | is served as above |
+| set up wrong (`source_misconfigured`: a refused key, a missing property, a host the install does not allow) | is served, with `meta.sourceError` (`'misconfigured'`, or `'host-refused'` for a host), which the admin words as a note to check the source's settings |
+| refused as asked (`invalid_param`) | is not served: the read fails as the query endpoint's `400` for a minute after the refusal, since the question itself is the problem |
+
+The [sync task](/analytics/sync) does not take a stale answer: it waits for the refresh, and only falls back to the stored value when the refresh fails, in which case it skips that source for that run rather than storing old numbers.
+
+## Cache keys
+
+A key is `r:` followed by the base64url SHA-256 of the read written as canonical JSON: the source, the scope's two [epochs](#invalidation), a key format version, and every field of the query, with object keys sorted, absent fields left out, dates written as ISO instants, and the fields that are sets (metrics, dimensions, filters, goal slugs) sorted. Two reads that ask the same thing in a different order therefore share an entry, and no value of one field can be written to look like another. Every key is 45 characters long, whatever the query holds.
+
+The window is part of the key. A window that ends now (a preset such as the last 30 days) is keyed on whole days of the [reporting timezone](/analytics/timezone) (UTC by default), so every read on the same day shares an entry. A window that ends on the last instant of a day is keyed on its exact bounds. Reads in different timezones never share an entry.
 
 ## Invalidation
 
-A TTL alone means a corrected provider document keeps serving the old numbers until every entry it fed expires, up to an hour on most sources. Every cache key therefore carries a **cache epoch** as its second segment: an opaque token, one per scope, stored in `payload.kv` under `analytics:epoch:global` for the install-wide token and `analytics:epoch:s:<scope>` for a named scope, URL-encoded. Bumping a scope's token retires that scope's cached reads at once, on every instance, because the keys those entries sit under stop being built. Nothing is deleted; the old entries expire on their own TTL under keys no read asks for any more.
+A TTL alone means a corrected provider document keeps serving the old numbers until every entry it fed expires, up to an hour on most sources. Every cache key therefore carries two values for the read's scope as well: its **configuration epoch** and its **refresh epoch**. A new value of either retires that scope's cached reads at once, on every instance, because the keys those entries sit under stop being built. Nothing is deleted; the old entries expire on their own under keys no read asks for any more.
 
-A bump also retires that scope's [stale-fallback](#stale-while-error) entries, which sit under the same keys: a source that fails right after a bump has no expired entry to fall back on and answers unavailable until it recovers.
+A new epoch also retires the stale values of that scope, which sit under the same keys: a source that fails right after has no expired entry to fall back on and answers unavailable until it recovers.
 
-Three things bump a token:
+### The configuration epoch
 
-- Saving or deleting a document in the [providers collection](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant). That document's own scope is bumped, and an update that moved it between scopes bumps the scope it left as well.
-- Saving or deleting a [goal](/analytics/goals) document, the same way. Goals declared in the plugin's `goals` option are fixed at config time and cannot change while the process runs, so they never bump.
-- [`POST /api/analytics/refresh`](/analytics/data-sources#refresh-endpoint), which the **Refresh** button in the [analytics view](/analytics/analytics-view) calls.
+The configuration epoch is the scope's provider and goal documents as they are committed: a SHA-256 over each document's id, save time (`updatedAt`), `enabled` flag and scope, plus the provider type of a provider document. No credential goes into it. Saving, deleting, switching on or off, or moving a document changes it, and a move changes both scopes. Goals declared in the plugin's `goals` option are fixed at config time and never change it, and an install that runs neither collection keys every read on a fixed `0`.
 
-An instance reads a scope's token at most once every ten seconds and serves that reading from memory in between, so one KV get covers a burst of reads and a bump made on one instance reaches every other within ten seconds. The interval is fixed and not an option.
+Each instance reads those fields at most once every ten seconds per scope and serves the answer from memory in between, so a save made on one instance retires the cached reads of every other within ten seconds. The instance that handled the save reads again as soon as it commits. Saving writes nothing for any of this: no KV entry and no extra row, so a save never waits on it.
 
-A token that cannot be read falls back to `0`, the value every scope starts on, and a warning is logged once per process rather than once per incident: a KV that stays unreachable is reported the first time and silent after that. The read still answers: an unreachable counter never turns into a failed analytics read. That fallback is memoized like a successful reading, so a broken KV costs one get per scope per ten seconds rather than one per read, and for that window the instance keeps serving entries written before the bump it could not see.
+The read goes through `payload.db` outside any transaction the request holds. A document saved in a transaction that has not committed is never seen, so a read made while it is open, even on the request holding it, is answered and cached as the committed state, and a rollback leaves nothing behind.
 
-A bump that fails, or that has not settled after two seconds, is logged and dropped rather than failing the document save that triggered it. The save goes through and that scope's cached reads stay until their TTL runs out. The two seconds are the budget for the whole save: a document that moved between scopes bumps both of them at once, under that one deadline, rather than waiting out a deadline each.
+Because the epoch is the documents themselves, a scope put back exactly as it was keys its reads as they were keyed then: deleting the only document added since an earlier read brings back what that read cached, within its TTL. Those entries were read from that same configuration.
 
-An instance bumps a given scope at most once every five seconds for the refresh endpoint; inside that window the endpoint answers the token already in force and retires nothing again. A looped `POST` therefore costs one round trip rather than one cold provider read per cached query. The two document hooks are not debounced, so a save is always visible on the next read. This is a debounce of invalidation, not request rate limiting: how often a caller may ask is the edge's decision, not the plugin's.
+While the provider documents cannot be read, the scope keys on the last provider epoch this instance read for it, which is what the adapters it still holds were built from; an instance that never read one keys on a token of that outage's own. While the goal documents cannot be read, reads match the config goals alone, so they key on a token of that outage's own, never on a healthy epoch. A warning is logged at most once a minute. Reads keep answering, and no outage ever keys on a value another outage or another configuration used.
+
+On an install using [`providers.resolve`](/analytics/providers#keeping-the-settings-somewhere-else) there are no documents to read, so the provider half of the epoch is a token that [`refreshProviders()`](/analytics/providers#when-the-settings-change) replaces. It is kept in the `analytics-state` collection while the [native engine](/analytics/native) runs, and in `payload.kv` under `analytics:config-epoch:global` or `analytics:config-epoch:s:<scope>` otherwise. Instances read it at most once every ten seconds too.
+
+### The refresh epoch
+
+The refresh epoch is an opaque token, one per scope, stored in `payload.kv` under `analytics:epoch:global` for the install-wide token and `analytics:epoch:s:<scope>` for a named scope, URL-encoded. One thing replaces it: [`POST /api/_x/refresh`](/analytics/reference/endpoints#refresh-endpoint), which the **Refresh** button in the [analytics view](/analytics/analytics-view) calls.
+
+An instance reads a scope's token at most once every ten seconds and serves that reading from memory in between, so one KV get covers a burst of reads and a refresh made on one instance reaches every other within ten seconds. The interval is fixed and not an option.
+
+A token that cannot be read falls back to the last token this instance read or stored for the scope, or, for a scope it never read, to a token of that outage's own, never to the `0` every scope starts on. A warning is logged once per process rather than once per incident. The read still answers: an unreachable counter never turns into a failed analytics read. That fallback is memoized like a successful reading, so a broken KV costs one get per scope per ten seconds rather than one per read, and for that window the instance keeps serving entries written before a refresh another instance made that it could not see. The configuration token of [`providers.resolve`](/analytics/providers#keeping-the-settings-somewhere-else) falls back the same way.
+
+An instance bumps a given scope at most once every five seconds for the refresh endpoint; inside that window the endpoint answers the token already in force and retires nothing again. A looped `POST` therefore costs one round trip rather than one cold provider read per cached query. This is a debounce of invalidation, not request rate limiting: how often a caller may ask is the edge's decision, not the plugin's.
 
 ### The refresh endpoint is state-changing and cookie-authenticated
 
-`POST /api/analytics/refresh` changes server state and Payload authenticates it from the admin session cookie, so configure Payload's [`csrf`](https://payloadcms.com/docs/authentication/cookies#csrf-attacks) allowlist on any install that exposes it:
+`POST /api/_x/refresh` changes server state and Payload authenticates it from the admin session cookie, so configure Payload's [`csrf`](https://payloadcms.com/docs/authentication/cookies#csrf-attacks) allowlist on any install that exposes it:
 
-```ts
+```ts partial
 buildConfig({
   csrf: ['https://admin.example.com'],
   // ...
@@ -56,80 +106,280 @@ buildConfig({
 
 With Payload's default `csrf: []` there is no allowlist to check, so a request carrying any `Origin` at all is accepted on its cookie. What stops a forged cross-site `POST` then is browser behavior rather than a check: the auth cookie's `SameSite=Lax` default keeps it off a cross-site `POST` in the first place, and the `Content-Type: application/json` a real client sends forces a CORS preflight no foreign origin passes. Only the first of those covers a forger, who picks the content type. An allowlist is the check itself, and it costs one line.
 
-<Callout type="warn">
-**Every entry cached by an earlier release is invalidated once on upgrade.** The epoch segment changed the key format, so entries written before it are never read again: the first read of each query after the upgrade reaches the source, and caching resumes normally from there. Nothing has to be cleared by hand, and the orphaned entries expire on their own.
-</Callout>
-
 ### Cross-scope entries key on the install-wide token
 
-A cross-scope read stamps no scope on its query, so its entries key on `analytics:epoch:global`. That covers a platform reader passing `scope=*`, and a scoped read through a shared config adapter that cannot narrow to one scope, which answers install-wide totals rather than that tenant's (see [Multi-tenancy](/analytics/multi-tenancy#4-who-sees-what)).
+A cross-scope read stamps no scope on its query, so its entries key on the install-wide epochs: `analytics:epoch:global` and the configuration of the documents that belong to no scope. That covers a platform reader passing `scope=*`, and a scoped read through a shared config adapter that cannot narrow to one scope, which answers install-wide totals rather than that tenant's (see [Multi-tenancy](/analytics/multi-tenancy#4-who-sees-what)).
 
-A tenant saving a provider document bumps that tenant's token, which leaves such an entry in place. It expires on its TTL, or a platform reader retires it by refreshing with `scope: '*'`.
+A tenant saving a provider document changes that tenant's configuration epoch, which leaves such an entry in place. It expires on its TTL, or a platform reader retires it by refreshing with `scope: '*'`.
 
-## Scheduled warming (opt-in)
+## The `analytics-cache` collection
 
-For provider-backed dashboards, the first load after an entry expires pays a cold provider round trip. The warm job pre-runs the dashboard's reads on a cron so that first load hits a warm cache:
+The built-in store is a collection the plugin registers on every install: one document per cached read, with its `key`, the stored `value`, its `owner` (the scope it was read for, empty for an install-wide read), `fetchedAt`, `expiresAt`, `staleUntil`, and `readAt` and `recipe` for the reads [warming](#warming) can repeat. It is hidden from the admin and has no access, REST or GraphQL endpoints, timestamps or document locking for anyone; the plugin reads and writes it through `payload.db` alone, outside any transaction the request holds, so a cached read never joins or waits on the host's own writes.
 
-```ts
-analytics({
-  adapters: [plausible({ /* ... */ })],
-  cache: { warm: true },                       // default cron: every 30 minutes
-  // cache: { warm: { cron: '0 * * * *' } },   // hourly
-})
-```
+Writing to it is best effort. Two instances that store the same read at once both succeed, the second as an update. A write that fails (SQLite busy, a dropped connection) is skipped and the read answers anyway; a read of the store that fails is treated as a miss. Either is logged at most once a minute per instance. On a local SQLite file, the cache's writes and its sweep wait behind the native engine's writes, and are skipped while the host holds a transaction open in the same process, whose lock they would otherwise wait on ([Transactions on SQLite](/analytics/native#transactions-on-sqlite)).
 
-The job registers a Payload task (`analytics-warm-cache`) whose work list derives from your `admin.dashboard.defaultLayout`: each metric, trend, and breakdown widget becomes one warm read with the same metric, timeframe, and data source it renders. The realtime widget is skipped (the live poller keeps it warm), as is any custom widget whose read shape the plugin cannot know. One provider failure is logged and does not abort the rest.
+On Postgres and SQLite the collection is a table, `analytics_cache`, so a migrate-mode install takes it in with its next generated migration (`payload migrate:create`). MongoDB creates it on first use.
 
-On a [multi-tenant](/analytics/multi-tenancy) install, configure `scopes` to fan the same work list out per tenant: every target runs once for the install-wide scope (unchanged) plus once per scope `scopes()` returns, each pass resolving that tenant's own runtime providers. Without `scopes`, warming stays install-wide only, even with `providers.collection` enabled. See [Cron tiers](/analytics/multi-tenancy#5-cron-tiers).
+### Expiry
 
-Warming is off by default because it spends provider API quota on a schedule. It pays off most for provider-backed dashboards; the native engine is fast enough that warming it is harmless but low value.
+Expired documents are deleted, so the collection holds only what can still be served:
 
-<Callout>
-The warm task runs through Payload's jobs runner. Enable cron `autoRun`, run a [worker](/jobs/workers), or invoke the queue from an external scheduler, or the schedule never fires. The same applies to [sync](/analytics/sync) and retention pruning.
-</Callout>
+- **MongoDB** deletes a document within about a minute of its `staleUntil`, through a TTL index on that field (`staleUntil_1`, `expireAfterSeconds: 0`) the plugin creates at boot. Payload has no way to declare a TTL index, so the plugin creates it through the driver, and leaves Payload's own index off that field on MongoDB, where the two would conflict. If the index cannot be created, a warning says so and the sweep below does the deleting.
+- **Every database** is also swept: a query for up to 1,000 documents past their `staleUntil`, then a delete of those still expired. Each [`analytics-maintain`](/analytics/native#maintenance) run sweeps up to ten such batches. Besides, each instance sweeps one batch after it writes to the cache, at most once every ten minutes, so an install that runs no jobs (a vendor-only install has no `analytics-maintain` task, and `jobs: false` registers none) still deletes what it wrote.
 
-## Resilience
+Where the install keeps an `analytics-state` collection (with [`native()`](/analytics/native), or with sync or warming), a sweep takes the `lease:cache-sweep` lease there first, so two instances never sweep at the same time, and one that finds the lease taken skips its turn. Any other install sweeps without a lease; a sweep only deletes documents that are already expired, so two of them overlapping delete nothing twice.
 
-Every provider read runs under a timeout, retries transient failures with backoff, respects the adapter's declared rate limits, and can serve a stale cached result rather than fail outright.
+### Renaming or reshaping it
 
-### Timeout
+`cache.collection` takes the slug and a function that reshapes the generated collection last:
 
 ```ts
 analytics({
   adapters: [/* ... */],
+  capture: { gate: 'all' },
   cache: {
-    timeoutMs: 15000, // default; per-read budget in ms
+    collection: {
+      slug: 'read-cache',
+      overrides: (collection) => ({ ...collection, dbName: 'read_cache' }),
+    },
   },
 })
 ```
 
-`cache.timeoutMs` bounds one adapter read end to end, including any retries and time spent waiting on the rate limiter. Past the budget, the in-flight request is aborted and the read fails over to a stale cache entry if one is available, otherwise it degrades to an empty or unavailable state.
+The store reads the collection under `slug`, which is the only way to rename it: an override returning another slug fails the boot. The plugin reads and writes its fields by name, so the boot also refuses an override that removes or retypes one, drops its indexes or adds a required field without a fixed `defaultValue`; opening access, REST or GraphQL is warned about at init, since it exposes cached analytics to whoever they let in. [Renaming the plugin's collections](/analytics/reference/options#renaming-the-plugins-collections) lists the checks.
 
-### Retry policy
+## Your own store
 
-A failed read retries only when the failure looks transient. The policy is fixed and not configurable:
+`cache.store` replaces the collection with a store of your own, for instance one with native expiry such as Redis. The `analytics-cache` collection is then not registered, and setting `cache.collection` beside it fails the boot. A store implements `CacheStore`, exported from `@10x-media/analytics`:
+
+```ts
+interface CacheStore {
+  /** The entry under `key`; null when there is none or it is past its staleUntil. */
+  get(key: string): Promise<CacheEntry | null>
+  /** Stores a value, stamping fetchedAt, expiresAt and staleUntil with the store's own clock. */
+  set(key: string, value: AnalyticsResult, options: CacheSetOptions): Promise<void>
+  /** Records that a read carrying `recipe` asked for the entry at `at`, keeping the recipe with it. */
+  touch(key: string, at: Date, recipe?: ReadRecipe): Promise<void>
+  /** Deletes at most `batch` entries past their staleUntil and answers how many. */
+  sweep(now: Date, batch: number): Promise<number>
+  /** The recipes of entries read since `since`, most recently read first, each once. */
+  recentRecipes(since: Date, limit: number): Promise<ReadRecipe[]>
+}
+
+interface CacheEntry {
+  value: AnalyticsResult
+  fetchedAt: number // epoch milliseconds
+  expiresAt: number
+  staleUntil: number
+  readAt?: number | null
+}
+
+interface CacheSetOptions {
+  ttlSeconds: number   // fresh for this long
+  staleSeconds: number // then served stale for this long
+  scope?: string
+  recipe?: ReadRecipe  // a reader's read: the entry counts as read now
+}
+
+interface ReadRecipe {
+  adapterRef: string // the source's adapter id
+  scope: string | null
+  timeframe: TimeframePreset // 'last7days', 'thisMonth', ...
+  window: 'live' | 'days' | 'previous'
+  query: Omit<AnalyticsQuery, 'dateRange'>
+}
+```
+
+The warm task's own writes carry no recipe and leave the entry's recipe and read time as they were. A reader who then asks for a warmed entry touches it with the recipe, which is how a store learns that a read is still wanted.
+
+A minimal Redis store with [ioredis](https://github.com/redis/ioredis) lets Redis delete each key at its `staleUntil`, so it has nothing to sweep:
+
+```ts
+import Redis from 'ioredis'
+import type { CacheStore } from '@10x-media/analytics'
+
+const redis = new Redis(process.env.REDIS_URL ?? 'redis://localhost:6379')
+const RECIPES = 'analytics:recipes'
+
+export const redisCacheStore: CacheStore = {
+  async get(key) {
+    const raw = await redis.get(key)
+    return raw === null ? null : JSON.parse(raw)
+  },
+  async set(key, value, { ttlSeconds, staleSeconds, recipe }) {
+    const fetchedAt = Date.now()
+    const expiresAt = fetchedAt + ttlSeconds * 1000
+    const staleUntil = expiresAt + staleSeconds * 1000
+    const readAt = recipe ? fetchedAt : null
+    const entry = JSON.stringify({ value, fetchedAt, expiresAt, staleUntil, readAt })
+    await redis.set(key, entry, 'PXAT', staleUntil)
+    if (recipe) {
+      await redis.zadd(RECIPES, fetchedAt, JSON.stringify(recipe))
+    }
+  },
+  async touch(key, at, recipe) {
+    const raw = await redis.get(key)
+    if (raw !== null) {
+      await redis.set(key, JSON.stringify({ ...JSON.parse(raw), readAt: at.getTime() }), 'KEEPTTL')
+    }
+    if (recipe) {
+      await redis.zadd(RECIPES, at.getTime(), JSON.stringify(recipe))
+    }
+  },
+  async sweep() {
+    return 0
+  },
+  async recentRecipes(since, limit) {
+    await redis.zremrangebyscore(RECIPES, '-inf', since.getTime() - 1)
+    const recipes = await redis.zrevrangebyscore(RECIPES, '+inf', since.getTime(), 'LIMIT', 0, limit)
+    return recipes.map((recipe) => JSON.parse(recipe))
+  },
+}
+
+analytics({
+  adapters: [/* ... */],
+  capture: { gate: 'all' },
+  cache: { store: redisCacheStore },
+})
+```
+
+`PXAT` needs Redis 6.2 or later. One store object serves every Payload instance in the process, so build it once, outside any function that builds the config. `readAt` in the entry `get` returns is when a reader last asked for it: the engine touches an entry at most once an hour by it, so a store that leaves it out is touched on every read. `touch` and `recentRecipes` keep the list of reads worth warming; a store that keeps none (`touch` doing nothing, `recentRecipes` answering `[]`) still caches correctly, and warming then does nothing. Every call is best effort, as with the collection: a store that throws turns a hit into a miss and a write into nothing, and never fails a read. A slow store never holds a read up either. A `get` that has not answered within a second, or within `cache.timeoutMs` when that is shorter, is a miss, and an entry whose `fetchedAt`, `expiresAt` or `staleUntil` is not a finite number is one too; both are logged like a throw. An answer the source gave is returned at once and written in the background, where a `set` still out after `cache.timeoutMs` is logged and no longer waited for; the [warm task](#warming) alone waits for its writes, within the same bound.
+
+## Warming
+
+For provider-backed dashboards, the first read after an entry expired waits for the vendor, or answers stale while it refreshes. The `analytics-warm` task reads again, shortly before they expire, the reads readers actually asked for:
+
+```ts
+analytics({
+  adapters: [plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY ?? '' })],
+  capture: { gate: 'all' },
+  cache: { warm: true }, // reads asked for in the last 24 hours, at most 200 per run
+  // cache: { warm: { windowHours: 6, maxReads: 50 } },
+  // When it runs and on which queue: the `jobs` option, every 30 minutes by default.
+  // jobs: { tasks: { warm: { cron: '*/15 * * * *', queue: 'analytics' } } },
+})
+```
+
+`cache.warm` decides whether reads are warmed and which: `windowHours` (default 24) is how recently a read must have been asked for, `maxReads` (default 200) the most one run reads again. A run picks them in turn from each scope, one per scope per round, most recently read first within a scope and among the scopes, out of the most recent four times `maxReads`, so one busy tenant never takes every place. `jobs.tasks.warm` decides when the task runs and on which queue (see [the `jobs` option](/analytics/native#the-jobs-option)). `cache.warm.cron` was removed in 1.0.0-beta.12 and fails the boot, naming `jobs.tasks.warm.cron`; so does an entry under `jobs.tasks.warm` while `cache.warm` is off, and `cache.warm` beside `jobs: false`.
+
+A read is worth repeating when its window is a named timeframe as of the moment it is read: a dashboard widget's or the document panel's preset up to now, the view's preset in whole days (the view names its preset in the query endpoint's `timeframe` parameter), or the comparison window before either. Such a read stores its recipe with its cached entry: the source, the scope, the timeframe and which of those windows, and the query without its window. A read of a picked range stores none: tomorrow it is the same days, read by nobody's dashboard. The entry records when it was last asked for, at most once an hour.
+
+Each run takes the recipes asked for within `windowHours`, works out each window again for the moment it runs, in the reporting timezone of the recipe's scope, and reads it again when its entry is missing or expires before the next run (within the task's interval). It reads as the plugin's `SYSTEM` principal, through the sources the scope's own provider documents grant it, at background priority, so a waiting reader is always served first. A source no longer among the scope's sources, or a window that no longer exists, is skipped; a failing source is logged once per scope in a run and does not stop the rest. A run works for at most four minutes, then leaves the reads it did not get to for the next and says so in its output (`finished: false`). A run holds the `lease:analytics-warm` lease while it works, so two workers never warm at the same time.
+
+Warming is off by default because it spends provider API quota on a schedule. A read nobody asks for again stops being warmed after `windowHours`. It pays off most for provider-backed dashboards; the native engine is fast enough that warming it is harmless but low value. Live counts are never warmed: they are only ever kept in memory.
+
+<Callout>
+The warm task runs through Payload's jobs runner. Enable cron `autoRun`, run a [worker](/jobs/workers), or invoke the queue from an external scheduler, or the schedule never fires; see [Running it](/analytics/native#running-it). Nothing stands in for a runner that never comes: an expired answer is still served at once while it refreshes. The same runner runs [sync](/analytics/sync).
+</Callout>
+
+## Upgrading from 1.0.0-beta.11 or earlier
+
+Earlier releases cached reads in `payload.kv`, where nothing deleted them. Those entries are never read again; the first read of each query after the upgrade reaches the source, and caching resumes in the new store. `deleteLegacyCache` from `@10x-media/analytics/migrations` deletes them from the key-value store (keys starting with `analytics|`, and the old live counts: `rt:` keys in the shape the old live cache wrote, never any other); see [Upgrading](/analytics/upgrading/beta-12#old-cached-reads).
+
+## Reaching the sources
+
+A read the cache cannot answer goes to its source through a **lane**: one per adapter instance, so every [provider document](/analytics/providers#provider-documents) of every tenant has its own, and so does each adapter declared in `adapters`. A document saved again gets a new adapter and with it a fresh lane. The adapters a [`providers.resolve`](/analytics/providers#keeping-the-settings-somewhere-else) builds anew on every read keep one lane per scope and adapter id, so two tenants whose adapters share an id never share a lane, a rate budget or a breaker. One request to a vendor holds, in this order, a rate token, a slot of its lane and a slot shared by every vendor source, and holds the slots only while the request is out. A tenant whose vendor is slow fills its own lane and nobody else's.
+
+```ts
+analytics({
+  adapters: [/* ... */],
+  capture: { gate: 'all' },
+  cache: {
+    timeoutMs: 15000, // how long a read with nothing cached waits for its source
+    concurrency: {
+      global: 16,  // requests out at once across every vendor source of one instance
+      perSource: 4, // requests out at once per source, unless its adapter declares rateLimit.maxConcurrent
+      perScope: 8,  // reads with nothing cached one scope may have waiting at once
+    },
+  },
+})
+```
+
+The native engine reads the instance's own database through a lane outside the global cap, so a vendor that is down never queues it. On Postgres the lane holds a third of the host's pool (`postgresAdapter({ pool: { max } })`, which `pg` defaults to 10), rounded down, at least 1 and at most 8: never more than the engine's own share of the pool for long work, so a read waits in the lane, where its deadline and priority count, rather than unseen for a connection. On MongoDB and SQLite it holds 8. Every number is per Payload instance: three instances of a deployment send up to three times as much.
+
+On a scoped install every tenant reads a config adapter, native among them, through that adapter's one lane, so one tenant holds at most half of its slots, rounded up: on a lane of two slots or more, one tenant's slow reads never take them all.
+
+### Readers before background work
+
+A request is **interactive** when a reader waits for it and **background** when nobody does: the refresh behind a stale answer, the [sync task](/analytics/sync), warming. Background requests wait while readers wait for the same lane or the global slots, and never hold more than half of a lane, so a dashboard opened during a sync run is served first.
+
+### Timeout
+
+`cache.timeoutMs` bounds one fetch from a source end to end: the waits for a token, a slot or a `Retry-After`, every attempt and the backoff between them. Past it the request still out is aborted and the read fails as `unavailable`; a request that ignores the abort keeps its lane slot five seconds more at most, then gives it back and counts against the [breaker](#circuit-breaker) as a timeout. Only a read with nothing cached waits for it: a read that found an expired entry was answered with it already, so the timeout ends only its refresh; [sync](/analytics/sync), which waits for the refresh, is answered with the expired entry then. A GA4 report is sent with what the read has left as its own deadline, so it ends with the read.
+
+### Retries
+
+A request that fails as an outage is sent again, holding nothing while it waits: the lane's slot goes to the next request during the backoff. The policy is fixed:
 
 | Failure | Retries |
 |---|---|
-| HTTP 429 or 5xx | Up to 2, with exponential backoff |
-| Other HTTP 4xx | None (treated as a caller bug) |
-| Aborted (timeout) | None |
-| Non-HTTP (network error) | 1 |
+| HTTP 408, 429, 5xx; gRPC unavailable, internal; a network error | Up to 2, after 0.5 s and then 1.25 s |
+| A timeout (the read's own, or the vendor's deadline); gRPC out of quota (resource exhausted) | None |
+| HTTP 400, 413, 414, 422 or 431, gRPC invalid argument: the query is refused as asked | None |
+| HTTP 401, 403, 404 and other 4xx; gRPC not found, permission denied, unauthenticated; a refused host | None |
 
-### Rate limiting
+A retry that would wait past the read's deadline is not made: the read fails at once with what it has.
 
-Each adapter declares its own provider rate limits through `capabilities.rateLimit`, and the engine throttles reads per adapter with a token bucket so a burst of dashboard reads never exceeds what the provider allows:
+### `Retry-After`
+
+A `429` or `503` that carries `Retry-After` (seconds or an HTTP date) pauses the source's lane until then, at most ten minutes. Requests wait out the pause without holding a slot; one whose read would end before the pause does fails at once as `unavailable`, and the query endpoint passes the remaining wait on in its own `Retry-After`. A longer wait a vendor asks for, or a value too long to read, counts as ten minutes there too.
+
+### Circuit breaker
+
+A source keeps one breaker per scope. A source every scope reads through (a config adapter on a scoped install, native among them) therefore counts each tenant's failures apart, so one tenant whose reads keep timing out stops only its own reads, never every tenant's. A breaker opens after 5 consecutive requests fail as an outage, or after one fails as [misconfigured](/analytics/reference/endpoints#errors) (a refused key, a property that does not exist, a host the install does not allow, a table the native engine cannot read), since asking again with the same settings cannot help. While it is open, every read of that scope through the source is answered at once: with its expired entry when there is one, otherwise as the failure that opened it, so a refused key or host keeps answering `source_misconfigured` and the admin keeps pointing at the source's settings, and an outage answers `unavailable` with `Retry-After` saying when the breaker lets a request through again. It stays open 30 seconds, then lets one request through as a probe: a success closes it, a failure opens it again for twice as long, up to ten minutes. The probe is claimed before it takes a rate token, so the requests turned away while it is out spend none, and a probe still unanswered after a minute lets the next request probe in its place. A refused query (`400`) is an answer, not a failure, and closes it too. So is a native read SQLite refuses before it runs, having counted that it could not finish in time: the read answers `503 unavailable`, but the database did answer, so nothing counts against the breaker.
+
+### Cold reads per scope
+
+A read with nothing cached is a **cold** read. Each scope has `cache.concurrency.perScope` places for cold reads waiting on their sources, 8 by default. Past them, a cold read through the [query endpoint](/analytics/reference/endpoints#query-endpoint) is refused at once with `429 rate_limited` and `Retry-After: 2`, and one from a widget, a display field or a job waits for a place within `cache.timeoutMs`. Reads answered from the cache, fresh or stale, are never counted or refused, and a read the same as one already waiting joins it. A read that waits for its source past an expired entry (the document panel's `fresh=1`, [sync](/analytics/sync)) takes a place like a cold one; where the query endpoint would refuse it, it is answered with the expired entry instead. One tenant opening a dozen cold dashboards then waits behind its own reads, never in front of every other tenant's, and on a lane every tenant shares its requests hold at most half the slots ([above](#reaching-the-sources)).
+
+### Rate limits
+
+Each adapter declares its vendor's limits in `capabilities.rateLimit`, and its lane spends one token per request to the vendor. GA4, Plausible, Umami and PostHog send every request through the lane, so a read paired with its goal report spends two tokens; a [custom adapter](/analytics/reference/adapter-contract#writing-your-own-adapter) that does not declare `upstreamAware` spends one per read.
 
 | Adapter | Limit |
 |---|---|
-| PostHog | 240 requests/minute, 2400 requests/hour |
-| Plausible | 600 requests/hour |
-| GA4 | 10 concurrent requests |
-| Umami, native | None declared |
+| PostHog | 240 requests a minute, 2,400 an hour; 4 at once |
+| Plausible | 600 requests an hour; 4 at once |
+| GA4 | 10 at once |
+| Umami | 4 at once |
+| native | 8 at once, outside the global cap; on Postgres a third of the pool, 1 to 8 |
 
-A limiter waits for a free slot rather than rejecting outright; that wait counts against `cache.timeoutMs`.
+A request waits for its token rather than failing outright, and that wait counts against `cache.timeoutMs`.
 
-### Stale-while-error
+## Observing reads
 
-When a cache entry expires and the refresh fails, the engine falls back to serving that expired entry rather than surfacing the failure, as long as the entry is still within a 24 hour stale window. The result carries `meta.stale: true` so callers can distinguish a fresh read from a stale one. Past the 24 hour window, or with no cached entry at all, the read degrades to an unavailable state instead. Every failed refresh is logged with the adapter id, never the underlying credentials.
+`hooks.afterRead` runs once for every read the plugin answers to a reader, on every surface: the query endpoint, the view, widgets, display fields and the `/rsc` read helpers. It is the seam for an install's own metrics, and it may answer a read differently:
 
+```ts
+declare const metrics: { histogram(name: string, value: number, labels: Record<string, string>): void }
+
+analytics({
+  adapters: [/* ... */],
+  capture: { gate: 'all' },
+  hooks: {
+    afterRead: ({ adapterId, query, result, from, durationMs }) => {
+      metrics.histogram('analytics_read_ms', durationMs, { source: adapterId, from })
+      // Return nothing to keep the answer, or a new result to answer this one read with.
+    },
+  },
+})
+```
+
+| Argument | What it is |
+|---|---|
+| `adapterId` | The source that answered. |
+| `query` | The query as the engine read it: clamped to the source's lookback, with the scope, timezone and goal slugs the surface resolved. |
+| `result` | The answer, already ranked, cut to `limit` and cached. |
+| `from` | `'memory'` (this instance's memory), `'store'` (a fresh cache entry), `'stale'` (an expired one, answered while it refreshes or because the refresh failed) or `'source'` (fetched just now). |
+| `durationMs` | From the start of the read to its answer, every wait included. |
+| `payload` | The Payload instance the read is for. |
+
+The contract:
+
+- `result` is shared with every other reader of the same cache entry. Never change it: return a new object, built from it, to answer differently.
+- What the hook returns answers that one read only. It is never cached, so it runs again on the next read, memory hits included.
+- It is awaited, so a slow hook slows every read.
+- A hook that only observes returns nothing: a block body without a `return` is typed for it (`AfterReadAnswer` includes `void`).
+- A hook that throws is logged, at most once a minute, and the read is answered as if it had returned nothing.
+- It does not run for a read that failed, nor for a source with no credentials, which answers empty without reaching the engine's cache.
+- It does not run for work that reads for itself: [warming](#warming), which only refreshes cached entries; [sync](/analytics/sync), which stores the source's own numbers rather than what the hook makes of them for one reader, and judges a stale answer by the source's own `meta.stale`; and live counts, which are never cached.

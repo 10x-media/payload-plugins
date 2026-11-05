@@ -1,7 +1,6 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
-import { ProviderHttpError } from '../../src/adapters/http/fetchJson'
+import { DEFAULT_JOBS } from '../../src/core/jobs'
 import { analytics } from '../../src/index'
 import { getRuntime } from '../../src/plugin/runtime'
 import { syncTask } from '../../src/sync/syncTask'
@@ -9,11 +8,13 @@ import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { readForWidget } from '../../src/widgets/readForWidget'
 import { readForWidgetBreakdown } from '../../src/widgets/readForWidgetBreakdown'
 import { readForWidgetSeries } from '../../src/widgets/readForWidgetSeries'
+import { advancePayloadClock, resetPayloadClock } from './payloadClock'
+import { readerRequest } from './readerRequest'
 
-// A 4xx (non-429) ProviderHttpError never retries (see retryPolicy.ts), so one failNext()
-// call reliably fails the read. The default 500 status would retry twice and succeed on
-// a later attempt, since failNext only fails the next single query() call.
-const injectedFailure = () => new ProviderHttpError(400, 'memory', 'memory: injected failure')
+// An outage the engine does not retry: a source that timed out is not asked again at once, so one
+// failNext fails the whole read. A 5xx would be retried, and a 4xx is not an outage at all.
+const injectedFailure = () =>
+	Object.assign(new Error('memory: injected timeout'), { name: 'TimeoutError' })
 
 describeForDb('analytics engine resilience', {}, (db) => {
 	const mem = memoryAdapter()
@@ -34,10 +35,11 @@ describeForDb('analytics engine resilience', {}, (db) => {
 	})
 
 	afterAll(async () => {
+		resetPayloadClock()
 		await booted.stop()
 	})
 
-	const req = () => ({ payload: booted.payload }) as unknown as PayloadRequest
+	const req = () => readerRequest(booted.payload)
 
 	it('serves a stale cache entry flagged meta.stale when the refresh fails after the TTL expires', async () => {
 		const first = await readForWidget({
@@ -49,9 +51,8 @@ describeForDb('analytics engine resilience', {}, (db) => {
 		expect(first.status).toBe('ok')
 		expect(first.metrics.pageviews).toBe(1)
 
-		// aggregate TTL above is 1s; sleeping past it with a real timer (bounded, ~2s) is the
-		// simplest way to expire the entry without reaching into the cache store's clock.
-		await new Promise((resolve) => setTimeout(resolve, 2_000))
+		// Past the aggregate TTL above (1s) on the clock the cache expires its entries by.
+		await advancePayloadClock(booted.payload, 2_000)
 
 		mem.failNext(injectedFailure())
 		const second = await readForWidget({
@@ -75,9 +76,11 @@ describeForDb('analytics engine resilience', {}, (db) => {
 		})
 		expect(direct.meta.stale).toBe(true)
 		expect(direct.totals?.pageviews).toBe(1)
+		// The refreshes run behind the answers; let them finish before the next read injects a failure.
+		await runtime.engine.idle?.()
 	})
 
-	it('reports unavailable when a cold cache key fails with no stale entry to fall back to', async () => {
+	it('reports busy, not unavailable, when a cold cache key fails with no stale entry to fall back to', async () => {
 		mem.failNext(injectedFailure())
 		const result = await readForWidget({
 			req: req(),
@@ -85,10 +88,10 @@ describeForDb('analytics engine resilience', {}, (db) => {
 			timeframe: 'last7days',
 			now: new Date('2026-01-31T00:00:00.000Z'),
 		})
-		expect(result.status).toBe('unavailable')
+		expect(result.status).toBe('busy')
 	})
 
-	it('reports unavailable for a series read on a cold cache key with no stale entry', async () => {
+	it('reports busy for a series read on a cold cache key with no stale entry', async () => {
 		mem.failNext(injectedFailure())
 		const result = await readForWidgetSeries({
 			req: req(),
@@ -96,10 +99,10 @@ describeForDb('analytics engine resilience', {}, (db) => {
 			timeframe: 'last7days',
 			now: new Date('2026-01-31T00:00:00.000Z'),
 		})
-		expect(result.status).toBe('unavailable')
+		expect(result.status).toBe('busy')
 	})
 
-	it('reports unavailable for a breakdown read on a cold cache key with no stale entry', async () => {
+	it('reports busy for a breakdown read on a cold cache key with no stale entry', async () => {
 		mem.failNext(injectedFailure())
 		const result = await readForWidgetBreakdown({
 			req: req(),
@@ -109,7 +112,7 @@ describeForDb('analytics engine resilience', {}, (db) => {
 			limit: 5,
 			now: new Date('2026-01-31T00:00:00.000Z'),
 		})
-		expect(result.status).toBe('unavailable')
+		expect(result.status).toBe('busy')
 	})
 })
 
@@ -126,14 +129,15 @@ describeForDb('analytics sync tier resilience', {}, (db) => {
 	})
 
 	afterAll(async () => {
+		resetPayloadClock()
 		await booted.stop()
 	})
 
-	const req = () => ({ payload: booted.payload }) as unknown as PayloadRequest
+	const req = () => readerRequest(booted.payload)
 
 	const runSync = async (): Promise<{ synced: number; failed: number }> => {
 		const task = syncTask({
-			cron: '0 */6 * * *',
+			schedule: DEFAULT_JOBS.sync,
 			lookbackDays: 3,
 			collectionSlug: 'analytics-daily',
 		})
@@ -164,9 +168,7 @@ describeForDb('analytics sync tier resilience', {}, (db) => {
 		)
 		expect(beforeSyncedAt.size).toBeGreaterThan(0)
 
-		// aggregate TTL above is 1s; sleeping past it with a real timer (bounded, ~2s) expires the
-		// cache entry without reaching into the cache store's clock, as engineResilience does above.
-		await new Promise((resolve) => setTimeout(resolve, 2_000))
+		await advancePayloadClock(booted.payload, 2_000)
 
 		mem.failNext(injectedFailure())
 		const second = await runSync()

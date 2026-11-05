@@ -8,16 +8,18 @@ import type {
 import { describe, expect, it } from 'vitest'
 import { MAX_QUERY_FILTER_VALUE_LENGTH } from '../query/limits'
 import { keys } from '../translations/keys'
+import { fieldByName, flattenRows } from './fieldRows'
 import {
 	FILTER_DIMENSION_COMPONENT,
 	FILTER_OPERATOR_COMPONENT,
+	FILTER_VALUE_COMPONENT,
 	filterField,
 	widgetFilters,
 } from './filterField'
 import type { WidgetFilter } from './types'
 
 const subField = (group: NamedGroupField, name: string): TextField => {
-	const found = group.fields.find((f: Field) => 'name' in f && f.name === name)
+	const found = fieldByName(group.fields, name)
 	if (!found) throw new Error(`no ${name} subfield`)
 	return found as TextField
 }
@@ -49,11 +51,27 @@ describe('filterField', () => {
 
 		expect(group.type).toBe('group')
 		expect(group.name).toBe('filter')
-		expect(group.fields.map((f: Field) => ('name' in f ? f.name : ''))).toEqual([
+		expect(flattenRows(group.fields).map((f: Field) => ('name' in f ? f.name : ''))).toEqual([
 			'dimension',
 			'operator',
 			'value',
 		])
+	})
+
+	it('lays the three out in one row, so no stored path gains a level', () => {
+		const group = filterField()
+
+		expect(group.fields.map((f: Field) => f.type)).toEqual(['row'])
+		// The row is the only wrapper: a second level would still store the same paths, but it
+		// is what a widget's own row layout would look like leaking into the group.
+		expect(flattenRows(group.fields).every((f: Field) => 'name' in f)).toBe(true)
+	})
+
+	it('renders the value with the per-dimension value field', () => {
+		const value = subField(filterField(), 'value')
+
+		expect(componentPath(value)).toBe(FILTER_VALUE_COMPONENT)
+		expect(FILTER_VALUE_COMPONENT).toBe('@10x-media/analytics/rsc#FilterValueFieldServer')
 	})
 
 	it('labels and describes the group from the typed keys', () => {
@@ -69,7 +87,7 @@ describe('filterField', () => {
 		expect(dimension.type).toBe('text')
 		expect(componentPath(dimension)).toBe(FILTER_DIMENSION_COMPONENT)
 		expect(FILTER_DIMENSION_COMPONENT).toBe(
-			'@10x-media/analytics/client#FilterDimensionSelectField'
+			'@10x-media/analytics/rsc#FilterDimensionSelectFieldServer'
 		)
 		expect(resolveLabel(dimension.label)).toBe(keys.widgetFieldFilterDimension)
 	})
@@ -80,7 +98,9 @@ describe('filterField', () => {
 		expect(operator.type).toBe('text')
 		expect(operator.defaultValue).toBe('eq')
 		expect(componentPath(operator)).toBe(FILTER_OPERATOR_COMPONENT)
-		expect(FILTER_OPERATOR_COMPONENT).toBe('@10x-media/analytics/client#FilterOperatorSelectField')
+		expect(FILTER_OPERATOR_COMPONENT).toBe(
+			'@10x-media/analytics/rsc#FilterOperatorSelectFieldServer'
+		)
 		expect(resolveLabel(operator.label)).toBe(keys.widgetFieldFilterOperator)
 	})
 

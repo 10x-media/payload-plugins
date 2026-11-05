@@ -45,6 +45,20 @@ jobs:
       # bug that hides in the packages an affected run skips.
       - name: Template parity (files every plugin carries verbatim)
         run: pnpm check:template
+      # Every docs page's internal links, and the analytics docs' code examples type-checked
+      # against the package's source (about ten seconds). Only when the change reaches one of
+      # them: a docs page selects the docs app, and a source change reaches analytics through
+      # the package graph. The scope fallback lists both, so it always runs then.
+      - id: docs-reach
+        name: Does the change reach the docs?
+        run: |
+          reached=$(pnpm exec turbo ls ${{ steps.scope.outputs.flag }} --filter=@10x-media/docs --filter=@10x-media/analytics --output=json |
+            jq '.packages.items | length > 0')
+          echo "docs affected: ${reached}"
+          echo "reached=${reached}" >>"$GITHUB_OUTPUT"
+      - if: steps.docs-reach.outputs.reached == 'true'
+        name: Docs links and analytics examples
+        run: pnpm docs:check
 
   typecheck:
     runs-on: ubuntu-latest
@@ -62,6 +76,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm exec turbo run typecheck ${{ steps.scope.outputs.flag }}
+      # The root scripts belong to no package, so no turbo task reaches them; a few seconds, unscoped.
+      - name: Root scripts
+        run: pnpm typecheck:scripts
 
   build:
     runs-on: ubuntu-latest
@@ -84,6 +101,10 @@ jobs:
       # --only-built skips the packages the line above deliberately did not build.
       - name: Verify published dist output (directives, externals, exports, publint)
         run: pnpm check:dist --only-built
+      # Packages with `"apiReport": true` keep an API Extractor report per entry under `api/`; a
+      # surface change fails here until `pnpm api:update` commits it. Same skip as the line above.
+      - name: API reports (public surface matches the checked-in reports)
+        run: pnpm api:check --only-built
       # turbo runs a task's `dependsOn` even where the task itself is missing, so this gate
       # also runs the affected dev apps' and the docs site's `next build`. Unscoped that is
       # eleven at once, which exhausts a 4-vCPU runner and returns as a bare cancel, hence
@@ -97,9 +118,12 @@ jobs:
       - name: Registry parity (rebuild shadcn registry, fail if drifted from source)
         run: pnpm check:registry
 
+  # The turbo step took 14 minutes on main, analytics 5 of them. Analytics' unit suite, clock pass
+  # and Mongo int lane now take about 6.5 minutes locally with three workers, roughly twice that
+  # here, which puts a whole-workspace run at 17 to 20 minutes.
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     strategy:
       matrix:
         # Current and next Node LTS. Floor is 22.18 (native .ts config support,
@@ -121,11 +145,16 @@ jobs:
         run: >-
           pnpm --filter @10x-media/payload-test-harness exec node -e
           "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
-      - run: pnpm exec turbo run test ${{ steps.scope.outputs.flag }}
+      # Every package's vitest runs 3 workers here, each booting Payload and an in-memory mongod.
+      # turbo's default of 10 packages at once bursts past mongod's 10 s launch limit and 60 s
+      # hooks; 4 rarely binds, since the typecheck tasks before each test already stagger them.
+      - run: pnpm exec turbo run test --concurrency=4 ${{ steps.scope.outputs.flag }}
 
+  # Analytics alone runs its whole int suite four times here: Mongo, Postgres, and SQLite with
+  # its engine on worker threads and again on the main thread.
   test-matrix:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 0 }
@@ -142,7 +171,8 @@ jobs:
         run: >-
           pnpm --filter @10x-media/payload-test-harness exec node -e
           "import('mongodb-memory-server').then((m) => m.MongoMemoryServer.create()).then((s) => s.stop()).then(() => process.exit(0))"
-      - run: pnpm exec turbo run test:matrix ${{ steps.scope.outputs.flag }}
+      # The same cap as `test`, for lanes that also start a Postgres container per boot.
+      - run: pnpm exec turbo run test:matrix --concurrency=4 ${{ steps.scope.outputs.flag }}
 
   # The heaviest tier runs on demand (PR label or manual dispatch), not on every push,
   # so main stays fast. test-matrix already covers Postgres-in-Docker on push.
@@ -164,12 +194,17 @@ jobs:
   # is affected: the dev app is what e2e drives, and it can import other plugins
   # (admin-wiki-dev imports fields). Runs on pull requests and manual dispatch, where the
   # `no_e2e` label opts out; the scope fallback (CI changes, dispatch) picks every plugin.
+  # A plugin in E2E_DATABASES gets one leg per database (its e2e.sh reads E2E_DBS), since all
+  # of them in one leg would outrun the timeout; every other plugin keeps a single leg.
   e2e-scope:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: github.event_name != 'push' && !contains(github.event.pull_request.labels.*.name, 'no_e2e')
+    env:
+      E2E_DATABASES: '{"analytics": ["mongo", "postgres", "sqlite"]}'
     outputs:
       plugins: ${{ steps.plugins.outputs.plugins }}
+      legs: ${{ steps.plugins.outputs.legs }}
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 0 }
@@ -188,18 +223,22 @@ jobs:
           e2e=$(jq -cn '[inputs | select(.scripts["test:e2e"]) | .name]' packages/*/package.json)
           plugins=$(pnpm exec turbo ls ${{ steps.scope.outputs.flag }} --output=json |
             jq -c --argjson e2e "$e2e" '[.packages.items[].name | rtrimstr("-dev") | select(IN($e2e[])) | ltrimstr("@10x-media/")] | unique')
+          legs=$(jq -c --argjson dbs "$E2E_DATABASES" '[.[] as $p | ($dbs[$p] // [""])[] | {plugin: $p, dbs: .}]' <<<"$plugins")
           echo "e2e: ${plugins}"
+          echo "legs: ${legs}"
           echo "plugins=${plugins}" >>"$GITHUB_OUTPUT"
+          echo "legs=${legs}" >>"$GITHUB_OUTPUT"
 
   e2e:
     needs: e2e-scope
     if: needs.e2e-scope.outputs.plugins != '[]'
+    name: e2e (${{ matrix.plugin }}${{ matrix.dbs && format(', {0}', matrix.dbs) || '' }})
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
-        plugin: ${{ fromJSON(needs.e2e-scope.outputs.plugins) }}
+        include: ${{ fromJSON(needs.e2e-scope.outputs.legs) }}
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -210,6 +249,50 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm --filter @10x-media/${{ matrix.plugin }} exec playwright install --with-deps chromium
       - run: pnpm test:e2e ${{ matrix.plugin }}
+        env:
+          E2E_DBS: ${{ matrix.dbs }}
+      # Traces of the failed tests' retries, and the HTML report where the plugin writes one. A
+      # failing pass stops e2e.sh, so the next pass never clears its folders first.
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-${{ matrix.plugin }}${{ matrix.dbs && format('-{0}', matrix.dbs) || '' }}
+          path: |
+            packages/${{ matrix.plugin }}/test-results/
+            packages/${{ matrix.plugin }}/playwright-report/
+          if-no-files-found: ignore
+          retention-days: 14
+
+  # Upgrades a 1.0.0-beta.11 install to this tree on every database the way the upgrading page
+  # says (packages/analytics/scripts/upgrade.sh). On pull requests and manual dispatch, when the
+  # change reaches analytics through the package graph; the scope fallback always runs it. The
+  # full history checkout also brings the beta.11 tag it checks out. The `no_e2e` label does not
+  # skip it: it boots no browser, and it is the only check of the upgrading page's migration edits.
+  analytics-upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    if: github.event_name != 'push'
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - id: scope
+        name: Resolve affected scope
+        run: bash scripts/ci-affected.sh
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - id: reach
+        name: Does the change reach analytics?
+        run: |
+          reached=$(pnpm exec turbo ls ${{ steps.scope.outputs.flag }} --filter=@10x-media/analytics --output=json |
+            jq '.packages.items | length > 0')
+          echo "analytics affected: ${reached}"
+          echo "reached=${reached}" >>"$GITHUB_OUTPUT"
+      - if: steps.reach.outputs.reached == 'true'
+        run: pnpm test:upgrade analytics
 
   changeset-required:
     runs-on: ubuntu-latest

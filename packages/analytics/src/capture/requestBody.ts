@@ -27,12 +27,8 @@ const concat = (chunks: Uint8Array[], total: number): ArrayBuffer => {
 }
 
 /**
- * Buffers a request body, refusing anything over `maxBytes`. A declared `content-length`
- * short-circuits before a byte is read; a chunked body declares no length at all, so the
- * running total is checked per chunk and the read is cancelled the moment it passes the
- * cap. A stream that errors mid-read (a beacon from a tab that is already unloading is
- * routine, not exceptional) resolves as `unreadable` rather than throwing, which would
- * escape the handler into Payload's routeError as a 500.
+ * Buffers a request body, cancelling the read once it passes `maxBytes` (chunked bodies declare no
+ * length). A stream erroring mid-read, routine for an unloading tab, resolves `unreadable`, never a 500.
  */
 export const readCappedBody = async (
 	req: CappedBodySource,

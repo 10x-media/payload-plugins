@@ -1,4 +1,5 @@
 import type { DateRange } from '../core/contract'
+import { isOneOf } from '../core/values'
 import {
 	addDaysInTz,
 	DEFAULT_TIMEZONE,
@@ -20,11 +21,12 @@ export const TIMEFRAME_PRESETS = [
 
 export type TimeframePreset = (typeof TIMEFRAME_PRESETS)[number]
 
+export const isTimeframePreset = (value: unknown): value is TimeframePreset =>
+	isOneOf(TIMEFRAME_PRESETS, value)
+
 /**
- * Resolve a relative timeframe preset to an absolute `DateRange`. `now` is injected
- * so callers stay deterministic. `end` is `now`; `start` is the day floor of the
- * window in `tz` (defaulting to UTC, so day boundaries align with the reporting
- * timezone). Inclusive day windows count the current day (`last7days` = today plus 6).
+ * `end` is `now`; `start` is the window's day floor in `tz`. Day windows include today (`last7days`
+ * is today plus 6).
  */
 export const resolveTimeframe = (
 	preset: TimeframePreset,

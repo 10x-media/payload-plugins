@@ -1,45 +1,22 @@
 import { expect, type Page, test } from '@playwright/test'
-
-const ALPHA = { email: 'alpha@10xmedia.de', password: 'password' }
-const BETA = { email: 'beta@10xmedia.de', password: 'password' }
-const PLATFORM = { email: 'dev@10xmedia.de', password: 'password' }
+import { ALPHA, BETA, login, loginAsTenant, setTenantCookie, tenantId } from './helpers'
 
 interface SourceEntry {
 	id: string
 	label: string
 }
 
-/** Authenticates the page's request context; does not touch the tenant-selector cookie. */
-const login = async (
-	page: Page,
-	credentials: { email: string; password: string }
-): Promise<void> => {
-	const res = await page.request.post('/api/users/login', { data: credentials })
-	expect(res.ok(), `login as ${credentials.email}`).toBeTruthy()
-}
-
-/**
- * Tenant users carry exactly one assigned tenant. The multi-tenant plugin's client
- * provider auto-selects it into the `payload-tenant` cookie on mount and calls
- * `router.refresh()`; reloading once that cookie lands avoids racing that refresh, so
- * every read after this call sees one deterministic, tenant-scoped server render.
- */
-const loginAsTenant = async (
-	page: Page,
-	credentials: { email: string; password: string }
-): Promise<void> => {
-	await login(page, credentials)
-
-	await page.goto('/admin')
-	await page.waitForFunction(() => document.cookie.includes('payload-tenant='))
-	await page.reload()
-}
-
+/** The settled card's number, or NaN when it settled on a state that shows none. */
 const readPageviewsMetric = async (page: Page): Promise<number> => {
-	const widget = page.locator('.analytics-metric-widget', { hasText: 'Pageviews' }).first()
+	const widget = page
+		.locator('.analytics-metric-widget:not(.analytics-widget--loading)', { hasText: 'Pageviews' })
+		.first()
 	await expect(widget).toBeVisible()
-	const text = (await widget.locator('span').nth(1).innerText()).trim()
-	return Number.parseInt(text.replace(/[^0-9]/g, ''), 10)
+	const value = widget.locator('.analytics-widget__value')
+	if ((await value.count()) === 0) {
+		return Number.NaN
+	}
+	return Number.parseInt((await value.innerText()).replace(/[^0-9]/g, ''), 10)
 }
 
 test('@tenancy dashboard pageviews are isolated per tenant', async ({ browser }) => {
@@ -58,25 +35,27 @@ test('@tenancy dashboard pageviews are isolated per tenant', async ({ browser })
 	expect(alphaPageviews).toBeGreaterThan(betaPageviews)
 })
 
+// The seed gives alpha one provider document, its site database on native, and beta two: its own
+// site database and a Plausible project.
 test('@tenancy sources endpoint only lists the caller tenant provider', async ({ page }) => {
 	await loginAsTenant(page, ALPHA)
 
-	const res = await page.request.get('/api/analytics/sources')
+	const res = await page.request.get('/api/_x/sources')
 	expect(res.ok()).toBeTruthy()
 	const body = (await res.json()) as { sources: SourceEntry[] }
 
-	const alphaSource = body.sources.find((s) => s.label === 'Alpha Plausible')
-	expect(alphaSource).toBeDefined()
-	expect(alphaSource?.id.startsWith('plausible:')).toBe(true)
-	expect(body.sources.some((s) => s.label === 'Beta Plausible')).toBe(false)
+	expect(body.sources.map((s) => s.label)).toEqual(['Alpha site database'])
+	expect(body.sources[0]?.id).toBe('native')
 })
 
-test('@tenancy analytics providers list redirects to the tenant single doc', async ({ page }) => {
+test("@tenancy the analytics providers list holds only the tenant's own documents", async ({
+	page,
+}) => {
 	await loginAsTenant(page, ALPHA)
 
 	await page.goto('/admin/collections/analytics-providers')
-	await expect(page).toHaveURL(/\/admin\/collections\/analytics-providers\/[^/]+$/)
-	await expect(page.getByLabel('Name')).toHaveValue('Alpha Plausible')
+	await expect(page.getByRole('link', { name: 'Alpha site database' })).toBeVisible()
+	await expect(page.locator('body')).not.toContainText('Beta site database')
 	await expect(page.locator('body')).not.toContainText('Beta Plausible')
 })
 
@@ -88,17 +67,8 @@ test('@tenancy a forged tenant cookie cannot read another tenant', async ({
 	// The plugin filters the `tenants` collection per user, so alpha's own session cannot
 	// see beta at all; a separate platform-admin session looks up the id to forge.
 	const platformContext = await browser.newContext()
-	const platformLogin = await platformContext.request.post('/api/users/login', {
-		data: PLATFORM,
-	})
-	expect(platformLogin.ok(), 'login as platform admin').toBeTruthy()
-	const tenantsRes = await platformContext.request.get(
-		'/api/tenants?where[slug][equals]=beta&depth=0'
-	)
-	expect(tenantsRes.ok()).toBeTruthy()
-	const { docs: tenants } = (await tenantsRes.json()) as { docs: Array<{ id: string | number }> }
-	const betaId = tenants[0]?.id
-	expect(betaId, 'beta tenant lookup').toBeDefined()
+	await login(platformContext.request)
+	const betaId = await tenantId(platformContext.request, 'beta')
 	await platformContext.close()
 
 	const betaContext = await browser.newContext()
@@ -113,21 +83,18 @@ test('@tenancy a forged tenant cookie cannot read another tenant', async ({
 
 	// Forge the client-set selector cookie onto alpha's authenticated session: alpha is
 	// still `req.user`, only the claimed tenant changes.
-	await page
-		.context()
-		.addCookies([{ name: 'payload-tenant', value: String(betaId), url: baseURL ?? page.url() }])
+	await setTenantCookie(page.context(), betaId, baseURL ?? page.url())
 
-	// The dev scopeResolver throws for a tenant alpha does not belong to; on this scoped
-	// install a failed resolution is indistinguishable from a forged one, so the sources
-	// endpoint answers empty rather than falling back to the config registry.
-	const sourcesRes = await page.request.get('/api/analytics/sources')
+	// `scope.resolve` selects beta from the cookie and `scope.member` refuses it, so the answer is
+	// empty rather than beta's sources or a fallback to the config registry.
+	const sourcesRes = await page.request.get('/api/_x/sources')
 	expect(sourcesRes.ok()).toBeTruthy()
 	const { sources } = (await sourcesRes.json()) as {
 		sources: Array<SourceEntry & { kind: string }>
 	}
 	expect(sources).toEqual([])
 
-	// The same failure degrades the server-rendered dashboard read to unavailable, so no
+	// The same refusal turns the server-rendered dashboard read into its no-access state, so no
 	// pageviews number renders; beta's never does.
 	await page.reload()
 	const forgedPageviews = await readPageviewsMetric(page)

@@ -4,6 +4,7 @@ import { createLocalReq } from 'payload'
 import type { ReactNode } from 'react'
 
 import { resolveTargetFilters } from '../access/filterTargets'
+import { FAILURE_CODES } from '../endpoints/codes'
 import { statusFromRow } from '../getImpersonation'
 import { labelUser } from '../ids'
 import { IMPERSONATION_SID_PREFIX } from '../plugin/constants'
@@ -16,7 +17,8 @@ import {
 	isPastAbsoluteExpiry,
 	relationOf,
 } from '../session/resolve'
-import { keys } from '../translations/keys'
+import { errorKey } from '../translations/errorKey'
+import { keys, type TranslationKey } from '../translations/keys'
 import { fillTemplate, messageFor } from '../translations/lookup'
 import { asAuthUser, boundSid } from '../types'
 import { ImpersonationBar } from './ImpersonationBar'
@@ -123,6 +125,7 @@ export const ImpersonationProvider = async ({
 	}
 
 	const locale = barSource.impersonatorLocale
+	const message = (key: TranslationKey) => messageFor(locale, key, payload.config.i18n.translations)
 	const targetName =
 		labelUser(options.ui.userLabel, {
 			email: barSource.targetEmail,
@@ -135,11 +138,11 @@ export const ImpersonationProvider = async ({
 		}) ?? String(barSource.impersonatorId ?? '')
 	const isImpersonatorSide = barSource.side === 'impersonator' && barSource.mode === 'parallel'
 	const actingAs = isImpersonatorSide
-		? fillTemplate(messageFor(locale, keys.sessionActiveOnSite), '{{name}}', String(targetName))
-		: fillTemplate(messageFor(locale, keys.actingAs), '{{name}}', String(targetName))
+		? fillTemplate(message(keys.sessionActiveOnSite), '{{name}}', String(targetName))
+		: fillTemplate(message(keys.actingAs), '{{name}}', String(targetName))
 	const returnTo = isImpersonatorSide
-		? messageFor(locale, keys.endSession)
-		: fillTemplate(messageFor(locale, keys.returnTo), '{{name}}', String(impersonatorLabel))
+		? message(keys.endSession)
+		: fillTemplate(message(keys.returnTo), '{{name}}', String(impersonatorLabel))
 
 	return (
 		<ImpersonationClientConfig value={clientValue}>
@@ -150,12 +153,17 @@ export const ImpersonationProvider = async ({
 				apiPath={apiPath}
 				frontendUrl={payload.config.serverURL || undefined}
 				impersonatorLocale={locale}
-				openWebsite={messageFor(locale, keys.openWebsite)}
-				pluginName={messageFor(locale, keys.pluginName)}
+				messages={{
+					collapseBar: message(keys.collapseBar),
+					errors: Object.fromEntries(FAILURE_CODES.map((code) => [code, message(errorKey(code))])),
+					expandBar: message(keys.expandBar),
+				}}
+				openWebsite={message(keys.openWebsite)}
+				pluginName={message(keys.pluginName)}
 				returnTo={returnTo}
 				sessionEndsAt={barSource.absoluteExpiresAt}
-				sessionEndsAtTemplate={messageFor(locale, keys.sessionEndsAt)}
-				sessionEndsInTemplate={messageFor(locale, keys.sessionEndsIn)}
+				sessionEndsAtTemplate={message(keys.sessionEndsAt)}
+				sessionEndsInTemplate={message(keys.sessionEndsIn)}
 				showFrontendLink={isImpersonatorSide}
 				targetName={targetName}
 				tone={isImpersonatorSide ? 'quiet' : 'warning'}

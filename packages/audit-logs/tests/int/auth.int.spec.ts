@@ -182,7 +182,7 @@ describe('failed logins', () => {
 			const [log] = await readLogs(booted.payload, { eventType: { equals: 'failed_login' } })
 			expect(log?.operation).toBe('auth')
 			expect(log?.relationTo).toBe('users')
-			expect(log?.user).toBeFalsy()
+			expect(log?.user?.value ?? null).toBeNull()
 			expect(log?.documentId).toBeFalsy()
 			expect(log?.ipAddress).toBe('203.0.113.7')
 			expect(log?.metadata).toMatchObject({

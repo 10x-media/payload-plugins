@@ -1,33 +1,28 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
-import { EVENTS_SLUG } from '../../src/native/collections/events'
 import { native } from '../../src/native/nativeAdapter'
 import { readForWidget } from '../../src/widgets/readForWidget'
+import { nativeOf, pageviewHit } from './nativeHelpers'
+import { readerRequest } from './readerRequest'
 
 describeForDb('readForWidget filter pass-through', {}, (db) => {
 	let booted: BootedPayload
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [native()] }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [native()], capture: { gate: 'off' } }),
+			db,
+		})
 	})
 	afterAll(async () => {
 		await booted.stop()
 	})
-	const req = () => ({ payload: booted.payload }) as unknown as PayloadRequest
+	const req = () => readerRequest(booted.payload)
 
 	const recordEvent = (path: string, timestamp: string) =>
-		booted.payload.create({
-			collection: EVENTS_SLUG as never,
-			data: {
-				timestamp,
-				type: 'pageview',
-				path,
-				hostname: 'h',
-				visitorHash: `v-${path}`,
-				sessionId: `s-${path}`,
-			} as never,
-		})
+		nativeOf(booted.payload).store.append([
+			pageviewHit({ ts: new Date(timestamp), path, v: `v-${path}` }),
+		])
 
 	it('narrows totals to the matching events against the native adapter', async () => {
 		await recordEvent('/a', '2026-06-01T12:00:00.000Z')

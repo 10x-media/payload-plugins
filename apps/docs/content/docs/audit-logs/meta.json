@@ -7,11 +7,13 @@
 		"what-is-logged",
 		"audit-fields",
 		"admin-view",
+		"extending",
 		"querying",
 		"anonymization",
 		"custom-events",
 		"data-retention",
 		"multi-tenancy",
-		"i18n"
+		"i18n",
+		"upgrading"
 	]
 }

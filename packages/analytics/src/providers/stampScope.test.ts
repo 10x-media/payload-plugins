@@ -2,18 +2,22 @@ import type { PayloadRequest } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { stampScope } from './stampScope'
 
-const req = { user: { id: 1 } } as unknown as PayloadRequest
-
 const base = {
 	scoped: true,
 	scopeField: 'scope',
 	resolveScope: async () => 't1' as string | null,
-	platformRead: async () => false,
+	member: () => true,
+	crossScope: async () => false,
 }
 
 type HookArgs = Parameters<ReturnType<typeof stampScope>>[0]
 const run = (hook: ReturnType<typeof stampScope>, args: Partial<HookArgs>) =>
-	hook({ req, operation: 'create', data: {}, ...args } as HookArgs)
+	hook({
+		req: { user: { id: 1 } } as unknown as PayloadRequest,
+		operation: 'create',
+		data: {},
+		...args,
+	} as HookArgs)
 
 describe('stampScope', () => {
 	it('unscoped installs pass data through untouched', async () => {
@@ -53,7 +57,7 @@ describe('stampScope', () => {
 	})
 
 	it('allows a mismatched scope for platform users', async () => {
-		const hook = stampScope({ ...base, platformRead: async () => true })
+		const hook = stampScope({ ...base, crossScope: async () => true })
 		const data = { scope: 't2' }
 		expect(await run(hook, { data })).toBe(data)
 	})
@@ -62,7 +66,7 @@ describe('stampScope', () => {
 		const hook = stampScope({
 			...base,
 			resolveScope: async () => null,
-			platformRead: async () => true,
+			crossScope: async () => true,
 		})
 		const data = { provider: 'posthog' }
 		expect(await run(hook, { data })).toBe(data)
@@ -94,5 +98,19 @@ describe('stampScope', () => {
 	it('rejects create when no scope resolves and the user is not platform', async () => {
 		const hook = stampScope({ ...base, resolveScope: async () => null })
 		await expect(run(hook, { data: { provider: 'posthog' } })).rejects.toThrow(/scope/)
+	})
+
+	// The hook runs on every write, access overridden or not, so it is the backstop for a
+	// selector pointed at a tenant the user does not belong to.
+	it('rejects create in a scope the user does not belong to, stamped or declared', async () => {
+		const hook = stampScope({ ...base, member: () => false })
+		await expect(run(hook, { data: { provider: 'posthog' } })).rejects.toThrow(/does not belong to/)
+		await expect(run(hook, { data: { scope: 't1' } })).rejects.toThrow(/does not belong to/)
+	})
+
+	it('lets platform users create in a scope they do not belong to', async () => {
+		const hook = stampScope({ ...base, member: () => false, crossScope: async () => true })
+		const data = { scope: 't1' }
+		expect(await run(hook, { data })).toBe(data)
 	})
 })

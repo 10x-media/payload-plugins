@@ -7,24 +7,21 @@ import type {
 	AnalyticsQuery,
 	AnalyticsResult,
 } from '../core/contract'
-import { createRegistry } from '../core/registry'
 import type { Goal } from '../goals/types'
-import { setRuntime } from '../plugin/runtime'
+import { keys } from '../translations/keys'
 import { readForWidgetBreakdown } from './readForWidgetBreakdown'
+import { requestWith } from './widgetTestKit'
 
 const NOW = new Date('2026-06-03T12:00:00.000Z')
 
 const caps = (): AnalyticsCapabilities => ({
-	perPageQuery: true,
 	realtime: false,
 	comparison: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews']),
 	dimensions: new Set(['source']),
-	filters: new Set(),
-	filterOperators: new Set(['eq']),
-	batchPageReport: false,
+	filters: {},
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 300 },
 })
@@ -46,19 +43,8 @@ const breakdownAdapter = (over: Partial<AnalyticsAdapter> = {}): AnalyticsAdapte
 	...over,
 })
 
-const reqWith = (adapters: AnalyticsAdapter[], goals: Goal[] = []): PayloadRequest => {
-	const payload = {} as PayloadRequest['payload']
-	setRuntime(payload, {
-		registry: createRegistry(adapters),
-		configAdapterIds: new Set(adapters.map((a) => a.id)),
-		bindings: {},
-		engine: { read: async (adapter, query) => adapter.query(query, {}) },
-		ttl: { aggregate: 3600, realtime: 300 },
-		comparison: true,
-		goals,
-	})
-	return { payload } as PayloadRequest
-}
+const reqWith = (adapters: AnalyticsAdapter[], goals: Goal[] = []): PayloadRequest =>
+	requestWith(adapters, { goals })
 
 const goalCaps = (): AnalyticsCapabilities => ({
 	...caps(),
@@ -85,7 +71,8 @@ const recordingAdapter = (
 const goal = (slug: string): Goal => ({ slug, name: slug, match: { kind: 'goal' } })
 
 describe('readForWidgetBreakdown', () => {
-	it('returns ok with label/value rows from the adapter dimension', async () => {
+	// A custom widget lists what the built-ins list: "Direct" rather than the stored `direct`.
+	it('returns ok with rows labelled as the built-in widgets label them', async () => {
 		const result = await readForWidgetBreakdown({
 			req: reqWith([breakdownAdapter()]),
 			metric: 'pageviews',
@@ -96,8 +83,8 @@ describe('readForWidgetBreakdown', () => {
 		})
 		expect(result.status).toBe('ok')
 		expect(result.rows).toEqual([
-			{ label: 'search', value: 9 },
-			{ label: 'direct', value: 4 },
+			{ label: 'search', dimensionValue: 'search', value: 9 },
+			{ label: keys.channelDirect, dimensionValue: 'direct', value: 4 },
 		])
 	})
 
@@ -141,7 +128,7 @@ describe('readForWidgetBreakdown', () => {
 	it('forwards filters into the engine query', async () => {
 		let received: AnalyticsQuery | undefined
 		const adapter = breakdownAdapter({
-			capabilities: { ...caps(), filters: new Set(['country']) },
+			capabilities: { ...caps(), filters: { country: ['eq'] } },
 			async query(q: AnalyticsQuery, _ctx: AdapterContext): Promise<AnalyticsResult> {
 				received = q
 				return {
@@ -181,7 +168,7 @@ describe('readForWidgetBreakdown', () => {
 
 	it('answers filter-unsupported when the operator is the part the adapter lacks', async () => {
 		const adapter = breakdownAdapter({
-			capabilities: { ...caps(), filters: new Set(['country']) },
+			capabilities: { ...caps(), filters: { country: ['eq'] } },
 		})
 		const spy = vi.spyOn(adapter, 'query')
 		const result = await readForWidgetBreakdown({
@@ -201,7 +188,7 @@ describe('readForWidgetBreakdown', () => {
 	it('still answers unavailable when the breakdown dimension itself is unsupported', async () => {
 		const result = await readForWidgetBreakdown({
 			req: reqWith([
-				breakdownAdapter({ capabilities: { ...caps(), filters: new Set(['country']) } }),
+				breakdownAdapter({ capabilities: { ...caps(), filters: { country: ['eq'] } } }),
 			]),
 			metric: 'pageviews',
 			dimension: 'browser',
@@ -224,7 +211,24 @@ describe('readForWidgetBreakdown', () => {
 			now: NOW,
 		})
 		expect(seen[0]?.goalSlugs).toEqual(['signup', 'purchase'])
-		expect(result.rows).toEqual([{ label: 'signup', value: 3 }])
+		expect(result.rows).toEqual([{ label: 'signup', dimensionValue: 'signup', value: 3 }])
+		// The names come along, so the widget lists a goal by name rather than by slug.
+		expect(result.goals).toEqual([
+			{ slug: 'signup', name: 'signup' },
+			{ slug: 'purchase', name: 'purchase' },
+		])
+	})
+
+	it('carries no goal names on a read that is not about goals', async () => {
+		const result = await readForWidgetBreakdown({
+			req: reqWith([breakdownAdapter()], [goal('signup')]),
+			metric: 'pageviews',
+			dimension: 'browser',
+			timeframe: 'last30days',
+			limit: 5,
+			now: NOW,
+		})
+		expect(result.goals).toBeUndefined()
 	})
 
 	it('prefers the slugs the caller already resolved over resolving them again', async () => {
@@ -241,23 +245,14 @@ describe('readForWidgetBreakdown', () => {
 		expect(seen[0]?.goalSlugs).toEqual(['from-caller'])
 	})
 
-	// A goal read a resolver could not answer is a read without rows, never a read that
-	// silently counts every event the source has, and never one that shares the cache key of
-	// a scope whose goals resolved.
+	// An unresolved goal read has no rows: it never counts every event, and never shares the
+	// cache key of a scope whose goals resolved.
 	it('hints the failure but still reads when the goals resolver throws', async () => {
 		const seen: AnalyticsQuery[] = []
-		const payload = {} as PayloadRequest['payload']
-		setRuntime(payload, {
-			registry: createRegistry([recordingAdapter(seen, goalCaps())]),
-			configAdapterIds: new Set(['native']),
-			bindings: {},
-			engine: { read: async (adapter, query) => adapter.query(query, {}) },
-			ttl: { aggregate: 3600, realtime: 300 },
-			comparison: true,
-			resolveGoals: () => Promise.reject(new Error('boom')),
-		})
 		const result = await readForWidgetBreakdown({
-			req: { payload } as PayloadRequest,
+			req: requestWith([recordingAdapter(seen, goalCaps())], {
+				resolveGoals: () => Promise.reject(new Error('boom')),
+			}),
 			metric: 'conversions',
 			dimension: 'goal',
 			timeframe: 'last30days',

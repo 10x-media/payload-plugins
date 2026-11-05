@@ -1,9 +1,8 @@
 import { MAX_UTM_LENGTH } from './utm'
 
 /**
- * Every acquisition channel the `channel` dimension can hold, lowercase as they are stored.
- * Paid is split per platform rather than pooled, because that is the split every vendor
- * reports and the one a budget question is actually asked in.
+ * Paid is split per platform rather than pooled: that is the split every vendor reports and the
+ * one a budget question is asked in.
  */
 export const TRAFFIC_CHANNELS = [
 	'direct',
@@ -35,6 +34,11 @@ export interface ChannelInput {
 	utmMedium?: string
 	/** The page's query string, read here only for the ad networks' click ids. */
 	query?: string
+	/**
+	 * The click id {@link clickIdOf} read out of the query, for a caller that kept it instead of
+	 * the query (a stored hit). Wins over `query` when both are given.
+	 */
+	clickId?: string
 }
 
 export interface SourceInput {
@@ -58,13 +62,8 @@ const ORGANIC_CHANNELS: Record<Platform, TrafficChannel> = {
 }
 
 /**
- * Every lookup below is a `Map` or a `Set` rather than an object literal: each is keyed by
- * whatever `utm_medium`, `utm_source` or a query key carries, and an object literal answers
- * an inherited member, which would put a function where a channel belongs.
- *
- * `referral` is deliberately absent. It names the channel the host branch already decides,
- * and pinning it here would turn a hit with no referrer at all into `referral` rather than
- * `direct`.
+ * Lookups here are `Map`s or `Set`s: keys come from the query, and an object literal answers
+ * inherited members. `referral` is absent so a hit with no referrer stays `direct`.
  */
 const MEDIUM_CHANNELS: ReadonlyMap<string, TrafficChannel> = new Map<string, TrafficChannel>([
 	['email', 'email'],
@@ -84,10 +83,8 @@ const MEDIUM_CHANNELS: ReadonlyMap<string, TrafficChannel> = new Map<string, Tra
 ])
 
 /**
- * Mediums that declare a paid visit, mapped to the platform the medium itself names. `null`
- * is a medium that says "paid" and nothing more: `cpc` is as common on a social buy as on a
- * search one, so it names no platform and leaves the referrer to. Any other medium starting
- * `paid` is treated the same way.
+ * Paid mediums and the platform each names. `null` ones (`cpc` runs on social and search alike)
+ * leave the platform to the referrer, as does any other medium starting `paid`.
  */
 const PAID_MEDIUMS: ReadonlyMap<string, Platform | null> = new Map<string, Platform | null>([
 	['cpc', null],
@@ -104,7 +101,7 @@ const PAID_MEDIUMS: ReadonlyMap<string, Platform | null> = new Map<string, Platf
 ])
 
 /** Click ids only a paid click carries, and the platform of the network that issues each. */
-const PAID_CLICK_IDS: ReadonlyMap<string, Platform> = new Map<string, Platform>([
+export const PAID_CLICK_IDS: ReadonlyMap<string, Platform> = new Map<string, Platform>([
 	['gclid', 'search'],
 	['gbraid', 'search'],
 	['wbraid', 'search'],
@@ -113,16 +110,14 @@ const PAID_CLICK_IDS: ReadonlyMap<string, Platform> = new Map<string, Platform>(
 ])
 
 /**
- * Facebook appends `fbclid` to every outbound link, organic posts included, so it proves the
- * platform and never the spend. It stands in for a referrer only when there is none, which is
- * the in-app browser case it exists to cover.
+ * Facebook appends `fbclid` to every outbound link, organic included, so it proves the platform,
+ * never the spend. It stands in only for a missing referrer (the in-app browser case).
  */
-const FACEBOOK_CLICK_ID = 'fbclid'
+export const FACEBOOK_CLICK_ID = 'fbclid'
 
 /**
- * Hosts the lists below would get wrong, checked first and sorted into no platform at all.
- * Webmail is a `referral` rather than `email`: a referrer only proves a link was opened in a
- * mail client, never that the mail was the newsletter an `email` bucket claims credit for.
+ * Hosts the lists below would misfile. Webmail is `referral`, not `email`: a referrer proves a
+ * mail client, never that the mail was the newsletter `email` claims credit for.
  */
 const NON_PLATFORM_HOSTS: ReadonlySet<string> = new Set([
 	'mail.google.com',
@@ -204,9 +199,8 @@ const NAME_PLATFORMS: ReadonlyMap<string, Platform> = new Map<string, Platform>(
 ])
 
 /**
- * Second-level suffixes a brand's country site sits under (`google.co.uk`, `yahoo.com.au`).
- * Without this list a two-label tail would also match `google.evil.com`, handing any host that
- * cares to name itself after a search engine the search channel.
+ * Suffixes a brand's country site sits under (`google.co.uk`); without them any two-label tail
+ * would match, handing `google.evil.com` the search channel.
  */
 const SECOND_LEVEL: ReadonlySet<string> = new Set(['co', 'com', 'net', 'org', 'ac', 'gov', 'edu'])
 
@@ -256,57 +250,58 @@ const namePlatform = (name: string): Platform | undefined =>
 	NAME_PLATFORMS.get(name) ?? (name.includes('.') ? hostPlatform(name) : undefined)
 
 interface ClickIds {
-	/** The platform of the paid click id the query carried, if it carried one. */
 	paid?: Platform
 	facebook: boolean
 }
 
-const clickIds = (query: string | undefined): ClickIds => {
+/**
+ * Name of the query's click id: the first paid network's, else Facebook's. Only the name is kept,
+ * so a stored hit can be classified again without its query.
+ */
+export const clickIdOf = (query: string | undefined): string | undefined => {
 	if (!query) {
-		return { facebook: false }
+		return undefined
 	}
-	let paid: Platform | undefined
 	let facebook = false
 	for (const [key, value] of new URLSearchParams(query)) {
 		if (!value) {
 			continue
 		}
 		const name = key.toLowerCase()
-		if (name === FACEBOOK_CLICK_ID) {
-			facebook = true
-			continue
+		if (PAID_CLICK_IDS.has(name)) {
+			return name
 		}
-		paid ??= PAID_CLICK_IDS.get(name)
+		facebook ||= name === FACEBOOK_CLICK_ID
 	}
-	return { paid, facebook }
+	return facebook ? FACEBOOK_CLICK_ID : undefined
+}
+
+const clicksOf = (clickId: string | undefined): ClickIds => {
+	const name = clickId?.toLowerCase()
+	return {
+		paid: name === undefined ? undefined : PAID_CLICK_IDS.get(name),
+		facebook: name === FACEBOOK_CLICK_ID,
+	}
 }
 
 const paidChannel = (platform: Platform | null | undefined): TrafficChannel =>
 	platform ? PAID_CHANNELS[platform] : 'paid-other'
 
 /**
- * The acquisition channel a hit arrived through, which is what a report is asked for ("how
- * much of last month was paid search?"), where the origin it came from is the `source`
- * dimension's job.
- *
- * `utm_medium` wins outright, because a campaign states its own channel and the referrer host
- * is then only the last hop. A paid click id is next, since an ad click carries one whatever
- * host it bounced through, and it names its own network's platform. The platform itself comes
- * from the referrer host, else from `utm_source` matched by name; on the paid path `utm_source`
- * answers too when the host names no platform, because an ad click routinely arrives through the
- * network's own redirect host. Anything left with a host is `referral`, and a hit with no usable
- * host at all is `direct`.
+ * `utm_medium` wins (a campaign states its own channel), then a paid click id, then the platform of
+ * the referrer host or `utm_source`. A remaining host is `referral`, none at all is `direct`.
  */
 export const classifyChannel = ({
 	referrerHost,
 	utmSource,
 	utmMedium,
 	query,
+	clickId,
 }: ChannelInput): TrafficChannel => {
 	const host = referrerHost?.trim().toLowerCase()
 	const name = utmSource?.trim().toLowerCase()
 	const medium = utmMedium?.trim().toLowerCase()
-	const clicks = clickIds(query)
+	const clicks = clicksOf(clickId ?? clickIdOf(query))
 	const named = host ? hostPlatform(host) : name ? namePlatform(name) : undefined
 	const platform = named ?? (!host && clicks.facebook ? 'social' : undefined)
 	if (medium) {
@@ -333,12 +328,8 @@ export const classifyChannel = ({
 }
 
 /**
- * The visit's named origin: the `utm_source` it was tagged with, else the host it came from,
- * else `direct`. That is what `source` means on Plausible (`visit:source`) and GA4
- * (`sessionSource`), so a report reads the same column whichever source answered it. The tag is
- * lowercased and capped like every other campaign key, so one tag spelled two ways is one row; the
- * host already arrives lowercased, and the `utmSource` dimension keeps the tag as it was written. A
- * campaign tagged `utm_source=direct` therefore shares the `direct` bucket with untagged traffic.
+ * `utm_source` (lowercased, capped), else referrer host, else `direct`, as Plausible and GA4 define
+ * source. A campaign tagged `utm_source=direct` therefore shares the untagged `direct` bucket.
  */
 export const deriveSource = ({ referrerHost, utmSource }: SourceInput): string => {
 	const tagged = utmSource?.trim().toLowerCase().slice(0, MAX_UTM_LENGTH)

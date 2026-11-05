@@ -1,0 +1,206 @@
+---
+title: Content items
+description: How often an offer, a banner or a product card is seen and clicked, and what it converts, wherever it appears.
+---
+
+A page has visitors. An offer, a banner or a product card does not: it appears on pages, often on many of them at once. Content items are the analytics of the thing itself. How often it was seen, by how many people, how often it was clicked, what it converted, and on which pages that happened.
+
+Items are measured by the [native engine](/analytics/native). A vendor slot receives the clicks (see [what vendors receive](#what-vendors-receive)), but the reports below read native alone.
+
+## What an item is
+
+An item is a document of a collection bound with `item: true`:
+
+```ts title="payload.config.ts"
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  collections: {
+    offers: { item: true },
+    // Bound as both: the product has a page of its own and appears as a card elsewhere.
+    products: { path: (doc) => `/products/${doc.slug}`, item: true },
+  },
+})
+```
+
+Each document is counted under its ref, `<collection>:<id>`, with the id URI-encoded: `offers:12`. A ref is at most 128 characters. A page sends it with a short signature only your server can write, `offers:12@Xk3Pq9LmZ1aB` (see [signed refs](#signed-refs)). Ingest keeps a ref only when its signature checks out, its collection is bound as an item, and its id could be one of that collection's ids (an ObjectId on Mongo, an integer or a uuid on Postgres, anything for a custom text id). All of that is decided without a database read. Any other ref is dropped and the event it came with is kept. Write the id as the document carries it, `String(doc.id)`, which is what the helpers below do.
+
+## Marking an element
+
+The plugin renders nothing on your site. Mark the element that shows the item where you render it on the server, with `itemAttributesFor` from the root entry:
+
+```tsx title="components/offer-card.tsx"
+import { itemAttributesFor } from '@10x-media/analytics'
+import { goalAttributes } from '@10x-media/analytics/attributes'
+import config from '@payload-config'
+import { getPayload } from 'payload'
+
+export const OfferCard = async ({ offer }: { offer: { id: string; title: string } }) => {
+  const payload = await getPayload({ config })
+  return (
+    <article {...itemAttributesFor(payload, { collection: 'offers', id: offer.id, name: offer.title })}>
+      <h3>{offer.title}</h3>
+      <a {...goalAttributes('book-demo')} href="/demo">
+        Book a demo
+      </a>
+    </article>
+  )
+}
+```
+
+That spreads `data-analytics-item="offers:12@Xk3Pq9LmZ1aB"` and, when a name is given, `data-analytics-item-name="Spring sale"`. The name goes to [vendor slots](#what-vendors-receive) only: native stores the ref and never the name, since the document's title is read fresh whenever a report shows it. An item with no id yet spreads to no attributes at all, so a document that was never saved renders unmarked.
+
+Mark the whole card rather than its button: a view is the card on screen, and a click anywhere on the card counts.
+
+### Signed refs
+
+Anyone can send a beacon to the ingest endpoint. Without a signature, a script on any page could invent items, or add views to a real one. The signature is twelve characters only your server can compute: it comes from your Payload secret, travels with the ref, and ingest checks it without reading the database. A ref without a valid signature is dropped, and the event it came with is kept.
+
+Sign where the document is rendered on the server:
+
+- `itemAttributesFor(payload, { collection, id, name })` returns the attributes, ready to spread.
+- `signItemRef(payload, collection, id)` returns the signed ref alone. Hand it to whatever renders the element elsewhere, a client component or a Lexical converter, and spread `itemAttributes({ ref, name })` from `@10x-media/analytics/attributes` there. That entry imports neither Payload nor React.
+
+```tsx title="components/OfferCard.tsx"
+import { signItemRef } from '@10x-media/analytics'
+import { itemAttributes } from '@10x-media/analytics/attributes'
+import type { Payload } from 'payload'
+
+type Offer = { id: string; title: string }
+
+/** Renders the element; it could as well be a client component in a file of its own. */
+const OfferTeaser = ({ offer, offerRef }: { offer: Offer; offerRef: string | undefined }) => (
+  <article {...itemAttributes({ ref: offerRef, name: offer.title })}>{offer.title}</article>
+)
+
+/** The server component that loads the offer signs its ref. */
+export const OfferCard = ({ payload, offer }: { payload: Payload; offer: Offer }) => (
+  <OfferTeaser offer={offer} offerRef={signItemRef(payload, 'offers', offer.id)} />
+)
+```
+
+Both return nothing for a document without an id, for an id the collection could not hold, and for a ref longer than ingest keeps. The tracker sends the signed ref to native as it was written; [vendor slots](#what-vendors-receive) receive the ref without its signature.
+
+Server code needs no signature: an `item` passed to `trackServerEvent`, `purchase` or `refund` is taken without one, as long as its collection is bound as items and its id is one that collection could hold. A signed ref passed there is still checked.
+
+An install that writes refs where it cannot sign them can keep unsigned refs as well:
+
+```ts
+native({ items: { signature: 'optional' } })
+```
+
+A ref with a wrong signature is still dropped. `itemRef(collection, id)` and `itemAttributes({ collection, id, name })` from the attributes entry write unsigned refs, for that install and for vendor slots, which keep every ref.
+
+## What counts as a view
+
+The tracker counts an item as seen when, without a break, for a whole second:
+
+- at least half of the element is on screen, or, for an element taller than the screen, it fills at least half of the screen;
+- the tab is in front.
+
+At the end of that second the element must also not be hidden by its styles (`opacity: 0` or `visibility: hidden`, on it or on a parent). Each item counts once per pageview, however often it scrolls back into view, and again on the next pageview. Two elements showing the same item on one page are one view of it.
+
+A page that changes is followed: an element added later is watched once the page has had a quiet moment, and an element whose ref changes (a carousel reusing its slides) counts as a new item. A browser without `IntersectionObserver` counts no views at all rather than guessing.
+
+Views travel on the page's [engagement](/analytics/capture#what-the-tracker-sends-to-native) message, the one that already carries time on page: when the tab is hidden, when the page is left, before the next pageview of a single-page app, and early once 50 items are waiting, which is what one message carries. An item seen is something new on its own, so the message goes out even under a second of time. Like everything else the tracker sends, no view is counted while the browser is [excluded](/analytics/capture#excluding-your-own-visits), and none while the native slot's [gate](/analytics/consent) is not open: views are never held back to be sent later, so nothing seen before the gate opens is ever counted.
+
+A view is never a row of its own. Ingest adds it to the item's counts and stores nothing else about it; see [Privacy](/analytics/privacy#content-items).
+
+## What counts as a click
+
+The first click anywhere inside a marked element, per item and pageview, sends an `item_click` event carrying the item. It is a real event: it appears among the events in the analytics view, and it counts toward the page and the site it happened on like any other click.
+
+A goal or a custom event fired by auto-capture from inside the element is credited to the item too. The **Book a demo** link above sends `item_click` for the offer and completes `book-demo` for it, in one click.
+
+Call it yourself where there is no element to mark, with a ref the server signed and passed to the page:
+
+```ts
+import { initTracker } from '@10x-media/analytics/tracker'
+
+/** Refs the server signed with `signItemRef` and rendered into the page. */
+declare const offerRef: string
+declare const productRef: string
+
+const tracker = await initTracker()
+tracker.track('video-play', { length: 30 }, { item: offerRef })
+tracker.trackGoal('book-demo', { item: offerRef })
+tracker.purchase({ orderId: 'ord_123', value: 49, item: productRef })
+```
+
+`useAnalytics()` offers the same calls. On the server, `trackServerEvent` takes `item` as a plain ref (`products:7`), and so do `purchase` and `refund`, so a payment webhook can credit a sale to the product card the buyer came through. A sale credited from the server counts toward the item's totals and on no page: its path is where it was recorded, `/orders` unless the call names one, not a page anyone saw the card on. When the browser recorded the same sale too, it [counts on the browser's record](/analytics/revenue#recorded-in-the-browser-and-by-the-webhook), in the buyer's visit, with the server's item and still on no page.
+
+## How conversions are credited
+
+Directly, and only directly: a goal completion counts for an item when it carries that item, by being fired inside the element or by naming it. Its revenue counts with it. A visitor who clicks an offer and books a demo on another page later is not credited to the offer.
+
+## The item report on a document
+
+`analyticsTab()` on a collection bound as an item reads the document as an item:
+
+- **Cards.** **Views**, **Viewers** (people who saw or clicked it), **Clicks**, **Click rate** (clicks per view), **Conversions**, **Conversion rate** (conversions per view), and **Revenue** on an install that [measures money](/analytics/revenue). Each compares against the previous period, like the page report. A rate never passes 100%: a click can arrive before its view was counted.
+- **Views over time**, as a trend: by day up to a month, by week for **Last 90 days**, by month past that.
+- **Pages it was seen on**, exact, from the item's own counts: every page with at least one view of it, ranked by views.
+- **Countries** and **Devices** of the people who clicked it: each person counted once, by the country and device of the visit they clicked in. A filter on the item alone also matches its views, so these read its `item_click` events from the raw hits, and a busy item over a long window can be marked as estimated, like the page report's lists. A source that cannot filter by event lists **Clicks by country** and **Clicks by device** instead, counting clicks rather than people.
+
+There is no live counter: nothing about an item is counted live.
+
+A collection bound as both a page and an item offers a **Show** select with **Views and clicks** and **Page visits**, and opens on the item. `report` pins one of them:
+
+```ts
+analyticsTab({ report: 'page' }) // only the page, even on a collection bound as both
+analyticsTab({ report: 'item' })
+```
+
+The stat fields follow the same rule, and a stat row left on its default metrics shows the item's views, viewers, clicks and conversions instead of a page's. A source that cannot read an item shows the panel's **not available** state, and the panel's data-source select offers only the sources that can. The document's tenant is resolved exactly as for a page, and so is who may see its numbers; see [Display fields](/analytics/display-fields#reports-a-page-or-an-item).
+
+## The Content tab
+
+The [analytics view](/analytics/analytics-view) gains a **Content** tab listing every item seen in the window, with **Views**, **Clicks**, **Click rate** and **Conversions**. Each row is named by its document's title, read through the collection's `useAsTitle` with the reader's own access, so an editor sees only titles they could open themselves. A document that was deleted, or that the reader may not open, reads **Removed or hidden item**, never as its ref. So does a ref whose id no document of its collection could have, which is never sent to the database at all: one id it cannot read must not cost the other rows their titles.
+
+Clicking a row filters the whole view to that item: the cards, the trend and every tab then read its clicks, goals and events. Views are never rows, so a view filtered to one item shows no views; the Content tab and the document's own report are where views are read.
+
+The tab appears only on a source that lists items, which on native means an install that binds at least one collection as items.
+
+## Turning it off
+
+Item capture is on by default once a collection is bound with `item: true`, and does nothing until a page marks an element; with no collection bound, the tracker watches nothing, whatever this says. Turn it off, or a part of it, under `capture.autoCapture`:
+
+```ts
+import type { AutoCaptureOptions } from '@10x-media/analytics'
+
+export const off: AutoCaptureOptions = { items: false }
+export const viewsOff: AutoCaptureOptions = { items: { impressions: false, clicks: true, pages: true } }
+```
+
+| Option | Default | Does |
+|---|---|---|
+| `impressions` | on | Counts views. Off, no element is watched at all. |
+| `clicks` | on | Sends `item_click`. Off, goals fired inside an item are still credited to it. |
+| `pages` | on | Counts each item per page it appeared on as well as its total. Off, **Pages it was seen on** stays empty. |
+
+`items: false` turns off all three, and with them the crediting of goals fired inside an item.
+
+## What vendors receive
+
+| Vendor | `item_click` | A goal or an event carrying an item |
+|---|---|---|
+| GA4 | `select_promotion`, with `promotion_id` (the ref), `promotion_name` and `items: [{ item_id, item_name }]` | `item` and `item_name` parameters |
+| Plausible | `item_click`, with `item` and `item_name` props | `item` and `item_name` props |
+| Umami | `item_click`, with `item` and `item_name` data | `item` and `item_name` data |
+| PostHog | `item_click`, with `item` and `item_name` properties | `item` and `item_name` properties |
+
+Every vendor receives the ref without its signature, which only native checks. Views are never forwarded: a vendor would bill every one of them as an event. Reading items back from a vendor is not available yet, so a vendor source offers no item report and no Content tab.
+
+## Reading it yourself
+
+The [query endpoint](/analytics/reference/endpoints) takes `item=<ref>` on a source that declares `perItemQuery`, and `dimensions=item` lists items. A response that names any item carries `itemLabels`, the same titles the view shows, with `null` for a removed or hidden one:
+
+```
+GET /api/_x/query?metrics=impressions,interactions&dimensions=item&from=2026-09-01&to=2026-09-30
+```
+
+`impressions` (views) are counted per item only, so a read of the whole site has no views to report. `interactions` (clicks) are counted per item and, like any event, on the page, the site and each breakdown row the click happened under, so a site's `interactions` are the total of its item clicks. Neither is offered as a card or a widget metric.
+
+## Upgrading
+
+Native keeps a view on the engagement row that carried it and a click on its event row, and counts both into its daily totals (see [content items](/analytics/native#content-items)). Items need no columns or migration of their own beyond the engine's [collections](/analytics/native#storage).

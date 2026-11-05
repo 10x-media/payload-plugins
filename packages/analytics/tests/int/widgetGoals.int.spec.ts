@@ -1,6 +1,11 @@
-import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { Endpoint, Payload, PayloadRequest, WidgetServerProps } from 'payload'
-import { renderToStaticMarkup } from 'react-dom/server'
+import {
+	type BootedPayload,
+	bootPayload,
+	describeForDb,
+	installTestClock,
+	type TestClock,
+} from '@10x-media/payload-test-harness'
+import type { Payload, WidgetServerProps } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type {
 	AnalyticsAdapter,
@@ -10,16 +15,18 @@ import type {
 import { GOALS_SLUG } from '../../src/goals/collection'
 import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
-import { ROLLUPS_SLUG } from '../../src/native/collections/rollups'
 import { native } from '../../src/native/nativeAdapter'
-import { QUERY_PATH } from '../../src/plugin/paths'
+import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import type { QueryResponse } from '../../src/query/response'
-import { startOfDayInTz } from '../../src/timeframe/tz'
+import { renderSettled } from '../../src/testing/renderSettled'
+import { DAY_MS, startOfDayInTz } from '../../src/timeframe/tz'
 import AnalyticsGoalsWidget from '../../src/widgets/AnalyticsGoalsWidget'
 import { readForWidgetGoals } from '../../src/widgets/readForWidgetGoals'
-import { ingestRequest } from './ingestRequest'
+import { callEndpoint } from './endpointHelpers'
+import { nativeOf, pageviewHit, postBeacon } from './nativeHelpers'
+import { readerRequest } from './readerRequest'
 
-const DAY_MS = 86_400_000
+const routes = routePaths(DEFAULT_ROUTE_BASE)
 
 const goals: Goal[] = [
 	{ slug: 'thanks', name: 'Thank you page', match: { kind: 'path', pattern: '/thank-you' } },
@@ -32,16 +39,16 @@ const goals: Goal[] = [
 	},
 ]
 
+/** The config goals above and the `demo` goal the unscoped install adds to its collection. */
+const INSTALL_GOAL_SLUGS = new Set(['thanks', 'purchase', 'newsletter', 'demo'])
+
 const providerCapabilities: AnalyticsCapabilities = {
-	perPageQuery: true,
 	realtime: false,
 	minGranularity: 'day',
 	maxLookbackDays: null,
 	metrics: new Set(['pageviews', 'visitors', 'conversions', 'revenue']),
 	dimensions: new Set(['page', 'goal']),
-	filters: new Set(['page']),
-	filterOperators: new Set(['eq']),
-	batchPageReport: false,
+	filters: { page: ['eq'] },
 	rateLimit: null,
 	recommendedTtl: { realtime: 60, aggregate: 3600 },
 }
@@ -84,43 +91,39 @@ interface IngestArgs {
 
 /** One ingest per visitor, so each seeded visitor counts as its own. */
 const ingestAs = async (payload: Payload, args: IngestArgs): Promise<void> => {
-	const endpoint = (payload.config.endpoints ?? []).find(
-		(e): e is Endpoint => typeof e === 'object' && e.path === '/analytics/ingest'
-	)
-	if (!endpoint || typeof endpoint.handler !== 'function') {
-		throw new Error('ingest endpoint not registered')
-	}
-	const res = await endpoint.handler(
-		ingestRequest(
-			payload,
-			{ hostname: 'h', ...args.body },
-			{ 'user-agent': args.visitor, ...args.headers }
-		)
+	const res = await postBeacon(
+		payload,
+		{ hostname: 'h', ...args.body },
+		{ 'user-agent': args.visitor, ...args.headers }
 	)
 	expect(res.status).toBe(202)
 }
 
 describeForDb('goals widget read: unscoped native install', {}, (db) => {
 	let booted: BootedPayload
+	let clock: TestClock
 	const providerQueries: AnalyticsQuery[] = []
 
 	// Today, so the seeded previous day stays out of the current window and only the
 	// comparison read sees it.
 	const read = (over: { compare?: boolean; limit?: number } = {}) =>
 		readForWidgetGoals({
-			req: { payload: booted.payload, headers: new Headers() } as unknown as PayloadRequest,
+			req: readerRequest(booted.payload),
 			timeframe: 'today',
 			limit: over.limit ?? 10,
 			compare: over.compare ?? false,
-			now: new Date(),
+			now: clock.now(),
 		})
 
 	beforeAll(async () => {
+		// Held still, so the seeding and every read below fall on one day whenever midnight passes.
+		clock = installTestClock(new Date())
 		booted = await bootPayload({
 			db,
 			plugin: analytics({
 				adapters: [native(), providerStub(providerQueries)],
 				defaultAdapter: 'native',
+				revenue: true,
 				goals: { defaults: goals, collection: true },
 			}),
 		})
@@ -148,29 +151,26 @@ describeForDb('goals widget read: unscoped native install', {}, (db) => {
 			visitor: 'ua-6',
 			body: { type: 'event', name: 'demo_requested', path: '/pricing' },
 		})
-		// The previous window, seeded straight into the rollups: ingest always stamps now.
-		// Through the db adapter, since the rollup writer's own buckets key on empty strings
-		// that the collection's required text fields reject through the document API.
-		await booted.payload.db.create({
-			collection: ROLLUPS_SLUG,
-			data: {
-				granularity: 'day',
-				period: new Date(startOfDayInTz(new Date(), 'UTC').getTime() - DAY_MS).toISOString(),
-				path: '',
-				dimension: 'goal',
-				dimvalue: 'purchase',
-				hostname: '',
-				events: 1,
-				samples: 1,
-				visitors: 1,
-				sessions: 1,
-				conversions: 4,
-				revenue: 100,
-			} as never,
-		})
+		// The previous window, seeded straight into the store: ingest always stamps now. Four
+		// purchases yesterday at noon, worth 100 together.
+		const yesterday = new Date(startOfDayInTz(clock.now(), 'UTC').getTime() - DAY_MS / 2)
+		await nativeOf(booted.payload).store.append(
+			['p-1', 'p-2', 'p-3', 'p-4'].map((v) => ({
+				...pageviewHit({ ts: yesterday, v, path: '/checkout' }),
+				type: 'goal' as const,
+				name: 'purchase',
+				landing: false,
+				value: 25,
+				currency: 'EUR',
+				goals: [{ slug: 'purchase', value: 25 }],
+				conversions: 1,
+				revenue: 25,
+			}))
+		)
 	}, 240_000)
 
 	afterAll(async () => {
+		clock?.reset()
 		await booted.stop()
 	})
 
@@ -188,9 +188,9 @@ describeForDb('goals widget read: unscoped native install', {}, (db) => {
 	})
 
 	it(`names a config goal and a collection goal on ${db}`, async () => {
-		const byslug = new Map((await read()).rows.map((r) => [r.slug, r.name]))
-		expect(byslug.get('purchase')).toBe('Purchase')
-		expect(byslug.get('demo')).toBe('Demo requested')
+		const names = new Map((await read()).rows.map((r) => [r.slug, r.name]))
+		expect(names.get('purchase')).toBe('Purchase')
+		expect(names.get('demo')).toBe('Demo requested')
 	})
 
 	it(`divides each goal's visitors by the site's for the rate on ${db}`, async () => {
@@ -217,7 +217,7 @@ describeForDb('goals widget read: unscoped native install', {}, (db) => {
 	it(`hints the install's goal slugs to a provider-shaped source on ${db}`, async () => {
 		providerQueries.length = 0
 		const result = await readForWidgetGoals({
-			req: { payload: booted.payload, headers: new Headers() } as unknown as PayloadRequest,
+			req: readerRequest(booted.payload),
 			timeframe: 'last30days',
 			limit: 10,
 			compare: false,
@@ -225,9 +225,7 @@ describeForDb('goals widget read: unscoped native install', {}, (db) => {
 			now: new Date(),
 		})
 		const goalRead = providerQueries.find((q) => (q.dimensions ?? []).includes('goal'))
-		expect(new Set(goalRead?.goalSlugs)).toEqual(
-			new Set(['thanks', 'purchase', 'newsletter', 'demo'])
-		)
+		expect(new Set(goalRead?.goalSlugs)).toEqual(INSTALL_GOAL_SLUGS)
 		expect(result.status).toBe('ok')
 		expect(result.rows).toHaveLength(4)
 		// The source served the rows, and the install named them.
@@ -235,13 +233,11 @@ describeForDb('goals widget read: unscoped native install', {}, (db) => {
 	})
 
 	it(`renders the goals widget on a provider-shaped source on ${db}`, async () => {
-		const req = {
-			payload: booted.payload,
-			headers: new Headers(),
+		const req = readerRequest(booted.payload, {
 			i18n: { t: (key: string) => key, language: 'en' },
-		} as unknown as PayloadRequest
-		const html = renderToStaticMarkup(
-			await AnalyticsGoalsWidget({
+		})
+		const html = await renderSettled(
+			AnalyticsGoalsWidget({
 				req,
 				widgetData: { dataSource: 'provider-stub' },
 			} as unknown as WidgetServerProps)
@@ -253,26 +249,16 @@ describeForDb('goals widget read: unscoped native install', {}, (db) => {
 
 	it(`sends the scope's goal slugs to the source through the query endpoint on ${db}`, async () => {
 		providerQueries.length = 0
-		const endpoint = (booted.payload.config.endpoints ?? []).find(
-			(e): e is Endpoint => typeof e === 'object' && e.path === QUERY_PATH
-		)
-		if (!endpoint || typeof endpoint.handler !== 'function') {
-			throw new Error('query endpoint not registered')
-		}
-		const res = await endpoint.handler({
-			payload: booted.payload,
-			user: { id: 1, email: 'reader@t.dev' },
-			url: `http://localhost/api${QUERY_PATH}?source=provider-stub&metrics=conversions&dimensions=goal&from=2026-01-10&to=2026-01-16`,
-			headers: new Headers(),
-		} as unknown as PayloadRequest)
+		const res = await callEndpoint(booted.payload, {
+			path: routes.query,
+			query:
+				'source=provider-stub&metrics=conversions&dimensions=goal&from=2026-01-10&to=2026-01-16',
+			user: { id: 1, email: 'reader@t.dev', collection: booted.payload.config.admin.user },
+		})
 		expect(res.status).toBe(200)
 		const body = (await res.json()) as QueryResponse
-		expect(new Set(providerQueries[0]?.goalSlugs)).toEqual(
-			new Set(['thanks', 'purchase', 'newsletter', 'demo'])
-		)
-		expect(new Set(body.query.goalSlugs)).toEqual(
-			new Set(['thanks', 'purchase', 'newsletter', 'demo'])
-		)
+		expect(new Set(providerQueries[0]?.goalSlugs)).toEqual(INSTALL_GOAL_SLUGS)
+		expect(new Set(body.query.goalSlugs)).toEqual(INSTALL_GOAL_SLUGS)
 		expect(body.result.rows).toHaveLength(4)
 		expect(body.result.meta.goalsUnresolved).toBeUndefined()
 	})
@@ -283,10 +269,7 @@ describeForDb('goals widget read: scoped native install', {}, (db) => {
 
 	const readAs = (tenant: string) =>
 		readForWidgetGoals({
-			req: {
-				payload: booted.payload,
-				headers: new Headers({ 'x-tenant': tenant }),
-			} as unknown as PayloadRequest,
+			req: readerRequest(booted.payload, { headers: new Headers({ 'x-tenant': tenant }) }),
 			timeframe: 'last30days',
 			limit: 10,
 			compare: false,
@@ -298,11 +281,12 @@ describeForDb('goals widget read: scoped native install', {}, (db) => {
 			db,
 			plugin: analytics({
 				adapters: [native()],
+				capture: { gate: 'off' },
 				goals: [
 					{ slug: 'alpha-goal', name: 'Alpha goal', match: { kind: 'goal' } },
 					{ slug: 'beta-goal', name: 'Beta goal', match: { kind: 'goal' } },
 				],
-				scopeResolver: ({ req }) => req.headers.get('x-tenant'),
+				scope: { member: () => true, resolve: ({ req }) => req.headers.get('x-tenant') },
 			}),
 		})
 		await ingestAs(booted.payload, {

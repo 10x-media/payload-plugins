@@ -100,5 +100,10 @@ export const measurements: CollectionConfig = {
 				},
 			}),
 		}),
+		{
+			name: 'standaloneMeasurementInputs',
+			type: 'ui',
+			admin: { components: { Field: '/components/standaloneShowcase#MeasurementInputShowcase' } },
+		},
 	],
 }

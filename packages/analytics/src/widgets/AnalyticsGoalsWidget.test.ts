@@ -1,10 +1,13 @@
 import type { PayloadRequest, WidgetServerProps } from 'payload'
-import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { renderSettled } from '../testing/renderSettled'
+import { declarationsOf } from '../testing/stylesheet'
+import { keys } from '../translations/keys'
 import AnalyticsGoalsWidget from './AnalyticsGoalsWidget'
 import { readForWidgetGoals, type WidgetGoalsResult } from './readForWidgetGoals'
 import type { GoalsWidgetData } from './types'
 import type { WidgetView } from './viewLink'
+import { hrefIn } from './widgetTestKit'
 
 vi.mock('./readForWidgetGoals', () => ({ readForWidgetGoals: vi.fn() }))
 
@@ -30,18 +33,15 @@ const req = (): PayloadRequest =>
 	}) as unknown as PayloadRequest
 
 const render = async (widgetData: GoalsWidgetData = {}, view?: WidgetView): Promise<string> =>
-	renderToStaticMarkup(
-		await AnalyticsGoalsWidget({ req: req(), widgetData, view } as unknown as WidgetServerProps)
+	renderSettled(
+		AnalyticsGoalsWidget({ req: req(), widgetData, view } as unknown as WidgetServerProps)
 	)
-
-const hrefIn = (html: string): string | undefined =>
-	html.match(/<a[^>]+href="([^"]+)"/)?.[1]?.replaceAll('&amp;', '&')
 
 const view = { path: '/x', defaultRange: 'last30days', defaultMetric: 'pageviews' } as const
 
-/** The rendered column headers, in order. */
+/** The column headers; each goal's name is its row's header, which this leaves out. */
 const headers = (html: string): string[] =>
-	Array.from(html.matchAll(/<th[^>]*>([^<]*)<\/th>/g), (m) => m[1] ?? '')
+	Array.from(html.matchAll(/<th[^>]*scope="col"[^>]*>([^<]*)<\/th>/g), (m) => m[1] ?? '')
 
 describe('AnalyticsGoalsWidget', () => {
 	beforeEach(() => {
@@ -78,7 +78,9 @@ describe('AnalyticsGoalsWidget', () => {
 			})
 		)
 		const html = await render()
-		expect(html).toMatch(/>-<\/td>/)
+		expect(html).toMatch(
+			/<td><span aria-hidden="true">-<\/span><span class="analytics-sr-only">analytics:stateNoValue<\/span><\/td>/
+		)
 	})
 
 	it('reads the row limit and comparison from the widget data', async () => {
@@ -139,6 +141,41 @@ describe('AnalyticsGoalsWidget', () => {
 		expect(html.split('role="img"').length - 1).toBe(1)
 	})
 
+	// A narrow card has no room to say it on every row; each pill still says it in its name.
+	it('says what the deltas compare against once, under the table, not on each row', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(
+			result({
+				rows: [
+					{ slug: 'purchase', name: 'Purchase', conversions: 5, previousConversions: 4 },
+					{ slug: 'newsletter', name: 'Newsletter', conversions: 9, previousConversions: 3 },
+				],
+			})
+		)
+		const html = await render({ compare: true })
+		expect(html.split('>analytics:comparisonVsPrevious<').length - 1).toBe(1)
+		expect(html.split('role="img"').length - 1).toBe(2)
+		expect(html).toMatch(/<\/table><\/div><span class="analytics-delta__caption">/)
+	})
+
+	// A phone leaves a goal's name a narrow column: cut short there, it would name no goal at all.
+	it('wraps a long goal name in the room the numbers leave it', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(
+			result({
+				rows: [
+					{ slug: 'quote', name: 'Requested a quote for the enterprise plan', conversions: 2 },
+				],
+			})
+		)
+		const html = await render()
+		expect(html).not.toContain('analytics-table--truncate')
+		expect(html).toContain('analytics-goals-widget__table')
+		expect(html).toMatch(/<th class="analytics-table__label" scope="row"><bdi>Requested a quote/)
+		expect(declarationsOf('.analytics-goals-widget__table .analytics-table__label')).toEqual({
+			width: '100%',
+			'overflow-wrap': 'anywhere',
+		})
+	})
+
 	it('renders the empty state when the read returned no goals', async () => {
 		vi.mocked(readForWidgetGoals).mockResolvedValue(result({ rows: [] }))
 		const html = await render()
@@ -151,6 +188,21 @@ describe('AnalyticsGoalsWidget', () => {
 		const html = await render()
 		expect(html).toContain('analytics:stateUnavailable')
 		expect(html).not.toContain('<table')
+	})
+
+	it('centers an empty state in the body, keeping the window it found nothing in', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result({ rows: [] }))
+		const html = await render()
+		expect(html).toMatch(/class="analytics-widget__empty"[^>]*>analytics:stateNoBreakdown</)
+		expect(html).toContain('analytics:timeframeLast30Days')
+	})
+
+	// A read that never answered has no numbers for a window to caption.
+	it('states no window on a read the source could not serve', async () => {
+		vi.mocked(readForWidgetGoals).mockResolvedValue(result({ status: 'unavailable', rows: [] }))
+		const html = await render()
+		expect(html).toContain('class="analytics-widget__empty"')
+		expect(html).not.toContain('analytics:timeframeLast30Days')
 	})
 
 	it('renders the not-configured state', async () => {
@@ -231,5 +283,20 @@ describe('AnalyticsGoalsWidget', () => {
 		const html = await render()
 		expect(html).toContain('analytics:stateNoGoals')
 		expect(html).not.toContain('analytics:stateNoBreakdown')
+	})
+})
+
+describe('AnalyticsGoalsWidget custom range', () => {
+	beforeEach(() => {
+		vi.mocked(readForWidgetGoals).mockReset()
+	})
+
+	it('says a range before 1970 is invalid instead of counting the last 30 days', async () => {
+		const html = await render({
+			timeframe: 'custom',
+			range: { from: '1969-12-01', to: '1970-01-05' },
+		})
+		expect(html).toContain(keys.viewErrorInvalid)
+		expect(readForWidgetGoals).not.toHaveBeenCalled()
 	})
 })

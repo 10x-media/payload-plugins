@@ -11,6 +11,17 @@ describe('createCoalescer', () => {
 		expect(worker).toHaveBeenCalledTimes(1)
 	})
 
+	it('says whether a key is still in flight', async () => {
+		const coalesce = createCoalescer<number>()
+		let finish: (value: number) => void = () => {}
+		const pending = coalesce('k', () => new Promise<number>((resolve) => (finish = resolve)))
+		expect(coalesce.has('k')).toBe(true)
+		expect(coalesce.has('other')).toBe(false)
+		finish(1)
+		await pending
+		expect(coalesce.has('k')).toBe(false)
+	})
+
 	it('runs again after the first settles', async () => {
 		const worker = vi.fn(async () => 1)
 		const coalesce = createCoalescer<number>()

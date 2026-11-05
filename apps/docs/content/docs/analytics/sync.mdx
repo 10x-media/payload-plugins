@@ -3,11 +3,12 @@ title: Sync tier
 description: Persist provider daily metrics into a queryable Payload collection.
 ---
 
-The cache keeps `payload.kv` hot, but kv is ephemeral. The sync tier is durable: an opt-in job that upserts each configured provider's daily metrics into a real Payload collection, so you can query third-party analytics with Payload's own APIs (`find`, `where`, REST, GraphQL, relationships, custom reports) without calling the provider live.
+The cache keeps recent reads for a while and then deletes them. The sync tier is durable: an opt-in job that upserts each configured provider's daily metrics into a real Payload collection, so you can query third-party analytics with Payload's own APIs (`find`, `where`, REST, GraphQL, relationships, custom reports) without calling the provider live.
 
 ```ts
 analytics({
-  adapters: [plausible({ /* ... */ })],
+  adapters: [plausible({ siteId: 'example.com', apiKey: process.env.PLAUSIBLE_API_KEY ?? '' })],
+  capture: { gate: 'all' },
   sync: true, // every 6h, last 3 days, into `analytics-daily`
 })
 ```
@@ -17,34 +18,127 @@ Or tuned:
 ```ts
 analytics({
   adapters: [/* ... */],
+  capture: { gate: 'all' },
   sync: {
-    cron: '0 4 * * *',
     lookbackDays: 7,
-    collectionSlug: 'site-metrics',
-    adapters: ['plausible'], // default: every configured provider
-    hidden: false, // show in the admin nav (default: hidden, still API-queryable)
+    adapters: ['plausible'], // default: every configured provider; an id no adapter has syncs nothing
+    collection: {
+      slug: 'site-metrics',
+      hidden: false, // show in the admin nav (default: hidden, still API-queryable)
+      overrides: (collection) => collection, // reshape the generated collection last
+    },
+  },
+  // When it runs and on which queue: the plugin's `jobs` option.
+  jobs: { tasks: { sync: { cron: '0 4 * * *', queue: 'analytics' } } },
+})
+```
+
+`sync` says what is copied, `jobs.tasks.sync` when and on which queue (see [the `jobs` option](/analytics/native#the-jobs-option)). `sync.cron` was removed in 1.0.0-beta.12 and fails the boot, naming `jobs.tasks.sync.cron`.
+
+## The collection
+
+`sync.collection.hidden` defaults to true: the collection is a query substrate for custom reporting rather than something to browse and edit, and `admin.hidden` only removes the nav entry, so it stays fully queryable through the REST, GraphQL and local APIs either way. Set `hidden: false` to surface it.
+
+When it is surfaced, it appears under the plugin's **Analytics settings** nav group, beside the goals and providers collections, and is labelled in the admin language like every other string the plugin renders. Both the group name (the `adminGroup` key) and the labels are localizable through the [`translations` option](/analytics/reference/translations). Its list opens on `source`, `date`, `pageviews` and `visitors`.
+
+`sync.collection.overrides` reshapes the generated collection last, the same seam the [goals](/analytics/goals) and [providers](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) collections offer. It receives the finished config and returns one, so it can add fields, hooks, admin components or access rules:
+
+```ts
+analytics({
+  adapters: [/* ... */],
+  capture: { gate: 'all' },
+  sync: {
+    collection: {
+      overrides: (collection) => ({
+        ...collection,
+        admin: { ...collection.admin, description: 'Synced nightly from Plausible.' },
+      }),
+    },
   },
 })
 ```
 
+Writes stay locked to the sync job whatever an override returns: the job writes through `payload.db`, below access control, so loosening `create`, `update` or `delete` in an override opens the collection to editors rather than to the job, and the boot warns about it once at init. For the same reason, collection and field hooks an override adds do not run on the rows the job writes. The job writes the fields above by name and relies on the unique `source + date + scope` index, so an override that removes or retypes one of them, drops that index, renames the collection (`sync.collection.slug` does) or adds a required field without a fixed `defaultValue` (a value, not a function) fails the boot; [Renaming the plugin's collections](/analytics/reference/options#renaming-the-plugins-collections) lists the checks.
+
 ## How it works
 
-When enabled, the plugin registers the collection (default slug `analytics-daily`) and a Payload task (`analytics-sync`). On its cron, the task reads each provider's last `lookbackDays` of daily metrics through the surfacing engine and upserts one row per `(source, date, scope)`.
+When enabled, the plugin registers the collection (default slug `analytics-daily`) and a Payload task (`analytics-sync`). On its schedule, the task reads each provider's last `lookbackDays` of daily metrics through the surfacing engine and writes one row per `(source, date, scope)`. The days are UTC days, whatever the scope's [reporting timezone](/analytics/timezone): the window starts at a UTC midnight and the read asks for no zone.
 
-A unique `source + date + scope` index makes re-runs idempotent: recent days are refreshed as provider data finalizes rather than duplicated, which is also why the default looks back three days instead of one. Each row carries `source`, `date`, `scope`, `pageviews`, `visitors`, `sessions`, `avgDuration`, `bounceRate`, `events`, and `syncedAt`; metrics a provider does not report stay null. The collection is read-only (the job writes, users read) and hidden from the admin nav by default, since it is a query substrate for custom reporting rather than something to browse and edit; it stays fully queryable through the REST/local API, and `sync: { hidden: false }` surfaces it in the nav. The native engine is excluded, since its data already lives durably in `analytics-rollups`, and one provider failing is logged without aborting the others.
+A unique `source + date + scope` index makes re-runs idempotent: recent days are refreshed as provider data finalizes rather than duplicated, which is also why the default looks back three days instead of one. Each row is written in one statement through `payload.db.upsert` on that index, outside any transaction, rather than looked up and then created. On Postgres and SQLite that upsert looks the row up and inserts it when it finds none, so two runs inserting the same new day at once collide on the index; the one that loses writes again and updates the row the other inserted. `syncedAt` and `updatedAt` record a row's last write; on MongoDB, where the upsert stamps no `createdAt`, a row has none.
 
-`scope` binds each row to the [multi-tenancy](/analytics/multi-tenancy) scope it was synced under (`''` for an unscoped install). The sync task itself has no request to resolve a scope from (it runs on a cron), so scope-bound rows come from the `scopes` option instead: configure it and the task fans out, running the full per-adapter pull once for the install-wide scope plus once per scope `scopes()` returns, stamping each pass's rows with that scope. Without `scopes`, sync keeps writing install-wide rows only (`scope: ''`), even on a `scopeResolver`-configured install. A shared config adapter that cannot filter by scope (no `capabilities.scopedQueries`) is skipped for every tenant pass and syncs only under the install-wide row, the same rule the [warm tier](/analytics/cache#scheduled-warming-opt-in) follows; see [Cron tiers](/analytics/multi-tenancy#5-cron-tiers). Read access is scope-filtered the same way [provider documents](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) are: a tenant reading `analytics-daily` sees only their own scope's rows, and `access.platformRead` lifts the restriction. Unscoped installs keep the historical any-authenticated-user read behavior. Enabling `sync` for the first time on a scoped install with existing native/other history needs no backfill, since the collection only ever holds rows the sync job itself writes; upgrading an **already-syncing** install to a scoped config needs the same column-backfill migration described in the [native engine's upgrade note](/analytics/native#upgrading-an-existing-install), since `scope` is a new required column on an existing table.
+A run reads as the plugin's `SYSTEM` principal, through the sources each scope's own provider documents grant it, at background priority, so a reader opening the dashboard during a run is served first (see [Readers before background work](/analytics/cache#readers-before-background-work)). It holds the `lease:analytics-sync` lease in `analytics-state` while it works, so a second worker starting a sync at the same moment does nothing, and stamps the task's heartbeat after every run that held the lease, finished or not. A run works for at most four minutes, which fits a serverless route of 300 seconds (see [Running it](/analytics/native#running-it)). One that runs out of time stops between two sources, says `finished: false` in its output, and records the scope it stopped at in `analytics-state`; the next run starts with that scope and takes the others after it, so on an install with many tenants no scope waits behind the rest for good. Each row carries `source`, `date`, `scope`, `pageviews`, `visitors`, `sessions`, `avgDuration` (time on page), `visitDuration` (time per visit), `bounceRate`, `events`, and `syncedAt`; metrics a provider does not report are null, and a day synced again is written whole, so a number the provider no longer reports for it goes back to null. The collection is read-only (the job writes, users read) and hidden from the admin nav by default; see [The collection](#the-collection). The native engine is excluded, since its data already lives durably in its own [daily totals](/analytics/native#storage), and one provider failing is logged without aborting the others.
+
+`scope` binds each row to the [multi-tenancy](/analytics/multi-tenancy) scope it was synced under (`''` for an unscoped install). The sync task itself has no request to resolve a scope from (it runs on a schedule), so scope-bound rows come from `scope.list` instead: configure it and the task fans out, running the full per-adapter pull once for the install-wide scope plus once per scope `scope.list` returns, stamping each pass's rows with that scope. Without `scope.list`, sync keeps writing install-wide rows only (`scope: ''`), even on a scoped install. A shared config adapter that cannot filter by scope (no `capabilities.scopedQueries`) is skipped for every tenant pass and syncs only under the install-wide row, the same rule the [warm task](/analytics/cache#warming) follows; see [Cron tiers](/analytics/multi-tenancy#5-cron-tiers). Reading the rows takes the plugin's [`access.read`](/analytics/reference/options#access) first, like every other analytics read, and then the scope filter [provider documents](/analytics/multi-tenancy#2-register-the-provider-collection-per-tenant) use: a tenant reading `analytics-daily` sees only the rows of the scope they selected, and only while they belong to it (`scope.member`), and `access.crossScope.named` lifts the restriction. Unscoped installs let every user of the admin collection (`admin.user`) that `access.read` admits read the rows. A second auth collection, such as customers, reads none on either. An `access.read` narrower than its default therefore narrows the collection's REST, GraphQL and Local API reads made with access control too. Enabling `sync` for the first time on a scoped install with existing native/other history needs no backfill, since the collection only ever holds rows the sync job itself writes; upgrading an **already-syncing** install to a scoped config needs the column-backfill migration under [upgrading an already-syncing install](#upgrading-an-already-syncing-install), since `scope` is a new required column on an existing table.
 
 Reads go through the [surfacing cache](/analytics/cache), so persisted rows can reflect cached values up to the aggregate TTL old. Keep `cache.ttl.aggregate` below your sync interval for the freshest rows.
 
+## Upgrading an already-syncing install
+
+`scope` is a required column on `analytics-daily`, and its unique index is `source + date + scope`. An install that synced before either existed needs a migration backfilling `scope` to `''`, the install-wide value. Each database takes its own:
+
+```ts title="MongoDB"
+import type { MigrateUpArgs, MongooseAdapter } from '@payloadcms/db-mongodb'
+
+export async function up({ payload }: MigrateUpArgs): Promise<void> {
+  const { collections } = payload.db as unknown as MongooseAdapter
+  await collections['analytics-daily']?.updateMany(
+    { scope: { $exists: false } },
+    { $set: { scope: '' } }
+  )
+}
+```
+
+```ts title="Postgres"
+import { type MigrateUpArgs, sql } from '@payloadcms/db-postgres'
+
+export async function up({ db }: MigrateUpArgs): Promise<void> {
+  await db.execute(
+    sql`ALTER TABLE analytics_daily ADD COLUMN IF NOT EXISTS scope varchar NOT NULL DEFAULT ''`
+  )
+}
+```
+
+SQLite has no `ADD COLUMN IF NOT EXISTS`, so its migration looks first:
+
+```ts title="SQLite"
+import { type MigrateUpArgs, sql } from '@payloadcms/db-sqlite'
+
+export async function up({ db }: MigrateUpArgs): Promise<void> {
+  const { rows } = await db.run(sql`PRAGMA table_info(analytics_daily)`)
+  if (!rows.some((column) => column.name === 'scope')) {
+    await db.run(sql`ALTER TABLE analytics_daily ADD COLUMN scope text NOT NULL DEFAULT ''`)
+  }
+}
+```
+
+Push-mode dev installs pick up the column and the widened unique index on the next boot; the snippet is for migrate-mode installs, where a schema push never runs. A migrate-mode Postgres or SQLite install also rebuilds the unique index, since Payload only creates it from the current config on a fresh index build. Against a stale `(source, date)` index, the first row of a day is written, and every row for the same day under another `scope` fails and is logged. `payload migrate:create` typically generates the same statements; index names differ per install, so confirm the actual one before dropping anything (`\d analytics_daily` on Postgres, `PRAGMA index_list(analytics_daily)` on SQLite). Both run the same two statements:
+
+```sql
+DROP INDEX IF EXISTS analytics_daily_source_date_idx;
+CREATE UNIQUE INDEX analytics_daily_source_date_scope_idx
+  ON analytics_daily (source, date, scope);
+```
+
+With a custom `sync.collection.slug`, use that collection and its table in both places.
+
+### Time per visit moved to `visitDuration`
+
+Until 1.0.0-beta.12 a vendor's `avgDuration` was its time per visit (GA4's `averageSessionDuration`, Plausible's `visit_duration`, Umami's total visit time over visits). It now means time on page on every source, and time per visit has a column of its own, `visitDuration`. A migrate-mode Postgres or SQLite install adds that column with the migration `payload migrate:create` generates (a nullable `visit_duration numeric`); push-mode installs and MongoDB need nothing.
+
+The sync task moves what was already stored, on every database, Cloudflare D1 included. Its first run after the upgrade notes the moment it started, then moves `avgDuration` to `visitDuration` and clears `avgDuration` on every row of a GA4, Plausible or Umami source (configured adapters and [provider documents](/analytics/providers) alike) synced before that moment. Rows of any other source are left as they are. A run that runs out of time carries on in the next one, and once every row is moved the task records it in `analytics-state` and never looks again. Days inside `lookbackDays` are synced again anyway, which is what fills GA4's time on page in for them; older days keep `avgDuration` empty.
+
 ## Running it
 
-Sync is off by default and needs Payload's jobs runner (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler) for the cron to fire. Run it on demand at any time:
+Sync is off by default and needs Payload's jobs runner (cron `autoRun`, a [worker](/jobs/workers), or an external scheduler) working the task's queue; [Running it](/analytics/native#running-it) sets one up for all of the plugin's tasks. Nothing stands in for a runner that never comes: the collection simply stops growing, and every instance serving reads warns once when the task's last run is more than two intervals old (12 hours on the default schedule). An unscheduled task is not watched. `jobs: false` registers no task, so it fails the boot beside `sync`; to sync only on demand, register the task unscheduled with `jobs: { tasks: { sync: { cron: false } } }` and queue it yourself:
 
 ```ts
-await payload.jobs.queue({ task: 'analytics-sync' })
+await payload.jobs.queue({ task: 'analytics-sync', input: {} })
 await payload.jobs.run()
 ```
+
+Both calls use the `default` queue, which is all they need together. To leave the run to a worker that works another queue instead, queue it there: `queue({ task: 'analytics-sync', input: {}, queue: 'analytics' })`.
+
+A worker booted without `onInit` runs it as well: the plugin builds what the task needs on first use.
 
 ## Querying
 

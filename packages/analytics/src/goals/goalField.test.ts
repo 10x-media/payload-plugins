@@ -31,8 +31,8 @@ describe('goalField', () => {
 
 		expect(field.type).toBe('text')
 		expect(field.name).toBe('goal')
-		expect(componentPath(field)).toBe('@10x-media/analytics/client#GoalSelectField')
-		expect(GOAL_FIELD_COMPONENT).toBe('@10x-media/analytics/client#GoalSelectField')
+		expect(componentPath(field)).toBe('@10x-media/analytics/rsc#GoalSelectFieldServer')
+		expect(GOAL_FIELD_COMPONENT).toBe('@10x-media/analytics/rsc#GoalSelectFieldServer')
 	})
 
 	it('defaults the label to the translated goal key', () => {
@@ -63,7 +63,7 @@ describe('goalField', () => {
 		expect(field.admin?.description).toBe('Pick one')
 		expect(field.admin?.position).toBe('sidebar')
 		expect(field.admin?.components?.Label).toEqual({ path: './Custom#Label' })
-		expect(componentPath(field)).toBe('@10x-media/analytics/client#GoalSelectField')
+		expect(componentPath(field)).toBe('@10x-media/analytics/rsc#GoalSelectFieldServer')
 	})
 
 	it('applies a function override last', () => {

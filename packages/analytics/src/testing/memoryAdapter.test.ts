@@ -26,8 +26,7 @@ describe('memoryAdapter', () => {
 
 	it('declares page as its only eq filter dimension', () => {
 		const caps = memoryAdapter().capabilities
-		expect(caps.filters).toEqual(new Set(['page']))
-		expect(caps.filterOperators).toEqual(new Set(['eq']))
+		expect(caps.filters).toEqual({ page: ['eq'] })
 	})
 
 	it('applies an eq filter on page against stored events before aggregation', async () => {
@@ -85,6 +84,23 @@ describe('memoryAdapter', () => {
 				{}
 			)
 		).rejects.toThrow('boom')
+	})
+
+	it('failNext fails as many calls in a row as it is told, then answers again', async () => {
+		const a = memoryAdapter()
+		const read = () =>
+			a.query(
+				{
+					metrics: ['pageviews'],
+					dateRange: { start: new Date('2026-01-01'), end: new Date('2026-01-31') },
+				},
+				{}
+			)
+		a.failNext(new Error('down'), 3)
+		for (let attempt = 0; attempt < 3; attempt++) {
+			await expect(read()).rejects.toThrow('down')
+		}
+		await expect(read()).resolves.toMatchObject({ meta: { provider: 'memory' } })
 	})
 
 	it('drops a filter for a dimension it cannot serve instead of throwing', async () => {

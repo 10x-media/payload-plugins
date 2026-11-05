@@ -5,6 +5,7 @@ import { platformHeaderResolver } from '../../src/native/geo/geoResolver'
 import { makeIngestHandler } from '../../src/native/ingest/endpoint'
 import { native } from '../../src/native/nativeAdapter'
 import { ingestRequest } from './ingestRequest'
+import { aroundNow, nativeOf } from './nativeHelpers'
 
 interface IngestOpts {
 	path?: string
@@ -16,7 +17,7 @@ interface IngestOpts {
 }
 
 const ingest = (booted: BootedPayload, opts: IngestOpts) =>
-	makeIngestHandler({ geoResolver: platformHeaderResolver })(
+	makeIngestHandler({ geoResolver: platformHeaderResolver, target: nativeOf })(
 		ingestRequest(
 			booted.payload,
 			{
@@ -33,14 +34,16 @@ const ingest = (booted: BootedPayload, opts: IngestOpts) =>
 
 const DESKTOP = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120'
 const PHONE = 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0) Mobile/15E148'
-const RANGE = { start: new Date('2020-01-01'), end: new Date('2030-01-01') }
 
 describeForDb('native dimension breakdowns', {}, (db) => {
 	const adapter = native()
 	let booted: BootedPayload
 
 	beforeAll(async () => {
-		booted = await bootPayload({ plugin: analytics({ adapters: [adapter] }), db })
+		booted = await bootPayload({
+			plugin: analytics({ adapters: [adapter], capture: { gate: 'off' } }),
+			db,
+		})
 		await ingest(booted, { path: '/a', ua: DESKTOP, referrer: 'https://www.google.com/' })
 		await ingest(booted, { path: '/b', ua: DESKTOP, referrer: 'https://www.google.com/' })
 		await ingest(booted, { path: '/c', ua: PHONE, referrer: 'https://t.co/x' })
@@ -55,8 +58,8 @@ describeForDb('native dimension breakdowns', {}, (db) => {
 
 	it('breaks pageviews down by acquisition channel, not by referrer host', async () => {
 		const result = await adapter.query(
-			{ metrics: ['pageviews'], dimensions: ['channel'], dateRange: RANGE },
-			{}
+			{ metrics: ['pageviews'], dimensions: ['channel'], dateRange: aroundNow() },
+			{ payload: booted.payload }
 		)
 		const byChannel = Object.fromEntries(
 			result.rows.map((r) => [r.dimensions?.channel, r.metrics.pageviews])
@@ -68,8 +71,8 @@ describeForDb('native dimension breakdowns', {}, (db) => {
 
 	it('breaks pageviews down by the origin each visit was named by', async () => {
 		const result = await adapter.query(
-			{ metrics: ['pageviews'], dimensions: ['source'], dateRange: RANGE },
-			{}
+			{ metrics: ['pageviews'], dimensions: ['source'], dateRange: aroundNow() },
+			{ payload: booted.payload }
 		)
 		const bySource = Object.fromEntries(
 			result.rows.map((r) => [r.dimensions?.source, r.metrics.pageviews])
@@ -79,8 +82,8 @@ describeForDb('native dimension breakdowns', {}, (db) => {
 
 	it('breaks pageviews down by device', async () => {
 		const result = await adapter.query(
-			{ metrics: ['pageviews'], dimensions: ['device'], dateRange: RANGE },
-			{}
+			{ metrics: ['pageviews'], dimensions: ['device'], dateRange: aroundNow() },
+			{ payload: booted.payload }
 		)
 		const byDevice = Object.fromEntries(
 			result.rows.map((r) => [r.dimensions?.device, r.metrics.pageviews])
@@ -91,8 +94,8 @@ describeForDb('native dimension breakdowns', {}, (db) => {
 
 	it('breaks events down by event name', async () => {
 		const result = await adapter.query(
-			{ metrics: ['events'], dimensions: ['event'], dateRange: RANGE },
-			{}
+			{ metrics: ['events'], dimensions: ['event'], dateRange: aroundNow() },
+			{ payload: booted.payload }
 		)
 		const byEvent = Object.fromEntries(
 			result.rows.map((r) => [r.dimensions?.event, r.metrics.events])
