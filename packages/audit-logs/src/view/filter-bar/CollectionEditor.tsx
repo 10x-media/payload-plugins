@@ -31,7 +31,7 @@ export function CollectionEditor({
 		const current = staged[name] ?? []
 		return (
 			<div className="al-ref-picker">
-				<div className="al-filterpopover__editor-label">{label}</div>
+				<div className="al-panel__label">{label}</div>
 				<ReactSelect
 					isClearable
 					isMulti

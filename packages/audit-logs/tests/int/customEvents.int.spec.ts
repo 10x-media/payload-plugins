@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { type CollectionConfig, createLocalReq } from 'payload'
+import { type CollectionConfig, createPayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { auditLogs, createAuditEvent } from '../../src/index'
 import { filterConditions } from '../../src/view/filterQuery'
@@ -34,8 +34,12 @@ describeForDb('createAuditEvent with multiTenancy', {}, (db) => {
 			collections: [posts, tags, users, tenants],
 			seed: async (payload) => {
 				userId = (await seedUser(payload)).id
-				tenantA = (await payload.create({ collection: 'tenants', data: { name: 'A' } })).id
-				tenantB = (await payload.create({ collection: 'tenants', data: { name: 'B' } })).id
+				tenantA = (
+					await payload.create({ overrideAccess: true, collection: 'tenants', data: { name: 'A' } })
+				).id
+				tenantB = (
+					await payload.create({ overrideAccess: true, collection: 'tenants', data: { name: 'B' } })
+				).id
 			},
 		})
 	})
@@ -51,7 +55,7 @@ describeForDb('createAuditEvent with multiTenancy', {}, (db) => {
 		})
 
 	it('lists an event with a tenant in that tenant view only', async () => {
-		await createAuditEvent(await createLocalReq({}, booted.payload), {
+		await createAuditEvent(await createPayloadRequest({ payload: booted.payload }), {
 			collection: 'posts',
 			eventType: 'tenant_scoped',
 			tenant: tenantA,
@@ -62,7 +66,7 @@ describeForDb('createAuditEvent with multiTenancy', {}, (db) => {
 	})
 
 	it('attributes the event to the given user when the request has none', async () => {
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		expect(req.user).toBeFalsy()
 
 		await createAuditEvent(req, {
@@ -76,10 +80,10 @@ describeForDb('createAuditEvent with multiTenancy', {}, (db) => {
 	})
 
 	it('reads the group from the configured context key', async () => {
-		const req = await createLocalReq(
-			{ context: { custom: 'g', auditGroup: 'other' } },
-			booted.payload
-		)
+		const req = await createPayloadRequest({
+			context: { custom: 'g', auditGroup: 'other' },
+			payload: booted.payload,
+		})
 
 		await createAuditEvent(req, { collection: 'posts', eventType: 'grouped' })
 
@@ -101,6 +105,7 @@ describeForDb('createAuditEvent with several auth collections', {}, (db) => {
 				await seedUser(payload)
 				adminId = (
 					await payload.create({
+						overrideAccess: true,
 						collection: 'admins',
 						data: { email: 'admin@example.com', password: 'password' },
 					})
@@ -114,7 +119,7 @@ describeForDb('createAuditEvent with several auth collections', {}, (db) => {
 	})
 
 	it('stores the given user as a polymorphic pair', async () => {
-		await createAuditEvent(await createLocalReq({}, booted.payload), {
+		await createAuditEvent(await createPayloadRequest({ payload: booted.payload }), {
 			collection: 'posts',
 			eventType: 'job_finished',
 			user: { collection: 'admins', id: adminId },
@@ -127,7 +132,7 @@ describeForDb('createAuditEvent with several auth collections', {}, (db) => {
 	it('warns and drops a tenant when multiTenancy is off', async () => {
 		const warn = vi.spyOn(booted.payload.logger, 'warn')
 
-		await createAuditEvent(await createLocalReq({}, booted.payload), {
+		await createAuditEvent(await createPayloadRequest({ payload: booted.payload }), {
 			collection: 'posts',
 			eventType: 'no_tenancy',
 			tenant: 'anything',

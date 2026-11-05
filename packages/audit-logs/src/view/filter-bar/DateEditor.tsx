@@ -1,6 +1,6 @@
 'use client'
 
-import { DatePicker, PillSelector } from '@payloadcms/ui'
+import { Button, DatePicker } from '@payloadcms/ui'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import type { Filters } from '../types'
@@ -40,22 +40,28 @@ export function DateEditor({ setStaged, staged }: EditorProps) {
 
 	return (
 		<div className="al-date-editor">
-			<PillSelector
-				onClick={({ pill }) =>
-					selectPreset(pill.name === 'any' ? undefined : (pill.name as DateRange))
-				}
-				pills={[
-					{ Label: t(keys.dateAnyTime), name: 'any', selected: !hasDates },
-					...PRESETS.map(({ key, range }) => ({
-						Label: t(key),
-						name: range,
-						selected: preset === range,
-					})),
-				]}
-			/>
+			{/* A single choice of text segments: ghost buttons, the chosen one a pill, the
+			    way Payload draws a segmented switch with words in it. */}
+			<fieldset className="al-date-editor__presets">
+				{[
+					{ key: keys.dateAnyTime, range: undefined, selected: !hasDates },
+					...PRESETS.map(({ key, range }) => ({ key, range, selected: preset === range })),
+				].map(({ key, range, selected }) => (
+					<Button
+						aria-pressed={selected}
+						buttonStyle={selected ? 'pill' : 'ghost'}
+						key={range ?? 'any'}
+						margin={false}
+						onClick={() => selectPreset(range)}
+						size="medium"
+					>
+						{t(key)}
+					</Button>
+				))}
+			</fieldset>
 			<div className="al-date-editor__dates">
 				<div className="al-date-editor__date">
-					<div className="al-filterpopover__editor-label">{t(keys.dateFrom)}</div>
+					<div className="al-panel__label">{t(keys.dateFrom)}</div>
 					<DatePicker
 						onChange={(value) => setDate('dateFrom', value)}
 						placeholder={t(keys.startDate)}
@@ -63,7 +69,7 @@ export function DateEditor({ setStaged, staged }: EditorProps) {
 					/>
 				</div>
 				<div className="al-date-editor__date">
-					<div className="al-filterpopover__editor-label">{t(keys.dateTo)}</div>
+					<div className="al-panel__label">{t(keys.dateTo)}</div>
 					<DatePicker
 						onChange={(value) => setDate('dateTo', value)}
 						placeholder={t(keys.endDate)}
@@ -75,7 +81,7 @@ export function DateEditor({ setStaged, staged }: EditorProps) {
 	)
 }
 
-/** What the Date pill reads when closed. */
+/** What the Date trigger reads. */
 export const dateFilterValue = (staged: Filters, t: Translate): string => {
 	const range = matchingRange(staged.dateFrom, staged.dateTo)
 	const preset = PRESETS.find((p) => p.range === range)

@@ -1,7 +1,7 @@
-import type { Field } from 'payload'
+import type { Block, Field } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { buildFieldMap } from './buildFieldMap'
+import { buildFieldMap, fieldMapOf } from './buildFieldMap'
 
 // Minimal field constructors, typed correctly to satisfy Payload's discriminated unions
 const rel = (name: string, hasMany = false): Field =>
@@ -71,7 +71,7 @@ describe('buildFieldMap', () => {
 		})
 
 		it('handles a top-level prefix with a named group', () => {
-			const map = buildFieldMap([group('meta', [rel('author')])], 'root')
+			const map = buildFieldMap([group('meta', [rel('author')])], { prefix: 'root' })
 			expect(map.get('root.meta.author')).toBe('rel-single')
 		})
 	})
@@ -155,6 +155,15 @@ describe('buildFieldMap', () => {
 			expect(map.get('content.*.link')).toBe('rel-single')
 			expect(map.get('content.*.authors')).toBe('rel-many')
 		})
+
+		it('resolves a block named by slug against the config blocks', () => {
+			const field = { type: 'blocks', name: 'content', blocks: ['hero', 'missing'] } as Field
+			const map = buildFieldMap([field], {
+				blocks: [{ slug: 'hero', fields: [rel('background')] } as Block],
+			})
+			expect(map.get('content.*.background')).toBe('rel-single')
+			expect(map.size).toBe(1)
+		})
 	})
 
 	describe('nesting', () => {
@@ -184,7 +193,7 @@ describe('buildFieldMap', () => {
 
 	describe('prefix parameter', () => {
 		it('prepends prefix to all paths', () => {
-			const map = buildFieldMap([rel('author'), rel('tags', true)], 'version')
+			const map = buildFieldMap([rel('author'), rel('tags', true)], { prefix: 'version' })
 			expect(map.get('version.author')).toBe('rel-single')
 			expect(map.get('version.tags')).toBe('rel-many')
 		})
@@ -218,9 +227,27 @@ describe('buildFieldMap', () => {
 	describe('map accumulation', () => {
 		it('accumulates into an existing map when passed in', () => {
 			const existing = new Map<string, 'rel-single' | 'rel-many'>([['pre.owner', 'rel-single']])
-			buildFieldMap([rel('reviewer')], '', existing)
+			buildFieldMap([rel('reviewer')], { map: existing })
 			expect(existing.get('pre.owner')).toBe('rel-single')
 			expect(existing.get('reviewer')).toBe('rel-single')
 		})
+	})
+})
+
+describe('fieldMapOf', () => {
+	it('builds once per config object and reuses that map', () => {
+		const entity = {
+			fields: [{ name: 'author', type: 'relationship', relationTo: 'users' }] as Field[],
+		}
+		const first = fieldMapOf(entity, [])
+
+		expect(fieldMapOf(entity, [])).toBe(first)
+		expect(first.get('author')).toBe('rel-single')
+	})
+
+	it('gives another config object its own map', () => {
+		const fields = [{ name: 'author', type: 'relationship', relationTo: 'users' }] as Field[]
+
+		expect(fieldMapOf({ fields }, [])).not.toBe(fieldMapOf({ fields }, []))
 	})
 })

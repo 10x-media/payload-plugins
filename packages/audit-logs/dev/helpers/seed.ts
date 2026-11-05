@@ -1,5 +1,5 @@
 import type { Payload } from 'payload'
-import { createLocalReq } from 'payload'
+import { createPayloadRequest } from 'payload'
 
 import { createAuditEvent } from '../../src/index'
 
@@ -19,16 +19,25 @@ const TAG_NAMES = ['release', 'internal', 'draft']
  * Idempotent: the whole run is skipped once an admin user exists.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ overrideAccess: true, collection: 'users' })
 	if (userCount.totalDocs > 0) return
 
 	// Two departments the admin belongs to. `logs.extend` copies them onto every entry
 	// the admin writes, so the rows below carry department badges and the Department
 	// filter under More filters has something to match.
-	const sales = await payload.create({ collection: 'departments', data: { name: 'Sales' } })
-	const support = await payload.create({ collection: 'departments', data: { name: 'Support' } })
+	const sales = await payload.create({
+		overrideAccess: true,
+		collection: 'departments',
+		data: { name: 'Sales' },
+	})
+	const support = await payload.create({
+		overrideAccess: true,
+		collection: 'departments',
+		data: { name: 'Support' },
+	})
 
 	const user = await payload.create({
+		overrideAccess: true,
 		collection: 'users',
 		data: {
 			email: DEV_EMAIL,
@@ -41,15 +50,21 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 
 	// Two tenants. The dev admin reaches both through `userHasAccessToAllTenants`.
 	const alpha = await payload.create({
+		overrideAccess: true,
 		collection: 'tenants',
 		data: { name: 'Alpha', slug: 'alpha' },
 	})
-	const beta = await payload.create({ collection: 'tenants', data: { name: 'Beta', slug: 'beta' } })
+	const beta = await payload.create({
+		overrideAccess: true,
+		collection: 'tenants',
+		data: { name: 'Beta', slug: 'beta' },
+	})
 
 	// Someone to impersonate, and a member of Alpha only, so impersonating them also
 	// narrows the tenant picker. The seed writes a few entries as them under
 	// impersonation, near the end.
 	const editor = await payload.create({
+		overrideAccess: true,
 		collection: 'users',
 		data: {
 			email: 'editor@10xmedia.de',
@@ -145,7 +160,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 
 	// update: array rows swapped, which produces a `sections.__order__` entry
 	// rather than a diff of every field in every row.
-	const seeded = await payload.findByID({ collection: 'posts', id: post.id })
+	const seeded = await payload.findByID({ overrideAccess: true, collection: 'posts', id: post.id })
 	const sections = (seeded.sections ?? []) as { heading?: string; body?: string }[]
 	await payload.update({
 		collection: 'posts',
@@ -222,13 +237,14 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	// A second auth collection, so the log names users of both. The customer places an order,
 	// so their entries sit next to the admin's in the list with their own pill.
 	const customer = await payload.create({
+		overrideAccess: true,
 		collection: 'customers',
 		data: { email: 'customer@10xmedia.de', password: DEV_PASSWORD, name: 'Dev Customer' },
 	})
-	const customerReq = await createLocalReq(
-		{ user: { ...customer, collection: 'customers' } as never },
-		payload
-	)
+	const customerReq = await createPayloadRequest({
+		payload,
+		user: { ...customer, collection: 'customers' } as never,
+	})
 	const order = await payload.create({
 		collection: 'orders',
 		data: {
@@ -249,10 +265,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 
 	// The admin takes it from there: marking it paid fires the `order_paid` event
 	// from the orders hook, then a refund is recorded by hand.
-	const adminReq = await createLocalReq(
-		{ user: { ...user, collection: 'users' } as never },
-		payload
-	)
+	const adminReq = await createPayloadRequest({
+		payload,
+		user: { ...user, collection: 'users' } as never,
+	})
 	await payload.update({
 		collection: 'orders',
 		id: order.id,
@@ -301,7 +317,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 
 	// Writes through an MCP server: `@payloadcms/plugin-mcp` sets `payloadAPI` to
 	// 'MCP', which `logs.payloadAPIs` labels and the API filter offers.
-	const mcpReq = await createLocalReq({ user: { ...user, collection: 'users' } as never }, payload)
+	const mcpReq = await createPayloadRequest({
+		payload,
+		user: { ...user, collection: 'users' } as never,
+	})
 	;(mcpReq as { payloadAPI: string }).payloadAPI = 'MCP'
 	await payload.update({
 		collection: 'posts',
@@ -313,16 +332,14 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 
 	// Writes under impersonation: the dev admin acting as the editor, the way
 	// `@10x-media/impersonation` stamps `_impersonation` on the request's user.
-	const impersonatedReq = await createLocalReq(
-		{
-			user: {
-				...editor,
-				collection: 'users',
-				_impersonation: { impersonator: { collection: 'users', id: user.id } },
-			} as never,
-		},
-		payload
-	)
+	const impersonatedReq = await createPayloadRequest({
+		payload,
+		user: {
+			...editor,
+			collection: 'users',
+			_impersonation: { impersonator: { collection: 'users', id: user.id } },
+		} as never,
+	})
 	await payload.update({
 		collection: 'posts',
 		id: post.id,
@@ -341,6 +358,6 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		metadata: { amount: 5, reason: 'Goodwill credit', sku: 'TEE-M' },
 	})
 
-	const logs = await payload.count({ collection: 'audit-logs' })
+	const logs = await payload.count({ overrideAccess: true, collection: 'audit-logs' })
 	payload.logger.info(`Seeded ${logs.totalDocs} audit log entries`)
 }

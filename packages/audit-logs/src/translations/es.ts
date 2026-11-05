@@ -16,7 +16,6 @@ export const es: Record<TranslationKey, string> = {
 	[keys.noEntries]: 'No se encontraron entradas de auditoría.',
 
 	// Pagination
-	[keys.paginationInfo]: '{{from}}–{{to}} de {{total}}',
 
 	// Debug bar
 	[keys.debug]: 'Depuración',

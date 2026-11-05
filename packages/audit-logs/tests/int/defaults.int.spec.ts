@@ -3,6 +3,7 @@ import type { PayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { auditLogs } from '../../src/index'
 import {
+	fieldNamed,
 	pages,
 	posts,
 	readLogs,
@@ -39,22 +40,20 @@ describe('nothing is audited by default', () => {
 		await booted.stop()
 	})
 
-	it('adds no audit fields to any collection', () => {
+	it("leaves Payload's authorship fields hidden on every collection", () => {
 		for (const slug of ['posts', 'pages', 'tags', 'users']) {
-			const names = (booted.payload.collections[slug]?.config.fields ?? []).map((f) =>
-				'name' in f ? f.name : undefined
-			)
-			expect(names, slug).not.toContain('createdBy')
-			expect(names, slug).not.toContain('lastModifiedBy')
+			const field = fieldNamed(booted.payload.collections[slug]?.config.fields, 'createdBy')
+			expect(field?.admin?.hidden, slug).toBe(true)
+			expect(field?.admin?.components?.Field, slug).toBeUndefined()
 		}
 	})
 
-	it('adds no audit fields to any global', () => {
+	it("leaves Payload's authorship fields hidden on every global", () => {
 		const global = booted.payload.config.globals.find((g) => g.slug === 'site-settings')
-		const names = (global?.fields ?? []).map((f) => ('name' in f ? f.name : undefined))
+		const field = fieldNamed(global?.fields, 'updatedBy')
 
-		expect(names).not.toContain('createdBy')
-		expect(names).not.toContain('lastModifiedBy')
+		expect(field?.admin?.hidden).toBe(true)
+		expect(field?.admin?.components?.Field).toBeUndefined()
 	})
 
 	it('writes no entry for creates, updates or deletes', async () => {
@@ -104,11 +103,13 @@ describe('nothing is audited by default', () => {
 		})
 		try {
 			const page = await enabled.payload.create({
+				overrideAccess: true,
 				collection: 'pages',
 				data: { title: 'Draft' },
 				draft: true,
 			})
 			await enabled.payload.update({
+				overrideAccess: true,
 				collection: 'pages',
 				id: page.id,
 				data: { title: 'Still a draft' },
@@ -119,6 +120,7 @@ describe('nothing is audited by default', () => {
 			expect((await readLogs(enabled.payload)).map((l) => l.operation)).toEqual(['create'])
 
 			await enabled.payload.update({
+				overrideAccess: true,
 				collection: 'pages',
 				id: page.id,
 				data: { title: 'Published', _status: 'published' },

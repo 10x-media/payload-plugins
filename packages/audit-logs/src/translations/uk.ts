@@ -21,7 +21,6 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.noEntries]: 'Записів аудиту не знайдено.',
 
 	// Pagination
-	[keys.paginationInfo]: '{{from}}–{{to}} з {{total}}',
 
 	// Debug bar
 	[keys.debug]: 'Налагодження',

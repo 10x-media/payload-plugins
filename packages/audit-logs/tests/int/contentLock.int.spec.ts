@@ -1,6 +1,6 @@
 import { contentLock, isContentLocked } from '@10x-media/content-lock'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { type CollectionConfig, createLocalReq } from 'payload'
+import { type CollectionConfig, createPayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { auditLogs, createAuditEvent } from '../../src/index'
 import { readLogs, seedUser, TEST_EMAIL, TEST_PASSWORD, users } from './fixtures'
@@ -46,7 +46,11 @@ describeForDb('audit-logs under a content lock on everything', {}, (db) => {
 			configOverrides: { plugins: [contentLock({ exempt: ['submissions'] })] },
 			seed: async (payload) => {
 				await seedUser(payload)
-				await payload.create({ collection: 'submissions', data: { body: 'before the lock' } })
+				await payload.create({
+					overrideAccess: true,
+					collection: 'submissions',
+					data: { body: 'before the lock' },
+				})
 			},
 		})
 
@@ -80,7 +84,11 @@ describeForDb('audit-logs under a content lock on everything', {}, (db) => {
 	})
 
 	it('keeps the entry for a write to a collection the lock leaves open', async () => {
-		const doc = await booted.payload.create({ collection: 'submissions', data: { body: 'hi' } })
+		const doc = await booted.payload.create({
+			overrideAccess: true,
+			collection: 'submissions',
+			data: { body: 'hi' },
+		})
 
 		const [entry] = await readLogs(booted.payload, { documentId: { equals: String(doc.id) } })
 
@@ -89,7 +97,7 @@ describeForDb('audit-logs under a content lock on everything', {}, (db) => {
 	})
 
 	it('writes a custom event', async () => {
-		await createAuditEvent(await createLocalReq({}, booted.payload), {
+		await createAuditEvent(await createPayloadRequest({ payload: booted.payload }), {
 			collection: 'submissions',
 			eventType: 'reviewed',
 		})
@@ -101,11 +109,12 @@ describeForDb('audit-logs under a content lock on everything', {}, (db) => {
 		expect((await readLogs(booted.payload)).length).toBeGreaterThan(0)
 
 		await booted.payload.jobs.queue({
+			overrideAccess: true,
 			task: 'audit-logs-delete',
 			input: undefined,
 			queue: 'audit-retention',
 		})
-		await booted.payload.jobs.run({ queue: 'audit-retention' })
+		await booted.payload.jobs.run({ overrideAccess: true, queue: 'audit-retention' })
 
 		expect(await readLogs(booted.payload)).toHaveLength(0)
 	})

@@ -1,7 +1,6 @@
 'use client'
 
-import { Link, NavGroup, useConfig } from '@payloadcms/ui'
-import { usePathname } from 'next/navigation'
+import { Link, NavGroup, useConfig, usePathname } from '@payloadcms/ui'
 import { formatAdminURL } from 'payload/shared'
 
 const VIEWS: { label: string; path: `/${string}` }[] = [

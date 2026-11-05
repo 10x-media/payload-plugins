@@ -14,7 +14,7 @@
 export type { AuditLogsPluginOptions, PluginOptions } from '../index'
 /** Root options object, the argument to `auditLogs()`. */
 /** Options as accepted for one collection or one global. */
-/** Shape of the `createdBy` and `lastModifiedBy` fields the plugin injects. */
+/** Where the plugin shows Payload's authorship fields, and its own field factory. */
 /** Callbacks the host implements. */
 /** Hooks into the archive and delete jobs. */
 /** Retention, multi tenancy, and the marker `anonymize` returns. */
@@ -22,9 +22,6 @@ export type { AuditLogsPluginOptions, PluginOptions } from '../index'
 export type {
 	AnonymizeFunction,
 	ArchiveJobHooks,
-	AuditFieldDefaultOptions,
-	AuditFieldOptions,
-	AuditFieldsCreateOptions,
 	AuditLogRowState,
 	AuditLogsListSlotProps,
 	AuditLogsRowSlotProps,
@@ -33,7 +30,9 @@ export type {
 	AuditLogUser,
 	AuditOptions,
 	AuditPluginConfig,
+	AuditRelationshipFieldOptions,
 	AuthEventsOptions,
+	AuthorshipFieldsOptions,
 	CollectionAuditLogConfig,
 	CustomEventComponentProps,
 	CustomEventComponents,
@@ -46,7 +45,6 @@ export type {
 	GlobalAuditOptions,
 	LoadViewContextFunction,
 	MultiTenancyConfig,
-	OverrideFunction,
 	PayloadAPIOption,
 	PayloadAPIOptionObject,
 	RedactedValue,

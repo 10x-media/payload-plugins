@@ -1,295 +1,321 @@
+/* Laid out like Payload's list view: header and controls band edge to edge, the
+   rows in a gutter, the page controls pinned to the bottom of the template. */
 .al-view {
-	padding-bottom: calc(var(--base) * 2.5);
-}
-/* Payload's list header classes, restated so the title lays out the same even
-   where its stylesheet is not loaded with the view. */
-.al-view__header {
-	margin-bottom: var(--base);
-}
-.al-view__header .list-header__title-and-actions {
 	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-end;
-	gap: calc(var(--base) * 0.5);
-}
-.al-view__header .list-header__title {
-	margin: 0;
+	flex: 1;
+	flex-direction: column;
+	width: 100%;
 }
 .al-view__count {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
+}
+.al-view__body {
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacer-3);
+	padding-block: var(--spacer-3) var(--spacer-4);
+}
+.al-select-tenant {
+	padding-block: var(--spacer-4);
 }
 
-.al-debug-bar {
+.al-debug-result {
+	color: var(--color-text-secondary);
+}
+
+/* Filter triggers: the label reads like the list view's button, the value carries
+   the weight once it narrows anything. */
+.al-filterbar__choices {
 	display: flex;
 	flex-wrap: wrap;
-	align-items: center;
-	gap: calc(var(--base) * 0.4);
-	padding: calc(var(--base) * 0.4) calc(var(--base) * 0.6);
-	margin-bottom: var(--base);
-	background: var(--theme-warning-50);
-	border: 1px solid var(--theme-warning-200);
-	border-radius: var(--style-radius-m);
-	font-size: 1rem;
+	gap: var(--spacer-2);
+	min-width: 0;
 }
-/* Payload's Button has no error style that renders, so the subtle one is
-   recoloured through its own variables. */
-.al-debug-bar__danger {
-	--color: var(--theme-error-750);
-	--bg-color: var(--theme-error-50);
-	--hover-bg: var(--theme-error-100);
-	--btn-border: 1px solid var(--theme-error-200);
-	--hover-btn-border: 1px solid var(--theme-error-300);
-}
-.al-debug-bar__danger.btn--disabled {
-	opacity: 0.5;
-}
-.al-debug-bar__result {
-	color: var(--theme-elevation-600);
-}
-
-.al-filterbar {
-	margin-bottom: var(--base);
-}
-.al-filterbar__row {
-	display: flex;
-	align-items: center;
-	gap: calc(var(--base) * 0.3);
-	flex-wrap: wrap;
-}
-.al-filterbar__spacer {
-	flex: 1;
-}
-
-/* A fixed filter: label muted, value in the text colour once it narrows anything. */
-.al-choice .pill__label {
+.al-choice .btn__label {
 	display: inline-flex;
-	gap: calc(var(--base) * 0.25);
-	max-width: 260px;
-}
-.al-choice__label {
-	color: var(--theme-elevation-500);
+	gap: var(--spacer-1);
+	max-width: 280px;
 }
 .al-choice__value {
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
-	color: var(--theme-elevation-500);
-}
-.al-choice--active {
-	background: var(--theme-elevation-200);
-}
-/* The lighter active background would swallow the muted label. */
-.al-choice--active .al-choice__label {
-	color: var(--theme-elevation-650);
+	color: var(--color-text-secondary);
 }
 .al-choice--active .al-choice__value {
-	color: var(--theme-text);
-	font-weight: 600;
-}
-.al-choice--open {
-	box-shadow: inset 0 0 0 1px var(--theme-elevation-400);
+	color: inherit;
+	font-weight: var(--text-body-medium-bold-font-weight);
 }
 
-/* The editor of the open pill, below the bar, styled like the list view's panels. */
-.al-filterbar__panel-inner {
-	margin-top: calc(var(--base) / 2);
-	padding: var(--base);
-	background: var(--theme-elevation-50);
-}
-.al-filterbar__panel-inner:empty {
-	display: none;
-}
-/* PillSelector brings the list view's own panel padding; ours already has it. */
-.al-filterbar__panel .pill-selector {
-	padding: 0;
-	background: none;
-}
-
-/* A select keeps the 40px of a plain input once it holds pills; with height auto
-   the multi-value padding would otherwise shrink it. */
-.al-filterbar__panel .react-select .rs__control {
-	min-height: 40px;
+/* The open filter's fields, under the band, as the list view shows its Filters. */
+.al-filterbar__panel {
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacer-3);
+	padding-block: var(--spacer-3);
+	padding-inline: var(--gutter-h);
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
 }
 
 /* Fields side by side, wrapping to one column when the view is narrow. */
 .al-panel-grid {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-	gap: var(--base);
+	gap: var(--spacer-3);
+}
+.al-panel__label {
+	color: var(--field-color-label);
+	font-size: var(--text-body-medium-bold-font-size);
+	font-weight: var(--text-body-medium-bold-font-weight);
+	line-height: var(--text-body-medium-bold-line-height);
+	letter-spacing: var(--field-label-letter-spacing);
 }
 .al-ref-picker {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.25);
+	gap: var(--spacer-2);
 	min-width: 0;
 }
-/* The row is the input: one border, radius and background around the select and
-   the drawer button alike, the way the fields plugin attaches actions. */
+/* The row is the input: one border around the select and the drawer button, the
+   way Payload groups an input with its controls. */
 .al-attached {
 	display: flex;
 	align-items: stretch;
-	min-height: 40px;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-input-bg);
-	box-shadow: 0 2px 2px -1px rgba(0, 0, 0, 0.1);
-	transition-property: border, box-shadow;
-	transition-duration: 100ms;
-	transition-timing-function: cubic-bezier(0, 0.2, 0.2, 1);
+	min-height: var(--field-min-height-large);
+	border: var(--stroke-width-small) solid var(--field-color-border);
+	border-radius: var(--field-border-radius);
+	background: var(--field-color-bg);
 }
-.al-attached:hover {
-	border-color: var(--theme-elevation-250);
+.al-attached:hover:not(:focus-within) {
+	border-color: var(--field-color-border-hover);
 }
 .al-attached:focus-within {
-	border-color: var(--theme-elevation-400);
+	border-color: var(--field-color-border-focus);
 }
 /* Spans the row's border too, so the menu opens from the outer edge, below the
    border, exactly where it does on a plain select. */
 .al-attached__control {
 	flex: 1;
 	min-width: 0;
-	margin: -1px 0;
+	margin: calc(var(--stroke-width-small) * -1) 0;
 }
 .al-attached__control .react-select .rs__control {
-	min-height: 40px;
-	border: 0;
-	border-radius: 0;
+	border-color: transparent;
 	background: transparent;
-	box-shadow: none;
 }
 .al-attached__action {
 	display: flex;
 	align-items: center;
 	margin: 0;
-	padding: 0 calc(var(--base) / 2);
+	padding: 0 var(--spacer-2);
 	border: 0;
-	border-left: 1px solid var(--theme-elevation-150);
+	border-inline-start: var(--stroke-width-small) solid var(--field-color-border);
 	background: none;
-	color: var(--theme-elevation-500);
+	color: var(--color-icon-secondary);
 	cursor: pointer;
-	transition: color 100ms cubic-bezier(0, 0.2, 0.2, 1);
 }
 .al-attached__action:hover,
 .al-attached__action:focus-visible {
-	color: var(--theme-elevation-800);
+	color: var(--color-icon);
+}
+.al-attached__action:focus-visible {
+	outline: var(--accessibility-outline);
+	outline-offset: var(--accessibility-outline-inset);
 }
 .al-attached__action .icon {
-	width: calc(var(--base) * 0.9);
-	height: calc(var(--base) * 0.9);
+	width: var(--spacer-3);
+	height: var(--spacer-3);
 }
 
-/* Changes, auth and custom as three columns, so the list stays short. */
-.al-event-editor {
-	display: grid;
-	grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-	gap: var(--base);
+/* Event popup, in the metrics of Payload's column selector
+   (`elements/ColumnSelection/Popup.css`, which only loads with the list view). */
+.popup__scroll-container:has(.al-event-filter__panel) {
+	max-height: fit-content;
+	padding: 0;
 }
-.al-event-editor__column {
+.al-event-filter__panel {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.4);
-	min-width: 0;
+	min-width: 260px;
+	max-height: min(520px, 100vh - var(--spacer-4));
 }
-.al-event-editor__other {
-	max-width: 280px;
+.al-event-filter__header {
+	display: flex;
+	flex-shrink: 0;
+	align-items: center;
+	justify-content: space-between;
+	height: var(--spacer-6);
+	padding-inline: var(--spacer-2);
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
+}
+.al-event-filter__title {
+	margin: 0;
+	padding-inline-start: var(--spacer-2);
+	color: var(--color-text);
+	font-size: var(--text-body-medium-bold-font-size);
+	font-weight: var(--text-body-medium-bold-font-weight);
+	line-height: var(--text-body-medium-bold-line-height);
+}
+.al-event-filter__close {
+	padding: 0;
+	color: var(--color-icon);
+}
+.al-event-filter__content {
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	min-height: 0;
+	overflow-y: auto;
+}
+.al-event-filter__section {
+	display: flex;
+	flex-direction: column;
+	padding-block: var(--spacer-2);
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
+}
+.al-event-filter__section:last-child {
+	border-bottom: none;
+}
+.al-event-filter__section-header {
+	display: flex;
+	align-items: center;
+	height: var(--spacer-5);
+	margin: 0;
+	padding-inline: var(--spacer-3);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-bold-font-size);
+	font-weight: var(--text-body-medium-bold-font-weight);
+	line-height: var(--text-body-medium-bold-line-height);
+}
+.al-event-filter__list {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+.al-event-filter__item {
+	display: flex;
+	align-items: center;
+	gap: var(--spacer-2);
+	padding-block: var(--spacer-1);
+	padding-inline: var(--spacer-3);
+}
+.al-event-filter__item:hover {
+	background: var(--color-bg-secondary);
+}
+.al-event-filter__item-label {
+	flex: 1;
+	min-width: 0;
+	overflow: hidden;
+	color: var(--color-text);
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	line-height: var(--text-body-medium-line-height);
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.al-event-filter__item--inactive .al-event-filter__item-label {
+	color: var(--color-text-secondary);
+}
+/* A typed event type: the column selector's search bar, as a plain text box. */
+.al-event-filter__other {
+	display: flex;
+	padding: var(--spacer-1) var(--spacer-2-5) 0;
+}
+.al-event-filter__other-input {
+	flex: 1;
+	height: var(--spacer-4);
+	padding-inline: var(--spacer-2);
+	border: none;
+	border-radius: var(--button-radius);
+	background: var(--color-bg-secondary);
+	color: var(--color-text);
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	line-height: var(--text-body-medium-line-height);
+}
+.al-event-filter__other-input::placeholder {
+	color: var(--color-text-tertiary);
+}
+.al-event-filter__other-input:focus {
+	outline: none;
+	box-shadow: inset 0 0 0 var(--stroke-width-small) var(--field-color-border-focus);
+}
+html[data-enhanced-contrast] .al-event-filter__other-input {
+	outline: var(--stroke-width-small) solid var(--color-border-control);
 }
 
 .al-date-editor {
 	display: flex;
 	flex-direction: column;
-	gap: var(--base);
+	gap: var(--spacer-3);
+}
+.al-date-editor__presets {
+	display: flex;
+	min-inline-size: 0;
+	margin: 0;
+	padding: 0;
+	border: 0;
+	flex-wrap: wrap;
+	gap: var(--spacer-1);
 }
 .al-date-editor__dates {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(220px, 280px));
-	gap: var(--base);
+	gap: var(--spacer-3);
 }
 .al-date-editor__date {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.25);
+	gap: var(--spacer-2);
 }
 
-.al-filterpopover__editor-label {
-	font-size: 0.85rem;
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	color: var(--theme-elevation-500);
-}
-
+/* Event badges on Payload's status families: tinted background, matching text. */
 .al-badge {
 	display: inline-flex;
 	align-items: center;
-	padding: calc(var(--base) * 0.1) calc(var(--base) * 0.4);
-	border-radius: var(--style-radius-s);
-	font-size: 0.85rem;
-	font-weight: 600;
-	text-transform: uppercase;
+	height: var(--spacer-4);
+	padding: 0 var(--spacer-1-5);
+	border-radius: var(--radius-chip);
+	font-size: var(--text-body-small-bold-font-size);
+	font-weight: var(--text-body-small-bold-font-weight);
+	line-height: var(--text-body-small-bold-line-height);
 	letter-spacing: 0.04em;
+	text-transform: uppercase;
 	white-space: nowrap;
 }
 .al-badge--create {
-	background: #dcfce7;
-	color: #166534;
+	background: var(--color-bg-success-tertiary);
+	color: var(--color-text-success);
 }
 .al-badge--update {
-	background: #dbeafe;
-	color: #1e40af;
+	background: var(--color-bg-selected);
+	color: var(--color-text-brand);
 }
 .al-badge--delete {
-	background: #fee2e2;
-	color: #991b1b;
+	background: var(--color-bg-danger-tertiary);
+	color: var(--color-text-danger);
 }
 .al-badge--auth {
-	background: #fef9c3;
-	color: #854d0e;
+	background: var(--color-bg-warning-tertiary);
+	color: var(--color-text-warning);
 }
 .al-badge--custom {
-	background: #ede9fe;
-	color: #5b21b6;
+	background: var(--color-bg-component-tertiary);
+	color: var(--color-text-component);
 }
 /* Every payloadAPI value, including ones only a third-party plugin knows. The rules
    below override it for the values that have a colour of their own. */
 .al-badge--api {
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-500);
+	background: var(--color-bg-secondary);
+	color: var(--color-text-secondary);
 }
 .al-badge--api-rest {
-	background: #ccfbf1;
-	color: #115e59;
+	background: var(--color-bg-tertiary);
+	color: var(--color-text);
 }
 .al-badge--api-graphql {
-	background: #fce7f3;
-	color: #9d174d;
-}
-[data-theme="dark"] .al-badge--create {
-	background: #14532d;
-	color: #86efac;
-}
-[data-theme="dark"] .al-badge--update {
-	background: #1e3a5f;
-	color: #93c5fd;
-}
-[data-theme="dark"] .al-badge--delete {
-	background: #450a0a;
-	color: #fca5a5;
-}
-[data-theme="dark"] .al-badge--auth {
-	background: #422006;
-	color: #fde68a;
-}
-[data-theme="dark"] .al-badge--custom {
-	background: #2e1065;
-	color: #c4b5fd;
-}
-[data-theme="dark"] .al-badge--api-rest {
-	background: #042f2e;
-	color: #5eead4;
-}
-[data-theme="dark"] .al-badge--api-graphql {
-	background: #500724;
-	color: #f9a8d4;
+	background: var(--color-bg-assistive-tertiary);
+	color: var(--color-text-assistive);
 }
 /* Context like the locale and filled the same way, but a link: it narrows the
    list to that tenant. Above the row's stretched toggle so the click lands.
@@ -298,90 +324,87 @@
 .al-badge--context {
 	position: relative;
 	z-index: 1;
-	gap: calc(var(--base) * 0.2);
+	gap: var(--spacer-1);
 	max-width: 180px;
 	min-width: 0;
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-600);
-	text-transform: none;
+	background: var(--color-bg-secondary);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	line-height: var(--text-body-medium-line-height);
 	letter-spacing: normal;
+	text-transform: none;
 }
 .al-badge__text {
 	min-width: 0;
 	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 	color: inherit;
 	text-decoration: none;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 .al-badge--tenant a.al-badge__text:hover,
 .al-badge--context a.al-badge__text:hover {
-	color: var(--theme-text);
+	color: var(--color-text);
 	text-decoration: underline;
 	text-underline-offset: 2px;
 }
 .al-badge__open {
 	display: inline-flex;
 	flex-shrink: 0;
-	color: var(--theme-elevation-400);
+	color: var(--color-icon-secondary);
 }
 .al-badge__open:hover {
-	color: var(--theme-text);
+	color: var(--color-icon);
 }
 .al-badge__open .icon {
-	width: calc(var(--base) * 0.6);
-	height: calc(var(--base) * 0.6);
-}
-.al-badge__open .icon .stroke {
-	stroke: currentColor;
+	width: var(--spacer-3);
+	height: var(--spacer-3);
 }
 .al-badge--locale {
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-500);
-	font-size: 0.77rem;
+	background: var(--color-bg-secondary);
+	color: var(--color-text-secondary);
 }
 
 .al-list {
 	display: flex;
 	flex-direction: column;
-	gap: 1px;
+	gap: var(--spacer-1);
 }
 .al-list__empty {
-	padding: 32px;
+	padding: var(--spacer-5);
+	border: var(--stroke-width-small) dashed var(--color-border);
+	border-radius: var(--radius-medium);
+	color: var(--color-text-secondary);
 	text-align: center;
-	color: var(--theme-elevation-400);
-	border: 1px dashed var(--theme-elevation-200);
-	border-radius: 6px;
 }
 
+/* `isolation` keeps the cells raised above the stretched toggle inside the row, so the
+   sticky page controls still cover the list as it scrolls under them. */
 .al-row {
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m);
+	isolation: isolate;
 	overflow: hidden;
-	background: var(--theme-elevation-0);
-	transition: border-color 220ms ease;
-}
-.al-row + .al-row {
-	margin-top: calc(var(--base) * 0.2);
-}
-.al-row--expanded {
-	border-color: var(--theme-elevation-300);
+	border: var(--stroke-width-small) solid var(--color-border);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg);
 }
 .al-row__summary {
 	position: relative;
 	display: grid;
-	grid-template-columns: calc(var(--base) * 0.8) 220px minmax(0, 220px) 1fr auto;
+	grid-template-columns: var(--spacer-4) 220px minmax(0, 220px) 1fr auto;
 	align-items: center;
-	gap: calc(var(--base) / 2);
-	padding: calc(var(--base) / 2) calc(var(--base) * 0.7);
-	font-size: 1rem;
+	gap: var(--spacer-2);
+	min-height: var(--spacer-6);
+	/* The chevron's 24px box leaves space around its glyph, so a smaller start padding
+	   puts the glyph as far from the edge as the date is on the other side. */
+	padding: var(--spacer-1) var(--spacer-3) var(--spacer-1) var(--spacer-2);
 	user-select: none;
 }
 .al-row__summary--expandable {
 	cursor: pointer;
 }
 .al-row__summary--expandable:hover {
-	background: var(--theme-elevation-50);
+	background: var(--color-bg-hover);
 }
 /* Covers the whole summary, so a click anywhere toggles. Positioned cells
    (the user pill) sit above it and keep their own clicks. */
@@ -396,19 +419,16 @@
 }
 .al-row__hit:focus-visible {
 	outline: var(--accessibility-outline);
-	outline-offset: -2px;
+	outline-offset: var(--accessibility-outline-inset);
 }
 /* Decoration only; clicks pass through to the stretched toggle beneath. */
 .al-row__toggle {
-	color: var(--theme-elevation-400);
 	display: inline-flex;
+	color: var(--color-icon-secondary);
 	pointer-events: none;
 }
 .al-row__toggle--hidden {
 	visibility: hidden;
-}
-.al-row__toggle-icon {
-	transition: transform 220ms ease;
 }
 .al-row__body {
 	display: grid;
@@ -421,12 +441,12 @@
 .al-row__op-col {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) * 0.4);
+	gap: var(--spacer-2);
 	overflow: hidden;
 }
 .al-row__collection {
-	font-weight: 600;
-	color: var(--theme-text);
+	color: var(--color-text);
+	font-weight: var(--text-body-medium-bold-font-weight);
 }
 .al-row__op-col .al-row__collection {
 	overflow: hidden;
@@ -440,7 +460,7 @@
 	z-index: 1;
 	display: inline-flex;
 	align-items: center;
-	gap: calc(var(--base) * 0.2);
+	gap: var(--spacer-1);
 	min-width: 0;
 	text-decoration: none;
 }
@@ -451,24 +471,18 @@
 }
 .al-row__collection--link .icon {
 	flex-shrink: 0;
-	width: calc(var(--base) * 0.7);
-	height: calc(var(--base) * 0.7);
-	color: var(--theme-elevation-400);
-	transition: color 150ms;
-}
-.al-row__collection--link .icon .stroke {
-	stroke: currentColor;
+	color: var(--color-icon-secondary);
 }
 .al-row__collection--link:hover .al-row__collection-name {
 	text-decoration: underline;
 }
 .al-row__collection--link:hover .icon {
-	color: var(--theme-text);
+	color: var(--color-icon);
 }
 .al-row__badges {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) * 0.3);
+	gap: var(--spacer-1);
 	overflow: hidden;
 }
 /* Host badges from `rowBadges`. Like the user pill, above the stretched toggle
@@ -478,7 +492,7 @@
 	z-index: 1;
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) * 0.3);
+	gap: var(--spacer-1);
 	min-width: 0;
 	pointer-events: none;
 }
@@ -498,102 +512,105 @@
 	pointer-events: auto;
 }
 .al-row__empty {
-	color: var(--theme-elevation-400);
+	color: var(--color-text-tertiary);
 }
 .al-row__right {
 	display: flex;
-	align-items: center;
-	gap: calc(var(--base) * 0.4);
-	margin-left: auto;
 	flex-shrink: 0;
+	align-items: center;
+	gap: var(--spacer-2);
+	margin-inline-start: auto;
 }
 .al-row__paths-count,
 .al-row__time {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 	white-space: nowrap;
 }
 
+/* The user pill: Payload's static pill, its popup triggers as segments. */
 .al-user {
+	flex-shrink: 1;
 	max-width: 100%;
 	min-width: 0;
-	flex-shrink: 1;
+	min-height: var(--spacer-4);
+	padding-inline: var(--spacer-2);
 }
 .al-user .pill__label {
 	display: inline-flex;
 	align-items: center;
 	align-self: stretch;
-	gap: calc(var(--base) * 0.4);
+	gap: var(--spacer-2);
 	min-width: 0;
 }
 /* A flex item, which only shrinks enough to ellipsize with min-width: 0. */
 .al-user__name {
 	min-width: 0;
 	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
 	color: inherit;
 	text-decoration: none;
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 a.al-user__name:hover {
 	text-decoration: underline;
 }
 .al-user__name--deleted {
+	color: var(--color-text-secondary);
 	font-style: italic;
-	color: var(--theme-elevation-500);
 }
 /* The popup triggers (the impersonated mark, the chevron of a host `user` slot)
    are segments of the pill rather than chips inside it: flush to the right edge,
    full height, each split from the one before by a hairline. */
 .al-user--segmented {
-	--pill-padding-inline-end: 0;
+	padding-inline-end: 0;
 }
 .al-user__popup,
 .al-user__trigger {
 	display: flex;
-	align-self: stretch;
 	flex-shrink: 0;
+	align-self: stretch;
 	background: none;
 }
 /* Two segments sit flush, the hairline alone between them. */
 .al-user__popup + .al-user__popup {
-	margin-inline-start: calc(var(--base) * -0.4);
+	margin-inline-start: calc(var(--spacer-2) * -1);
 }
 .al-user__impersonated {
 	display: flex;
 	align-items: center;
-	padding: 0 calc(var(--base) * 0.4);
-	border-left: 1px solid var(--theme-elevation-250);
-	background: var(--theme-warning-100);
-	color: var(--theme-warning-800);
+	height: 100%;
+	padding: 0 var(--spacer-2);
+	border-inline-start: var(--stroke-width-small) solid var(--color-border);
+	background: var(--color-bg-warning-tertiary);
+	color: var(--color-text-warning);
 }
 .al-user__trigger:hover .al-user__impersonated,
 .al-user__trigger:focus-visible .al-user__impersonated {
-	background: var(--theme-warning-150);
+	background: var(--color-bg-warning-tertiary-hover);
 }
 .al-user__more {
 	display: flex;
 	align-items: center;
-	padding: 0 calc(var(--base) * 0.3);
-	border-left: 1px solid var(--theme-elevation-250);
-	color: var(--theme-elevation-500);
+	height: 100%;
+	padding: 0 var(--spacer-1);
+	border-inline-start: var(--stroke-width-small) solid var(--color-border);
+	color: var(--color-icon-secondary);
 }
 .al-user__trigger:hover .al-user__more,
 .al-user__trigger:focus-visible .al-user__more {
-	color: var(--theme-text);
+	color: var(--color-icon);
 }
-.al-user__more .icon {
-	width: calc(var(--base) * 0.6);
-	height: calc(var(--base) * 0.6);
-}
+/* The popup's scroll container already pads the block axis; the inline padding is
+   what a native menu gets from its button list and buttons together. */
 .al-user__popover {
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
-	gap: calc(var(--base) * 0.25);
-	font-size: 1rem;
+	gap: var(--spacer-1);
+	padding: var(--spacer-1) var(--spacer-3);
 }
 .al-user__popover-label {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .al-row__detail {
@@ -601,26 +618,25 @@ a.al-user__name:hover {
 	overflow: hidden;
 }
 .al-row__detail-inner {
-	padding: calc(var(--base) * 0.6) calc(var(--base) * 0.7) calc(var(--base) * 0.8);
-	border-top: 1px solid var(--theme-elevation-150);
-	background: var(--theme-elevation-0);
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.6);
+	gap: var(--spacer-3);
+	padding: var(--spacer-3);
+	border-top: var(--stroke-width-small) solid var(--color-border);
 }
 .al-row__meta {
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--base) * 0.4) var(--base);
-	color: var(--theme-elevation-800);
+	gap: var(--spacer-2) var(--spacer-4);
+	color: var(--color-text);
 }
 .al-row__meta-item {
 	display: inline-flex;
-	gap: calc(var(--base) * 0.3);
+	gap: var(--spacer-1-5);
 	min-width: 0;
 }
 .al-row__meta-label {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 .al-row__ua {
 	max-width: 400px;
@@ -631,7 +647,7 @@ a.al-user__name:hover {
 .al-row__meta-link {
 	color: inherit;
 	text-decoration: underline;
-	text-decoration-color: var(--theme-elevation-300);
+	text-decoration-color: var(--color-border);
 	text-underline-offset: 2px;
 }
 .al-row__meta-link:hover {
@@ -642,34 +658,33 @@ a.al-user__name:hover {
 .al-row__changed-paths {
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--base) * 0.25);
+	gap: var(--spacer-1);
 }
 .al-path-tag {
-	padding: 0 calc(var(--base) * 0.3);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-800);
+	padding: 0 var(--spacer-1-5);
+	border-radius: var(--radius-chip);
+	background: var(--color-bg-secondary);
+	color: var(--color-text);
 	font-family: var(--font-mono);
-	font-size: 0.92rem;
-	line-height: calc(var(--base) * 1.1);
+	font-size: var(--text-mono-small-font-size);
+	line-height: var(--text-mono-small-line-height);
 	text-decoration: none;
 }
 .al-path-tag:hover {
-	background: var(--theme-elevation-150);
+	background: var(--color-bg-secondary-hover);
 	text-decoration: underline;
 }
 
 .al-row__section {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.3);
+	gap: var(--spacer-2);
 }
 .al-row__section-label {
-	font-size: 0.85rem;
-	font-weight: 600;
-	text-transform: uppercase;
-	letter-spacing: 0.05em;
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-bold-font-size);
+	font-weight: var(--text-body-medium-bold-font-weight);
+	line-height: var(--text-body-medium-bold-line-height);
 }
 
 .al-diff {
@@ -677,23 +692,20 @@ a.al-user__name:hover {
 	border-collapse: collapse;
 }
 .al-diff__th {
-	padding: calc(var(--base) * 0.3) calc(var(--base) * 0.5);
-	border-bottom: 1px solid var(--theme-elevation-150);
-	color: var(--theme-elevation-500);
-	font-size: 0.85rem;
-	font-weight: 600;
-	letter-spacing: 0.05em;
-	text-align: left;
-	text-transform: uppercase;
+	padding: var(--spacer-1-5) var(--spacer-2);
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
+	color: var(--color-text-secondary);
+	font-weight: var(--text-body-medium-bold-font-weight);
+	text-align: start;
 }
 .al-diff__row:hover {
-	background: var(--theme-elevation-50);
+	background: var(--color-bg-hover);
 }
 .al-diff__td {
-	padding: calc(var(--base) * 0.3) calc(var(--base) * 0.5);
-	border-bottom: 1px solid var(--theme-elevation-100);
-	vertical-align: top;
+	padding: var(--spacer-1-5) var(--spacer-2);
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
 	overflow-wrap: anywhere;
+	vertical-align: top;
 }
 .al-diff__col-path {
 	width: 30%;
@@ -703,48 +715,35 @@ a.al-user__name:hover {
 	width: 35%;
 }
 .al-diff__path {
-	color: var(--theme-elevation-800);
+	color: var(--color-text);
 	font-family: var(--font-mono);
-	font-size: 0.92rem;
+	font-size: var(--text-mono-small-font-size);
 }
-/* Theme tokens rather than fixed hex: they invert in dark mode, so the tint stays
-   faint and the text stays readable on either background. */
+/* Status tints rather than fixed hex: Payload re-scopes them in dark mode, so the
+   tint stays faint and the text stays readable on either background. */
 .al-diff__td.al-diff__col-before {
-	background: var(--theme-error-50);
-	color: var(--theme-error-750);
+	background: var(--color-bg-danger-tertiary);
+	color: var(--color-text-danger);
 }
 .al-diff__td.al-diff__col-after {
-	background: var(--theme-success-50);
-	color: var(--theme-success-750);
+	background: var(--color-bg-success-tertiary);
+	color: var(--color-text-success);
 }
 .al-diff__json,
 .al-json-block {
 	margin: 0;
+	overflow-y: auto;
 	font-family: var(--font-mono);
-	font-size: 0.92rem;
+	font-size: var(--text-mono-small-font-size);
+	line-height: var(--text-mono-small-line-height);
 	white-space: pre-wrap;
 	word-break: break-all;
-	overflow-y: auto;
 }
 .al-diff__json {
-	max-height: calc(var(--base) * 10);
+	max-height: 200px;
 }
 .al-json-block {
-	max-height: calc(var(--base) * 15);
-}
-.al-raw-json {
-	margin-top: calc(var(--base) * 0.3);
-}
-
-.al-pagination {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	gap: calc(var(--base) * 0.6);
-	margin-top: var(--base);
-}
-.al-pagination__info {
-	color: var(--theme-elevation-500);
+	max-height: 300px;
 }
 
 /* Read by assistive technology, not drawn: names an icon-only control. */

@@ -478,90 +478,39 @@ export type CollectionAuditLogConfig = {
 	snapshotOnDelete?: boolean
 }
 
-export type OverrideFunction = (incomingField: RelationshipField) => RelationshipField
-
-export type AuditFieldsCreateOptions = {
+/** Options for {@link auditRelationshipField}. */
+export type AuditRelationshipFieldOptions = {
 	/**
-	 * Pass-through for any Payload relationship field admin options.
-	 * Merged on top of the plugin defaults (`readOnly: true`, custom `Field` component).
-	 * `admin.components.Field` takes precedence over the plugin's custom component.
+	 * Pass-through for any Payload relationship field admin options, merged over the
+	 * plugin's (`readOnly: true` and its own `Field` component). `admin.components.Field`
+	 * wins over the plugin's component.
 	 */
 	admin?: RelationshipField['admin']
-	/**
-	 * When true, skips registering the custom read-only field component and falls back
-	 * to Payload's default relationship field UI.
-	 * @default false
-	 */
-	disableCustomComponent?: boolean
-	/**
-	 * The label displayed above the field in the admin UI.
-	 */
-	label: RelationshipField['label']
-	/**
-	 * The field name used in the database and form state.
-	 */
+	/** The label displayed above the field in the admin UI. */
+	label?: RelationshipField['label']
+	/** The field name used in the database and form state. */
 	name: string
-	/**
-	 * The collection(s) this field relates to.
-	 */
+	/** The collection or collections the field relates to. */
 	relationTo: CollectionSlug | CollectionSlug[]
 }
 
-type AuditFieldAutomaticOptions = {
-	isManual?: false
-	/**
-	 * Override any property of the generated field.
-	 * The function receives the fully built field and should return the modified version.
-	 * Note: `hasMany` is always forced to false and cannot be overridden.
-	 *
-	 * @example
-	 * overrides: (field) => ({ ...field, access: { update: () => false } })
-	 */
-	overrides?: OverrideFunction
-} & Partial<AuditFieldsCreateOptions>
-
-type AuditFieldManualOptions = {
-	isManual: true
-	/**
-	 * Whether the field relates to multiple collections (polymorphic).
-	 * When true, the hook will write `{ relationTo, value }` instead of a plain ID.
-	 * @default false
-	 */
-	isPolymorphic?: boolean
-	/**
-	 * The full path to the field including the field name.
-	 * Example: 'groupField.subField.fieldName'
-	 */
-	path: string
-	/**
-	 * The collection(s) this field relates to.
-	 * Used to validate that the current user belongs to one of these collections before writing.
-	 * If not provided, defaults to all detected auth collections.
-	 */
-	relationTo?: CollectionSlug | CollectionSlug[]
-}
-
 /**
- * Options for a single audit field.
+ * Where the plugin shows Payload's own `createdBy` and `updatedBy` fields in the admin.
  *
- * - `false`, disables the field entirely
- * - `AuditFieldAutomaticOptions`, plugin creates and manages the field automatically
- * - `AuditFieldManualOptions`, field is defined manually; plugin only writes to it via hooks
+ * - `true`, every collection and global the config has when the plugin runs
+ * - object, only the listed ones
  */
-export type AuditFieldOptions = AuditFieldAutomaticOptions | AuditFieldManualOptions | false
-
-type AuditFieldsOptions =
-	| true
-	| false
+export type AuthorshipFieldsOptions =
+	| boolean
 	| {
-			createdBy?: AuditFieldOptions
-			lastModifiedBy?: AuditFieldOptions
+			collections?: CollectionSlug[]
+			globals?: GlobalSlug[]
 	  }
 
 /**
  * Per-collection audit configuration.
  *
- * - `true`, enable both `auditFields` and `auditLog` with defaults
+ * - `true`, enable `auditLog` with defaults
  * - object, opt-in: only what is explicitly set is enabled
  */
 /** As much as Payload will say about why it refused a login. */
@@ -622,13 +571,6 @@ export type AuditOptions =
 			 */
 			auth?: AuthEventsOptions
 			/**
-			 * Configuration for the `createdBy` and `lastModifiedBy` fields.
-			 * - `true`, enable both fields with defaults
-			 * - `false`, disable both fields (same as omitting)
-			 * - object, granular control over each field; omitted fields are disabled
-			 */
-			auditFields?: AuditFieldsOptions
-			/**
 			 * Configuration for CRUD audit log entries.
 			 * - `true`, enable with all operations and defaults
 			 * - `false`, disable (same as omitting)
@@ -640,7 +582,7 @@ export type AuditOptions =
 /**
  * Per-global audit configuration.
  *
- * - `true`, enable both `auditFields` and `auditLog` with defaults
+ * - `true`, enable `auditLog` with defaults
  * - object, opt-in: only what is explicitly set is enabled
  *
  * Note: globals are always `update`-only. `operations`, `snapshotOnCreate`, and
@@ -649,15 +591,8 @@ export type AuditOptions =
 export type GlobalAuditOptions =
 	| true
 	| {
-			auditFields?: AuditFieldsOptions
 			auditLog?: true | false | GlobalAuditLogConfig
 	  }
-
-/**
- * Top-level defaults applied to all automatic audit fields across every collection and global.
- * Per-collection / per-global options take precedence over these.
- */
-export type AuditFieldDefaultOptions = Omit<AuditFieldAutomaticOptions, 'isManual'>
 
 /** One entry of `logs.payloadAPIs`, resolved to `{ label, value }`. */
 export type PayloadAPIOptionObject = { label: string; value: string }
@@ -979,24 +914,22 @@ export type AuditPluginConfig = {
 	 */
 	anonymize?: Partial<Record<CollectionSlug | GlobalSlug, AnonymizeFunction>>
 	/**
-	 * Collections to add audit fields and/or audit log to.
-	 * Keys are collection slugs; values are the audit configuration for that collection.
+	 * Shows Payload's own `createdBy` and `updatedBy` fields (its `authorship`, hidden by
+	 * default) in the admin, through the plugin's read-only component: the user as text,
+	 * or as a link that opens them in a drawer when the viewer may read them. Payload
+	 * fills both; the plugin writes nothing to them.
+	 *
+	 * A collection or global whose `authorship` turns a field off gets nothing for it,
+	 * and one that declares its own `createdBy` or `updatedBy` keeps it as declared.
+	 *
+	 * @default false
+	 */
+	authorshipFields?: AuthorshipFieldsOptions
+	/**
+	 * Collections to audit. Keys are collection slugs; values are the audit configuration
+	 * for that collection.
 	 */
 	collections?: Partial<Record<CollectionSlug, AuditOptions>>
-	/**
-	 * Default options applied to all automatic audit fields across every collection and global.
-	 * Per-collection / per-global options take precedence.
-	 *
-	 * @example
-	 * defaults: {
-	 *   createdBy: { admin: { hidden: true } },
-	 *   lastModifiedBy: { label: 'Modified By' },
-	 * }
-	 */
-	defaults?: {
-		createdBy?: AuditFieldDefaultOptions
-		lastModifiedBy?: AuditFieldDefaultOptions
-	}
 	/**
 	 * Multi-tenancy support. Configure when using `@payloadcms/plugin-multi-tenant` or any
 	 * setup where documents have a tenant relationship field.
@@ -1021,8 +954,8 @@ export type AuditPluginConfig = {
 	 */
 	impersonation?: boolean
 	/**
-	 * Set to `true` to disable all plugin behaviour while keeping fields and the audit-logs
-	 * collection in the schema (useful for maintaining consistent DB migrations).
+	 * Set to `true` to disable all plugin behaviour while keeping the audit-logs collection
+	 * in the schema (useful for maintaining consistent DB migrations).
 	 */
 	disabled?: boolean
 	/**
@@ -1050,8 +983,8 @@ export type AuditPluginConfig = {
 	 */
 	retention?: DataRetentionConfig
 	/**
-	 * Globals to add audit fields and/or audit log to.
-	 * Keys are global slugs; values are the audit configuration for that global.
+	 * Globals to audit. Keys are global slugs; values are the audit configuration for
+	 * that global.
 	 */
 	globals?: Partial<Record<GlobalSlug, GlobalAuditOptions>>
 }

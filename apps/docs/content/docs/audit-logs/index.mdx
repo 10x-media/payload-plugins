@@ -22,15 +22,15 @@ Unlike `collections` in most plugins, this one is opt-*in*: nothing is audited u
 
 ## Two features, one plugin
 
-**Audit fields** add `createdBy` and `lastModifiedBy` relationship fields to a collection or global and keep them stamped. They answer "who owns this document right now" from the document itself, with no join.
+**Audit fields** show Payload's own `createdBy` and `updatedBy` on the document, through a read-only field that links to the user. Payload 4 stamps them on every collection and global; the plugin makes them visible. They answer "who owns this document right now" from the document itself, with no join.
 
 **Audit logs** record a separate entry per change in an `audit-logs` collection, each carrying a field-level diff. They answer "what happened to this document over time".
 
-They are independent. Enable either, or both, per collection.
+They are independent: `authorshipFields` turns on the first, `collections` and `globals` the second.
 
 ## How it works
 
-The plugin attaches Payload hooks to the collections you list. `beforeChange` stamps the audit fields; `afterChange` and `afterDelete` compute a diff between `previousDoc` and `doc` and write an entry. Auth collections additionally get `afterLogin` and `afterForgotPassword`.
+The plugin attaches Payload hooks to the collections you list. `afterChange` and `afterDelete` compute a diff between `previousDoc` and `doc` and write an entry. Auth collections additionally get `afterLogin` and `afterForgotPassword`.
 
 Three consequences are worth knowing before you enable it.
 

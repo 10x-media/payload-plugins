@@ -13,14 +13,14 @@ import {
 	withCondition,
 } from '@payloadcms/ui'
 import { mergeFieldStyles } from '@payloadcms/ui/shared'
-import type { RelationshipFieldClientComponent, ValueWithRelation } from 'payload'
+import type { RelationshipFieldClientProps, ValueWithRelation } from 'payload'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
 import './AuditRelationshipField.css'
 
 const baseClass = 'audit-relationship-field'
 
-const AuditRelationshipFieldComponent: RelationshipFieldClientComponent = (props) => {
+const AuditRelationshipFieldComponent = (props: RelationshipFieldClientProps) => {
 	const {
 		field: {
 			admin: { className, description } = {},
@@ -46,7 +46,7 @@ const AuditRelationshipFieldComponent: RelationshipFieldClientComponent = (props
 		serverURL,
 	} = config
 	const { permissions } = useAuth()
-	const { code: locale } = useLocale()
+	const locale = useLocale()?.code
 
 	const isPolymorphic = Array.isArray(relationToProp) && relationToProp.length > 1
 

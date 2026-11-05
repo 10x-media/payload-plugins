@@ -1,10 +1,7 @@
 import type { Config, GlobalConfig, GlobalSlug } from 'payload'
 
 import { afterChangeGlobalAuditLog } from '../hooks/afterChangeGlobal'
-import { beforeChangeGlobalAuditField } from '../hooks/beforeChangeGlobal'
 import type { AuditPluginConfig } from '../types'
-import { buildFieldMap } from '../utilities/buildFieldMap'
-import { buildAuditConfig } from './auditFields'
 import type { PluginContext } from './context'
 import { resolveGlobalAuditLogConfig } from './resolveOptions'
 
@@ -17,30 +14,16 @@ const registerGlobal = (
 	const globalOptions = pluginOptions.globals?.[slug]
 	if (!globalOptions) return global
 
-	const { createdByHookConfig, fields, hasActiveFields, lastModifiedByHookConfig } =
-		buildAuditConfig(global.fields, globalOptions, ctx.defaultRelationTo, pluginOptions.defaults)
-
 	const auditLogConfig = resolveGlobalAuditLogConfig(globalOptions)
 
 	const hooks = { ...global.hooks }
-
-	if (!pluginOptions.disabled && hasActiveFields) {
-		hooks.beforeChange = [
-			beforeChangeGlobalAuditField({
-				createdBy: createdByHookConfig,
-				lastModifiedBy: lastModifiedByHookConfig,
-			}),
-			...(hooks.beforeChange ?? []),
-		]
-	}
 
 	if (!pluginOptions.disabled && auditLogConfig !== false) {
 		const tenantFieldName =
 			ctx.tenantFieldName && !ctx.multiTenancy?.excludeGlobals?.includes(slug)
 				? ctx.tenantFieldName
 				: undefined
-		const fieldMap =
-			pluginOptions.normalizeRelationships !== false ? buildFieldMap(fields) : undefined
+		const normalizeRelationships = pluginOptions.normalizeRelationships !== false
 
 		hooks.afterChange = [
 			...(hooks.afterChange ?? []),
@@ -51,7 +34,7 @@ const registerGlobal = (
 				collectUserAgent: ctx.collectUserAgent,
 				drafts: auditLogConfig.drafts ?? pluginOptions.drafts ?? 'ignore',
 				excludeFields: auditLogConfig.excludeFields,
-				fieldMap,
+				normalizeRelationships,
 				globalSlug: slug,
 				groupContextKey: ctx.groupContextKey,
 				recordImpersonator: ctx.recordImpersonator,
@@ -61,7 +44,7 @@ const registerGlobal = (
 		]
 	}
 
-	return { ...global, fields, hooks }
+	return { ...global, hooks }
 }
 
 export const registerGlobals = (

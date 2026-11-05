@@ -3,7 +3,7 @@ import type { CollectionAfterChangeHook, CollectionSlug } from 'payload'
 import type { AnonymizeFunction, ShouldLogFunction } from '../types'
 import { REDACTED } from '../types'
 import { anonymizeDoc } from '../utilities/anonymize'
-import type { FieldMap } from '../utilities/buildFieldMap'
+import { fieldMapOf } from '../utilities/buildFieldMap'
 import { computeDiff, normalizeSnapshot } from '../utilities/diff'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
@@ -18,7 +18,8 @@ export type AuditLogAfterChangeOptions = {
 	collectUserAgent: boolean
 	drafts: 'ignore' | 'log'
 	excludeFields?: string[]
-	fieldMap?: FieldMap
+	/** Reduce relationship values to ids in diffs and snapshots (`normalizeRelationships`). */
+	normalizeRelationships: boolean
 	groupContextKey?: string
 	/** False when the log collection has no `impersonator` field. */
 	recordImpersonator: boolean
@@ -65,7 +66,10 @@ const applyAnonymization = (
 
 export const afterChangeCollectionAuditLog =
 	(options: AuditLogAfterChangeOptions): CollectionAfterChangeHook =>
-	async ({ req, doc, previousDoc, operation }) => {
+	async ({ collection, req, doc, previousDoc, operation }) => {
+		const fieldMap = options.normalizeRelationships
+			? fieldMapOf(collection, req.payload.config.blocks)
+			: undefined
 		if (!options.operations.includes(operation)) return
 
 		// Draft handling: skip autosave draft saves; on publish fetch the last published version
@@ -135,9 +139,7 @@ export const afterChangeCollectionAuditLog =
 					: (doc as Record<string, unknown>)
 				: undefined
 			const snapshot =
-				snapshotRaw && options.fieldMap
-					? normalizeSnapshot(snapshotRaw, options.fieldMap)
-					: snapshotRaw
+				snapshotRaw && fieldMap ? normalizeSnapshot(snapshotRaw, fieldMap) : snapshotRaw
 
 			await writeAuditLog({
 				req,
@@ -164,7 +166,7 @@ export const afterChangeCollectionAuditLog =
 			previousDoc as Record<string, unknown>,
 			doc as Record<string, unknown>,
 			options.excludeFields,
-			options.fieldMap
+			fieldMap
 		)
 
 		// On update with no changes, skip, only excluded fields changed

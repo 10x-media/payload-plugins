@@ -1,4 +1,4 @@
-import type { CollectionSlug, Config } from 'payload'
+import type { Config } from 'payload'
 
 import type { AuditPluginConfig, DataRetentionConfig, MultiTenancyConfig } from '../types'
 
@@ -10,8 +10,6 @@ import type { AuditPluginConfig, DataRetentionConfig, MultiTenancyConfig } from 
 export type PluginContext = {
 	collectIpAddress: boolean
 	collectUserAgent: boolean
-	/** What the `createdBy` and `lastModifiedBy` audit fields relate to. */
-	defaultRelationTo: CollectionSlug | CollectionSlug[]
 	/** Key read off `req.context` to group entries written by one operation. */
 	groupContextKey: string | undefined
 	groupEnabled: boolean
@@ -34,21 +32,6 @@ export const buildPluginContext = (
 	/** The `definePlugin` slug map, built from every entry of `config.plugins`. */
 	plugins: Record<string, unknown> = {}
 ): PluginContext => {
-	const authCollectionsSlugs = (config.collections ?? [])
-		.filter((collection) => collection.auth)
-		.map((collection) => collection.slug as CollectionSlug)
-
-	// One auth collection stores a plain id, several store a polymorphic pair, none
-	// falls back to the conventional slug. Read out rather than indexed: a length
-	// check does not tell the compiler the element exists.
-	const [onlyAuthCollection] = authCollectionsSlugs
-	const defaultRelationTo: CollectionSlug | CollectionSlug[] =
-		authCollectionsSlugs.length === 1 && onlyAuthCollection
-			? onlyAuthCollection
-			: authCollectionsSlugs.length > 1
-				? authCollectionsSlugs
-				: 'users'
-
 	const groupConfig = pluginOptions.logs?.group
 	const groupEnabled = Boolean(groupConfig)
 
@@ -59,7 +42,6 @@ export const buildPluginContext = (
 		// Corrected once the log collection is built and any override has run.
 		fastWrite: true,
 		collectUserAgent: pluginOptions.logs?.userAgent !== false,
-		defaultRelationTo,
 		groupContextKey: groupEnabled
 			? (groupConfig !== true && groupConfig !== false && groupConfig?.contextKey) || 'auditGroup'
 			: undefined,

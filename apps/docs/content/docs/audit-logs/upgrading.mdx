@@ -1,11 +1,90 @@
 ---
 title: Upgrading
-description: Move an install to a newer beta, with the data edits each release needs.
+description: Move an install to Payload 4, or to a newer beta, with the data edits each release needs.
 ---
 
-Until 1.0.0, `@10x-media/audit-logs` is published as betas, and a beta may change how entries are stored. Each release that does is listed here with what to do about it.
+`@10x-media/audit-logs` 4.x is the Payload 4 line; the 0.x betas run on Payload 3. A release that changes how anything is stored is listed here with what to do about it.
 
-## From 0.1.0-beta.4
+## Payload 4
+
+Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The log, its collection and its options are unchanged, and the plugin runs on Next.js and TanStack Start. What changes is the audit fields: Payload 4 has its own.
+
+### Checklist
+
+1. Upgrade `@10x-media/audit-logs` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.7`. `next` is no longer a peer.
+2. Remove `auditFields` from every collection and global, and `defaults` from the plugin options. Replace `createdByField` and `lastModifiedByField` with Payload's `createCreatedByField` and `createUpdatedByField` where you placed them by hand (see [The field component](/audit-logs/audit-fields#the-field-component)).
+3. To keep the fields visible in the admin, set `authorshipFields`: `true`, or the collections and globals that had `auditFields`.
+4. Move the stored values across, on [MongoDB](#mongodb) or [Postgres](#postgres).
+5. In code of your own that reads them, `lastModifiedBy` is `updatedBy`, and both are always `{ relationTo, value }`.
+
+`posts: true` used to turn on the log and the audit fields; it now means the log only.
+
+### Audit fields are Payload's
+
+Payload 4 stamps `createdBy` and `updatedBy` on every collection and global itself (its `authorship`), so the plugin no longer adds or fills fields of its own. Its `createdBy` keeps the name; `lastModifiedBy` becomes `updatedBy`. Payload's fields are relationships to every auth collection, so each value is a `{ relationTo, value }` pair even with one auth collection, where the plugin stored a plain id. They are hidden in the admin unless `authorshipFields` shows them.
+
+Every document saved after the upgrade gets a correct `updatedBy`, and a new document a `createdBy`. Documents saved before it keep what the plugin wrote only if you move it.
+
+### MongoDB
+
+Run once in `mongosh`, after deploying the new version. List every collection that had `auditFields`, and every global that did (globals live in the `globals` collection, one document per `globalType`). With one auth collection the old values are plain ids; use its slug if it is not `users`:
+
+```js
+const targets = [
+  { collection: 'posts', filter: {} },
+  { collection: 'globals', filter: { globalType: 'settings' } },
+]
+for (const { collection, filter } of targets) {
+  const c = db.getCollection(collection)
+  c.updateMany({ ...filter, lastModifiedBy: { $exists: true } }, { $rename: { lastModifiedBy: 'updatedBy' } })
+  // A plain id, stored with one auth collection: name the collection.
+  for (const field of ['createdBy', 'updatedBy']) {
+    c.updateMany(
+      { ...filter, [field]: { $exists: true, $ne: null, $not: { $type: 'object' } } },
+      [{ $set: { [field]: { relationTo: 'users', value: `$${field}` } } }],
+    )
+  }
+}
+```
+
+With several auth collections the values are already pairs, and the rename is all that runs.
+
+### Postgres
+
+Generate a migration with `pnpm payload migrate:create` once Payload 4 and the plugin are in. Among Payload's own changes it creates a `<table>_rels` table per collection and global, where Payload keeps `createdBy` and `updatedBy`, and drops the plugin's columns. Copy the data across in `up`, **after the `_rels` tables are created and before the columns are dropped**.
+
+With one auth collection (`users` here) the plugin stored `created_by_id` and `last_modified_by_id` on the table itself. Per collection or global (`posts` here):
+
+```sql
+INSERT INTO "posts_rels" ("parent_id", "path", "users_id")
+  SELECT "id", 'createdBy', "created_by_id" FROM "posts" WHERE "created_by_id" IS NOT NULL;
+INSERT INTO "posts_rels" ("parent_id", "path", "users_id")
+  SELECT "id", 'updatedBy', "last_modified_by_id" FROM "posts" WHERE "last_modified_by_id" IS NOT NULL;
+```
+
+With several, the values already sit in `<table>_rels`; rename the path, anywhere in `up`:
+
+```sql
+UPDATE "posts_rels" SET "path" = 'updatedBy' WHERE "path" = 'lastModifiedBy';
+```
+
+<Callout type="warn">
+On a development database that Payload pushes its schema to, the push drops `created_by_id` and `last_modified_by_id` on the first boot and the ids go with them. Copy the data, or take a backup, before booting the new version there.
+</Callout>
+
+Payload's `_rels` rows reference the user with `ON DELETE cascade`, so deleting a user clears their `createdBy` and `updatedBy` from the documents, as the plugin's columns did with `set null`. The log keeps the user either way: an entry stores them as text.
+
+### Your own code
+
+- **Local API access.** Payload 4 applies access control in the Local API by default. A hook or script that writes to an audited collection with a request whose user the collection's access refuses now fails; pass `overrideAccess: true` for writes the system makes on someone's behalf. `jobs.queue` and `jobs.run` follow the same default.
+- **Requests for `createAuditEvent`.** `createLocalReq` is gone; build one with `createPayloadRequest({ payload, user })`.
+- **Blocks by slug.** A blocks field may name a block from the config's `blocks` by slug. The plugin resolves those when it maps relationship paths, so nothing changes for you.
+
+### What looks different
+
+The view is built from Payload 4's list parts. The header is Payload's list header, with the debug actions on its right instead of a separate bar. The filters sit in the list-controls band: Event opens a popup of switches, like Columns, and Collection, User, Date, Tenant and More filters open a section under the band, like Filters. Pagination is Payload's page controls, pinned to the bottom. Badges, rows and the diff use Payload 4's tokens. The `paginationInfo` translation is gone; Payload's page controls bring their own strings.
+
+## From 0.1.0-beta.4 (Payload 3 line)
 
 `user` and `impersonator` are no longer relationship fields. Each is a group of two text fields, `relationTo` (the auth collection) and `value` (the id), in that shape whether the host has one auth collection or several:
 

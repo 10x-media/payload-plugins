@@ -1,5 +1,6 @@
 import { type Config, definePlugin } from 'payload'
 
+import { registerAuthorshipFields } from './plugin/authorshipFields'
 import { buildPluginContext } from './plugin/context'
 import { registerCollections } from './plugin/registerCollections'
 import { registerGlobals } from './plugin/registerGlobals'
@@ -30,13 +31,13 @@ declare module 'payload' {
 }
 
 /**
- * Audit logging for Payload v3: who changed what, a diff per change, auth events,
+ * Audit logging for Payload 4: who changed what, a diff per change, auth events,
  * and a browsable view. Authored with `definePlugin` so sibling plugins can detect
  * it by slug.
  */
 export const auditLogs = definePlugin<AuditLogsPluginOptions>({
 	slug: '@10x-media/audit-logs',
-	plugin: ({ config, plugins, ...pluginOptions }): Config => {
+	plugin: ({ config, options: pluginOptions = {}, plugins }): Config => {
 		const ctx = buildPluginContext(config, pluginOptions, plugins)
 
 		registerTranslations(config, pluginOptions.translations)
@@ -45,26 +46,27 @@ export const auditLogs = definePlugin<AuditLogsPluginOptions>({
 		registerViews(config, ctx, pluginOptions)
 		registerCollections(config, ctx, pluginOptions)
 		registerGlobals(config, ctx, pluginOptions)
+		// After the log collection, which opts out of authorship.
+		registerAuthorshipFields(config, pluginOptions.authorshipFields)
 		registerRetention(config, pluginOptions)
 
 		return config
 	},
 })
 
-export { auditRelationshipField, createdByField, lastModifiedByField } from './fields/index'
+export { auditRelationshipField } from './fields/index'
 export type {
 	AnonymizeFunction,
-	AuditFieldOptions,
-	AuditFieldsCreateOptions,
 	AuditOptions,
 	AuditPluginConfig,
+	AuditRelationshipFieldOptions,
 	AuthEventsOptions,
+	AuthorshipFieldsOptions,
 	CollectionAuditLogConfig,
 	DataRetentionConfig,
 	GlobalAuditLogConfig,
 	GlobalAuditOptions,
 	MultiTenancyConfig,
-	OverrideFunction,
 	PayloadAPIOption,
 	PayloadAPIOptionObject,
 	ShouldLogFunction,

@@ -3,31 +3,9 @@ import { describe, expect, it } from 'vitest'
 
 import { buildPluginContext } from './context'
 
-const auth = (slug: string): CollectionConfig =>
-	({ slug, auth: true, fields: [] }) as unknown as CollectionConfig
-const plain = (slug: string): CollectionConfig =>
-	({ slug, fields: [] }) as unknown as CollectionConfig
-
 const config = (collections: CollectionConfig[]): Config => ({ collections }) as Config
 
 describe('buildPluginContext', () => {
-	describe('what the audit fields point at', () => {
-		it('one auth collection is named alone', () => {
-			const ctx = buildPluginContext(config([auth('users'), plain('posts')]), {})
-			expect(ctx.defaultRelationTo).toBe('users')
-		})
-
-		it('several auth collections are listed together', () => {
-			const ctx = buildPluginContext(config([auth('users'), auth('admins')]), {})
-			expect(ctx.defaultRelationTo).toEqual(['users', 'admins'])
-		})
-
-		it('no auth collection falls back to the conventional slug', () => {
-			const ctx = buildPluginContext(config([plain('posts')]), {})
-			expect(ctx.defaultRelationTo).toBe('users')
-		})
-	})
-
 	describe('grouping', () => {
 		it('is off unless asked for', () => {
 			const ctx = buildPluginContext(config([]), {})

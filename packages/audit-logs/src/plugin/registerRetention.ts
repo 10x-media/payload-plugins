@@ -37,10 +37,13 @@ const registerDebugEndpoint = (config: Config, retention: DataRetentionConfig): 
 				if (task === 'audit-logs-archive' && !retention.archive) {
 					return Response.json({ error: 'Archive not configured' }, { status: 400 })
 				}
+				// The check above is the gate: Payload 4 would otherwise hold the request
+				// to `jobs.access.queue`, which a debug button has no business configuring.
 				await req.payload.jobs.queue({
-					task,
 					input: undefined,
+					overrideAccess: true,
 					queue: retention.queue ?? DEFAULT_QUEUE,
+					task,
 				})
 				return Response.json({ queued: true, task })
 			},

@@ -185,7 +185,7 @@ metadata: {
 Only REST is covered. The entry is written from the collection's `afterError` hook, which Payload calls from its REST error handler, so attempts through GraphQL or `payload.login()` produce no entry.
 
 <Callout type="warn">
-  This is the one audited write anyone on the internet can trigger. Payload 3 has no built-in rate limiting, and `maxLoginAttempts` only counts against accounts that exist, so attempts against addresses you never registered are never throttled. One request is one row, at whatever rate the caller can send. Put a rate limiter in front of `/api/*/login`, or use `shouldLog` below, before enabling this on a public auth collection. The identifiers recorded also belong to people who may not be your users, which is worth a line in your privacy policy.
+  This is the one audited write anyone on the internet can trigger. Payload has no built-in rate limiting, and `maxLoginAttempts` only counts against accounts that exist, so attempts against addresses you never registered are never throttled. One request is one row, at whatever rate the caller can send. Put a rate limiter in front of `/api/*/login`, or use `shouldLog` below, before enabling this on a public auth collection. The identifiers recorded also belong to people who may not be your users, which is worth a line in your privacy policy.
 </Callout>
 
 `shouldLog` decides whether an attempt becomes a row. Returning `false` drops it, which is where a burst gets collapsed:

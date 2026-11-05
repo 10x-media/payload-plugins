@@ -27,7 +27,7 @@ export default buildConfig({
 })
 ```
 
-`true` turns on both features with defaults: `createdBy` and `lastModifiedBy` fields, plus a log entry for every create, update and delete. Use an object to enable only one of them.
+`true` logs every create, update and delete of the collection with defaults. Use an object to narrow it.
 
 Then regenerate the import map, which is how Payload resolves the plugin's admin components:
 
@@ -37,25 +37,18 @@ payload generate:importmap
 
 ## Verify
 
-Open a `posts` document. Two read-only relationship fields appear, `Created By` and `Last Modified By`, both stamped with your user.
-
-Change the title and save. Open `/admin/audit-logs`: one row for the create, one for the update. Expand the update and the diff shows `title` with its before and after value, and nothing else.
+Create a `posts` document, change its title and save. Open `/admin/audit-logs`: one row for the create, one for the update. Expand the update and the diff shows `title` with its before and after value, and nothing else.
 
 ## Scope it
 
-Auditing is opt-in per collection, and each collection picks which half it wants:
+Auditing is opt-in per collection:
 
 ```ts title="payload.config.ts"
 auditLogs({
   collections: {
-    // Both features, defaults for each.
+    // The log, with defaults.
     posts: true,
-
-    // Log only. No extra columns on the document.
     orders: { auditLog: true },
-
-    // Fields only. No log entries.
-    pages: { auditFields: true },
 
     // Log, narrowed.
     products: {

@@ -29,18 +29,7 @@ Overrides are merged per key, so naming one leaves the rest of that locale alone
 
 ## Field labels are not translations
 
-The `createdBy` and `lastModifiedBy` labels are Payload field labels, not plugin strings, so they go through Payload's own mechanism:
-
-```ts title="payload.config.ts"
-auditLogs({
-  defaults: {
-    createdBy: { label: { en: 'Created by', de: 'Erstellt von' } },
-    lastModifiedBy: { label: { en: 'Modified by', de: 'Geändert von' } },
-  },
-})
-```
-
-The same applies per collection through `auditFields.createdBy.label`.
+The `createdBy` and `updatedBy` labels are Payload's own, translated with the rest of its admin. To relabel them, declare the fields with Payload's factories and pass a `label`, which takes a per-locale object like any field label; [audit fields](/audit-logs/audit-fields#the-field-component) shows how.
 
 ## What is not translated
 

@@ -57,6 +57,7 @@ const PillPopup = ({ button, children }: { button: ReactNode; children: ReactNod
 		noBackground
 		render={() => <div className="al-user__popover">{children}</div>}
 		size="fit-content"
+		theme="auto"
 		verticalAlign="bottom"
 	/>
 )
@@ -81,17 +82,14 @@ export function UserPill({ adminRoute, impersonator, popover, user }: Props) {
 			{impersonator && (
 				<PillPopup button={<span className="al-user__impersonated">{t(keys.impersonated)}</span>}>
 					<span className="al-user__popover-label">{t(keys.impersonatedBy)}</span>
-					{/* Not `to`: Pill renders that link itself and gives it no target. */}
-					<Pill pillStyle={impersonator.deleted ? 'light-gray' : 'light'} size="small">
-						<UserName adminRoute={adminRoute} user={impersonator} />
-					</Pill>
+					<UserName adminRoute={adminRoute} user={impersonator} />
 				</PillPopup>
 			)}
 			{popover != null && (
 				<PillPopup
 					button={
 						<span className="al-user__more" title={t(keys.aboutUser)}>
-							<ChevronIcon direction="down" />
+							<ChevronIcon direction="down" size={16} />
 							<span className="al-visually-hidden">{t(keys.aboutUser)}</span>
 						</span>
 					}

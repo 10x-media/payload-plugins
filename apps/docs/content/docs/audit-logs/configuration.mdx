@@ -9,7 +9,7 @@ description: The full option surface, from per-collection opt-in to the audit-lo
 |---|---|---|---|
 | `collections` | `Record<CollectionSlug, AuditOptions>` | `{}` | Which collections to audit. Opt-in. |
 | `globals` | `Record<GlobalSlug, GlobalAuditOptions>` | `{}` | Which globals to audit. Opt-in. |
-| `defaults` | `{ createdBy?, lastModifiedBy? }` | none | Defaults applied to every automatic audit field. |
+| `authorshipFields` | `boolean \| { collections?, globals? }` | `false` | Show Payload's own `createdBy` and `updatedBy` through the plugin's read-only field. See [audit fields](/audit-logs/audit-fields). |
 | `anonymize` | `Record<Slug, AnonymizeFunction>` | none | Per-entity value redaction. See [anonymization](/audit-logs/anonymization). |
 | `drafts` | `'ignore' \| 'log'` | `'ignore'` | Default draft handling for versioned entities. |
 | `normalizeRelationships` | `boolean` | `true` | Reduce relationship values to plain ids in diffs and snapshots. |
@@ -23,11 +23,10 @@ description: The full option surface, from per-collection opt-in to the audit-lo
 
 ## Per collection
 
-`AuditOptions` is `true` (both features, defaults) or an object:
+`AuditOptions` is `true` (the log, with defaults) or an object:
 
 ```ts
 posts: {
-  auditFields: true,   // true | false | { createdBy?, lastModifiedBy? }
   auditLog: true,      // true | false | CollectionAuditLogConfig
   auth: true,          // true | false | { login?, forgotPassword?, failedLogin? }
 }
@@ -40,7 +39,7 @@ logins and password resets, and like everything else here it is off until asked 
 because it is a write an anonymous caller can trigger. See
 [refused logins](/audit-logs/what-is-logged#refused-logins).
 
-An omitted key is off. `auditFields: true` without `auditLog` gives you the two columns and no log; `auditLog: true` without `auditFields` gives you the log and no extra columns.
+An omitted key is off.
 
 ### CollectionAuditLogConfig
 

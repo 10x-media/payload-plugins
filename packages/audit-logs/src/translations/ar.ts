@@ -16,7 +16,6 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.noEntries]: 'لم يتم العثور على إدخالات في سجل التدقيق.',
 
 	// Pagination
-	[keys.paginationInfo]: '{{from}}–{{to}} من {{total}}',
 
 	// Debug bar
 	[keys.debug]: 'تصحيح الأخطاء',

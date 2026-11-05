@@ -16,7 +16,6 @@ export const zh: Record<TranslationKey, string> = {
 	[keys.noEntries]: '未找到审计日志记录。',
 
 	// Pagination
-	[keys.paginationInfo]: '{{from}}–{{to}}，共 {{total}} 条',
 
 	// Debug bar
 	[keys.debug]: '调试',

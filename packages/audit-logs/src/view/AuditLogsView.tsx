@@ -1,7 +1,6 @@
-import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
 import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
-import { redirect } from 'next/navigation'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps, CollectionSlug, Params, Where } from 'payload'
 import { parseCookies } from 'payload'
 import { customEventTypeOptions, payloadAPILabels } from '../plugin/resolveOptions'
@@ -20,6 +19,7 @@ import { AuditLogsClient } from './AuditLogsClient'
 import { authRedirectUrl } from './authRedirect'
 import { filterConditions, parseFilters, splitRef } from './filterQuery'
 import { PAYLOAD_INTERNAL_COLLECTIONS, PAYLOAD_INTERNAL_GLOBALS } from './internalEntities'
+import { normalizeSearchParams } from './searchParams'
 import type { RenderedEvents, RenderedRowSlots, SelectOption } from './types'
 import { CUSTOM_FILTER_PREFIX, labelOf, resolveUser } from './utils'
 
@@ -27,6 +27,8 @@ export async function AuditLogsView({
 	initPageResult,
 	params,
 	searchParams,
+	server,
+	viewActions,
 	pluginOptions,
 	useTenant,
 	forceWhere,
@@ -44,10 +46,10 @@ export async function AuditLogsView({
 
 	const t = asTranslate(req.i18n.t)
 	// Payload resolves both before rendering the view, so these are plain objects.
-	const sp: Params = searchParams ?? {}
+	const sp: Params = normalizeSearchParams(searchParams)
 
 	const authRedirect: () => never = () =>
-		redirect(authRedirectUrl({ config: req.payload.config, params, searchParams: sp, user }))
+		server.redirect(authRedirectUrl({ config: req.payload.config, params, searchParams: sp, user }))
 
 	if (!user) authRedirect()
 
@@ -84,10 +86,11 @@ export async function AuditLogsView({
 				permissions={initPageResult.permissions}
 				searchParams={searchParams}
 				user={user}
+				viewActions={viewActions}
 				visibleEntities={initPageResult.visibleEntities}
 				req={req}
 			>
-				<Gutter>
+				<Gutter className="al-select-tenant">
 					<p>{t(keys.selectTenant)}</p>
 				</Gutter>
 			</DefaultTemplate>
@@ -319,50 +322,49 @@ export async function AuditLogsView({
 			permissions={initPageResult.permissions}
 			searchParams={searchParams}
 			user={user}
+			viewActions={viewActions}
 			visibleEntities={initPageResult.visibleEntities}
 			req={req}
 		>
-			<Gutter>
-				<AuditLogsClient
-					adminRoute={req.payload.config.routes?.admin ?? '/admin'}
-					apiRoute={req.payload.config.routes?.api ?? '/api'}
-					collectionOptions={collectionOptions}
-					docs={docs}
-					filters={filters}
-					globalOptions={globalOptions}
-					tenantGlobalOptions={tenantGlobalOptions}
-					collectionLabels={collectionLabels}
-					tenantsSlug={multiTenancy ? tenantsSlug : undefined}
-					globalLabels={globalLabels}
-					refLabels={refLabels}
-					titleFields={Object.fromEntries(
-						collectionConfigs.map((c) => [c.slug, titleFieldOf(c.slug)])
-					)}
-					limit={limit}
-					lockedTenantId={lockedTenantId}
-					page={page}
-					tenantOptions={tenantOptions}
-					totalDocs={result.totalDocs}
-					totalPages={result.totalPages}
-					userTitleFields={userTitleFields}
-					payloadAPILabels={payloadAPILabels(pluginOptions.logs?.payloadAPIs)}
-					debugMode={pluginOptions.debug === true && Boolean(pluginOptions.retention)}
-					hasArchive={Boolean(pluginOptions.retention?.archive)}
-					renderedEvents={renderedEvents}
-					renderedRows={renderedRows}
-					beforeList={renderSlot(slots?.beforeList, listProps)}
-					afterList={renderSlot(slots?.afterList, listProps)}
-					customFilters={customFilters.map((f) => ({
-						label: labelOf(f.label, req.i18n) ?? f.name,
-						name: f.name,
-						relationTo: f.relationTo,
-					}))}
-					customEventTypes={customEventTypeOptions(
-						pluginOptions.logs?.eventTypes,
-						viewConfig?.components?.customEvents
-					)}
-				/>
-			</Gutter>
+			<AuditLogsClient
+				adminRoute={req.payload.config.routes?.admin ?? '/admin'}
+				apiRoute={req.payload.config.routes?.api ?? '/api'}
+				collectionOptions={collectionOptions}
+				docs={docs}
+				filters={filters}
+				globalOptions={globalOptions}
+				tenantGlobalOptions={tenantGlobalOptions}
+				collectionLabels={collectionLabels}
+				tenantsSlug={multiTenancy ? tenantsSlug : undefined}
+				globalLabels={globalLabels}
+				refLabels={refLabels}
+				titleFields={Object.fromEntries(
+					collectionConfigs.map((c) => [c.slug, titleFieldOf(c.slug)])
+				)}
+				limit={limit}
+				lockedTenantId={lockedTenantId}
+				page={page}
+				tenantOptions={tenantOptions}
+				totalDocs={result.totalDocs}
+				totalPages={result.totalPages}
+				userTitleFields={userTitleFields}
+				payloadAPILabels={payloadAPILabels(pluginOptions.logs?.payloadAPIs)}
+				debugMode={pluginOptions.debug === true && Boolean(pluginOptions.retention)}
+				hasArchive={Boolean(pluginOptions.retention?.archive)}
+				renderedEvents={renderedEvents}
+				renderedRows={renderedRows}
+				beforeList={renderSlot(slots?.beforeList, listProps)}
+				afterList={renderSlot(slots?.afterList, listProps)}
+				customFilters={customFilters.map((f) => ({
+					label: labelOf(f.label, req.i18n) ?? f.name,
+					name: f.name,
+					relationTo: f.relationTo,
+				}))}
+				customEventTypes={customEventTypeOptions(
+					pluginOptions.logs?.eventTypes,
+					viewConfig?.components?.customEvents
+				)}
+			/>
 		</DefaultTemplate>
 	)
 }

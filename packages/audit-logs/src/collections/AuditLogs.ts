@@ -28,6 +28,10 @@ export const buildAuditLogsCollection = (
 ): CollectionConfig => {
 	return {
 		slug: 'audit-logs',
+		// An entry names its own user and is never edited, so Payload's `createdBy` /
+		// `updatedBy` and versions would only add columns and tables to a write-heavy log.
+		authorship: false,
+		versions: false,
 		admin: {
 			hidden,
 			defaultColumns: ['relationTo', 'operation', 'user', 'createdAt'],

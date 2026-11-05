@@ -1,8 +1,4 @@
-import type { CollectionSlug } from 'payload'
-
 import type {
-	AuditFieldDefaultOptions,
-	AuditFieldOptions,
 	AuditOptions,
 	CollectionAuditLogConfig,
 	CustomEventComponents,
@@ -19,45 +15,6 @@ export const DEFAULT_AUDIT_LOG_OPERATIONS: Array<'create' | 'delete' | 'update'>
 	'update',
 	'delete',
 ]
-
-/**
- * A single-entry `relationTo` array still stores a plain id, so only two or more
- * collections make a `createdBy` or `lastModifiedBy` field polymorphic.
- */
-export const isPolymorphicRelationTo = (relationTo: CollectionSlug | CollectionSlug[]): boolean =>
-	Array.isArray(relationTo) && relationTo.length > 1
-
-export const resolveFieldOptions = (
-	auditOptions: AuditOptions | GlobalAuditOptions,
-	field: 'createdBy' | 'lastModifiedBy'
-): AuditFieldOptions => {
-	if (auditOptions === true) return {}
-	const { auditFields } = auditOptions
-	if (!auditFields) return false
-	if (auditFields === true) return {}
-	return auditFields[field] ?? false
-}
-
-/** Manual fields declare their own dot path; automatic ones are addressed by field name. */
-export const resolveHookPath = (
-	options: Exclude<AuditFieldOptions, false>,
-	defaultFieldName: string
-): string => {
-	if (options.isManual) {
-		return options.path
-	}
-	return options.name ?? defaultFieldName
-}
-
-export const mergeWithDefaults = (
-	options: AuditFieldOptions,
-	defaults: AuditFieldDefaultOptions | undefined
-): AuditFieldOptions => {
-	if (options === false || options.isManual || !defaults) {
-		return options
-	}
-	return { ...defaults, ...options }
-}
 
 export type ResolvedGlobalAuditLogConfig = {
 	drafts?: 'ignore' | 'log'
@@ -143,7 +100,7 @@ export const resolveAuthConfig = (
 
 /**
  * The values Payload core itself assigns: `REST` and `GraphQL` in `createPayloadRequest`,
- * `local` in `createLocalReq`. Plugins add their own by augmenting `PayloadRequest`, so
+ * `local` in `createPayloadRequest` without an API. Plugins add their own by augmenting `PayloadRequest`, so
  * this list can never be complete. That is why the stored `payloadAPI` field is free
  * text and this list drives labelling only, never validation.
  */

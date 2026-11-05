@@ -24,8 +24,6 @@ describe('auditLogs factory', () => {
 		const posts = out.collections?.find((c) => c.slug === 'posts')
 		expect(posts?.hooks?.beforeChange ?? []).toHaveLength(0)
 		expect(posts?.hooks?.afterChange ?? []).toHaveLength(0)
-		// The fields still exist, which is the point: the schema does not change.
-		expect(posts?.fields.map((f) => 'name' in f && f.name)).toContain('createdBy')
 	})
 
 	it('applies the translations option', () => {

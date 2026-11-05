@@ -1,7 +1,8 @@
 'use client'
 
-import { Button, Pagination, PerPage, Pill, useStepNav } from '@payloadcms/ui'
-import { useRouter } from 'next/navigation'
+import { Button, Gutter, PageControlsComponent, Pill, useRouter, useStepNav } from '@payloadcms/ui'
+import { ListHeader } from '@payloadcms/ui/elements/ListHeader'
+import type { PaginatedDocs } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 
@@ -126,53 +127,68 @@ export function AuditLogsClient({
 		[router, filters]
 	)
 
-	const pageStart = page * limit - (limit - 1)
-	const pageEnd = totalPages > 1 && totalPages !== page ? limit * page : totalDocs
+	// Payload's own page controls, fed from the server's result rather than a list query.
+	const pageData: PaginatedDocs = {
+		docs,
+		hasNextPage: page < totalPages,
+		hasPrevPage: page > 1,
+		limit,
+		nextPage: page < totalPages ? page + 1 : null,
+		page,
+		pagingCounter: (page - 1) * limit + 1,
+		prevPage: page > 1 ? page - 1 : null,
+		totalDocs,
+		totalPages,
+	}
+
+	// Development only: queue the retention jobs now instead of waiting for their cron.
+	const debugActions = debugMode
+		? [
+				<Pill key="debug" pillStyle="warning">
+					{t(keys.debug)}
+				</Pill>,
+				hasArchive ? (
+					<Button
+						buttonStyle="secondary"
+						disabled={runningTask !== null}
+						key="archive"
+						margin={false}
+						onClick={() => triggerJob('audit-logs-archive')}
+						size="medium"
+					>
+						{runningTask === 'audit-logs-archive' ? t(keys.queuing) : t(keys.runArchive)}
+					</Button>
+				) : null,
+				<Button
+					buttonStyle="destructive"
+					disabled={runningTask !== null}
+					key="delete"
+					margin={false}
+					onClick={() => triggerJob('audit-logs-delete')}
+					size="medium"
+				>
+					{runningTask === 'audit-logs-delete' ? t(keys.queuing) : t(keys.runDelete)}
+				</Button>,
+				lastResult ? (
+					<span className="al-debug-result" key="result" role="status">
+						{lastResult}
+					</span>
+				) : null,
+			].filter(Boolean)
+		: []
 
 	return (
 		<div className="al-view">
-			{/* Payload's list header markup: its exported ListHeader is the collection one,
-			    which needs a collection config this view does not have. */}
-			<header className="list-header al-view__header">
-				<div className="list-header__content">
-					<div className="list-header__title-and-actions">
-						<h1 className="list-header__title">{t(keys.title)}</h1>
-						<div className="list-header__title-actions al-view__count">
-							{t(keys.entries, { count: totalDocs })}
-						</div>
-					</div>
-				</div>
-			</header>
-
-			{debugMode && (
-				<div className="al-debug-bar">
-					<Pill pillStyle="warning" size="small">
-						{t(keys.debug)}
-					</Pill>
-					{hasArchive && (
-						<Button
-							buttonStyle="subtle"
-							disabled={runningTask !== null}
-							margin={false}
-							onClick={() => triggerJob('audit-logs-archive')}
-							size="small"
-						>
-							{runningTask === 'audit-logs-archive' ? t(keys.queuing) : t(keys.runArchive)}
-						</Button>
-					)}
-					<Button
-						buttonStyle="subtle"
-						className="al-debug-bar__danger"
-						disabled={runningTask !== null}
-						margin={false}
-						onClick={() => triggerJob('audit-logs-delete')}
-						size="small"
-					>
-						{runningTask === 'audit-logs-delete' ? t(keys.queuing) : t(keys.runDelete)}
-					</Button>
-					{lastResult && <span className="al-debug-bar__result">{lastResult}</span>}
-				</div>
-			)}
+			<ListHeader
+				Actions={debugActions}
+				className="al-view__header"
+				title={t(keys.title)}
+				TitleActions={[
+					<span className="al-view__count" key="count">
+						{t(keys.entries, { count: totalDocs })}
+					</span>,
+				]}
+			/>
 
 			<FilterBar
 				collectionOptions={collectionOptions}
@@ -190,49 +206,44 @@ export function AuditLogsClient({
 				tenantOptions={lockedTenantId ? undefined : tenantOptions}
 			/>
 
-			{beforeList}
+			<Gutter className="al-view__body">
+				{beforeList}
 
-			<div className="al-list">
-				{docs.length === 0 ? (
-					<div className="al-list__empty">{t(keys.noEntries)}</div>
-				) : (
-					docs.map((doc) => (
-						<LogRow
-							adminRoute={adminRoute}
-							collectionLabels={collectionLabels}
-							doc={doc as unknown as AuditLogDoc}
-							globalLabels={globalLabels}
-							key={String(doc.id)}
-							eventTypeLabels={eventTypeLabels}
-							payloadAPILabels={payloadAPILabels}
-							renderedEvent={renderedEvents?.[String(doc.id)]}
-							slots={renderedRows?.[String(doc.id)]}
-							tenantLabels={tenantLabels}
-							tenantsSlug={tenantsSlug}
-							userTitleFields={userTitleFields}
-						/>
-					))
-				)}
-			</div>
+				<div className="al-list">
+					{docs.length === 0 ? (
+						<div className="al-list__empty">{t(keys.noEntries)}</div>
+					) : (
+						docs.map((doc) => (
+							<LogRow
+								adminRoute={adminRoute}
+								collectionLabels={collectionLabels}
+								doc={doc as unknown as AuditLogDoc}
+								globalLabels={globalLabels}
+								key={String(doc.id)}
+								eventTypeLabels={eventTypeLabels}
+								payloadAPILabels={payloadAPILabels}
+								renderedEvent={renderedEvents?.[String(doc.id)]}
+								slots={renderedRows?.[String(doc.id)]}
+								tenantLabels={tenantLabels}
+								tenantsSlug={tenantsSlug}
+								userTitleFields={userTitleFields}
+							/>
+						))
+					)}
+				</div>
 
-			{afterList}
+				{afterList}
+			</Gutter>
 
 			{totalDocs > 0 && (
-				<div className="al-pagination">
-					<Pagination
-						hasNextPage={page < totalPages}
-						hasPrevPage={page > 1}
-						nextPage={page + 1}
-						onChange={goToPage}
-						page={page}
-						prevPage={page - 1}
-						totalPages={totalPages}
-					/>
-					<div className="al-pagination__info">
-						{t(keys.paginationInfo, { from: pageStart, to: pageEnd, total: totalDocs })}
-					</div>
-					<PerPage handleChange={handleLimit} limit={limit} limits={LIMIT_OPTIONS} />
-				</div>
+				<PageControlsComponent
+					countLabel={t(keys.entries, { count: totalDocs })}
+					data={pageData}
+					handlePageChange={async (next) => goToPage(next)}
+					handlePerPageChange={async (next) => handleLimit(next)}
+					limit={limit}
+					limits={LIMIT_OPTIONS}
+				/>
 			)}
 		</div>
 	)

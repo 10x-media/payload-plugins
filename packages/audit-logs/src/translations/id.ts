@@ -16,7 +16,6 @@ export const id: Record<TranslationKey, string> = {
 	[keys.noEntries]: 'Tidak ada entri log audit.',
 
 	// Pagination
-	[keys.paginationInfo]: '{{from}}–{{to}} dari {{total}}',
 
 	// Debug bar
 	[keys.debug]: 'Debug',

@@ -5,8 +5,8 @@ import { posts, readLogs, seedUser, tags, users } from './fixtures'
 
 /**
  * `disabled` is deliberately weaker here than in the sibling plugins: the schema
- * must survive so the next migration does not drop the collection and the audit
- * columns. Only the behaviour is switched off.
+ * must survive so the next migration does not drop the collection. Only the
+ * behaviour is switched off.
  */
 describe('disabled plugin', () => {
 	let booted: BootedPayload
@@ -15,7 +15,7 @@ describe('disabled plugin', () => {
 		booted = await bootPayload({
 			plugin: auditLogs({
 				disabled: true,
-				collections: { posts: { auditFields: true, auditLog: true } },
+				collections: { posts: { auditLog: true } },
 			}),
 			db: 'mongo',
 			collections: [posts, tags, users],
@@ -33,23 +33,19 @@ describe('disabled plugin', () => {
 		expect(booted.payload.collections['audit-logs']).toBeDefined()
 	})
 
-	it('keeps the audit fields on the audited collection', () => {
-		const names = (booted.payload.collections.posts?.config.fields ?? []).map((f) =>
-			'name' in f ? f.name : undefined
-		)
-
-		expect(names).toContain('createdBy')
-		expect(names).toContain('lastModifiedBy')
-	})
-
 	it('writes no entries', async () => {
-		const doc = await booted.payload.create({ collection: 'posts', data: { title: 'Quiet' } })
+		const doc = await booted.payload.create({
+			overrideAccess: true,
+			collection: 'posts',
+			data: { title: 'Quiet' },
+		})
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'posts',
 			id: doc.id,
 			data: { title: 'Still quiet' },
 		})
-		await booted.payload.delete({ collection: 'posts', id: doc.id })
+		await booted.payload.delete({ overrideAccess: true, collection: 'posts', id: doc.id })
 
 		expect(await readLogs(booted.payload)).toHaveLength(0)
 	})
