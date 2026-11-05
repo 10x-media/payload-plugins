@@ -2,7 +2,6 @@ import type { Config, GlobalConfig, GlobalSlug } from 'payload'
 
 import { afterChangeGlobalAuditLog } from '../hooks/afterChangeGlobal'
 import type { AuditPluginConfig } from '../types'
-import { buildFieldMap } from '../utilities/buildFieldMap'
 import type { PluginContext } from './context'
 import { resolveGlobalAuditLogConfig } from './resolveOptions'
 
@@ -24,10 +23,7 @@ const registerGlobal = (
 			ctx.tenantFieldName && !ctx.multiTenancy?.excludeGlobals?.includes(slug)
 				? ctx.tenantFieldName
 				: undefined
-		const fieldMap =
-			pluginOptions.normalizeRelationships !== false
-				? buildFieldMap(global.fields, { blocks: ctx.configBlocks })
-				: undefined
+		const normalizeRelationships = pluginOptions.normalizeRelationships !== false
 
 		hooks.afterChange = [
 			...(hooks.afterChange ?? []),
@@ -38,7 +34,7 @@ const registerGlobal = (
 				collectUserAgent: ctx.collectUserAgent,
 				drafts: auditLogConfig.drafts ?? pluginOptions.drafts ?? 'ignore',
 				excludeFields: auditLogConfig.excludeFields,
-				fieldMap,
+				normalizeRelationships,
 				globalSlug: slug,
 				groupContextKey: ctx.groupContextKey,
 				recordImpersonator: ctx.recordImpersonator,

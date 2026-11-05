@@ -2,7 +2,7 @@ import type { GlobalAfterChangeHook, GlobalSlug } from 'payload'
 
 import type { AnonymizeFunction, ShouldLogFunction } from '../types'
 import { REDACTED } from '../types'
-import type { FieldMap } from '../utilities/buildFieldMap'
+import { fieldMapOf } from '../utilities/buildFieldMap'
 import { computeDiff } from '../utilities/diff'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
@@ -16,7 +16,8 @@ export type AuditLogGlobalAfterChangeOptions = {
 	collectUserAgent: boolean
 	drafts: 'ignore' | 'log'
 	excludeFields?: string[]
-	fieldMap?: FieldMap
+	/** Reduce relationship values to ids in diffs and snapshots (`normalizeRelationships`). */
+	normalizeRelationships: boolean
 	globalSlug: GlobalSlug
 	groupContextKey?: string
 	/** False when the log collection has no `impersonator` field. */
@@ -58,7 +59,10 @@ const applyAnonymization = (
 
 export const afterChangeGlobalAuditLog =
 	(options: AuditLogGlobalAfterChangeOptions): GlobalAfterChangeHook =>
-	async ({ req, doc, previousDoc }) => {
+	async ({ global, req, doc, previousDoc }) => {
+		const fieldMap = options.normalizeRelationships
+			? fieldMapOf(global, req.payload.config.blocks)
+			: undefined
 		if (options.drafts === 'ignore' && doc._status === 'draft') return
 
 		if (
@@ -96,7 +100,7 @@ export const afterChangeGlobalAuditLog =
 			previousDoc as Record<string, unknown>,
 			doc as Record<string, unknown>,
 			options.excludeFields,
-			options.fieldMap
+			fieldMap
 		)
 
 		if (changedPaths.length === 0) return

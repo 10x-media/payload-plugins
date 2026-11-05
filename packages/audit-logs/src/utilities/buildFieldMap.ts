@@ -10,6 +10,25 @@ export type FieldKind = 'rel-single' | 'rel-many' | 'join'
  */
 export type FieldMap = Map<string, FieldKind>
 
+const maps = new WeakMap<object, FieldMap>()
+
+/**
+ * The field map of a sanitized collection or global config, built on first use and kept for
+ * as long as that config lives. Hooks pass the config they are handed, which carries every
+ * field added after this plugin ran: Payload's own `createdBy` / `updatedBy` (added while it
+ * sanitizes) and whatever plugins later in `config.plugins` add. A map built from the raw
+ * config at plugin time misses those, and their populated values reach the log. Keyed by the
+ * config object, so each Payload instance gets its own map and a reloaded config a new one.
+ */
+export const fieldMapOf = (entity: { fields: Field[] }, blocks: Block[] | undefined): FieldMap => {
+	let map = maps.get(entity)
+	if (!map) {
+		map = buildFieldMap(entity.fields, { blocks })
+		maps.set(entity, map)
+	}
+	return map
+}
+
 /**
  * Walks a Payload field config tree and records every relationship/upload field
  * with its kind ('rel-single' | 'rel-many').

@@ -8,7 +8,6 @@ import {
 import { afterChangeCollectionAuditLog } from '../hooks/afterChangeCollection'
 import { afterDeleteCollectionAuditLog } from '../hooks/afterDeleteCollection'
 import type { AuditOptions, AuditPluginConfig } from '../types'
-import { buildFieldMap } from '../utilities/buildFieldMap'
 import { isTenantScoped } from '../utilities/tenantScope'
 import type { PluginContext } from './context'
 import { resolveAuditLogConfig, resolveAuthConfig } from './resolveOptions'
@@ -87,10 +86,7 @@ const registerCollection = (
 			isTenantScoped(slug, ctx.multiTenancy, true)
 				? ctx.tenantFieldName
 				: undefined
-		const fieldMap =
-			pluginOptions.normalizeRelationships !== false
-				? buildFieldMap(collection.fields, { blocks: ctx.configBlocks })
-				: undefined
+		const normalizeRelationships = pluginOptions.normalizeRelationships !== false
 
 		hooks.afterChange = [
 			...(hooks.afterChange ?? []),
@@ -106,7 +102,7 @@ const registerCollection = (
 					...(collection.auth ? ['hash', 'salt'] : []),
 					...(auditLogConfig.excludeFields ?? []),
 				],
-				fieldMap,
+				normalizeRelationships,
 				groupContextKey: ctx.groupContextKey,
 				recordImpersonator: ctx.recordImpersonator,
 				isSelfTenant,
@@ -128,7 +124,7 @@ const registerCollection = (
 					collectIpAddress: ctx.collectIpAddress,
 					fastWrite: ctx.fastWrite,
 					collectUserAgent: ctx.collectUserAgent,
-					fieldMap,
+					normalizeRelationships,
 					groupContextKey: ctx.groupContextKey,
 					recordImpersonator: ctx.recordImpersonator,
 					isSelfTenant,

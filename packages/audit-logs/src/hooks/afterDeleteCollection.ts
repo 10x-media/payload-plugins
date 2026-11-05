@@ -2,7 +2,7 @@ import type { CollectionAfterDeleteHook, CollectionSlug } from 'payload'
 
 import type { AnonymizeFunction, ShouldLogFunction } from '../types'
 import { anonymizeDoc } from '../utilities/anonymize'
-import type { FieldMap } from '../utilities/buildFieldMap'
+import { fieldMapOf } from '../utilities/buildFieldMap'
 import { normalizeSnapshot } from '../utilities/diff'
 import { getClientIP, getUserAgent } from '../utilities/request'
 import { extractTenantId } from '../utilities/tenant'
@@ -15,7 +15,8 @@ export type AuditLogAfterDeleteOptions = {
 	collectIpAddress: boolean
 	fastWrite: boolean
 	collectUserAgent: boolean
-	fieldMap?: FieldMap
+	/** Reduce relationship values to ids in diffs and snapshots (`normalizeRelationships`). */
+	normalizeRelationships: boolean
 	groupContextKey?: string
 	/** False when the log collection has no `impersonator` field. */
 	recordImpersonator: boolean
@@ -27,7 +28,10 @@ export type AuditLogAfterDeleteOptions = {
 
 export const afterDeleteCollectionAuditLog =
 	(options: AuditLogAfterDeleteOptions): CollectionAfterDeleteHook =>
-	async ({ req, id, doc }) => {
+	async ({ collection, req, id, doc }) => {
+		const fieldMap = options.normalizeRelationships
+			? fieldMapOf(collection, req.payload.config.blocks)
+			: undefined
 		const documentId = String(id)
 		const userValue = actingUserRef(req.user)
 		const impersonator = options.recordImpersonator ? impersonatorRef(req.user) : undefined
@@ -65,7 +69,7 @@ export const afterDeleteCollectionAuditLog =
 						options.anonymize
 					)
 				: (doc as Record<string, unknown>)
-			snapshot = options.fieldMap ? normalizeSnapshot(snapshotRaw, options.fieldMap) : snapshotRaw
+			snapshot = fieldMap ? normalizeSnapshot(snapshotRaw, fieldMap) : snapshotRaw
 		}
 
 		await writeAuditLog({

@@ -1,7 +1,7 @@
 import type { Block, Field } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { buildFieldMap } from './buildFieldMap'
+import { buildFieldMap, fieldMapOf } from './buildFieldMap'
 
 // Minimal field constructors, typed correctly to satisfy Payload's discriminated unions
 const rel = (name: string, hasMany = false): Field =>
@@ -231,5 +231,23 @@ describe('buildFieldMap', () => {
 			expect(existing.get('pre.owner')).toBe('rel-single')
 			expect(existing.get('reviewer')).toBe('rel-single')
 		})
+	})
+})
+
+describe('fieldMapOf', () => {
+	it('builds once per config object and reuses that map', () => {
+		const entity = {
+			fields: [{ name: 'author', type: 'relationship', relationTo: 'users' }] as Field[],
+		}
+		const first = fieldMapOf(entity, [])
+
+		expect(fieldMapOf(entity, [])).toBe(first)
+		expect(first.get('author')).toBe('rel-single')
+	})
+
+	it('gives another config object its own map', () => {
+		const fields = [{ name: 'author', type: 'relationship', relationTo: 'users' }] as Field[]
+
+		expect(fieldMapOf({ fields }, [])).not.toBe(fieldMapOf({ fields }, []))
 	})
 })

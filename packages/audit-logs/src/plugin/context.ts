@@ -1,4 +1,4 @@
-import type { Block, Config } from 'payload'
+import type { Config } from 'payload'
 
 import type { AuditPluginConfig, DataRetentionConfig, MultiTenancyConfig } from '../types'
 
@@ -9,8 +9,6 @@ import type { AuditPluginConfig, DataRetentionConfig, MultiTenancyConfig } from 
  */
 export type PluginContext = {
 	collectIpAddress: boolean
-	/** The config's `blocks`, which a blocks field may name by slug. */
-	configBlocks: Block[]
 	collectUserAgent: boolean
 	/** Key read off `req.context` to group entries written by one operation. */
 	groupContextKey: string | undefined
@@ -41,7 +39,6 @@ export const buildPluginContext = (
 
 	return {
 		collectIpAddress: pluginOptions.logs?.ipAddress !== false,
-		configBlocks: config.blocks ?? [],
 		// Corrected once the log collection is built and any override has run.
 		fastWrite: true,
 		collectUserAgent: pluginOptions.logs?.userAgent !== false,
