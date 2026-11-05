@@ -67,7 +67,7 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 
 	if (hintCookieName.startsWith(cookiePrefix)) {
 		throw new Error(
-			`${PREFIX} hintCookieName "${hintCookieName}" must not start with cookiePrefix "${cookiePrefix}". @payloadcms/next refresh/logout take the first cookie whose name starts with the prefix.`
+			`${PREFIX} hintCookieName "${hintCookieName}" must not start with cookiePrefix "${cookiePrefix}". Payload's refresh and logout take the first cookie whose name starts with the prefix.`
 		)
 	}
 

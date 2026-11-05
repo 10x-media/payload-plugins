@@ -1,7 +1,6 @@
 'use client'
 
-import { Button, Pill, toast } from '@payloadcms/ui'
-import { usePathname } from 'next/navigation'
+import { Button, ChevronIcon, Pill, toast, usePathname } from '@payloadcms/ui'
 import {
 	type PointerEvent as ReactPointerEvent,
 	useCallback,
@@ -324,9 +323,12 @@ export const ImpersonationBar = ({
 				style={{ left: point.x, top: point.y }}
 			>
 				<span className="impersonation-chip__name">{targetName}</span>
-				<button
+				<Button
 					aria-label={messages?.expandBar ?? messageFor(impersonatorLocale, keys.expandBar)}
+					buttonStyle="ghost"
 					className="impersonation-bar__icon"
+					icon={<ChevronIcon direction="up" />}
+					margin={false}
 					onClick={(event) => {
 						if (dragged.current) {
 							event.preventDefault()
@@ -334,10 +336,8 @@ export const ImpersonationBar = ({
 						}
 						expand()
 					}}
-					type="button"
-				>
-					<ExpandIcon />
-				</button>
+					size="medium"
+				/>
 			</div>
 		)
 	}
@@ -379,31 +379,20 @@ export const ImpersonationBar = ({
 					disabled={busy}
 					margin={false}
 					onClick={() => void onExit()}
-					size="small"
+					size="medium"
 				>
 					{returnTo}
 				</Button>
-				<button
+				<Button
 					aria-label={messages?.collapseBar ?? messageFor(impersonatorLocale, keys.collapseBar)}
+					buttonStyle="ghost"
 					className="impersonation-bar__icon"
+					icon={<ChevronIcon direction="down" />}
+					margin={false}
 					onClick={collapse}
-					type="button"
-				>
-					<CollapseIcon />
-				</button>
+					size="medium"
+				/>
 			</div>
 		</div>
 	)
 }
-
-const CollapseIcon = () => (
-	<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
-		<path d="M3.5 6 8 10.5 12.5 6" stroke="currentColor" strokeWidth="1.5" />
-	</svg>
-)
-
-const ExpandIcon = () => (
-	<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
-		<path d="M3 6h10M3 10h10" stroke="currentColor" strokeWidth="1.5" />
-	</svg>
-)

@@ -1,22 +1,21 @@
-import type { Access, CollectionConfig, TypedUser, Where } from 'payload'
+import type { Access, CollectionConfig, User, Where } from 'payload'
 
 import { devSsoCallback, devSsoStrategy } from './sso'
 
 /** Roles that may reach the admin panel. */
 const STAFF_ROLES = ['admin', 'editor']
 
-const rolesOf = (user: null | TypedUser | undefined) =>
+const rolesOf = (user: null | User | undefined) =>
 	(user as { roles?: string[] } | null | undefined)?.roles ?? []
 
-const hasStaffRole = (user: null | TypedUser | undefined) =>
+const hasStaffRole = (user: null | User | undefined) =>
 	STAFF_ROLES.some((role) => rolesOf(user).includes(role))
 
 /**
  * Host predicate for `access.impersonate`. Only `admin` may start a session;
  * editors are valid targets.
  */
-export const canImpersonate = (user: null | TypedUser | undefined) =>
-	rolesOf(user).includes('admin')
+export const canImpersonate = (user: null | User | undefined) => rolesOf(user).includes('admin')
 
 export const adminOnly: Access = ({ req }) => hasStaffRole(req.user)
 

@@ -1,4 +1,4 @@
-import type { Payload, PayloadRequest, TypedUser } from 'payload'
+import type { Payload, PayloadRequest, User } from 'payload'
 
 import { absoluteExpiryCookies } from './auth/expiryCookies'
 import { getRegistry } from './plugin/registry'
@@ -62,7 +62,7 @@ export const statusFromRow = (row: ImpersonationRecord, sid: string): Impersonat
  * ```
  */
 export async function getImpersonation(
-	args: PayloadRequest | { headers: Headers; payload: Payload; user?: null | TypedUser }
+	args: PayloadRequest | { headers: Headers; payload: Payload; user?: null | User }
 ): Promise<ImpersonationStatus> {
 	const payload = args.payload
 	const headers = args.headers

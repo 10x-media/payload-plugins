@@ -1,0 +1,40 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x beta) to 4.x, on Next.js or TanStack Start.
+---
+
+`@10x-media/impersonation` 4.x is the Payload 4 line; the 0.x betas run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin's options, endpoints and sessions collection are unchanged, and it runs on Next.js and TanStack Start. This page covers what changes around it.
+
+## Checklist
+
+1. Upgrade `@10x-media/impersonation` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.7`. `next` is no longer a peer. In parallel mode, upgrade `@10x-media/dual-session` to 4.x as well, and follow [its upgrading page](/dual-session/upgrading): its Next.js proxy moved to `@10x-media/dual-session/next`, and TanStack Start needs its middleware.
+2. End open impersonation sessions before the deploy (see [Sessions](#sessions)).
+3. On TanStack Start, render the website banner from a server function (see [Frontend banner](#frontend-banner)).
+4. In your own code, rename `TypedUser` to `User` and pass `overrideAccess: true` where it looks users up without one (see [Your own code](#your-own-code)).
+5. Give frontend target collections a `read` access their own users pass (see [Frontend targets must be able to read themselves](#frontend-targets-must-be-able-to-read-themselves)).
+
+## Sessions
+
+Payload 4 accepts only tokens that carry its auth version in their header, which no Payload 3 token does. Every session therefore ends with the upgrade, an impersonated one included: the impersonator and the target both sign in again. The sessions collection keeps its rows, but a row that was open stays open, because the session it minted is still in the target's `sessions` until it expires. [`closeStaleImpersonations`](/impersonation/security#sessions) closes it then, at boot or from the retention task.
+
+To keep the audit trail exact, end open sessions from the sessions collection (or `POST /api/impersonation/:id/end`) before you deploy.
+
+## Frontend banner
+
+On Next.js, `ImpersonationFrontendBanner` is unchanged. TanStack Start renders a route's component on the client, so it has no place for a server component; use `getFrontendBanner` in a server function and `ImpersonationFrontendBannerView` from `@10x-media/impersonation/client` instead. [TanStack Start](/impersonation/frontend#tanstack-start) has the route.
+
+## Frontend targets must be able to read themselves
+
+Payload 3's default access let any signed-in user through. Payload 4's lets only users of the `admin.user` collection through. A frontend auth collection with no `access.read` of its own therefore answers its own users' `GET /api/customers/me` with a 403 on Payload 4, an impersonated customer included: the session is there and `/me` refuses to read the document. This is Payload's change, not the plugin's; [dual-session's upgrading page](/dual-session/upgrading#frontend-users-must-be-able-to-read-themselves) has the access that fixes it. The plugin's own reads (targets for the switcher, the session rows) are unaffected: they run past access, and `access.impersonate` and `access.filterTargets` still decide who sees what.
+
+## Your own code
+
+- **`TypedUser` is `User`.** Payload 4 exports the union of every auth collection's user as `User`. The plugin's types that carry a user (the impersonated user, the `binding` option, `getImpersonation`'s result) are built on it; code of your own typed against `TypedUser` changes the name and nothing else.
+- **Local API access.** Payload 4 applies access control in the Local API by default. A hook on the sessions collection, a custom `session.issue`, or a seed that reads users or session rows without `overrideAccess: true` now finds nothing for anyone but an admin.
+- **Custom user cards.** Payload 4's `Button` has new styles: `subtle` is `pill` and `icon-label` is `ghost`, and `ExternalLinkIcon` is `NewTabIcon`. A card that copies the shipped one's actions should copy them again; the shipped card uses ghost buttons with `EditIcon` and `NewTabIcon` and a `tooltip`.
+
+## What looks different
+
+The bar, chip and switcher use Payload 4's tokens. Swap mode keeps the warning tone; the admin side of a parallel session moves from the success tokens (green in Payload 3's light theme) to Payload 4's selected blue, the family of its `success` pill. The switcher is Payload 4's drawer, with its list search and a collection menu button. Payload 4 versions every collection by default; the sessions collection opts out (`versions: false`), since the plugin writes its rows and nobody edits them.
+
+On Postgres, the plugin's tables are unchanged; Payload 4's own schema changes come with Payload's migration.

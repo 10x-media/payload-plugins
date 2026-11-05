@@ -44,29 +44,31 @@ const CUSTOMER_TOTAL = 65
  * collection, and an SSO-only user. Idempotent.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ overrideAccess: true, collection: 'users' })
 	if (userCount.totalDocs === 0) {
-		await payload.create({ collection: 'users', data: DEV_ADMIN })
+		await payload.create({ overrideAccess: true, collection: 'users', data: DEV_ADMIN })
 		payload.logger.info(`Seeded dev admin: ${DEV_ADMIN.email} / ${DEV_ADMIN.password}`)
 
-		await payload.create({ collection: 'users', data: DEV_EDITOR })
+		await payload.create({ overrideAccess: true, collection: 'users', data: DEV_EDITOR })
 		payload.logger.info(`Seeded dev editor: ${DEV_EDITOR.email} / ${DEV_EDITOR.password}`)
 
-		await payload.create({ collection: 'users', data: DEV_USER })
+		await payload.create({ overrideAccess: true, collection: 'users', data: DEV_USER })
 		payload.logger.info(`Seeded website user: ${DEV_USER.email} / ${DEV_USER.password}`)
 	}
 
-	const customerCount = await payload.count({ collection: 'customers' })
+	const customerCount = await payload.count({ overrideAccess: true, collection: 'customers' })
 	if (customerCount.totalDocs === 0) {
-		await payload.create({ collection: 'customers', data: DEV_CUSTOMER })
+		await payload.create({ overrideAccess: true, collection: 'customers', data: DEV_CUSTOMER })
 		payload.logger.info(`Seeded customer: ${DEV_CUSTOMER.email} / ${DEV_CUSTOMER.password}`)
 	}
 
-	const customersSoFar = (await payload.count({ collection: 'customers' })).totalDocs
+	const customersSoFar = (await payload.count({ overrideAccess: true, collection: 'customers' }))
+		.totalDocs
 	if (customersSoFar < CUSTOMER_TOTAL) {
 		for (let n = customersSoFar; n < CUSTOMER_TOTAL; n += 1) {
 			const label = String(n).padStart(2, '0')
 			await payload.create({
+				overrideAccess: true,
 				collection: 'customers',
 				data: {
 					email: `customer-${label}@10xmedia.de`,
@@ -78,22 +80,23 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info(`Seeded ${CUSTOMER_TOTAL} customers for switcher pagination`)
 	}
 
-	const partnerCount = await payload.count({ collection: 'partners' })
+	const partnerCount = await payload.count({ overrideAccess: true, collection: 'partners' })
 	if (partnerCount.totalDocs === 0) {
-		await payload.create({ collection: 'partners', data: DEV_PARTNER })
+		await payload.create({ overrideAccess: true, collection: 'partners', data: DEV_PARTNER })
 		payload.logger.info(`Seeded partner: ${DEV_PARTNER.email} / ${DEV_PARTNER.password}`)
 	}
 
-	const ssoCount = await payload.count({ collection: 'sso-users' })
+	const ssoCount = await payload.count({ overrideAccess: true, collection: 'sso-users' })
 	if (ssoCount.totalDocs === 0) {
-		await payload.create({ collection: 'sso-users', data: DEV_SSO })
+		await payload.create({ overrideAccess: true, collection: 'sso-users', data: DEV_SSO })
 		payload.logger.info(`Seeded SSO user: ${DEV_SSO.email} (header x-dev-sso-email)`)
 	}
 
-	const postCount = await payload.count({ collection: 'posts' })
+	const postCount = await payload.count({ overrideAccess: true, collection: 'posts' })
 	if (postCount.totalDocs < 100) {
 		const admin = (
 			await payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				pagination: false,
@@ -102,6 +105,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		).docs[0]
 		const editor = (
 			await payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				pagination: false,
@@ -110,23 +114,28 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		).docs[0]
 		if (postCount.totalDocs === 0) {
 			await payload.create({
+				overrideAccess: true,
 				collection: 'posts',
 				data: { author: admin?.id, title: 'Staff only', visibility: 'staff' },
 			})
 			await payload.create({
+				overrideAccess: true,
 				collection: 'posts',
 				data: { author: editor?.id, title: 'Partner brief', visibility: 'partners' },
 			})
 			await payload.create({
+				overrideAccess: true,
 				collection: 'posts',
 				data: { author: editor?.id, title: 'Public announcement', visibility: 'public' },
 			})
 		}
 		const visibilities = ['staff', 'partners', 'public'] as const
-		const afterNamed = (await payload.count({ collection: 'posts' })).totalDocs
+		const afterNamed = (await payload.count({ overrideAccess: true, collection: 'posts' }))
+			.totalDocs
 		for (let index = afterNamed; index < 100; index += 1) {
 			const n = index + 1
 			await payload.create({
+				overrideAccess: true,
 				collection: 'posts',
 				data: {
 					author: n % 2 === 0 ? editor?.id : admin?.id,

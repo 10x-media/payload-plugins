@@ -1,6 +1,5 @@
-import { headers as nextHeaders } from 'next/headers'
 import type { ServerProps } from 'payload'
-import { createLocalReq } from 'payload'
+import { createPayloadRequest } from 'payload'
 import type { ReactNode } from 'react'
 
 import { resolveTargetFilters } from '../access/filterTargets'
@@ -30,6 +29,7 @@ export const ImpersonationProvider = async ({
 	children,
 	i18n,
 	payload,
+	server,
 	user,
 }: ImpersonationProviderProps) => {
 	const options = getRegistry(payload.config)
@@ -42,8 +42,8 @@ export const ImpersonationProvider = async ({
 		startable.map((slug) => [slug, true as const])
 	)
 	if (user && options.access.filterTargets) {
-		const headerList = await nextHeaders()
-		const req = await createLocalReq({ req: { headers: headerList, i18n } as never, user }, payload)
+		const headers = (await server?.getHeaders()) ?? new Headers()
+		const req = await createPayloadRequest({ payload, req: { headers, i18n: i18n as never }, user })
 		targets = await resolveTargetFilters({ collections: startable, options, req })
 	}
 
@@ -51,7 +51,7 @@ export const ImpersonationProvider = async ({
 	const sid = boundSid(user, options.session.binding)
 	const painted = user ? asAuthUser(user)._impersonation : undefined
 	const paintedLive = painted && !isPastAbsoluteExpiry(painted) ? painted : undefined
-	const hint = await readHintCookie(options.hintCookieName)
+	const hint = await readHintCookie(server, options.hintCookieName)
 	const shouldLookup =
 		!painted &&
 		(Boolean(options.session.issue) ||

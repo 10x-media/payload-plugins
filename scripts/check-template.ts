@@ -54,6 +54,7 @@ const TRACKED = [
 const EXEMPT: Record<string, readonly string[]> = {
 	// The website demo page its e2e suite drives on both frameworks (`dev-tanstack/src/app/index.tsx`).
 	'dual-session': ['dev-tanstack/src/routeTree.gen.ts'],
+	impersonation: ['dev-tanstack/src/routeTree.gen.ts'],
 }
 
 // A tracked file is compared byte for byte, so it cannot carry `{{token}}` substitutions.

@@ -62,6 +62,7 @@ export const devSsoStrategy: AuthStrategy = {
 
 		const found = (
 			await payload.find({
+				overrideAccess: true,
 				collection: COLLECTION,
 				limit: 1,
 				pagination: false,

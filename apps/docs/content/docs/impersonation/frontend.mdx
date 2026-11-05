@@ -30,6 +30,40 @@ export default async function Layout({ children }) {
 
 Pass `user` if you already called `payload.auth`, so the banner does not authenticate again. `className` and `labels` (`actingAs` with `{{name}}`, `exit`) are the styling and copy hooks. The default look has zero specificity, so your own class overrides it without `!important`. Pass `unstyled` to drop it and style the `impersonation-frontend-banner`, `__text`, and `__exit` classes yourself. The name follows `ui.userLabel` (`useAsTitle` by default); pass `userLabel="email"` or `"title"` to override it for the banner. Exit reloads only when the request succeeds.
 
+## TanStack Start
+
+TanStack Start renders a route's component on the client, so the server-component banner has no place there. Split it the same way the banner does internally: `getFrontendBanner` on the server, `ImpersonationFrontendBannerView` in the component. The view renders the same markup, classes and default look.
+
+```tsx title="src/app/index.tsx"
+import { ImpersonationFrontendBannerView } from '@10x-media/impersonation/client'
+import { createFileRoute } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
+import { getRequest } from '@tanstack/react-start/server'
+
+const loadBanner = createServerFn({ method: 'GET' }).handler(async () => {
+  const [{ getPayload }, { getFrontendBanner }, { default: config }] = await Promise.all([
+    import('payload'),
+    import('@10x-media/impersonation'),
+    import('@payload-config'),
+  ])
+  return getFrontendBanner({
+    headers: new Headers(getRequest().headers),
+    payload: await getPayload({ config }),
+  })
+})
+
+export const Route = createFileRoute('/')({
+  component: Page,
+  loader: () => loadBanner(),
+})
+
+function Page() {
+  return <ImpersonationFrontendBannerView banner={Route.useLoaderData()} />
+}
+```
+
+`getFrontendBanner` takes the banner's `labels`, `user` and `userLabel` and returns `null` when the request is not the impersonated session; the view takes `className` and `unstyled`. Load the server modules inside the handler, as above, so they stay out of the client bundle. In parallel mode the website request must reach Payload with its frontend scope, which on TanStack Start is `@10x-media/dual-session`'s request middleware.
+
 ## Build your own
 
 Status on the server, one POST to exit:

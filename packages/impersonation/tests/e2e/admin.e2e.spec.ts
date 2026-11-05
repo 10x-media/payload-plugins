@@ -16,18 +16,18 @@ const collectionLabel = (slug: string) =>
 
 const startAs = async (page: Page, name: string, collection?: string) => {
 	await page.locator('.impersonation-switcher-button').click()
-	const drawer = page.locator('.drawer--is-open, .drawer')
+	const drawer = page.locator('.impersonation-switcher-drawer')
 	await expect(drawer).toBeVisible()
 	if (collection) {
 		await drawer.locator('.impersonation-collection').click()
 		await page
-			.locator('.popup-button-list')
-			.getByRole('button', { name: collectionLabel(collection), exact: true })
+			.locator('.popup-button-list:visible')
+			.getByText(collectionLabel(collection), { exact: true })
 			.click()
 	}
-	await drawer.locator('.search-filter input').fill(name)
+	await drawer.locator('.search-input__input').fill(name)
 	await drawer.locator('.impersonation-card__pick').filter({ hasText: name }).click()
-	const confirm = page.locator('.confirmation-modal')
+	const confirm = page.locator('.impersonation-confirm-modal:visible')
 	await expect(confirm).toBeVisible()
 	await confirm.getByRole('button', { name: 'Impersonate', exact: true }).click()
 }
@@ -69,7 +69,7 @@ test('document action starts impersonation', async ({ page }) => {
 	const id = (await listed.json()).docs[0].id
 	await page.goto(`/admin/collections/users/${id}`)
 	await page.locator('.impersonation-document-button').click()
-	const confirm = page.locator('.confirmation-modal')
+	const confirm = page.locator('.impersonation-confirm-modal:visible')
 	await expect(confirm).toBeVisible()
 	await confirm.getByRole('button', { name: 'Impersonate', exact: true }).click()
 	await expect(page.locator('.impersonation-bar')).toContainText('Acting as')
@@ -128,4 +128,18 @@ test('frontend helper reports a customer impersonation', async ({ page }) => {
 	)
 	await page.locator('.impersonation-frontend-banner__exit').click()
 	await expect(page.locator('.dev-impersonation-status')).toHaveText('not impersonating')
+})
+
+test('a partner session keeps the admin and ends from the quiet bar', async ({ page }) => {
+	await loginAdmin(page)
+	await startAs(page, 'Dev Partner', 'partners')
+	await expect(page.locator('.dev-impersonation-status')).toContainText(
+		'impersonating as partners/'
+	)
+	await page.goto('/admin')
+	const bar = page.locator('.impersonation-bar--quiet')
+	await expect(bar).toContainText('Dev Partner session is active on the website')
+	await bar.getByRole('button', { name: 'End session', exact: true }).click()
+	await expect(page.locator('.impersonation-bar')).toHaveCount(0)
+	await expect(page.locator('.impersonation-switcher-button')).toBeVisible()
 })

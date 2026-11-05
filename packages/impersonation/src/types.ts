@@ -5,7 +5,7 @@ import type {
 	Payload,
 	PayloadComponent,
 	PayloadRequest,
-	TypedUser,
+	User,
 	Where,
 } from 'payload'
 
@@ -76,7 +76,7 @@ export type IssuedSession = {
 	mode: ImpersonationMode
 	sid: string
 	token: string
-	user: TypedUser
+	user: User
 }
 
 export type SessionIssueArgs = {
@@ -96,7 +96,7 @@ export type SessionRevokeArgs = {
 
 export type SessionSeams = {
 	/** Defaults to `user._sid`. */
-	binding?: (user: TypedUser) => string | undefined
+	binding?: (user: User) => string | undefined
 	issue?: (args: SessionIssueArgs) => Promise<IssuedSession>
 	revoke?: (args: SessionRevokeArgs) => Promise<void>
 }
@@ -264,18 +264,18 @@ export type ResolvedOptions = {
 }
 
 /** Runtime fields Payload paints on `req.user` but generated collection types omit. */
-export type ImpersonatedUser = TypedUser & {
+export type ImpersonatedUser = User & {
 	_impersonation?: ImpersonationActor
 	_sid?: string
 	_strategy?: string
 }
 
-export const asAuthUser = (user: TypedUser): ImpersonatedUser => user as ImpersonatedUser
+export const asAuthUser = (user: User): ImpersonatedUser => user as ImpersonatedUser
 
 /** Sid the current request is bound to. Host `session.binding` wins over `_sid`. */
 export const boundSid = (
-	user: null | TypedUser | undefined,
-	binding?: (user: TypedUser) => string | undefined
+	user: null | User | undefined,
+	binding?: (user: User) => string | undefined
 ): string | undefined => {
 	if (!user) {
 		return undefined

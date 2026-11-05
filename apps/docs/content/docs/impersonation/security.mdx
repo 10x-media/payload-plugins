@@ -23,7 +23,7 @@ Cookie POSTs to start, exit, and end must be same-origin. The plugin does **not*
 
 ## Sessions
 
-- Hint cookie holds the row id and is never trusted alone. Its name must not start with `cookiePrefix` (`@payloadcms/next` refresh/logout take the first matching cookie).
+- Hint cookie holds the row id and is never trusted alone. Its name must not start with `cookiePrefix` (Payload's `refresh` server function takes the first cookie whose name starts with the prefix).
 - Active = open row + `targetSid === req.user._sid`. Never a start-time `expiresAt` on the row. Payload refresh extends `user.sessions[].expiresAt` and the JWT; filtering on a frozen expiry was the PWW prototype bug.
 - `maxDuration` is an optional absolute cap. **Unset, an impersonation never expires on its own** because refresh keeps extending the minted session.
 - Call `closeStaleImpersonations(payload)` from a cron (or rely on `onInit`) to close rows whose minted sid vanished, whose target is gone, or whose `maxDuration` cap has passed. Authenticated requests also expire a past `absoluteExpiresAt`.

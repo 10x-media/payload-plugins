@@ -3,13 +3,15 @@
 # @10x-media/impersonation
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/impersonation` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/impersonation` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/impersonation).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/impersonation@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/impersonation) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
 Let an authorised account sign in as another user without their password, then return. Every session is recorded. After start, `req.user` is the target.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/impersonation?style=flat-square)](https://www.npmjs.com/package/@10x-media/impersonation)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 > [!WARNING]
 > **Experimental.** This plugin mints and revokes sessions. That is not a place where a subtle bug announces itself. It is covered by unit, integration and end-to-end tests against Payload's real routing on Mongo and Postgres, but auth surfaces differ a lot between projects. Try it in staging first, and [report anything that looks off](https://github.com/10x-media/payload-plugins/issues).
@@ -17,7 +19,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Quick start
 
 ```bash
-pnpm add @10x-media/impersonation
+pnpm add @10x-media/impersonation@alpha
 ```
 
 ```ts

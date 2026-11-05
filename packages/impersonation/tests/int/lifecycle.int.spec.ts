@@ -14,8 +14,16 @@ const collections: CollectionConfig[] = [
 ]
 
 const seed = async (payload: Payload) => {
-	await payload.create({ collection: 'users', data: { ...ADMIN, name: 'Admin' } })
-	await payload.create({ collection: 'users', data: { ...TARGET, name: 'Target' } })
+	await payload.create({
+		overrideAccess: true,
+		collection: 'users',
+		data: { ...ADMIN, name: 'Admin' },
+	})
+	await payload.create({
+		overrideAccess: true,
+		collection: 'users',
+		data: { ...TARGET, name: 'Target' },
+	})
 }
 
 const sessionsOf = async (payload: Payload, email: string) => {
@@ -48,11 +56,13 @@ describeForDb('impersonation lifecycle', {}, (db) => {
 		})
 		client = createRestClient(booted)
 		const admin = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'users',
 			limit: 1,
 			where: { email: { equals: ADMIN.email } },
 		})
 		const target = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'users',
 			limit: 1,
 			where: { email: { equals: TARGET.email } },
@@ -407,6 +417,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -438,6 +449,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -469,6 +481,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -522,6 +535,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -552,6 +566,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -582,6 +597,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 			seed: async (payload) => {
 				await seed(payload)
 				await payload.create({
+					overrideAccess: true,
 					collection: 'staff',
 					data: { email: 'staff@10xmedia.de', name: 'Staff', password: 'password' },
 				})
@@ -590,6 +606,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const staff = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'staff',
 				limit: 1,
 				where: { email: { equals: 'staff@10xmedia.de' } },
@@ -619,10 +636,12 @@ describeForDb('impersonation refusals', {}, (db) => {
 			plugin: impersonation({ access: { impersonate: () => true } }),
 			seed: async (payload) => {
 				await payload.create({
+					overrideAccess: true,
 					collection: 'users',
 					data: { ...ADMIN, _verified: true, name: 'Admin' },
 				})
 				await payload.create({
+					overrideAccess: true,
 					collection: 'users',
 					data: { ...TARGET, name: 'Target' },
 				})
@@ -631,6 +650,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -664,6 +684,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -697,6 +718,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -754,6 +776,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -847,6 +870,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -871,17 +895,23 @@ describeForDb('impersonation refusals', {}, (db) => {
 			plugin: impersonation({ access: { impersonate: () => true } }),
 			seed: async (payload) => {
 				await seed(payload)
-				await payload.create({ collection: 'users', data: { ...extra, name: 'Other' } })
+				await payload.create({
+					overrideAccess: true,
+					collection: 'users',
+					data: { ...extra, name: 'Other' },
+				})
 			},
 		})
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
 			})
 			const actor = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: extra.email } },
@@ -917,13 +947,22 @@ describeForDb('impersonation refusals', {}, (db) => {
 			db,
 			plugin: impersonation({ access: { impersonate: () => true } }),
 			seed: async (payload) => {
-				await payload.create({ collection: 'users', data: { ...ADMIN, name: 'Admin' } })
-				await payload.create({ collection: 'users', data: { ...TARGET, name: 'Target' } })
+				await payload.create({
+					overrideAccess: true,
+					collection: 'users',
+					data: { ...ADMIN, name: 'Admin' },
+				})
+				await payload.create({
+					overrideAccess: true,
+					collection: 'users',
+					data: { ...TARGET, name: 'Target' },
+				})
 			},
 		})
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -954,15 +993,21 @@ describeForDb('impersonation refusals', {}, (db) => {
 			plugin: impersonation({ access: { impersonate: () => true } }),
 			seed: async (payload) => {
 				await payload.create({
+					overrideAccess: true,
 					collection: 'users',
 					data: { ...ADMIN, apiKey, enableAPIKey: true, name: 'Admin' },
 				})
-				await payload.create({ collection: 'users', data: { ...TARGET, name: 'Target' } })
+				await payload.create({
+					overrideAccess: true,
+					collection: 'users',
+					data: { ...TARGET, name: 'Target' },
+				})
 			},
 		})
 		try {
 			const client = createRestClient(booted)
 			const target = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: TARGET.email } },
@@ -995,6 +1040,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 			seed: async (payload) => {
 				await seed(payload)
 				await payload.create({
+					overrideAccess: true,
 					collection: 'members',
 					data: { email: 'member@10xmedia.de', name: 'Member', password: 'password' },
 				})
@@ -1003,6 +1049,7 @@ describeForDb('impersonation refusals', {}, (db) => {
 		try {
 			const client = createRestClient(booted)
 			const member = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'members',
 				limit: 1,
 				where: { email: { equals: 'member@10xmedia.de' } },

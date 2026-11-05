@@ -1,4 +1,4 @@
-import type { CollectionSlug, Payload, TypedUser } from 'payload'
+import type { CollectionSlug, Payload, User } from 'payload'
 
 import { collectionBySlug } from '../ids'
 import { relationOf } from '../session/resolve'
@@ -21,7 +21,7 @@ export const absoluteExpiryCookies = async ({
 	payload: Payload
 	row: ImpersonationRecord
 	sid: string
-	user: TypedUser
+	user: User
 }): Promise<string[]> => {
 	const impersonator = relationOf(row.impersonator)
 	const target = relationOf(row.target)
@@ -64,15 +64,15 @@ export const absoluteExpiryCookies = async ({
 const findSlotUser = async (
 	payload: Payload,
 	target: { collection: string; id: number | string }
-): Promise<TypedUser> => {
+): Promise<User> => {
 	try {
 		return (await payload.findByID({
 			id: target.id,
 			collection: target.collection as CollectionSlug,
 			depth: 0,
 			overrideAccess: true,
-		})) as TypedUser
+		})) as User
 	} catch {
-		return { collection: target.collection, id: target.id } as TypedUser
+		return { collection: target.collection, id: target.id } as User
 	}
 }

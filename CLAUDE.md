@@ -193,7 +193,7 @@ The template is copied once at `pnpm new` and never consulted again, so a fix ap
 
 Tracked files are compared byte for byte, so they cannot contain `{{placeholder}}` tokens; the check says so explicitly if one appears.
 
-A dev app that adds a TanStack route of its own (dual-session's website demo page) regenerates `dev-tanstack/src/routeTree.gen.ts`; `EXEMPT` in `scripts/check-template.ts` lists that file per package. It is for generated output only, never for drifted boilerplate.
+A dev app that adds a TanStack route of its own (the website demo pages of dual-session and impersonation) regenerates `dev-tanstack/src/routeTree.gen.ts`; `EXEMPT` in `scripts/check-template.ts` lists that file per package. It is for generated output only, never for drifted boilerplate.
 
 ## Release flow
 

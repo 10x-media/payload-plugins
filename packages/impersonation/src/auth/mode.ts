@@ -1,4 +1,4 @@
-import type { CollectionSlug, Payload, TypedUser } from 'payload'
+import type { CollectionSlug, Payload, User } from 'payload'
 
 import { sharedCookieName } from './cookies'
 
@@ -7,12 +7,12 @@ export type DualSessionHelpers = {
 		collection: CollectionSlug
 		payload: Payload
 		token: string
-		user?: null | TypedUser
+		user?: null | User
 	}) => string
 	resolveIsolatedCookieName: (args: {
 		collection: CollectionSlug
 		payload: Payload
-		user?: null | TypedUser
+		user?: null | User
 	}) => string | undefined
 }
 
@@ -40,7 +40,7 @@ export const resolveMode = async ({
 }: {
 	collection: CollectionSlug
 	payload: Payload
-	user: TypedUser
+	user: User
 }): Promise<{ cookieName: string; isolated: boolean }> => {
 	const shared = sharedCookieName(payload.config.cookiePrefix)
 	const dual = await loadDualSession()
@@ -64,7 +64,7 @@ export const resolveMode = async ({
 export const isolatedCookieNameFor = async (args: {
 	collection: CollectionSlug
 	payload: Payload
-	user: TypedUser
+	user: User
 }): Promise<string | undefined> => {
 	const { cookieName, isolated } = await resolveMode(args)
 	return isolated ? cookieName : undefined
@@ -79,7 +79,7 @@ export const isolatedAuthCookie = async ({
 	collection: CollectionSlug
 	payload: Payload
 	token: string
-	user: TypedUser
+	user: User
 }): Promise<string | undefined> => {
 	const dual = await loadDualSession()
 	if (!dual) {

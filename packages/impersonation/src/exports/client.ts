@@ -3,6 +3,7 @@
 export { EndSessionMenuItem } from '../ui/EndSessionMenuItem'
 export { ImpersonationBar } from '../ui/ImpersonationBar'
 export { ImpersonationDocumentButton } from '../ui/ImpersonationDocumentButton'
+export { ImpersonationFrontendBannerView } from '../ui/ImpersonationFrontendBannerView'
 export { ImpersonationFrontendExit } from '../ui/ImpersonationFrontendExit'
 export { ImpersonationSwitcher } from '../ui/ImpersonationSwitcher'
 export { ImpersonationUserCard } from '../ui/ImpersonationUserCard'

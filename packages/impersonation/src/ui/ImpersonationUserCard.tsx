@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, EditIcon, ExternalLinkIcon } from '@payloadcms/ui'
+import { Button, EditIcon, NewTabIcon } from '@payloadcms/ui'
 
 export type ImpersonationUserCardProps = {
 	collectionSlug: string
@@ -45,27 +45,23 @@ export const ImpersonationUserCard = ({
 		</button>
 		<div className="impersonation-card__actions">
 			<Button
-				buttonStyle="icon-label"
-				extraButtonProps={{
-					'aria-label': openDrawerLabel,
-				}}
+				aria-label={openDrawerLabel}
+				buttonStyle="ghost"
 				icon={<EditIcon />}
-				iconStyle="none"
 				margin={false}
 				onClick={onOpenDrawer}
-				size="small"
+				size="medium"
+				tooltip={openDrawerLabel}
 			/>
 			<Button
-				buttonStyle="icon-label"
+				aria-label={openDocumentLabel}
+				buttonStyle="ghost"
 				el="link"
-				extraButtonProps={{
-					'aria-label': openDocumentLabel,
-				}}
-				icon={<ExternalLinkIcon />}
-				iconStyle="none"
+				icon={<NewTabIcon />}
 				margin={false}
-				size="small"
+				size="medium"
 				to={documentHref}
+				tooltip={openDocumentLabel}
 			/>
 		</div>
 	</div>
