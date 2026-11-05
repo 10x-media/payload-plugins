@@ -1,6 +1,5 @@
-import { headers as nextHeaders } from 'next/headers'
 import type { ServerProps } from 'payload'
-import { createLocalReq } from 'payload'
+import { createPayloadRequest } from 'payload'
 import type { ReactNode } from 'react'
 
 import { resolveTargetFilters } from '../access/filterTargets'
@@ -21,8 +20,8 @@ import { errorKey } from '../translations/errorKey'
 import { keys, type TranslationKey } from '../translations/keys'
 import { fillTemplate, messageFor } from '../translations/lookup'
 import { asAuthUser, boundSid } from '../types'
-import { ImpersonationBar } from './ImpersonationBar'
 import { ImpersonationClientConfig } from './ImpersonationConfig'
+import { ImpersonationFixedBar } from './ImpersonationHeader'
 
 export type ImpersonationProviderProps = ServerProps & { children?: ReactNode }
 
@@ -30,6 +29,7 @@ export const ImpersonationProvider = async ({
 	children,
 	i18n,
 	payload,
+	server,
 	user,
 }: ImpersonationProviderProps) => {
 	const options = getRegistry(payload.config)
@@ -42,8 +42,8 @@ export const ImpersonationProvider = async ({
 		startable.map((slug) => [slug, true as const])
 	)
 	if (user && options.access.filterTargets) {
-		const headerList = await nextHeaders()
-		const req = await createLocalReq({ req: { headers: headerList, i18n } as never, user }, payload)
+		const headers = (await server?.getHeaders()) ?? new Headers()
+		const req = await createPayloadRequest({ payload, req: { headers, i18n: i18n as never }, user })
 		targets = await resolveTargetFilters({ collections: startable, options, req })
 	}
 
@@ -51,7 +51,7 @@ export const ImpersonationProvider = async ({
 	const sid = boundSid(user, options.session.binding)
 	const painted = user ? asAuthUser(user)._impersonation : undefined
 	const paintedLive = painted && !isPastAbsoluteExpiry(painted) ? painted : undefined
-	const hint = await readHintCookie(options.hintCookieName)
+	const hint = await readHintCookie(server, options.hintCookieName)
 	const shouldLookup =
 		!painted &&
 		(Boolean(options.session.issue) ||
@@ -144,30 +144,29 @@ export const ImpersonationProvider = async ({
 		? message(keys.endSession)
 		: fillTemplate(message(keys.returnTo), '{{name}}', String(impersonatorLabel))
 
+	const bar = {
+		actingAs,
+		adminRoute: payload.config.routes.admin,
+		apiPath,
+		frontendUrl: payload.config.serverURL || undefined,
+		impersonatorLocale: locale,
+		messages: {
+			errors: Object.fromEntries(FAILURE_CODES.map((code) => [code, message(errorKey(code))])),
+		},
+		openWebsite: message(keys.openWebsite),
+		pluginName: message(keys.pluginName),
+		returnTo,
+		sessionEndsAt: barSource.absoluteExpiresAt,
+		sessionEndsAtTemplate: message(keys.sessionEndsAt),
+		sessionEndsInTemplate: message(keys.sessionEndsIn),
+		showFrontendLink: isImpersonatorSide,
+		tone: isImpersonatorSide ? ('quiet' as const) : ('warning' as const),
+	}
+
 	return (
-		<ImpersonationClientConfig value={clientValue}>
+		<ImpersonationClientConfig value={{ ...clientValue, bar }}>
 			{children}
-			<ImpersonationBar
-				actingAs={actingAs}
-				adminRoute={payload.config.routes.admin}
-				apiPath={apiPath}
-				frontendUrl={payload.config.serverURL || undefined}
-				impersonatorLocale={locale}
-				messages={{
-					collapseBar: message(keys.collapseBar),
-					errors: Object.fromEntries(FAILURE_CODES.map((code) => [code, message(errorKey(code))])),
-					expandBar: message(keys.expandBar),
-				}}
-				openWebsite={message(keys.openWebsite)}
-				pluginName={message(keys.pluginName)}
-				returnTo={returnTo}
-				sessionEndsAt={barSource.absoluteExpiresAt}
-				sessionEndsAtTemplate={message(keys.sessionEndsAt)}
-				sessionEndsInTemplate={message(keys.sessionEndsIn)}
-				showFrontendLink={isImpersonatorSide}
-				targetName={targetName}
-				tone={isImpersonatorSide ? 'quiet' : 'warning'}
-			/>
+			<ImpersonationFixedBar />
 		</ImpersonationClientConfig>
 	)
 }

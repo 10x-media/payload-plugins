@@ -92,12 +92,13 @@ export const ImpersonationDocumentButton = () => {
 	return (
 		<>
 			<Button
-				buttonStyle="subtle"
+				buttonStyle="pill"
 				className="impersonation-document-button"
 				icon={<ImpersonateIcon />}
 				iconPosition="left"
 				margin={false}
 				onClick={() => openModal(CONFIRM_SLUG)}
+				size="medium"
 			>
 				{t(keys.switchToUser)}
 			</Button>

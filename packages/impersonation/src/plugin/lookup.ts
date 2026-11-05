@@ -1,3 +1,4 @@
+import type { ServerProps } from 'payload'
 import { parseCookies } from 'payload/shared'
 
 import type { ResolvedOptions } from '../types'
@@ -25,16 +26,14 @@ export const shouldLookupImpersonation = ({
 	return parseCookies(headers).has(options.hintCookieName)
 }
 
-export const readHintCookie = async (name: string): Promise<string | undefined> => {
+/** Reads the hint cookie in a server component, through Payload's framework-neutral server adapter. */
+export const readHintCookie = async (
+	server: ServerProps['server'] | undefined,
+	name: string
+): Promise<string | undefined> => {
 	try {
-		const spec: string = 'next/headers'
-		const mod = (await import(spec)) as {
-			cookies: () =>
-				| { get: (key: string) => { value?: string } | undefined }
-				| Promise<{ get: (key: string) => { value?: string } | undefined }>
-		}
-		const store = await mod.cookies()
-		return store.get(name)?.value
+		const store = await server?.getCookies()
+		return store?.get(name)?.value
 	} catch {
 		return undefined
 	}

@@ -4,13 +4,11 @@ import {
 	Button,
 	ChevronIcon,
 	Drawer,
+	ListSearchFilter,
 	Pagination,
-	Pill,
 	Popup,
 	PopupList,
 	RenderCustomComponent,
-	SearchFilter,
-	SearchIcon,
 	toast,
 	useConfig,
 	useDocumentDrawer,
@@ -79,7 +77,6 @@ export const ImpersonationSwitcher = ({
 	const { closeModal, isModalOpen, openModal } = useModal()
 	const { apiPath, cardEmail, reasonMode, targetFilters } = useImpersonation()
 	const [collection, setCollection] = useState(collections[0]?.slug ?? '')
-	const [collectionMenuOpen, setCollectionMenuOpen] = useState(false)
 	const [search, setSearch] = useState('')
 	const [page, setPage] = useState(1)
 	const [docs, setDocs] = useState<ListedUser[]>([])
@@ -216,42 +213,36 @@ export const ImpersonationSwitcher = ({
 	return (
 		<>
 			<Button
-				buttonStyle="subtle"
+				buttonStyle="pill"
 				className="impersonation-switcher-button"
+				icon={<ImpersonateIcon />}
+				iconPosition="left"
 				margin={false}
 				onClick={() => {
 					setPage(1)
 					openModal(drawerSlug)
 				}}
-				size="small"
-				icon={<ImpersonateIcon />}
-				iconPosition="left"
+				size="medium"
 			>
 				{t(keys.switchToUser)}
 			</Button>
-			<Drawer slug={drawerSlug} title={t(keys.switchToUser)}>
+			<Drawer
+				className="impersonation-switcher-drawer"
+				slug={drawerSlug}
+				title={t(keys.switchToUser)}
+			>
 				<div className="impersonation-switcher" ref={switcherRef}>
-					<div className="search-bar">
-						<SearchIcon />
-						<SearchFilter handleChange={onSearch} label={t(keys.searchByName)} />
+					<div className="impersonation-switcher__controls">
+						<ListSearchFilter
+							className="impersonation-switcher__search"
+							label={t(keys.searchByName)}
+							onSearchChange={onSearch}
+						/>
 						{visibleCollections.length > 1 ? (
-							<div className="search-bar__actions">
+							<div className="impersonation-switcher__collections">
 								<Popup
-									button={
-										<Pill
-											className="impersonation-collection"
-											icon={<ChevronIcon direction={collectionMenuOpen ? 'up' : 'down'} />}
-											pillStyle="light"
-											size="small"
-										>
-											{visibleCollections.find((entry) => entry.slug === collection)?.label ??
-												collection}
-										</Pill>
-									}
-									buttonType="custom"
 									caret={false}
 									horizontalAlign="right"
-									onToggleOpen={setCollectionMenuOpen}
 									render={({ close }) => (
 										<PopupList.ButtonGroup>
 											{visibleCollections.map((entry) => (
@@ -269,7 +260,24 @@ export const ImpersonationSwitcher = ({
 											))}
 										</PopupList.ButtonGroup>
 									)}
+									renderButton={({ active, onKeyDown, ...buttonProps }) => (
+										<Button
+											{...buttonProps}
+											buttonStyle="secondary"
+											className="impersonation-collection"
+											extraButtonProps={{ onKeyDown }}
+											icon={<ChevronIcon direction={active ? 'up' : 'down'} />}
+											iconPosition="right"
+											margin={false}
+											selected={active}
+											size="medium"
+										>
+											{visibleCollections.find((entry) => entry.slug === collection)?.label ??
+												collection}
+										</Button>
+									)}
 									size="fit-content"
+									verticalAlign="bottom"
 								/>
 							</div>
 						) : null}

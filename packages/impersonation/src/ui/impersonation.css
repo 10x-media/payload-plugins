@@ -1,212 +1,136 @@
+/* Laid out like other admin-wide notices in the header slot: one line, an inset rule below. */
 .impersonation-bar {
-	align-items: center;
-	background: var(--theme-warning-50);
-	border-block-start: 1px solid var(--theme-warning-250);
-	bottom: 0;
-	color: var(--theme-warning-800);
-	display: flex;
-	gap: calc(var(--base) * 0.75);
-	inset-inline: 0;
-	justify-content: space-between;
-	padding-block: calc(var(--base) * 0.35);
-	padding-inline: var(--gutter-h, 1rem);
-	position: fixed;
-	z-index: var(--z-status, 10);
+	--impersonation-accent: var(--color-border-warning);
+	--impersonation-surface: var(--color-bg-warning-tertiary);
+	background: var(--impersonation-surface);
+	color: var(--color-text);
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	letter-spacing: var(--text-body-medium-letter-spacing);
+	line-height: var(--text-body-medium-line-height);
+	padding: var(--spacer-1) var(--gutter-h);
 }
 
-html[data-theme="dark"] .impersonation-bar {
-	background: var(--theme-warning-100);
-	color: var(--theme-warning-800);
-}
-
-/* Follows Payload's nav column: `--nav-width` while it is open, animated like the grid. */
-body:has(.template-default--nav-open) .impersonation-bar {
-	inset-inline-start: var(--nav-width);
-}
-
-@media (prefers-reduced-motion: no-preference) {
-	.impersonation-bar {
-		transition: inset-inline-start var(--nav-trans-time) linear;
-	}
-}
-
+/* The admin side of a parallel session: informational, in the family of Payload's `success` pill. */
 .impersonation-bar--quiet {
-	background: var(--theme-success-50);
-	border-block-start-color: var(--theme-success-250);
-	color: var(--theme-success-800);
+	--impersonation-accent: var(--color-border-brand);
+	--impersonation-surface: var(--color-bg-selected);
 }
 
-html[data-theme="dark"] .impersonation-bar--quiet {
-	background: var(--theme-success-100);
-	color: var(--theme-success-800);
+/* An inset line rather than a border, so it adds nothing to the height. */
+.impersonation-bar--header {
+	box-shadow: inset 0 -1px 0 var(--impersonation-accent);
+	position: relative;
+	z-index: 2;
 }
 
-.impersonation-bar__meta {
-	display: flex;
-	flex-direction: column;
-	gap: calc(var(--base) * 0.15);
-	min-width: 0;
+.impersonation-bar--fixed {
+	bottom: 0;
+	box-shadow: inset 0 1px 0 var(--impersonation-accent);
+	inset-inline: 0;
+	position: fixed;
+	z-index: var(--z-status);
 }
 
-.impersonation-bar__copy {
+.impersonation-bar__row {
 	align-items: center;
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--base) * 0.4);
+	gap: var(--spacer-1) var(--spacer-2-5);
+}
+
+.impersonation-bar__title {
+	font-weight: var(--text-body-medium-bold-font-weight);
 }
 
 .impersonation-bar__time {
-	color: var(--theme-warning-800);
-	font-size: 0.875rem;
-	opacity: 0.92;
-}
-
-.impersonation-bar--quiet .impersonation-bar__time {
-	color: var(--theme-success-800);
-}
-
-.impersonation-chip__name {
-	max-width: 12rem;
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+	color: var(--color-text-secondary);
+	font-variant-numeric: tabular-nums;
 }
 
 .impersonation-bar__actions {
 	align-items: center;
-	display: flex;
-	flex-shrink: 0;
-	gap: calc(var(--base) * 0.5);
+	display: inline-flex;
+	gap: var(--spacer-2);
+	margin-inline-start: auto;
 }
 
 .impersonation-bar__link {
 	color: inherit;
-	font-size: 0.875rem;
 	text-decoration: underline;
 }
 
-.impersonation-bar__icon {
-	align-items: center;
-	background: transparent;
-	border: 0;
-	color: inherit;
-	cursor: pointer;
-	display: inline-flex;
-	padding: calc(var(--base) * 0.2);
-}
-
-.impersonation-bar__icon:focus-visible {
-	outline: 2px solid var(--theme-warning-800);
-	outline-offset: 2px;
-}
-
-.impersonation-chip {
-	align-items: center;
-	background: var(--theme-warning-50);
-	border: 1px solid var(--theme-warning-250);
-	border-radius: 999px;
-	box-shadow: 0 8px 24px rgb(0 0 0 / 18%);
-	color: var(--theme-warning-800);
-	cursor: grab;
-	display: flex;
-	gap: calc(var(--base) * 0.25);
-	padding-block: calc(var(--base) * 0.3);
-	padding-inline: calc(var(--base) * 0.7) calc(var(--base) * 0.3);
-	position: fixed;
-	touch-action: none;
-	user-select: none;
-	z-index: calc(var(--z-nav, 20) + 30);
-}
-
-html[data-theme="dark"] .impersonation-chip {
-	background: var(--theme-warning-100);
-}
-
-.impersonation-chip--quiet {
-	background: var(--theme-success-50);
-	border-color: var(--theme-success-250);
-	color: var(--theme-success-800);
-}
-
-html[data-theme="dark"] .impersonation-chip--quiet {
-	background: var(--theme-success-100);
-}
-
-.impersonation-bar--quiet .impersonation-bar__icon:focus-visible,
-.impersonation-chip--quiet .impersonation-bar__icon:focus-visible {
-	outline-color: var(--theme-success-800);
-}
-
-.impersonation-chip--dragging {
-	cursor: grabbing;
-	transition: none;
-}
-
-.impersonation-chip:not(.impersonation-chip--dragging) {
-	transition:
-		left 280ms cubic-bezier(0.2, 0.8, 0.2, 1),
-		top 280ms cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-@media (prefers-reduced-motion: reduce) {
-	.impersonation-chip:not(.impersonation-chip--dragging) {
-		transition: none;
-	}
+/* Bounds the drawer so its content scrolls inside it rather than the modal container growing. */
+.impersonation-switcher-drawer.drawer {
+	height: 100%;
 }
 
 .impersonation-switcher {
 	display: flex;
-	padding-block-end: var(--base);
+	flex: 1;
 	flex-direction: column;
-	gap: var(--base);
-	min-height: calc(100vh - 10rem);
+	gap: var(--spacer-3);
+	padding-block: var(--spacer-4);
+	padding-inline: var(--gutter-h);
+}
+
+.impersonation-switcher__controls {
+	align-items: center;
+	display: flex;
+	gap: var(--spacer-2);
+}
+
+.impersonation-switcher__search {
+	flex: 1;
+}
+
+.impersonation-switcher__collections {
+	flex-shrink: 0;
 }
 
 .impersonation-switcher__results {
 	display: flex;
 	flex: 1;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.4);
-	isolation: isolate;
+	gap: var(--spacer-2);
 	min-height: 0;
-	overflow: auto;
-	z-index: 0;
 }
 
 .impersonation-card {
 	align-items: center;
-	background: var(--theme-elevation-50);
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m, 4px);
+	background: var(--color-bg-secondary);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
 	display: flex;
-	gap: calc(var(--base) * 0.35);
-	padding-block: calc(var(--base) * 0.35);
-	padding-inline: calc(var(--base) * 0.5);
+	gap: var(--spacer-2);
+	padding-block: var(--spacer-1);
+	padding-inline: var(--spacer-2) var(--spacer-1);
 	width: 100%;
 }
 
 .impersonation-card:hover {
-	background: var(--theme-elevation-100);
-	border-color: var(--theme-elevation-250);
+	background: var(--color-bg-secondary-hover);
 }
 
 .impersonation-card__pick {
 	align-items: flex-start;
 	background: none;
 	border: 0;
-	color: var(--theme-text);
+	border-radius: var(--radius-small);
+	color: var(--color-text);
 	cursor: pointer;
 	display: flex;
 	flex: 1;
 	flex-direction: column;
-	gap: 0.15rem;
+	font: inherit;
+	gap: var(--spacer-0);
 	min-width: 0;
-	padding: calc(var(--base) * 0.2);
+	padding: var(--spacer-1);
 	text-align: start;
 }
 
 .impersonation-card__pick:focus-visible {
-	outline: 2px solid var(--theme-elevation-800);
+	outline: 2px solid var(--color-border-strong);
 	outline-offset: 2px;
 }
 
@@ -214,27 +138,27 @@ html[data-theme="dark"] .impersonation-chip--quiet {
 	align-items: center;
 	display: flex;
 	flex-shrink: 0;
-	gap: calc(var(--base) * 0.15);
+	gap: var(--spacer-1);
 }
 
 .impersonation-card__title {
-	font-weight: 600;
+	font-size: var(--text-body-medium-strong-font-size);
+	font-weight: var(--text-body-medium-strong-font-weight);
 }
 
 .impersonation-card__email {
-	color: var(--theme-elevation-500);
-	font-size: 1rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 }
 
 .impersonation-switcher__empty {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 	margin: 0;
 }
 
 .impersonation-switcher__pager {
 	align-items: center;
 	display: flex;
-	gap: calc(var(--base) * 0.4);
 	justify-content: flex-end;
 	margin-block-start: auto;
 }

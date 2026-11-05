@@ -109,6 +109,9 @@ export const buildRecordsCollection = ({
 			singular: labelForKey(keys.collectionSingular),
 		},
 		timestamps: true,
+		// Payload 4 versions every collection by default. Rows are written only by the plugin and
+		// never edited, so a version history would only duplicate them.
+		versions: false,
 	}
 }
 

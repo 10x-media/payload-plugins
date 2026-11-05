@@ -1,7 +1,8 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+
+import { useRefresh } from './refresh'
 
 type Credentials = { email: string; password: string }
 
@@ -24,7 +25,7 @@ export const SessionPanel = ({
 	defaults: Credentials
 	title: string
 }) => {
-	const router = useRouter()
+	const refresh = useRefresh()
 	const [credentials, setCredentials] = useState<Credentials>(defaults)
 	const [status, setStatus] = useState<string>('')
 	const [pending, setPending] = useState(false)
@@ -39,7 +40,7 @@ export const SessionPanel = ({
 			)
 			const result = (await response.json()) as { errors?: { message: string }[] }
 			setStatus(response.ok ? `${action} ok` : (result.errors?.[0]?.message ?? `${action} failed`))
-			router.refresh()
+			refresh()
 		} finally {
 			setPending(false)
 		}

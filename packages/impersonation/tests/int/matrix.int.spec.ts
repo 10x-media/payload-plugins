@@ -13,8 +13,16 @@ const collections: CollectionConfig[] = [
 ]
 
 const seed = async (payload: Payload) => {
-	await payload.create({ collection: 'users', data: { ...ADMIN, name: 'Admin' } })
-	await payload.create({ collection: 'users', data: { ...TARGET, name: 'Target' } })
+	await payload.create({
+		overrideAccess: true,
+		collection: 'users',
+		data: { ...ADMIN, name: 'Admin' },
+	})
+	await payload.create({
+		overrideAccess: true,
+		collection: 'users',
+		data: { ...TARGET, name: 'Target' },
+	})
 }
 
 describeForDb('impersonation cross-db', {}, (db) => {
@@ -37,6 +45,7 @@ describeForDb('impersonation cross-db', {}, (db) => {
 	it(`starts and exits against ${db}`, async () => {
 		const client = createRestClient(booted)
 		const target = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'users',
 			limit: 1,
 			where: { email: { equals: TARGET.email } },

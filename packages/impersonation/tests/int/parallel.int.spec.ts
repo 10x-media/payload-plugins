@@ -1,6 +1,6 @@
 import { dualSession } from '@10x-media/dual-session'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, Payload, TypedUser } from 'payload'
+import type { CollectionConfig, Payload, User } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { impersonation } from '../../src/index'
@@ -33,13 +33,29 @@ const roleSplitCollections: CollectionConfig[] = [
 ]
 
 const seedIsolated = async (payload: Payload) => {
-	await payload.create({ collection: 'users', data: { ...ADMIN, name: 'Admin' } })
-	await payload.create({ collection: 'partners', data: { ...PARTNER, name: 'Partner' } })
+	await payload.create({
+		overrideAccess: true,
+		collection: 'users',
+		data: { ...ADMIN, name: 'Admin' },
+	})
+	await payload.create({
+		overrideAccess: true,
+		collection: 'partners',
+		data: { ...PARTNER, name: 'Partner' },
+	})
 }
 
 const seedRoleSplit = async (payload: Payload) => {
-	await payload.create({ collection: 'users', data: { ...STAFF, name: 'Staff' } })
-	await payload.create({ collection: 'users', data: { ...CUSTOMER, name: 'Customer' } })
+	await payload.create({
+		overrideAccess: true,
+		collection: 'users',
+		data: { ...STAFF, name: 'Staff' },
+	})
+	await payload.create({
+		overrideAccess: true,
+		collection: 'users',
+		data: { ...CUSTOMER, name: 'Customer' },
+	})
 }
 
 describeForDb('impersonation parallel', {}, (db) => {
@@ -63,6 +79,7 @@ describeForDb('impersonation parallel', {}, (db) => {
 			seed: seedIsolated,
 		})
 		const partner = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'partners',
 			limit: 1,
 			where: { email: { equals: PARTNER.email } },
@@ -152,7 +169,7 @@ describeForDb('impersonation role-split fallback', {}, (db) => {
 			plugin: dualSession({
 				collections: [
 					{
-						isolate: (user: TypedUser) =>
+						isolate: (user: User) =>
 							((user as { roles?: string[] }).roles ?? []).includes('customer'),
 						slug: 'users',
 					},
@@ -162,6 +179,7 @@ describeForDb('impersonation role-split fallback', {}, (db) => {
 		})
 		try {
 			await booted.payload.create({
+				overrideAccess: true,
 				collection: 'users',
 				data: {
 					email: 'editor@10xmedia.de',
@@ -172,6 +190,7 @@ describeForDb('impersonation role-split fallback', {}, (db) => {
 			})
 			const client = createRestClient(booted)
 			const editor = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'users',
 				limit: 1,
 				where: { email: { equals: 'editor@10xmedia.de' } },
@@ -209,6 +228,7 @@ describeForDb('impersonation parallel custom cookie', {}, (db) => {
 		})
 		try {
 			const partner = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'partners',
 				limit: 1,
 				where: { email: { equals: PARTNER.email } },
@@ -243,6 +263,7 @@ describeForDb('impersonation parallel maxDuration', {}, (db) => {
 		})
 		try {
 			const partner = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'partners',
 				limit: 1,
 				where: { email: { equals: PARTNER.email } },

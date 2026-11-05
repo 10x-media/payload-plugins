@@ -1,9 +1,4 @@
-import {
-	addDataAndFileToRequest,
-	headersWithCors,
-	type PayloadRequest,
-	type TypedUser,
-} from 'payload'
+import { addDataAndFileToRequest, headersWithCors, type PayloadRequest, type User } from 'payload'
 
 import { isJsonContentType, verifyMutationOrigin } from '../auth/origin'
 import { getRegistry } from '../plugin/registry'
@@ -52,14 +47,14 @@ export const getOptions = (req: PayloadRequest): ResolvedOptions => {
 	return options
 }
 
-export const callerSid = (user: null | TypedUser | undefined): string | undefined => {
+export const callerSid = (user: null | User | undefined): string | undefined => {
 	if (!user) {
 		return undefined
 	}
 	return asAuthUser(user)._sid
 }
 
-export const isApiKeyStrategy = (user: TypedUser): boolean => {
+export const isApiKeyStrategy = (user: User): boolean => {
 	const strategy = asAuthUser(user)._strategy
 	return typeof strategy === 'string' && strategy.endsWith('-api-key')
 }

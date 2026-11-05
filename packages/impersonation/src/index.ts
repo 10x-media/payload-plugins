@@ -15,6 +15,12 @@ import { setRegistry } from './plugin/registry'
 import { closeStaleImpersonations } from './session/closeStale'
 import type { ImpersonationPluginOptions } from './types'
 
+export type {
+	FrontendBannerData,
+	GetFrontendBannerArgs,
+	ImpersonationFrontendBannerLabels,
+} from './frontendBanner'
+export { getFrontendBanner } from './frontendBanner'
 export type { ImpersonationStatus } from './getImpersonation'
 export { PLUGIN_SLUG } from './plugin/constants'
 export type {
@@ -36,8 +42,8 @@ declare module 'payload' {
  */
 export const impersonation = definePlugin<ImpersonationPluginOptions>({
 	slug: PLUGIN_SLUG,
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
-		if (options.disabled === true) {
+	plugin: ({ config, options }): Config => {
+		if (!options || options.disabled === true) {
 			return config
 		}
 

@@ -32,13 +32,13 @@ Each flag is independent. `ui: false` turns all of them off. The provider still 
 | Flag | Default | What it does |
 |---|---|---|
 | `ui.headerAction` | `true` | **Impersonate** in the admin header. Opens the user drawer. |
-| `ui.bar` | `true` | Bottom bar while a session is open. It sits beside the nav, not over it. Collapse keeps an Impersonation chip that snaps to the edges of the content area. |
+| `ui.bar` | `true` | Bar while a session is open, in Payload's `header` slot above the nav and content, so it covers nothing. Admin pages without the nav (`/admin/unauthorized`) pin it to the bottom instead. |
 | `ui.documentAction` | `true` | **Impersonate** next to Save on a target document (`beforeDocumentControls`, so it still shows when the dots menu is hidden). Hidden while a session is already open. |
 | `ui.recordAction` | `true` | **End session** beside Save on an `impersonation-sessions` document (`beforeDocumentControls`). Hidden when the row already has `endedAt`. Create, update, and delete stay denied. |
 | `ui.sessionsCollection` | `false` | Put `impersonation-sessions` in the admin nav. `access.readRecords` still decides who can read a row. |
 | `ui.card` | unset | Replacement for the default switcher row. Same props as `ImpersonationUserCard`: `collectionSlug`, `doc`, `onSelect`, `onOpenDrawer`, `documentHref`, `title`, `email`, `openDocumentLabel`, `openDrawerLabel`. Pass a component path, or `{ path, exportName }` for a named export. Omit to keep the default card. |
 | `ui.cardEmail` | `true` | Show email under `useAsTitle` on default switcher cards. |
-| `ui.userLabel` | `'title'` | How the bar, collapsed chip, and frontend banner name users. `'title'` is the collection's `useAsTitle`, `'email'` is the email. Each falls back to the other. |
+| `ui.userLabel` | `'title'` | How the bar and frontend banner name users. `'title'` is the collection's `useAsTitle`, `'email'` is the email. Each falls back to the other. |
 
 Build your own control with `useImpersonation` from `@10x-media/impersonation/client`. It returns `{ status, setStatus, start, exit, end, reasonMode, targetFilters, apiPath, cardEmail, sessionCollection }`. `targetFilters` is the `access.filterTargets` result (`true` or a `Where` per collection). `status` starts from the server render and updates after the bar checks the live session. `StartConfirmModal` is exported too.
 

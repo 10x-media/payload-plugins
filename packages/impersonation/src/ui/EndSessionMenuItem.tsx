@@ -37,7 +37,12 @@ export const EndSessionMenuItem = () => {
 
 	return (
 		<>
-			<Button buttonStyle="subtle" margin={false} onClick={() => openModal(CONFIRM_SLUG)}>
+			<Button
+				buttonStyle="pill"
+				margin={false}
+				onClick={() => openModal(CONFIRM_SLUG)}
+				size="medium"
+			>
 				{t(keys.endSession)}
 			</Button>
 			<ConfirmationModal

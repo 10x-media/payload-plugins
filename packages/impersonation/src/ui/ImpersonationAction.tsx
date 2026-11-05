@@ -12,7 +12,7 @@ import { asAuthUser, boundSid } from '../types'
 import { ImpersonationSwitcher } from './ImpersonationSwitcher'
 import type { ImpersonationUserCardProps } from './ImpersonationUserCard'
 
-export const ImpersonationAction = async ({ payload, user }: ServerProps) => {
+export const ImpersonationAction = async ({ payload, server, user }: ServerProps) => {
 	const options = getRegistry(payload.config)
 	if (!options?.ui.headerAction || !user) {
 		return null
@@ -31,7 +31,7 @@ export const ImpersonationAction = async ({ payload, user }: ServerProps) => {
 		return null
 	}
 
-	const hint = await readHintCookie(options.hintCookieName)
+	const hint = await readHintCookie(server, options.hintCookieName)
 	const shouldLookup =
 		Boolean(options.session.issue) || Boolean(hint) || sid.startsWith(IMPERSONATION_SID_PREFIX)
 	if (shouldLookup) {

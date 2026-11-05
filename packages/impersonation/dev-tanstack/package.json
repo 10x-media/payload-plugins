@@ -4,13 +4,15 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"build": "vite build",
 		"dev": "vite dev",
+		"start": "srvx --prod --dir=. --static=dist/client --entry=dist/server/server.js",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
 		"generate:importmap": "bash ../../../scripts/payload.sh . generate:importmap"
 	},
 	"dependencies": {
-		"@10x-media/impersonation": "workspace:*",
 		"@10x-media/dual-session": "workspace:*",
+		"@10x-media/impersonation": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/tanstack-start": "catalog:",
@@ -20,6 +22,7 @@
 		"payload": "catalog:",
 		"react": "catalog:",
 		"react-dom": "catalog:",
+		"srvx": "catalog:",
 		"vite": "catalog:"
 	},
 	"devDependencies": {

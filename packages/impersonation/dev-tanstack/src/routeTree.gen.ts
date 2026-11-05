@@ -9,11 +9,17 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './app/__root'
+import { Route as IndexRouteImport } from './app/index'
 import { Route as PayloadRouteImport } from './app/_payload'
 import { Route as PayloadAdminIndexRouteImport } from './app/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './app/_payload/admin.$'
 import { Route as PayloadApiSplatRouteImport } from './app/_payload/api.$'
 
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const PayloadRoute = PayloadRouteImport.update({
   id: '/_payload',
   getParentRoute: () => rootRouteImport,
@@ -35,19 +41,20 @@ const PayloadApiSplatRoute = PayloadApiSplatRouteImport.update({
 } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof PayloadRouteWithChildren
+  '/': typeof IndexRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/api/$': typeof PayloadApiSplatRoute
   '/admin/': typeof PayloadAdminIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof PayloadRouteWithChildren
+  '/': typeof IndexRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/api/$': typeof PayloadApiSplatRoute
   '/admin': typeof PayloadAdminIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
+  '/': typeof IndexRoute
   '/_payload': typeof PayloadRouteWithChildren
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/api/$': typeof PayloadApiSplatRoute
@@ -60,6 +67,7 @@ export interface FileRouteTypes {
   to: '/' | '/admin/$' | '/api/$' | '/admin'
   id:
     | '__root__'
+    | '/'
     | '/_payload'
     | '/_payload/admin/$'
     | '/_payload/api/$'
@@ -67,11 +75,19 @@ export interface FileRouteTypes {
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
+  IndexRoute: typeof IndexRoute
   PayloadRoute: typeof PayloadRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_payload': {
       id: '/_payload'
       path: ''
@@ -119,6 +135,7 @@ const PayloadRouteWithChildren =
   PayloadRoute._addFileChildren(PayloadRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
+  IndexRoute: IndexRoute,
   PayloadRoute: PayloadRouteWithChildren,
 }
 export const routeTree = rootRouteImport
@@ -126,10 +143,11 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

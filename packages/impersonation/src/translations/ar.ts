@@ -6,8 +6,6 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.collectionSingular]: 'جلسة انتحال الهوية',
 	[keys.confirm]: 'انتحال الهوية',
 	[keys.confirmTitle]: 'انتحال هوية هذا المستخدم؟',
-	[keys.collapseBar]: 'طي شريط انتحال الهوية',
-	[keys.expandBar]: 'توسيع شريط انتحال الهوية',
 	[keys.endSession]: 'إنهاء الجلسة',
 	[keys.endSessionBody]: 'سينتهي انتحال الهوية. يعود الهدف إلى حسابه.',
 	[keys.errorAlreadyImpersonating]: 'هناك انتحال هوية جارٍ',

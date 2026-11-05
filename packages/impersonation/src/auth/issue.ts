@@ -1,4 +1,4 @@
-import type { CollectionSlug, Payload, PayloadRequest, TypedUser } from 'payload'
+import type { CollectionSlug, Payload, PayloadRequest, User } from 'payload'
 import { getFieldsToSign, jwtSign } from 'payload'
 import { generatePayloadCookie } from 'payload/shared'
 
@@ -7,7 +7,7 @@ import type { IssuedSession, SessionIssueArgs } from '../types'
 import { sharedCookieName } from './cookies'
 import { isolatedAuthCookie, resolveMode } from './mode'
 
-type RawUser = TypedUser & {
+type RawUser = User & {
 	email?: string
 	sessions?: { createdAt?: null | string; expiresAt: string; id: string }[] | null
 }
@@ -87,7 +87,7 @@ export const issueSession = async ({
 		throw new Error(`@10x-media/impersonation: target ${collection}/${userId} was not found`)
 	}
 
-	raw.collection = collectionConfig.slug as TypedUser['collection']
+	raw.collection = collectionConfig.slug as User['collection']
 	const sid = await mintPrefixedSession({
 		collection: collection as CollectionSlug,
 		collectionConfig,
