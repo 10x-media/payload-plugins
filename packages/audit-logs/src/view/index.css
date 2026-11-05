@@ -391,11 +391,13 @@ html[data-enhanced-contrast] .al-event-filter__other-input {
 .al-row__summary {
 	position: relative;
 	display: grid;
-	grid-template-columns: var(--spacer-3) 220px minmax(0, 220px) 1fr auto;
+	grid-template-columns: var(--spacer-4) 220px minmax(0, 220px) 1fr auto;
 	align-items: center;
 	gap: var(--spacer-2);
 	min-height: var(--spacer-6);
-	padding: var(--spacer-1) var(--spacer-3);
+	/* The chevron's 24px box leaves space around its glyph, so a smaller start padding
+	   puts the glyph as far from the edge as the date is on the other side. */
+	padding: var(--spacer-1) var(--spacer-3) var(--spacer-1) var(--spacer-2);
 	user-select: none;
 }
 .al-row__summary--expandable {
@@ -598,12 +600,14 @@ a.al-user__name:hover {
 .al-user__trigger:focus-visible .al-user__more {
 	color: var(--color-icon);
 }
+/* The popup's scroll container already pads the block axis; the inline padding is
+   what a native menu gets from its button list and buttons together. */
 .al-user__popover {
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
 	gap: var(--spacer-1);
-	padding: var(--spacer-2);
+	padding: var(--spacer-1) var(--spacer-3);
 }
 .al-user__popover-label {
 	color: var(--color-text-secondary);

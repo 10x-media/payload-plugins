@@ -128,11 +128,7 @@ export function LogRow({
 						aria-hidden
 						className={`al-row__toggle${!isExpandable ? ' al-row__toggle--hidden' : ''}`}
 					>
-						<ChevronIcon
-							className="al-row__toggle-icon"
-							direction={expanded ? 'down' : 'right'}
-							size={16}
-						/>
+						<ChevronIcon className="al-row__toggle-icon" direction={expanded ? 'down' : 'right'} />
 					</span>
 
 					<span className="al-row__op-col">
