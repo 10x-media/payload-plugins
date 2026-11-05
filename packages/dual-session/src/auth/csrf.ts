@@ -29,5 +29,20 @@ export const isCookieAuthAllowed = ({
 	const secFetchSite = headers.get('Sec-Fetch-Site')
 
 	// Allow same-origin, same-site, and direct navigations (none)
-	return secFetchSite === 'same-origin' || secFetchSite === 'same-site' || secFetchSite === 'none'
+	if (secFetchSite === 'same-origin' || secFetchSite === 'same-site' || secFetchSite === 'none') {
+		return true
+	}
+
+	// Browsers omit Sec-Fetch-Site on plain HTTP to hosts other than localhost, so its absence
+	// is inconclusive: fall back to the Referer's origin against the same allowlist
+	if (!secFetchSite) {
+		const referer = headers.get('Referer')
+
+		if (referer && URL.canParse(referer)) {
+			return payload.config.csrf.includes(new URL(referer).origin)
+		}
+	}
+
+	// Reject cross-site requests and non-browser clients that send neither header
+	return false
 }

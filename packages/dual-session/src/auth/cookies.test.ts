@@ -1,4 +1,4 @@
-import type { CollectionSlug, SanitizedCollectionConfig, TypedUser } from 'payload'
+import type { CollectionSlug, SanitizedCollectionConfig, User } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import {
@@ -79,12 +79,12 @@ describe('isolated cookies', () => {
 })
 
 describe('resolveSlotCookieName', () => {
-	const admin = { id: 1, roles: ['admin'] } as unknown as TypedUser
-	const writer = { id: 2, roles: ['writer'] } as unknown as TypedUser
+	const admin = { id: 1, roles: ['admin'] } as unknown as User
+	const writer = { id: 2, roles: ['writer'] } as unknown as User
 
 	const roleSplit = {
 		cookieName: STAFF_COOKIE,
-		isolate: (user: TypedUser) => !(user as { roles?: string[] }).roles?.includes('admin'),
+		isolate: (user: User) => !(user as { roles?: string[] }).roles?.includes('admin'),
 	}
 
 	it('sends every user of a fully isolated collection to its own cookie', () => {

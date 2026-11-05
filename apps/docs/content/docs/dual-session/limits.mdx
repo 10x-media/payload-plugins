@@ -37,7 +37,7 @@ The plugin does not detect this case. Two ways out:
 
 **Route preview through your own endpoint** and set the admin session for it explicitly. Preview is already a dedicated route in most projects, so this keeps the scope explicit.
 
-**Or force the scope in the proxy**, if your preview URLs are recognisable:
+**Or force the scope in the proxy or middleware**, if your preview URLs are recognisable:
 
 ```ts
 createAuthScopeProxy({

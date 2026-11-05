@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionSlug, Config, TypedUser } from 'payload'
+import type { CollectionConfig, CollectionSlug, Config, User } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import type { DualSessionPluginOptions } from '../types'
@@ -7,8 +7,7 @@ import { resolveAdminUserSlug, selectCollections } from './selectCollections'
 const slug = (value: string) => value as CollectionSlug
 
 /** The `isolate` a role-split project writes: the negation of `checkRole(['admin'], user)`. */
-const isolateNonAdmins = (user: TypedUser) =>
-	!(user as { roles?: string[] }).roles?.includes('admin')
+const isolateNonAdmins = (user: User) => !(user as { roles?: string[] }).roles?.includes('admin')
 
 const incoming: CollectionConfig[] = [
 	{ slug: 'users', auth: true, fields: [] },

@@ -10,10 +10,11 @@ const isWithin = (pathname: string, base: string) =>
  * Decides which session a request may authenticate against, or `undefined` when the
  * request carries no signal to decide by.
  *
- * Admin panel pages and their server actions live under `adminRoute`, so those are
- * unambiguous. Payload's REST namespace is shared between the admin panel and the
- * website, so those calls are attributed by `Referer`, which on same-origin browser fetches
- * carry the full originating path.
+ * Admin panel pages, and on Next.js their server actions, live under `adminRoute`, so those
+ * are unambiguous. Payload's REST namespace is shared between the admin panel and the
+ * website, and so is TanStack Start's server function endpoint, so those calls are
+ * attributed by `Referer`, which on same-origin browser fetches carry the full originating
+ * path.
  *
  * A `Referer` only says something about the admin panel when it belongs to the same
  * origin the API is served from: a frontend on another origin may well have an
@@ -29,6 +30,7 @@ const isWithin = (pathname: string, base: string) =>
 export const resolveAuthScope = ({
 	adminRoute = '/admin',
 	apiRoute = '/api',
+	isServerFunction = false,
 	origin,
 	pathname,
 	referer,
@@ -36,6 +38,11 @@ export const resolveAuthScope = ({
 }: {
 	adminRoute?: string
 	apiRoute?: string
+	/**
+	 * The request calls a TanStack Start server function. Every page shares that endpoint,
+	 * admin and website alike, so it is attributed by `Referer` like a REST call.
+	 */
+	isServerFunction?: boolean
 	/** The origin the request was served from, used to vet a `Referer` from another site. */
 	origin?: null | string
 	pathname: string
@@ -47,7 +54,7 @@ export const resolveAuthScope = ({
 		return 'admin'
 	}
 
-	if (isWithin(pathname, apiRoute)) {
+	if (isServerFunction || isWithin(pathname, apiRoute)) {
 		if (!referer) {
 			return undefined
 		}

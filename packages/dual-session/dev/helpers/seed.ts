@@ -14,46 +14,62 @@ export const DEMO_NOTE_TITLE = 'Demo note'
  * note and global the frontend writes to. Idempotent.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ overrideAccess: true, collection: 'users' })
 	if (userCount.totalDocs === 0) {
-		await payload.create({ collection: 'users', data: { ...DEV_ADMIN, roles: ['admin'] } })
+		await payload.create({
+			overrideAccess: true,
+			collection: 'users',
+			data: { ...DEV_ADMIN, roles: ['admin'] },
+		})
 		payload.logger.info(`Seeded dev admin: ${DEV_ADMIN.email} / ${DEV_ADMIN.password}`)
 
-		await payload.create({ collection: 'users', data: { ...DEV_MEMBER, roles: ['member'] } })
+		await payload.create({
+			overrideAccess: true,
+			collection: 'users',
+			data: { ...DEV_MEMBER, roles: ['member'] },
+		})
 		payload.logger.info(`Seeded dev member: ${DEV_MEMBER.email} / ${DEV_MEMBER.password}`)
 	}
 
-	const customerCount = await payload.count({ collection: 'customers' })
+	const customerCount = await payload.count({ overrideAccess: true, collection: 'customers' })
 	if (customerCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'customers',
 			data: { ...DEV_CUSTOMER, name: 'Dev Customer' },
 		})
 		payload.logger.info(`Seeded dev customer: ${DEV_CUSTOMER.email} / ${DEV_CUSTOMER.password}`)
 	}
 
-	const partnerCount = await payload.count({ collection: 'partners' })
+	const partnerCount = await payload.count({ overrideAccess: true, collection: 'partners' })
 	if (partnerCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'partners',
 			data: { ...DEV_PARTNER, company: 'Dev Partner GmbH' },
 		})
 		payload.logger.info(`Seeded dev partner: ${DEV_PARTNER.email} / ${DEV_PARTNER.password}`)
 	}
 
-	const noteCount = await payload.count({ collection: 'notes' })
+	const noteCount = await payload.count({ overrideAccess: true, collection: 'notes' })
 	if (noteCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'notes',
 			data: { title: DEMO_NOTE_TITLE, touchCount: 0 },
 		})
 	}
 
-	const settings = await payload.findGlobal({ slug: 'site-settings', depth: 0 })
+	const settings = await payload.findGlobal({
+		overrideAccess: true,
+		slug: 'site-settings',
+		depth: 0,
+	})
 	if (!settings.headline) {
 		await payload.updateGlobal({
 			slug: 'site-settings',
 			data: { headline: 'Seeded headline' },
+			overrideAccess: true,
 		})
 	}
 }

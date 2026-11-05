@@ -1,7 +1,8 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+
+import { useRefresh } from './refresh'
 
 export type ApiAction = {
 	body?: Record<string, unknown>
@@ -24,7 +25,7 @@ export type ApiAction = {
 	}
 	method: 'GET' | 'PATCH' | 'POST'
 	path: string
-	/** `'no-referrer'` strips the `Referer` the proxy attributes API calls by. */
+	/** `'no-referrer'` strips the `Referer` the proxy or middleware attributes API calls by. */
 	referrerPolicy?: ReferrerPolicy
 }
 
@@ -39,11 +40,11 @@ const pretty = (text: string) => {
 }
 
 /**
- * Fires REST calls from the website origin, so the auth-scope proxy attributes them by
- * `Referer` exactly as it would for real frontend code.
+ * Fires REST calls from the website origin, so the auth-scope proxy or middleware attributes
+ * them by `Referer` exactly as it would for real frontend code.
  */
 export const ApiConsole = ({ actions, title }: { actions: ApiAction[]; title: string }) => {
-	const router = useRouter()
+	const refresh = useRefresh()
 	const [steps, setSteps] = useState<Step[] | null>(null)
 	const [pending, setPending] = useState<string | null>(null)
 
@@ -74,7 +75,7 @@ export const ApiConsole = ({ actions, title }: { actions: ApiAction[]; title: st
 				setSteps([
 					{ name: `${action.method} ${action.path}`, status: response.status, body: pretty(text) },
 				])
-				router.refresh()
+				refresh()
 				return
 			}
 
@@ -95,7 +96,7 @@ export const ApiConsole = ({ actions, title }: { actions: ApiAction[]; title: st
 					lookupStep,
 					{ name: 'write', status: 0, body: 'skipped: the lookup returned no document' },
 				])
-				router.refresh()
+				refresh()
 				return
 			}
 
@@ -114,7 +115,7 @@ export const ApiConsole = ({ actions, title }: { actions: ApiAction[]; title: st
 					body: pretty(written.text),
 				},
 			])
-			router.refresh()
+			refresh()
 		} finally {
 			setPending(null)
 		}

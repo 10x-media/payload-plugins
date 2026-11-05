@@ -134,6 +134,18 @@ test('an admin-only browser is still an admin on the website', async ({ page }) 
 	await expect(page.getByTestId('live-user')).toHaveText(`users · ${ADMIN.email}`)
 })
 
+test('a website page is scoped to the frontend session, not the admin one', async ({ page }) => {
+	await login(page, 'users', ADMIN)
+	await login(page, 'customers', CUSTOMER)
+
+	await page.goto('/')
+
+	// `live-user` is the page request's own `req.user`, so it reads the scope the Next proxy or
+	// the TanStack Start middleware stamped. Without one, `adminSessionPriority` would have
+	// answered with the admin.
+	await expect(page.getByTestId('live-user')).toHaveText(`customers · ${CUSTOMER.email}`)
+})
+
 test('an unattributed call still resolves a lone frontend session', async ({ page }) => {
 	await login(page, 'customers', CUSTOMER)
 

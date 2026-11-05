@@ -1,10 +1,16 @@
 import { SignJWT } from 'jose'
-import type { CollectionSlug, Payload, SanitizedCollectionConfig } from 'payload'
-import { describe, expect, it } from 'vitest'
+import {
+	type CollectionSlug,
+	JWT_AUTH_VERSION,
+	type Payload,
+	type SanitizedCollectionConfig,
+} from 'payload'
+import { describe, expect, it, vi } from 'vitest'
 
 import { createIsolatedAuthStrategy } from './strategy'
 
 const SECRET = 'test-secret-value'
+const PREVIOUS_SECRET = 'previous-secret-value'
 const CUSTOMER_COOKIE = 'payload-customers-token'
 
 const slug = (value: string) => value as CollectionSlug
@@ -21,6 +27,7 @@ const authConfig = (overrides: Record<string, unknown> = {}) =>
 
 type FakePayloadArgs = {
 	findByID?: Payload['findByID']
+	disableLocalStrategy?: boolean
 	jwtOrder?: ('Bearer' | 'cookie' | 'JWT')[]
 	useAPIKey?: boolean
 	useSessions?: boolean
@@ -32,6 +39,7 @@ type FakePayloadArgs = {
  * at the boundary because the strategy only reads a handful of properties.
  */
 const createFakePayload = ({
+	disableLocalStrategy = false,
 	findByID,
 	jwtOrder = ['JWT', 'Bearer', 'cookie'],
 	useAPIKey = false,
@@ -40,7 +48,9 @@ const createFakePayload = ({
 }: FakePayloadArgs = {}) =>
 	({
 		collections: {
-			customers: { config: { auth: authConfig({ useAPIKey, useSessions, verify }) } },
+			customers: {
+				config: { auth: authConfig({ disableLocalStrategy, useAPIKey, useSessions, verify }) },
+			},
 		},
 		config: {
 			admin: { user: 'users' },
@@ -48,15 +58,23 @@ const createFakePayload = ({
 			cookiePrefix: 'payload',
 			csrf: [],
 		},
+		// Payload 4 verifies tokens against every key in the keyring (active, then previous).
+		encryptionKeyring: { all: [{ legacyKey: SECRET }, { legacyKey: PREVIOUS_SECRET }] },
 		findByID: findByID ?? (async () => null),
 		secret: SECRET,
 	}) as unknown as Payload
 
-const signToken = (claims: Record<string, unknown>) =>
+const signToken = (
+	claims: Record<string, unknown>,
+	{
+		authVersion = JWT_AUTH_VERSION,
+		secret = SECRET,
+	}: { authVersion?: number; secret?: string } = {}
+) =>
 	new SignJWT(claims)
-		.setProtectedHeader({ alg: 'HS256' })
+		.setProtectedHeader({ alg: 'HS256', authVersion })
 		.setExpirationTime('2h')
-		.sign(new TextEncoder().encode(SECRET))
+		.sign(new TextEncoder().encode(secret))
 
 const headersWithCookies = (cookies: Record<string, string>) =>
 	new Headers({
@@ -127,10 +145,10 @@ describe('createIsolatedAuthStrategy', () => {
 	})
 
 	it('rejects a token signed with the wrong secret', async () => {
-		const token = await new SignJWT({ collection: 'customers', id: 'customer-1', sid: 'session-1' })
-			.setProtectedHeader({ alg: 'HS256' })
-			.setExpirationTime('2h')
-			.sign(new TextEncoder().encode('a-different-secret'))
+		const token = await signToken(
+			{ collection: 'customers', id: 'customer-1', sid: 'session-1' },
+			{ secret: 'a-different-secret' }
+		)
 
 		const result = await strategy.authenticate({
 			headers: headersWithCookies({ [CUSTOMER_COOKIE]: token }),
@@ -138,6 +156,76 @@ describe('createIsolatedAuthStrategy', () => {
 		})
 
 		expect(result.user).toBeNull()
+	})
+
+	it('accepts a token signed with a previous secret, as core does during a rotation', async () => {
+		const token = await signToken(
+			{ collection: 'customers', id: 'customer-1', sid: 'session-1' },
+			{ secret: PREVIOUS_SECRET }
+		)
+
+		const result = await strategy.authenticate({
+			headers: headersWithCookies({ [CUSTOMER_COOKIE]: token }),
+			payload: createFakePayload({ findByID: findCustomer }),
+		})
+
+		expect(result.user).toMatchObject({ id: 'customer-1' })
+	})
+
+	it('rejects a token without Payload’s auth version in its header', async () => {
+		const token = await new SignJWT({ collection: 'customers', id: 'customer-1', sid: 'session-1' })
+			.setProtectedHeader({ alg: 'HS256' })
+			.setExpirationTime('2h')
+			.sign(new TextEncoder().encode(SECRET))
+
+		const result = await strategy.authenticate({
+			headers: headersWithCookies({ [CUSTOMER_COOKIE]: token }),
+			payload: createFakePayload({ findByID: findCustomer }),
+		})
+
+		expect(result.user).toBeNull()
+	})
+
+	it('rejects a token whose id is not a string or number', async () => {
+		const token = await signToken({ collection: 'customers', id: { $ne: null }, sid: 'session-1' })
+
+		const result = await strategy.authenticate({
+			headers: headersWithCookies({ [CUSTOMER_COOKIE]: token }),
+			payload: createFakePayload({ findByID: findCustomer }),
+		})
+
+		expect(result.user).toBeNull()
+	})
+
+	it('rejects every token when the collection disables the local strategy', async () => {
+		const result = await strategy.authenticate({
+			headers: headersWithCookies({ [CUSTOMER_COOKIE]: await validToken() }),
+			payload: createFakePayload({ disableLocalStrategy: true, findByID: findCustomer }),
+		})
+
+		expect(result.user).toBeNull()
+	})
+
+	it('reads the user past access control, in the request locale, and leaves the request as it was', async () => {
+		const findByID = vi.fn(async (args: { req?: { locale?: string } }) => {
+			if (args.req) {
+				args.req.locale = 'changed-by-the-lookup'
+			}
+			return structuredClone(customer)
+		})
+		const req = { fallbackLocale: 'en', locale: 'de', query: { depth: '2' } }
+
+		const result = await strategy.authenticate({
+			headers: headersWithCookies({ [CUSTOMER_COOKIE]: await validToken() }),
+			payload: createFakePayload({ findByID: findByID as unknown as Payload['findByID'] }),
+			req: req as unknown as Parameters<typeof strategy.authenticate>[0]['req'],
+		})
+
+		expect(result.user).toMatchObject({ id: 'customer-1' })
+		expect(findByID).toHaveBeenCalledWith(
+			expect.objectContaining({ fallbackLocale: 'en', locale: 'de', overrideAccess: true, req })
+		)
+		expect(req).toEqual({ fallbackLocale: 'en', locale: 'de', query: { depth: '2' } })
 	})
 
 	it('rejects an unverified user when the collection requires verification', async () => {
@@ -333,5 +421,29 @@ describe('createIsolatedAuthStrategy', () => {
 		expect((await strategy.authenticate({ headers, payload })).user).toMatchObject({
 			id: 'customer-1',
 		})
+	})
+
+	it('falls back to the Referer when a browser sends neither Origin nor Sec-Fetch-Site', async () => {
+		const payload = createFakePayload({ findByID: findCustomer })
+		payload.config.csrf = ['https://site.test']
+
+		// Browsers leave out Sec-Fetch-Site on plain HTTP to hosts other than localhost.
+		const headers = headersWithCookies({ [CUSTOMER_COOKIE]: await validToken() })
+		expect((await strategy.authenticate({ headers, payload })).user).toBeNull()
+
+		headers.set('Referer', 'https://evil.test/page')
+		expect((await strategy.authenticate({ headers, payload })).user).toBeNull()
+
+		headers.set('Referer', 'not a url')
+		expect((await strategy.authenticate({ headers, payload })).user).toBeNull()
+
+		headers.set('Referer', 'https://site.test/account')
+		expect((await strategy.authenticate({ headers, payload })).user).toMatchObject({
+			id: 'customer-1',
+		})
+
+		// A cross-site request carrying an allowed Referer is still refused.
+		headers.set('Sec-Fetch-Site', 'cross-site')
+		expect((await strategy.authenticate({ headers, payload })).user).toBeNull()
 	})
 })

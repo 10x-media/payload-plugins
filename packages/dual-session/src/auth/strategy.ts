@@ -1,5 +1,10 @@
 import { jwtVerify } from 'jose'
-import type { AuthStrategyResult, CollectionSlug, Payload } from 'payload'
+import {
+	type AuthStrategyResult,
+	type CollectionSlug,
+	JWT_AUTH_VERSION,
+	type Payload,
+} from 'payload'
 import { parseCookies } from 'payload/shared'
 import type { AuthScope, AuthStrategy } from '../types'
 import { hasPrecedingAuthorization } from './authorization'
@@ -22,15 +27,65 @@ type UserWithSession = AuthenticatedUser & {
 }
 
 type TokenClaims = {
-	collection?: string
-	id?: number | string
+	collection: string
+	id: number | string
 	sid?: string
 }
 
-const verifyToken = async ({ payload, token }: { payload: Payload; token: string }) => {
-	const secretKey = new TextEncoder().encode(payload.secret)
-	const { payload: claims } = await jwtVerify<TokenClaims>(token, secretKey)
-	return claims
+/** Mirrors core's `getJWTAuthenticationReference`: a token without these shapes is refused. */
+const toClaims = (claims: Record<string, unknown>): null | TokenClaims => {
+	const { id, collection, sid } = claims
+
+	if (
+		typeof collection !== 'string' ||
+		(typeof id !== 'number' && typeof id !== 'string') ||
+		(sid !== undefined && typeof sid !== 'string')
+	) {
+		return null
+	}
+
+	return { id, collection, ...(sid ? { sid } : {}) }
+}
+
+/**
+ * Verifies a token the way core's JWT strategy does: against every secret in the keyring
+ * (the active one first, then `previousSecrets`, so tokens survive a secret rotation),
+ * and only when its protected header carries Payload's current `authVersion`.
+ *
+ * @throws when no key verifies the token, its header is not Payload's, or its claims are malformed.
+ */
+const verifyToken = async ({
+	payload,
+	token,
+}: {
+	payload: Payload
+	token: string
+}): Promise<TokenClaims> => {
+	let lastError: unknown = new Error('No secret in the keyring verified the token.')
+
+	for (const key of payload.encryptionKeyring.all) {
+		try {
+			const { payload: decoded, protectedHeader } = await jwtVerify(
+				token,
+				new TextEncoder().encode(key.legacyKey)
+			)
+
+			if (protectedHeader.authVersion !== JWT_AUTH_VERSION) {
+				throw new Error('Invalid JWT protected header')
+			}
+
+			const claims = toClaims(decoded)
+			if (!claims) {
+				throw new Error('Invalid JWT authentication reference')
+			}
+
+			return claims
+		} catch (error) {
+			lastError = error
+		}
+	}
+
+	throw lastError
 }
 
 /**
@@ -96,7 +151,7 @@ export const createIsolatedAuthStrategy = ({
 
 	return {
 		name,
-		authenticate: async ({ headers, isGraphQL = false, payload, strategyName }) => {
+		authenticate: async ({ headers, isGraphQL = false, payload, req, strategyName }) => {
 			const token = parseCookies(headers).get(cookieName)
 
 			// Nothing to do, and importantly this also stops this strategy from ever
@@ -147,6 +202,12 @@ export const createIsolatedAuthStrategy = ({
 				return NO_USER
 			}
 
+			// `findByID` with `req` leaves its locale and depth on the request; core's JWT strategy
+			// puts them back afterwards, and so does this one.
+			const requestFallbackLocale = req?.fallbackLocale
+			const requestLocale = req?.locale
+			const requestDepth = req?.query?.depth
+
 			try {
 				const claims = await verifyToken({ payload, token })
 
@@ -157,14 +218,21 @@ export const createIsolatedAuthStrategy = ({
 				}
 
 				const collection = payload.collections[slug]
-				if (!collection) {
+				if (!collection?.config.auth || collection.config.auth.disableLocalStrategy) {
 					return NO_USER
 				}
 
+				// Same lookup as core's JWT strategy: the token already proves who this is, so
+				// the user's own read access must not hide them (Payload 4's Local API no longer
+				// overrides access by default), and the document is read in the request's locale.
 				const user = (await payload.findByID({
 					id: claims.id,
 					collection: slug,
 					depth: isGraphQL ? 0 : collection.config.auth.depth,
+					fallbackLocale: requestFallbackLocale,
+					locale: requestLocale,
+					overrideAccess: true,
+					req,
 				})) as UserWithSession | null
 
 				if (!user) {
@@ -188,6 +256,14 @@ export const createIsolatedAuthStrategy = ({
 				return { user }
 			} catch {
 				return NO_USER
+			} finally {
+				if (req) {
+					req.fallbackLocale = requestFallbackLocale
+					req.locale = requestLocale
+					if (req.query) {
+						req.query.depth = requestDepth
+					}
+				}
 			}
 		},
 	}

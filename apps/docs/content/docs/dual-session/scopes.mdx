@@ -1,6 +1,6 @@
 ---
 title: Scopes
-description: How a request is attributed to the admin panel or the website, and how to compose the proxy with your own.
+description: How a request is attributed to the admin panel or the website, on Next.js and TanStack Start, and how to compose the proxy with your own.
 ---
 
 A browser holding two sessions makes every REST call ambiguous. `/api/customers/me` is the same URL whether the admin panel asked or the website did, and the right answer differs.
@@ -21,7 +21,7 @@ One request header, `x-payload-auth-scope`, carrying one of two values:
 
 Two rules for whoever sets it:
 
-**Set it on the request Payload receives**, not on the response. In Next that means `NextResponse.next({ request: { headers } })`.
+**Set it on the request Payload receives**, not on the response. On Next.js that means `NextResponse.next({ request: { headers } })`; on TanStack Start, the request's own headers, because Payload's adapter reads the request rather than anything a middleware hands on.
 
 **Replace it, never merge it.** A request arriving with its own `x-payload-auth-scope` must have that value overwritten or removed, so the value a strategy reads is always yours.
 
@@ -31,28 +31,28 @@ The scope picks *which of the caller's own sessions* to use. It is not an author
 
 **Scopes govern isolated cookies only.** A session on the shared `${cookiePrefix}-token` is read by core's own strategy, which has never heard of scopes and authenticates every request whatever the header says. That is deliberate: it is what keeps the admin panel reachable, and why an editor browsing the website is still the editor there. On a role-split collection it means the staff half is not scoped at all, and only the website half is.
 
-Absent is a state to use, not a failure to avoid. A proxy that cannot attribute a request should send no scope, and the plugin then answers by checking whether an admin session actually exists.
+Absent is a state to use, not a failure to avoid. A proxy or middleware that cannot attribute a request should send no scope, and the plugin then answers by checking whether an admin session actually exists.
 
 ## The default rule
 
-`createAuthScopeProxy` implements this:
+`createAuthScopeProxy` (Next.js) and `createAuthScopeMiddleware` (TanStack Start) implement this:
 
 | Request | Scope |
 | --- | --- |
 | Under `adminRoute` (`/admin`) | `admin` |
-| Under `apiRoute` (`/api`), same-origin `Referer` under `adminRoute` | `admin` |
-| Under `apiRoute`, any other `Referer` | `frontend` |
-| Under `apiRoute`, no usable `Referer` | *absent* |
+| Under `apiRoute` (`/api`) or a TanStack Start server function, same-origin `Referer` under `adminRoute` | `admin` |
+| Under `apiRoute` or a server function, any other `Referer` | `frontend` |
+| Under `apiRoute` or a server function, no usable `Referer` | *absent* |
 | Anything else | `frontend` |
 
-Admin pages and their server actions live under `/admin`, so those are unambiguous. REST calls are attributed by `Referer`, which same-origin browser fetches carry in full.
+Admin pages, and on Next.js their server actions, live under `/admin`, so those are unambiguous. REST calls are attributed by `Referer`, which same-origin browser fetches carry in full. TanStack Start sends every server function, the admin panel's and the website's, to one endpoint of its own, so those are attributed by `Referer` too.
 
 A `Referer` only says something about the admin panel when it belongs to the origin the API is served from. A frontend on another origin may have an `/admin` route of its own, and `Sec-Fetch-Site` is what separates the two: `cross-site` or `same-site` means the referring page is not yours, whatever its path looks like. Browsers set that header themselves and a page cannot forge it.
 
-## Installing the proxy
+## Installing on Next.js
 
 ```ts title="proxy.ts"
-import { createAuthScopeProxy } from '@10x-media/dual-session/proxy'
+import { createAuthScopeProxy } from '@10x-media/dual-session/next'
 
 export default createAuthScopeProxy()
 
@@ -61,7 +61,7 @@ export const config = {
 }
 ```
 
-Next 16 renamed `middleware.ts` to `proxy.ts`. Either name works on the version that expects it; the file sits next to `app/`.
+The file sits next to `app/`.
 
 ### The matcher must include `/api`
 
@@ -74,12 +74,36 @@ export const config = { matcher: ['/((?!api|_next/static|_next/image|favicon.ico
 
 Use the one above instead.
 
+## Installing on TanStack Start
+
+A global request middleware, registered in `src/start.ts`:
+
+```ts title="src/start.ts"
+import { createAuthScopeMiddleware } from '@10x-media/dual-session/tanstack-start'
+import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
+
+export const startInstance = createStart(() => ({
+  requestMiddleware: [
+    createCsrfMiddleware({ filter: ({ handlerType }) => handlerType === 'serverFn' }),
+    createAuthScopeMiddleware(),
+  ],
+}))
+```
+
+Global request middleware runs on every request, `/api` included, so there is no matcher to get wrong.
+
+<Callout type="warn">
+A `requestMiddleware` list **replaces** TanStack Start's default CSRF middleware, so list it again as above. Keep its `filter`: TanStack Start's default checks server functions only, and an unfiltered one also refuses every REST call and page load that carries no `Origin`, `Sec-Fetch-Site` or `Referer`, `curl` and server-to-server calls included.
+</Callout>
+
+If you already have a `src/start.ts`, add `createAuthScopeMiddleware()` to its `requestMiddleware`. The middleware writes the scope into the request's own headers, so it composes with anything else in the list.
+
 ## Composing with an existing proxy
 
-Next allows exactly one proxy file, so if you already have one, do not replace it. `resolveAuthScope` is a pure function with no `next/server` import, and is the intended integration point:
+Next.js allows exactly one proxy file, so if you already have one, do not replace it. `resolveAuthScope` is a pure function with no `next/server` import, and is the intended integration point:
 
 ```ts title="proxy.ts"
-import { AUTH_SCOPE_HEADER, resolveAuthScope } from '@10x-media/dual-session/proxy'
+import { AUTH_SCOPE_HEADER, resolveAuthScope } from '@10x-media/dual-session/next'
 import { type NextRequest, NextResponse } from 'next/server'
 
 export default function proxy(request: NextRequest) {
@@ -125,7 +149,7 @@ export default function proxy(request: NextRequest) {
 
 ## Custom rules
 
-`createAuthScopeProxy` takes a `resolveScope` that runs first; return `undefined` to fall through to the default rule.
+`createAuthScopeProxy` and `createAuthScopeMiddleware` take a `resolveScope` that runs first; return `undefined` to fall through to the default rule.
 
 ```ts
 export default createAuthScopeProxy({
@@ -134,7 +158,9 @@ export default createAuthScopeProxy({
 })
 ```
 
-`adminRoute` and `apiRoute` follow your Payload `routes` config if you have changed them.
+The middleware's `resolveScope` gets a plain `Request`, so read the path with `new URL(request.url).pathname`.
+
+`adminRoute` and `apiRoute` follow your Payload `routes` config if you have changed them. The proxy and the middleware take the same options, `scopeHeader` included.
 
 ## Per-collection scopes
 
@@ -152,13 +178,13 @@ A [role-split](/dual-session/role-split) entry, the one naming `admin.user`, mus
 
 The isolated strategy runs ahead of core's `local-jwt`, so a cookie allowed to answer admin-scoped requests would be consulted first on the very collection the panel authenticates against: a website visitor's session would win over the admin's, and the panel would lock its own admins out. The staff half needs no scope of its own, because it is on the shared cookie, which is never gated.
 
-## Without a proxy
+## Without a proxy or middleware
 
 The plugin works without one, using `adminSessionPriority` (on by default): with no scope header, an isolated cookie stands down as long as a **valid** admin token is also present. The admin panel therefore stays reachable.
 
-The cost is that an admin-and-customer browser resolves as the admin on the website too. Set `adminSessionPriority: false` to invert that, or install the proxy so the scope is read rather than inferred.
+The cost is that an admin-and-customer browser resolves as the admin on the website too. Set `adminSessionPriority: false` to invert that, or install the proxy or middleware so the scope is read rather than inferred.
 
-An unattributed request lands in this same branch, so a session that works without the proxy keeps working once you install one.
+An unattributed request lands in this same branch, so a session that works without one keeps working once you install it.
 
 On a role-split collection the check compares the shared cookie against `admin.user`, which is that collection's own slug. Same slug, different cookie: the website half stands down for a live admin session exactly as a separate collection would.
 
@@ -166,7 +192,7 @@ On a role-split collection the check compares the shared cookie against `admin.u
 
 A global `Referrer-Policy: no-referrer`, whether from your own security headers or a CDN, removes the signal API calls are attributed by. Every REST call then goes unattributed, and frontend sessions stop working for anyone who also holds an admin session.
 
-Payload's admin panel and this plugin both need the same-origin `Referer`, so the fix is to not strip it same-origin:
+Payload's admin panel and this plugin both need the same-origin `Referer`, so the fix is to not strip it same-origin. On Next.js:
 
 ```ts title="next.config.ts"
 headers: async () => [
@@ -181,4 +207,4 @@ headers: async () => [
 
 ## Next
 
-[One collection, two sessions](/dual-session/role-split) if your auth collections are really one collection with roles, [Frontends and clients](/dual-session/clients) for setups where the website is not this Next app, [Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what scopes cannot cover.
+[One collection, two sessions](/dual-session/role-split) if your auth collections are really one collection with roles, [Frontends and clients](/dual-session/clients) for setups where the website is not this Payload app, [Custom auth](/dual-session/custom-auth) for your own SSO, [Limits](/dual-session/limits) for what scopes cannot cover.

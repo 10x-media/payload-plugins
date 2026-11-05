@@ -1,4 +1,4 @@
-import type { CollectionSlug, IncomingAuthType, TypedUser } from 'payload'
+import type { CollectionSlug, IncomingAuthType, User } from 'payload'
 
 import type { TranslationsOption } from './translations'
 
@@ -30,7 +30,7 @@ export type IsolatedCollection = {
 	 *
 	 * @default every session of the collection is isolated
 	 */
-	isolate?: (user: TypedUser) => boolean
+	isolate?: (user: User) => boolean
 	/**
 	 * Scopes in which this collection's cookie is allowed to authenticate a request.
 	 * Only enforced when the auth-scope proxy is installed.
@@ -84,7 +84,7 @@ export type ResolvedIsolatedCollection = Required<
 	 * Left absent when every session of the collection is isolated, so callers can tell a
 	 * collection that never needs a user to pick its cookie from one that always does.
 	 */
-	isolate?: (user: TypedUser) => boolean
+	isolate?: (user: User) => boolean
 }
 
 /** Payload does not export the `AuthStrategy` object type directly. */

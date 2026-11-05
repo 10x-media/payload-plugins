@@ -14,7 +14,7 @@ import {
 	sanitizeJoinParams,
 	sanitizePopulateParam,
 	sanitizeSelectParam,
-	type TypedUser,
+	type User,
 } from 'payload'
 import { isNumber, parseCookies } from 'payload/shared'
 
@@ -48,10 +48,10 @@ const getString = (req: PayloadRequest, key: string) =>
 
 /**
  * The core auth operations type the user they return loosely (`Record<string, unknown>` on
- * some paths, the collection's own doc on others), while `TypedUser` is the union across
+ * some paths, the collection's own doc on others), while `User` is the union across
  * every auth collection. It is the same object either way.
  */
-const asUser = (user: unknown) => user as TypedUser | undefined
+const asUser = (user: unknown) => user as User | undefined
 
 /**
  * Replacements for the built-in auth endpoints that read from and write to a
@@ -84,7 +84,7 @@ export const buildIsolatedAuthEndpoints = ({
 		return collection
 	}
 
-	const slotFor = (req: PayloadRequest, user: null | TypedUser | undefined) =>
+	const slotFor = (req: PayloadRequest, user: null | User | undefined) =>
 		resolveSlotCookieName({
 			entry,
 			sharedName: getSharedCookieName(req.payload.config.cookiePrefix),
@@ -131,6 +131,7 @@ export const buildIsolatedAuthEndpoints = ({
 				}
 
 				if (authConfig.removeTokenFromResponses) {
+					delete result.refreshToken
 					delete result.token
 				}
 
@@ -186,7 +187,14 @@ export const buildIsolatedAuthEndpoints = ({
 				const authConfig = collection.config.auth
 				const headers = headersWithCors({ headers: new Headers(), req })
 
-				const { refreshedToken, ...result } = await refreshOperation({ collection, req })
+				// With `auth.refreshTokens` a client can refresh with the refresh token from login
+				// instead of its (possibly expired) cookie. The operation then sets `req.user` to that
+				// token's user, so the slot below is resolved for the right one.
+				const { refreshedToken, refreshToken, ...result } = await refreshOperation({
+					collection,
+					refreshToken: getString(req, 'refreshToken') || undefined,
+					req,
+				})
 				const name = slotFor(req, req.user)
 
 				if (result.setCookie && refreshedToken && name) {
@@ -200,7 +208,7 @@ export const buildIsolatedAuthEndpoints = ({
 					{
 						message: req.t('authentication:tokenRefreshSuccessful'),
 						...result,
-						...(authConfig.removeTokenFromResponses ? {} : { refreshedToken }),
+						...(authConfig.removeTokenFromResponses ? {} : { refreshedToken, refreshToken }),
 					},
 					{ headers, status: 200 }
 				)

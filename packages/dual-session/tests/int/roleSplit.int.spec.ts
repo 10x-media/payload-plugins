@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, CollectionSlug, Payload, TypedUser } from 'payload'
+import type { CollectionConfig, CollectionSlug, Payload, User } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { dualSession, generateIsolatedAuthCookie, resolveIsolatedCookieName } from '../../src/index'
@@ -17,7 +17,7 @@ const CUSTOMER_COOKIE = 'payload-customers-token'
 const slug = (value: string) => value as CollectionSlug
 
 /** The predicate a role-split project writes: admins stay put, everyone else moves. */
-const isolate = (user: TypedUser) => !(user as { roles?: string[] }).roles?.includes('admin')
+const isolate = (user: User) => !(user as { roles?: string[] }).roles?.includes('admin')
 
 const collections: CollectionConfig[] = [
 	{
@@ -32,10 +32,10 @@ const collections: CollectionConfig[] = [
 ]
 
 const seed = async (payload: Payload) => {
-	await payload.create({ collection: slug('staff'), data: ADMIN })
-	await payload.create({ collection: slug('staff'), data: WRITER })
-	await payload.create({ collection: slug('customers'), data: CUSTOMER })
-	await payload.create({ collection: slug('auditors'), data: AUDITOR })
+	await payload.create({ overrideAccess: true, collection: slug('staff'), data: ADMIN })
+	await payload.create({ overrideAccess: true, collection: slug('staff'), data: WRITER })
+	await payload.create({ overrideAccess: true, collection: slug('customers'), data: CUSTOMER })
+	await payload.create({ overrideAccess: true, collection: slug('auditors'), data: AUDITOR })
 }
 
 type MeBody = { token?: string; user: null | { collection: string; email: string } }
@@ -52,6 +52,7 @@ describeForDb('dualSession splitting one collection by role', { dbs: ['mongo'] }
 
 	const staffSessions = async (email: string) => {
 		const found = await booted.payload.find({
+			overrideAccess: true,
 			collection: slug('staff'),
 			limit: 1,
 			pagination: false,
@@ -259,7 +260,11 @@ describeForDb('dualSession splitting one collection by role', { dbs: ['mongo'] }
 		it('moves the refreshed token to the half the user now belongs to', async () => {
 			// Its own user, so promoting it cannot disturb the fixtures other tests share.
 			const mover = { email: 'mover@10xmedia.de', password: 'password', roles: ['writer'] }
-			const created = await booted.payload.create({ collection: slug('staff'), data: mover })
+			const created = await booted.payload.create({
+				overrideAccess: true,
+				collection: slug('staff'),
+				data: mover,
+			})
 
 			const rest = client()
 			await rest.post('/api/staff/login', { body: mover })
@@ -267,6 +272,7 @@ describeForDb('dualSession splitting one collection by role', { dbs: ['mongo'] }
 			const isolatedBefore = rest.jar.get(STAFF_COOKIE)
 
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: slug('staff'),
 				id: created.id,
 				data: { roles: ['admin'] },
@@ -293,12 +299,13 @@ describeForDb('dualSession splitting one collection by role', { dbs: ['mongo'] }
 		const userNamed = async (email: string) =>
 			(
 				await booted.payload.find({
+					overrideAccess: true,
 					collection: slug('staff'),
 					limit: 1,
 					pagination: false,
 					where: { email: { equals: email } },
 				})
-			).docs[0] as unknown as TypedUser
+			).docs[0] as unknown as User
 
 		it('refuses to pick a cookie for a split collection without a user', () => {
 			// An OAuth callback that forgets this would sign people into whichever half the

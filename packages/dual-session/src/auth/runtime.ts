@@ -1,4 +1,4 @@
-import type { CollectionSlug, Payload, TypedUser } from 'payload'
+import type { CollectionSlug, Payload, User } from 'payload'
 
 import { PLUGIN_SLUG } from '../plugin/constants'
 import { resolveCollections } from '../plugin/resolveCollections'
@@ -41,7 +41,7 @@ const slotFor = ({
 	collection: CollectionSlug
 	entry: ResolvedIsolatedCollection
 	payload: Payload
-	user: null | TypedUser | undefined
+	user: null | User | undefined
 }): string => {
 	if (!entry.isolate) {
 		return entry.cookieName
@@ -78,7 +78,7 @@ export const resolveIsolatedCookieName = ({
 	collection: CollectionSlug
 	payload: Payload
 	/** Required when the collection is configured with an `isolate` predicate. */
-	user?: null | TypedUser
+	user?: null | User
 }): string | undefined => {
 	const entry = findEntry(payload, collection)
 
@@ -118,7 +118,7 @@ export const generateIsolatedAuthCookie = ({
 	payload: Payload
 	token: string
 	/** Required when the collection is configured with an `isolate` predicate. */
-	user?: null | TypedUser
+	user?: null | User
 }): string => {
 	const entry = findEntry(payload, collection)
 

@@ -3,13 +3,15 @@
 # @10x-media/dual-session
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/dual-session` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/dual-session` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/dual-session).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/dual-session@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/dual-session) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
 Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist. Payload signs every collection's token into one config-wide `payload-token`, which means a customer logging in on your website overwrites the editor's admin session in the same browser, and back again. This plugin moves the collections you name onto cookies of their own.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/dual-session?style=flat-square)](https://www.npmjs.com/package/@10x-media/dual-session)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 > [!WARNING]
 > **Experimental.** This plugin changes how sessions are established, which is not a place where a subtle bug announces itself. It is covered by unit, integration and end-to-end tests against Payload's real routing on both Mongo and Postgres, but auth surfaces differ a lot between projects and yours may take a path none of those cover. Try it in staging first, and [report anything that looks off](https://github.com/10x-media/payload-plugins/issues).
@@ -19,7 +21,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **One cookie per collection**: `payload-customers-token` alongside `payload-token`, so both sessions are live at once.
 - **Core operations, not reimplementations**: the six cookie-writing auth endpoints are shadowed by replacements that delegate to the same Payload operations, so hooks, lockout, sessions and verification are unchanged.
 - **A strategy that mirrors Payload's own**: same CSRF gate, same `verify` check, same session `sid` check. It just reads a different cookie.
-- **Request attribution via an optional Next proxy**, so the admin panel and the website get different answers from the same REST URL.
+- **Request attribution via an optional Next.js proxy or TanStack Start middleware**, so the admin panel and the website get different answers from the same REST URL.
 - **Ranked frontend sessions**: list order decides which one wins when a visitor holds several.
 - **Works with your own SSO**: declared strategies keep first refusal, and `generateIsolatedAuthCookie` is the one-line swap for `generatePayloadCookie` in a custom OAuth callback.
 - **One collection with roles, too**: an `isolate` predicate splits a single `users` collection so editors keep the shared cookie and website visitors get their own.
@@ -32,7 +34,7 @@ If another auth plugin is already in the config (OAuth, magic links, passkeys, S
 ## Quick start
 
 ```bash
-pnpm add @10x-media/dual-session@beta
+pnpm add @10x-media/dual-session@alpha
 ```
 
 ```ts
@@ -47,9 +49,11 @@ export default buildConfig({
 })
 ```
 
+On Next.js, add the proxy:
+
 ```ts
-// proxy.ts (middleware.ts on Next 15)
-import { createAuthScopeProxy } from '@10x-media/dual-session/proxy'
+// proxy.ts
+import { createAuthScopeProxy } from '@10x-media/dual-session/next'
 
 export default createAuthScopeProxy()
 
@@ -59,6 +63,24 @@ export const config = {
 ```
 
 The matcher must cover `/api`; the widely copied default excludes it, which leaves every REST call unattributed.
+
+On TanStack Start, add the middleware:
+
+```ts
+// src/start.ts
+import { createAuthScopeMiddleware } from '@10x-media/dual-session/tanstack-start'
+import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
+
+export const startInstance = createStart(() => ({
+  requestMiddleware: [
+    // A global list replaces TanStack Start's default CSRF check: keep it, for server functions only.
+    createCsrfMiddleware({ filter: ({ handlerType }) => handlerType === 'serverFn' }),
+    createAuthScopeMiddleware(),
+  ],
+}))
+```
+
+Payload 4 only lets `admin.user` read a collection by default, so give each frontend auth collection a `read` access that lets its users read themselves, or `/api/customers/me` answers 403.
 
 If editors and website visitors are one collection told apart by a `roles` field, split it by user instead of by collection:
 
@@ -80,6 +102,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/dual-session):
 - [Custom auth](https://docs.10xmedia.de/dual-session/custom-auth)
 - [Configuration](https://docs.10xmedia.de/dual-session/configuration)
 - [Limits](https://docs.10xmedia.de/dual-session/limits)
+- [Upgrading to Payload 4](https://docs.10xmedia.de/dual-session/upgrading)
 
 ## License
 

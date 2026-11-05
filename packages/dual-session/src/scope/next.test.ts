@@ -1,7 +1,7 @@
 import { NextRequest, type NextResponse } from 'next/server'
 import { describe, expect, it } from 'vitest'
 
-import { createAuthScopeProxy } from './proxy'
+import { createAuthScopeProxy } from './next'
 
 /**
  * Reads back the request headers a proxy handed downstream. Next encodes them onto the

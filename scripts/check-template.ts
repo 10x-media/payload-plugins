@@ -46,6 +46,16 @@ const TRACKED = [
 	'src/translations/useTranslation.ts',
 ]
 
+/**
+ * Tracked files a package may legitimately differ in, keyed by package directory. Only for a
+ * file generated from that package's own additions (a TanStack route of its own regenerates
+ * `routeTree.gen.ts`), never for boilerplate that drifted.
+ */
+const EXEMPT: Record<string, readonly string[]> = {
+	// The website demo page its e2e suite drives on both frameworks (`dev-tanstack/src/app/index.tsx`).
+	'dual-session': ['dev-tanstack/src/routeTree.gen.ts'],
+}
+
 // A tracked file is compared byte for byte, so it cannot carry `{{token}}` substitutions.
 const PLACEHOLDER_RE = /\{\{[^}]*\}\}/
 
@@ -76,6 +86,8 @@ for (const tracked of TRACKED) {
 	}
 
 	for (const name of packageNames()) {
+		if (EXEMPT[name]?.includes(tracked)) continue
+
 		const packagePath = join(PACKAGES_DIR, name, tracked)
 
 		if (!existsSync(packagePath)) {

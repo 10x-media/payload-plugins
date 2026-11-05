@@ -44,7 +44,7 @@ The endpoints it replaces are `POST /login`, `POST /logout`, `POST /refresh-toke
 
 Payload's REST namespace is shared. `/api/customers/me` looks identical whether the admin panel asked or the website did, but the answer should differ: a browser holding both sessions has two valid users, and the request has to pick one.
 
-The [auth-scope proxy](/dual-session/scopes) stamps each request with the session it is allowed to use, based on where it came from. Without it the plugin still works, falling back to a rule that keeps the admin panel reachable at the cost of precision on the website.
+The [auth-scope proxy or middleware](/dual-session/scopes) stamps each request with the session it is allowed to use, based on where it came from. Without it the plugin still works, falling back to a rule that keeps the admin panel reachable at the cost of precision on the website.
 
 ## One collection with roles
 
@@ -60,10 +60,10 @@ Staff keep the shared cookie, byte for byte as core writes it; everyone else mov
 
 ## Requirements
 
-Payload `^3.83.0`. Next is optional and only needed for the proxy; the plugin itself is framework-agnostic.
+Payload `^4.0.0-beta.7`, on Next.js or TanStack Start. `next` is only needed for the proxy (`/next`), `@tanstack/react-start` only for the middleware (`/tanstack-start`); the plugin itself is framework-agnostic. Coming from the Payload 3 line: [Upgrading to Payload 4](/dual-session/upgrading).
 
 The collection backing the admin panel (`admin.user`) may only be listed together with an `isolate` predicate. It owns the shared cookie, and moving it wholesale would take the admin panel down. The plugin refuses to build a config that does.
 
 ## Next
 
-[Quick start](/dual-session/quick-start), then [Scopes](/dual-session/scopes) for the proxy. [One collection, two sessions](/dual-session/role-split) if your project has one `users` collection with roles, [Frontends and clients](/dual-session/clients) if the website is not this Next app, [Custom auth](/dual-session/custom-auth) if you have your own SSO.
+[Quick start](/dual-session/quick-start), then [Scopes](/dual-session/scopes) for the proxy or middleware. [One collection, two sessions](/dual-session/role-split) if your project has one `users` collection with roles, [Frontends and clients](/dual-session/clients) if the website is not this Payload app, [Custom auth](/dual-session/custom-auth) if you have your own SSO.

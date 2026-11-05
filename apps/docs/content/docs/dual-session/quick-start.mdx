@@ -1,6 +1,6 @@
 ---
 title: Quick start
-description: Isolate a collection, install the proxy, and hold two sessions at once.
+description: Isolate a collection, install the proxy or middleware, and hold two sessions at once.
 ---
 
 <Callout type="warn">
@@ -41,10 +41,28 @@ dualSession({
 
 Do not list the collection named by `admin.user`, unless you give it an `isolate` predicate, which is how a single `users` collection with roles backs both sessions. See [One collection, two sessions](/dual-session/role-split). If you never set `admin.user`, Payload defaults it to the first collection declaring `auth`, and so does this plugin.
 
-## Install the proxy
+## Let frontend users read themselves
+
+Payload 4's default access lets only the `admin.user` collection read a collection. A frontend auth collection without `access.read` therefore answers its own users' `GET /api/customers/me` with a 403. Let them read their own document:
+
+```ts
+const customers: CollectionConfig = {
+  slug: 'customers',
+  auth: true,
+  access: {
+    read: ({ req: { user } }) =>
+      user?.collection === 'customers' ? { id: { equals: user.id } } : Boolean(user),
+  },
+  fields: [],
+}
+```
+
+Who else may read customers, the fallback here, is your access policy, not the plugin's.
+
+## Install the proxy (Next.js)
 
 ```ts title="proxy.ts"
-import { createAuthScopeProxy } from '@10x-media/dual-session/proxy'
+import { createAuthScopeProxy } from '@10x-media/dual-session/next'
 
 export default createAuthScopeProxy()
 
@@ -53,13 +71,29 @@ export const config = {
 }
 ```
 
-Next 16 calls this file `proxy.ts`; on Next 15 it is `middleware.ts` with the same contents. It goes next to `app/`.
+It goes next to `app/`.
 
 <Callout type="warn">
 The matcher **must** cover `/api`. The common default `'/((?!api|_next/static).*)'` excludes it, which leaves every REST call unattributed, so a visitor holding an admin session sees the admin answer on the website. See [Scopes](/dual-session/scopes).
 </Callout>
 
 Already have a proxy? Compose rather than replace it. [Scopes](/dual-session/scopes#composing-with-an-existing-proxy) has the recipe.
+
+## Install the middleware (TanStack Start)
+
+```ts title="src/start.ts"
+import { createAuthScopeMiddleware } from '@10x-media/dual-session/tanstack-start'
+import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
+
+export const startInstance = createStart(() => ({
+  requestMiddleware: [
+    createCsrfMiddleware({ filter: ({ handlerType }) => handlerType === 'serverFn' }),
+    createAuthScopeMiddleware(),
+  ],
+}))
+```
+
+A `requestMiddleware` list replaces TanStack Start's default CSRF middleware, which is why it is listed again, with the default's filter. See [Scopes](/dual-session/scopes#installing-on-tanstack-start).
 
 ## Try it
 

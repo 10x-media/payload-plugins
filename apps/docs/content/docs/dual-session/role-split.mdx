@@ -36,7 +36,7 @@ Nothing is layered over the admin session. The plugin only adds a second slot ne
 It is asked one question, about one user, at the moment a session is being written:
 
 ```ts
-isolate?: (user: TypedUser) => boolean
+isolate?: (user: User) => boolean // `User` from `payload`
 ```
 
 Roles live in the user document, so read them from there. The predicate is never given a request, and it is deliberately synchronous, because a classification that needs a database read is a sign the role is in the wrong place.
