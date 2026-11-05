@@ -13,7 +13,7 @@
 
 /* The admin side of a parallel session: informational, in the family of Payload's `success` pill. */
 .impersonation-bar--quiet {
-	--impersonation-accent: var(--color-border-selected);
+	--impersonation-accent: var(--color-border-brand);
 	--impersonation-surface: var(--color-bg-selected);
 }
 
