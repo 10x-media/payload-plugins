@@ -1,4 +1,4 @@
-import type { Collection, PayloadRequest, TypedUser } from 'payload'
+import type { Collection, PayloadRequest, User } from 'payload'
 
 import type { ResolvedIsolatedCollection } from '../types'
 
@@ -28,7 +28,7 @@ export const warnIfAdminMisclassified = async ({
 	cookieName: string
 	entry: ResolvedIsolatedCollection
 	req: PayloadRequest
-	user: null | TypedUser | undefined
+	user: null | User | undefined
 }): Promise<void> => {
 	// biome-ignore lint/plugin/noProcessEnv: a development-only diagnostic, matching how Payload gates its own
 	if (cookieName !== entry.cookieName || !user || process.env.NODE_ENV === 'production') {
@@ -48,7 +48,7 @@ export const warnIfAdminMisclassified = async ({
 
 	try {
 		req.user = user
-		if (await adminAccess({ req })) {
+		if (await adminAccess({ slug: collection.config.slug, req })) {
 			req.payload.logger.warn(
 				`@10x-media/dual-session: user "${user.id}" passes ${collection.config.slug}.access.admin, but \`isolate\` sent their session to the "${entry.cookieName}" cookie, which the admin panel does not read. They will not be able to sign in to it. Check the predicate.`
 			)

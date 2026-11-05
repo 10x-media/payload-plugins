@@ -52,6 +52,7 @@ const ssoStrategy: AuthStrategy = {
 
 		const user = (
 			await payload.find({
+				overrideAccess: true,
 				collection: slug('customers'),
 				limit: 1,
 				pagination: false,
@@ -147,6 +148,8 @@ const collections: CollectionConfig[] = [
 	{ slug: 'users', auth: true, fields: [] },
 	{
 		slug: 'customers',
+		// Payload 4's default access admits only `admin.user`; customers must be able to read themselves.
+		access: { read: ({ req }) => Boolean(req.user) },
 		auth: { strategies: [ssoStrategy] },
 		endpoints: [ssoCallback],
 		fields: [],
@@ -154,8 +157,8 @@ const collections: CollectionConfig[] = [
 ]
 
 const seed = async (payload: Payload) => {
-	await payload.create({ collection: slug('users'), data: ADMIN })
-	await payload.create({ collection: slug('customers'), data: CUSTOMER })
+	await payload.create({ overrideAccess: true, collection: slug('users'), data: ADMIN })
+	await payload.create({ overrideAccess: true, collection: slug('customers'), data: CUSTOMER })
 }
 
 type MeBody = { user: null | { collection: string; email: string } }

@@ -1,6 +1,6 @@
 ---
 title: Frontends and clients
-description: Setups where the website is not this Next app, and callers that send no Referer.
+description: Setups where the website is not this Payload app, and callers that send no Referer.
 ---
 
 ## Do you need the plugin at all
@@ -9,7 +9,7 @@ The shared cookie belongs to the origin Payload is served from, not to whoever c
 
 | Setup | Plugin needed |
 | --- | --- |
-| Website and admin panel both on this Next app | Yes |
+| Website and admin panel both on this Next.js or TanStack Start app | Yes |
 | Website on another framework or another domain, one Payload behind both | Yes |
 | Website consumes Payload only through a mobile or desktop app | No |
 | Two separate Payload instances | No |
@@ -29,13 +29,13 @@ Two Payload instances do isolate, because there are two cookies on two origins.
 
 ## The proxy is not a frontend concern
 
-In Payload v3 the REST handlers are Next route handlers, so `/api` is served by the Next app whatever the website is built with. The proxy runs there, on every REST call, including the ones a Nuxt or SvelteKit page makes.
+Payload's REST handlers are routes of the app that serves Payload, Next.js or TanStack Start, so `/api` is served by that app whatever the website is built with. The proxy or middleware runs there, on every REST call, including the ones a Nuxt or SvelteKit page makes.
 
 So a website on another framework, served from the same origin through path routing, needs nothing extra:
 
 ```
-example.com/admin   -> Next (Payload)
-example.com/api     -> Next (Payload)
+example.com/admin   -> Next.js or TanStack Start (Payload)
+example.com/api     -> Next.js or TanStack Start (Payload)
 example.com/*       -> Nuxt
 ```
 
@@ -56,6 +56,8 @@ await fetch('/api/orders', {
 ```
 
 An `Authorization` header outranks every cookie, so these requests never touch scopes, cookie CSRF checks or the proxy. Store the token the way the platform expects and treat it as the session.
+
+With `auth.refreshTokens` on the collection, login also returns a `refreshToken`, and `POST /api/customers/refresh-token` with `{ refreshToken }` in the body trades it for a new token and a new refresh token, even after the token expired. The plugin's endpoint passes it through to Payload and writes the refreshed token to the isolated cookie, never the shared one, so a browser that refreshes this way keeps the admin session too. With `removeTokenFromResponses` the refresh token stays out of the response, like the token.
 
 This is also why an app-only Payload does not need the plugin: with no cookie in play there is nothing to isolate. A [role-split](/dual-session/role-split) collection changes nothing here either, because both halves log in through the same route and get the same kind of token.
 

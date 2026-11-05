@@ -44,11 +44,11 @@ declare module 'payload' {
  * everyone else (the admins) exactly where core put them.
  *
  * For `req.user` to be fully deterministic, pair this with the auth-scope proxy.
- * See `@10x-media/dual-session/proxy`.
+ * See `@10x-media/dual-session/next` or `@10x-media/dual-session/tanstack-start`.
  */
 export const dualSession = definePlugin<DualSessionPluginOptions>({
 	slug: PLUGIN_SLUG,
-	plugin: ({ config: incomingConfig, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config: incomingConfig, options }): Config => {
 		if (options.disabled === true) {
 			return incomingConfig
 		}

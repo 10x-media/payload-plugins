@@ -1,4 +1,4 @@
-import type { CollectionSlug, SanitizedCollectionConfig, TypedUser } from 'payload'
+import type { CollectionSlug, SanitizedCollectionConfig, User } from 'payload'
 import { generateCookie, getCookieExpiration } from 'payload/shared'
 
 import type { ResolvedIsolatedCollection } from '../types'
@@ -41,7 +41,7 @@ export const resolveSlotCookieName = ({
 }: {
 	entry: Pick<ResolvedIsolatedCollection, 'cookieName' | 'isolate'>
 	sharedName: string
-	user: null | TypedUser | undefined
+	user: null | User | undefined
 }): string | undefined => {
 	if (!user) {
 		return undefined

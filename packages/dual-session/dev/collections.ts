@@ -1,11 +1,11 @@
-import type { Access, CollectionConfig, GlobalConfig, PayloadRequest, TypedUser } from 'payload'
+import type { Access, CollectionConfig, GlobalConfig, PayloadRequest, User } from 'payload'
 
 import { devSsoCallback, devSsoStrategy } from './sso'
 
 /** Roles that may reach the admin panel. Everyone else on `users` is a website visitor. */
 const STAFF_ROLES = ['admin', 'editor']
 
-const hasStaffRole = (user: null | TypedUser | undefined) => {
+const hasStaffRole = (user: null | User | undefined) => {
 	const roles = (user as { roles?: string[] } | null | undefined)?.roles ?? []
 	return STAFF_ROLES.some((role) => roles.includes(role))
 }
@@ -14,10 +14,24 @@ const hasStaffRole = (user: null | TypedUser | undefined) => {
  * Which `users` documents get a cookie of their own. The inverse of the admin gate, so the
  * two answers cannot drift: a session is isolated exactly when it cannot reach the panel.
  */
-export const isolateWebsiteUsers = (user: TypedUser) => !hasStaffRole(user)
+export const isolateWebsiteUsers = (user: User) => !hasStaffRole(user)
 
 /** Only a staff member of the admin collection passes. */
 export const adminOnly: Access = ({ req }) => hasStaffRole(req.user)
+
+/**
+ * Staff read every document of a frontend auth collection, its own users only themselves.
+ * Payload 4's default access admits only the `admin.user` collection, so without this a
+ * customer could not read their own document and `/api/customers/me` answers 403.
+ */
+const staffOrSelf =
+	(slug: string): Access =>
+	({ req }) => {
+		if (hasStaffRole(req.user)) {
+			return true
+		}
+		return req.user?.collection === slug ? { id: { equals: req.user.id } } : false
+	}
 
 /** Any resolved session passes, whichever cookie it came from. */
 const anySession: Access = ({ req }) => Boolean(req.user)
@@ -62,6 +76,7 @@ export const users: CollectionConfig = {
  */
 export const partners: CollectionConfig = {
 	slug: 'partners',
+	access: { read: staffOrSelf('partners') },
 	auth: true,
 	admin: { useAsTitle: 'email' },
 	fields: [{ name: 'company', type: 'text' }],
@@ -74,6 +89,7 @@ export const partners: CollectionConfig = {
  */
 export const customers: CollectionConfig = {
 	slug: 'customers',
+	access: { read: staffOrSelf('customers') },
 	auth: { strategies: [devSsoStrategy] },
 	admin: { useAsTitle: 'email' },
 	fields: [{ name: 'name', type: 'text' }],

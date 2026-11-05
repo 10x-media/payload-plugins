@@ -43,7 +43,7 @@ collections: [{ slug: 'users', isolate: (user) => !checkRole(['admin', 'editor']
 
 ### `adminSessionPriority`
 
-Default `true`. With no scope header on a request, ignore isolated cookies as long as a valid admin token is also present. Applies both to projects without a proxy and to single requests the proxy could not attribute. See [Without a proxy](/dual-session/scopes#without-a-proxy).
+Default `true`. With no scope header on a request, ignore isolated cookies as long as a valid admin token is also present. Applies both to projects without a proxy or middleware and to single requests neither could attribute. See [Without a proxy or middleware](/dual-session/scopes#without-a-proxy-or-middleware).
 
 ### `scopeHeader`
 
@@ -73,9 +73,13 @@ Per-locale overrides keyed by the typed keys from `@10x-media/dual-session/i18n`
 | `resolveAuthScope` | The scope rule as a pure function. Returns `undefined` for a request it cannot attribute. |
 | `AUTH_SCOPE_HEADER`, `PLUGIN_SLUG` | Constants. |
 
-### `@10x-media/dual-session/proxy`
+### `@10x-media/dual-session/next`
 
-`createAuthScopeProxy`, `resolveAuthScope`, `AUTH_SCOPE_HEADER`, and the `AuthScope` / `AuthScopeProxyOptions` types. Edge-safe: it pulls in `NextResponse` and a pure function, nothing else.
+`createAuthScopeProxy`, `resolveAuthScope`, `AUTH_SCOPE_HEADER`, and the `AuthScope` / `AuthScopeProxyOptions` types. Edge-safe: it pulls in `NextResponse` and a pure function, nothing else. Needs `next`.
+
+### `@10x-media/dual-session/tanstack-start`
+
+`createAuthScopeMiddleware`, `resolveAuthScope`, `AUTH_SCOPE_HEADER`, and the `AuthScope` / `AuthScopeMiddlewareOptions` types. Needs `@tanstack/react-start`.
 
 ### `@10x-media/dual-session/types`
 

@@ -1,0 +1,77 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x, on Next.js or TanStack Start.
+---
+
+`@10x-media/dual-session` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin's options are unchanged, it stores nothing in the database, and it runs on Next.js and TanStack Start. This page covers what changes around it.
+
+## Checklist
+
+1. Upgrade `@10x-media/dual-session` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.7`. `next` and `@tanstack/react-start` are optional peers, one per framework.
+2. On Next.js, import the proxy from `@10x-media/dual-session/next` (see [The proxy moved](#the-proxy-moved)).
+3. On TanStack Start, register the middleware (see [TanStack Start](#tanstack-start)).
+4. Give every isolated auth collection a `read` access its own users pass (see [Frontend users must be able to read themselves](#frontend-users-must-be-able-to-read-themselves)).
+5. In your own code, rename `TypedUser` to `User` and pass `overrideAccess: true` where it looks users up without one (see [Your own code](#your-own-code)).
+6. Expect every visitor, editors included, to sign in once more after the deploy (see [Sessions](#sessions)).
+
+## The proxy moved
+
+`@10x-media/dual-session/proxy` is now `@10x-media/dual-session/next`, next to the new `/tanstack-start`. The exports are the same:
+
+```ts title="proxy.ts"
+import { createAuthScopeProxy } from '@10x-media/dual-session/next'
+
+export default createAuthScopeProxy()
+
+export const config = {
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
+}
+```
+
+Payload 4 needs Next.js 16.4, so the file is `proxy.ts`; a `middleware.ts` from Next.js 15 is renamed with it. A composed proxy changes only its import of `resolveAuthScope` and `AUTH_SCOPE_HEADER`.
+
+## TanStack Start
+
+The proxy's counterpart is a global request middleware in `src/start.ts`:
+
+```ts title="src/start.ts"
+import { createAuthScopeMiddleware } from '@10x-media/dual-session/tanstack-start'
+import { createCsrfMiddleware, createStart } from '@tanstack/react-start'
+
+export const startInstance = createStart(() => ({
+  requestMiddleware: [
+    createCsrfMiddleware({ filter: ({ handlerType }) => handlerType === 'serverFn' }),
+    createAuthScopeMiddleware(),
+  ],
+}))
+```
+
+It takes the proxy's options and applies the same rule, and attributes TanStack Start's server functions by `Referer` the way it does REST calls. Keep the CSRF middleware and its filter: see [Scopes](/dual-session/scopes#installing-on-tanstack-start). Without either, the plugin falls back to `adminSessionPriority`, as it does on Next.js without the proxy.
+
+## Frontend users must be able to read themselves
+
+Payload 3's default access let any signed-in user through. Payload 4's lets only users of the `admin.user` collection through. A frontend auth collection with no `access.read` of its own therefore answers its own users' `GET /api/customers/me` with a 403 on Payload 4: the session is there, the cookie is right, and `/me` refuses to read the document. This is Payload's change and hits any frontend auth collection, plugin or not; the plugin's strategy itself still finds the user.
+
+Let users read their own document:
+
+```ts
+access: {
+  read: ({ req: { user } }) =>
+    user?.collection === 'customers' ? { id: { equals: user.id } } : Boolean(user),
+},
+```
+
+The fallback decides who else may list customers; set it to your policy. The `create`, `update` and `delete` defaults changed the same way.
+
+## Your own code
+
+- **`TypedUser` is `User`.** Payload 4 exports the union of every auth collection's user as `User`. An `isolate` predicate typed as `(user: TypedUser) => boolean` becomes `(user: User) => boolean`.
+- **Local API access.** Payload 4 applies access control in the Local API by default. A custom auth strategy that finds its user with `payload.find` (the SSO example in [Custom auth](/dual-session/custom-auth)), a seed, or a callback that reads the user before minting a token needs `overrideAccess: true`, or it finds nobody. The plugin's own strategy already reads past access, as core's does.
+- **`jwtSign` and `generateIsolatedAuthCookie` are unchanged.** Tokens your callback signs with `jwtSign` carry Payload 4's auth version and validate against the isolated cookie as before. Payload 4's `createAuthToken` starts the session and signs in one call, and works the same way (see [Custom auth](/dual-session/custom-auth)).
+- **Refresh tokens.** `auth.refreshTokens` works on isolated collections: the plugin's `refresh-token` endpoint takes the refresh token and writes the isolated cookie (see [Mobile and desktop apps](/dual-session/clients#mobile-and-desktop-apps)).
+
+## Sessions
+
+Payload 4 accepts only tokens that carry its auth version in their header, which no Payload 3 token does. Every existing session therefore ends with the upgrade: the shared admin cookie through core, the isolated cookies through the plugin, which checks tokens the same way. Visitors sign in again, nothing else is needed.
+
+From then on the plugin verifies isolated tokens against Payload's whole keyring, so with `previousSecrets` configured a secret rotation keeps isolated sessions alive exactly as it keeps the admin's.

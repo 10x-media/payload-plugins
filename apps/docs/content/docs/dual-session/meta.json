@@ -8,6 +8,7 @@
 		"clients",
 		"custom-auth",
 		"configuration",
-		"limits"
+		"limits",
+		"upgrading"
 	]
 }

@@ -13,8 +13,8 @@ const collections: CollectionConfig[] = [
 ]
 
 const seed = async (payload: Payload) => {
-	await payload.create({ collection: 'users', data: ADMIN })
-	await payload.create({ collection: 'customers', data: CUSTOMER })
+	await payload.create({ overrideAccess: true, collection: 'users', data: ADMIN })
+	await payload.create({ overrideAccess: true, collection: 'customers', data: CUSTOMER })
 }
 
 const cookieHeaders = (cookies: Record<string, string>) =>
@@ -51,8 +51,16 @@ describeForDb('dualSession sessions', { dbs: ['mongo'] }, (db) => {
 			configOverrides: { admin: { user: 'users' } },
 		})
 
-		const admin = await booted.payload.login({ collection: 'users', data: ADMIN })
-		const customer = await booted.payload.login({ collection: 'customers', data: CUSTOMER })
+		const admin = await booted.payload.login({
+			overrideAccess: true,
+			collection: 'users',
+			data: ADMIN,
+		})
+		const customer = await booted.payload.login({
+			overrideAccess: true,
+			collection: 'customers',
+			data: CUSTOMER,
+		})
 
 		adminToken = admin.token ?? ''
 		customerToken = customer.token ?? ''
@@ -96,6 +104,7 @@ describeForDb('dualSession sessions', { dbs: ['mongo'] }, (db) => {
 
 	it('rejects the customer token once its session is revoked', async () => {
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'customers',
 			where: { email: { equals: CUSTOMER.email } },
 			data: { sessions: [] },

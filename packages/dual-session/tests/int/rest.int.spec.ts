@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, CollectionSlug, Payload } from 'payload'
+import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { dualSession } from '../../src/index'
@@ -10,18 +10,28 @@ const CUSTOMER = { email: 'customer@10xmedia.de', password: 'password' }
 const PARTNER = { email: 'partner@10xmedia.de', password: 'password' }
 const MEMBER = { email: 'member@10xmedia.de', password: 'password' }
 const KIOSK = { email: 'kiosk@10xmedia.de', password: 'password' }
+const SUBSCRIBER = { email: 'subscriber@10xmedia.de', password: 'password' }
+const VAULT = { email: 'vault@10xmedia.de', password: 'password' }
 
 const ADMIN_COOKIE = 'payload-token'
 const CUSTOMER_COOKIE = 'payload-customers-token'
 const PARTNER_COOKIE = 'partner-session'
+const SUBSCRIBER_COOKIE = 'payload-subscribers-token'
 
 const slug = (value: string) => value as CollectionSlug
 
+/**
+ * Payload 4's default access admits only the `admin.user` collection, so a frontend auth
+ * collection grants its own sessions read access or `/me` answers 403.
+ */
+const access = { read: ({ req }: { req: PayloadRequest }) => Boolean(req.user) }
+
 const collections: CollectionConfig[] = [
 	{ slug: 'users', auth: true, fields: [] },
-	{ slug: 'partners', auth: true, fields: [] },
+	{ slug: 'partners', access, auth: true, fields: [] },
 	{
 		slug: 'customers',
+		access,
 		auth: true,
 		endpoints: [
 			{
@@ -32,8 +42,15 @@ const collections: CollectionConfig[] = [
 		],
 		fields: [],
 	},
-	{ slug: 'members', auth: { verify: true }, fields: [] },
-	{ slug: 'kiosks', auth: { useSessions: false }, fields: [] },
+	{ slug: 'members', access, auth: { verify: true }, fields: [] },
+	{ slug: 'kiosks', access, auth: { useSessions: false }, fields: [] },
+	{ slug: 'subscribers', access, auth: { refreshTokens: true }, fields: [] },
+	{
+		slug: 'vaults',
+		access,
+		auth: { refreshTokens: true, removeTokenFromResponses: true },
+		fields: [],
+	},
 	// Isolated, but local login is off: the shadows must behave exactly like the built-ins
 	// they replace, which is to refuse.
 	{
@@ -50,15 +67,18 @@ const collections: CollectionConfig[] = [
 ]
 
 const seed = async (payload: Payload) => {
-	await payload.create({ collection: slug('users'), data: ADMIN })
-	await payload.create({ collection: slug('customers'), data: CUSTOMER })
-	await payload.create({ collection: slug('partners'), data: PARTNER })
+	await payload.create({ overrideAccess: true, collection: slug('users'), data: ADMIN })
+	await payload.create({ overrideAccess: true, collection: slug('customers'), data: CUSTOMER })
+	await payload.create({ overrideAccess: true, collection: slug('partners'), data: PARTNER })
 	await payload.create({
+		overrideAccess: true,
 		collection: slug('members'),
 		data: { ...MEMBER, _verified: true },
 		disableVerificationEmail: true,
 	})
-	await payload.create({ collection: slug('kiosks'), data: KIOSK })
+	await payload.create({ overrideAccess: true, collection: slug('kiosks'), data: KIOSK })
+	await payload.create({ overrideAccess: true, collection: slug('subscribers'), data: SUBSCRIBER })
+	await payload.create({ overrideAccess: true, collection: slug('vaults'), data: VAULT })
 }
 
 type MeBody = { token?: string; user: null | { collection: string; email: string } }
@@ -78,6 +98,8 @@ describeForDb('dualSession over the real REST router', { dbs: ['mongo'] }, (db) 
 					slug('members'),
 					slug('kiosks'),
 					slug('machines'),
+					slug('subscribers'),
+					slug('vaults'),
 				],
 			}),
 			collections,
@@ -313,6 +335,57 @@ describeForDb('dualSession over the real REST router', { dbs: ['mongo'] }, (db) 
 			})
 
 			expect(me.body.user).toMatchObject({ collection: 'kiosks', email: KIOSK.email })
+		})
+
+		it('refreshes with a refresh token into the isolated cookie, without a session cookie', async () => {
+			const rest = client()
+			await rest.post('/api/users/login', { body: ADMIN })
+			const adminToken = rest.jar.get(ADMIN_COOKIE)
+
+			const login = await rest.post<{ refreshToken?: string }>('/api/subscribers/login', {
+				body: SUBSCRIBER,
+			})
+			expect(setCookieNames(login)).toEqual([SUBSCRIBER_COOKIE])
+			expect(login.body.refreshToken).toEqual(expect.any(String))
+
+			// A client whose token expired holds only the refresh token. The admin cookie is
+			// still live, and must neither be refreshed nor overwritten.
+			const response = await rest.post<{ refreshedToken?: string; refreshToken?: string }>(
+				'/api/subscribers/refresh-token',
+				{ body: { refreshToken: login.body.refreshToken }, cookie: `${ADMIN_COOKIE}=${adminToken}` }
+			)
+
+			expect(response.status).toBe(200)
+			expect(setCookieNames(response)).toEqual([SUBSCRIBER_COOKIE])
+			expect(response.body.refreshToken).toEqual(expect.any(String))
+			expect(response.body.refreshToken).not.toBe(login.body.refreshToken)
+			expect(rest.jar.get(ADMIN_COOKIE)).toBe(adminToken)
+
+			const me = await rest.get<MeBody>('/api/subscribers/me', {
+				headers: { 'x-payload-auth-scope': 'frontend' },
+			})
+			expect(me.body.user).toMatchObject({ collection: 'subscribers', email: SUBSCRIBER.email })
+		})
+
+		it('keeps refresh tokens out of responses with removeTokenFromResponses', async () => {
+			const rest = client()
+			const login = await rest.post<{ refreshToken?: string; token?: string }>(
+				'/api/vaults/login',
+				{ body: VAULT }
+			)
+
+			expect(login.status).toBe(200)
+			expect(login.body.token).toBeUndefined()
+			expect(login.body.refreshToken).toBeUndefined()
+
+			const refresh = await rest.post<{ refreshedToken?: string; refreshToken?: string }>(
+				'/api/vaults/refresh-token',
+				{ headers: { 'x-payload-auth-scope': 'frontend' } }
+			)
+
+			expect(refresh.status).toBe(200)
+			expect(refresh.body.refreshedToken).toBeUndefined()
+			expect(refresh.body.refreshToken).toBeUndefined()
 		})
 
 		it('refuses local login exactly like the built-in it shadows', async () => {

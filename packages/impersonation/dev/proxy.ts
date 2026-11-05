@@ -1,4 +1,4 @@
-import { createAuthScopeProxy } from '@10x-media/dual-session/proxy'
+import { createAuthScopeProxy } from '@10x-media/dual-session/next'
 
 /**
  * Next 16 renamed `middleware.ts` to `proxy.ts`. Required so a partner session

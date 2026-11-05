@@ -6,6 +6,7 @@ export default definePluginBuild({
 		'exports/types': 'src/exports/types.ts',
 		'exports/client': 'src/exports/client.ts',
 		'exports/i18n': 'src/exports/i18n.ts',
-		'exports/proxy': 'src/exports/proxy.ts',
+		'exports/next': 'src/exports/next.ts',
+		'exports/tanstack-start': 'src/exports/tanstack-start.ts',
 	},
 })

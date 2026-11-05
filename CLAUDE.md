@@ -193,6 +193,8 @@ The template is copied once at `pnpm new` and never consulted again, so a fix ap
 
 Tracked files are compared byte for byte, so they cannot contain `{{placeholder}}` tokens; the check says so explicitly if one appears.
 
+A dev app that adds a TanStack route of its own (dual-session's website demo page) regenerates `dev-tanstack/src/routeTree.gen.ts`; `EXEMPT` in `scripts/check-template.ts` lists that file per package. It is for generated output only, never for drifted boilerplate.
+
 ## Release flow
 
 This branch is the Payload 4 line, in alpha pre-mode: every package is `4.0.0-alpha.N` on the `alpha` dist-tag (plugin major = Payload major). `main` is the Payload 3 line, on `beta`, and owns `latest`. The branches never merge, because merging would collide on every changeset, `pre.json`, changelog and version. Fixes land on `main` and are ported here by hand; `main` pull requests that need it carry the `port-to-v4` label and a `v4: ported in #N` / `v4: not needed` line.

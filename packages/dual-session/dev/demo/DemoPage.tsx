@@ -1,28 +1,8 @@
-import { AUTH_SCOPE_HEADER } from '@10x-media/dual-session'
-import { headers as nextHeaders } from 'next/headers'
-import { getPayload } from 'payload'
-import {
-	DEMO_NOTE_TITLE,
-	DEV_ADMIN,
-	DEV_CUSTOMER,
-	DEV_MEMBER,
-	DEV_PARTNER,
-} from '../../helpers/seed'
-import config from '../../payload.config'
-import { type ApiAction, ApiConsole } from './_components/ApiConsole'
-import { SessionPanel } from './_components/SessionPanel'
-
-export const dynamic = 'force-dynamic'
-
-const ADMIN_COOKIE = 'payload-token'
-const CUSTOMER_COOKIE = 'payload-customers-token'
-const MEMBER_COOKIE = 'payload-users-token'
-const PARTNER_COOKIE = 'partner-session'
-
-type ResolvedUser = { collection?: string; email?: string; id?: number | string } | null
-
-const describe = (user: ResolvedUser) =>
-	user ? `${user.collection} · ${user.email ?? user.id}` : 'nobody'
+import { DEV_ADMIN, DEV_CUSTOMER, DEV_MEMBER, DEV_PARTNER } from '../helpers/seed'
+import { type ApiAction, ApiConsole } from './ApiConsole'
+import { ADMIN_COOKIE, CUSTOMER_COOKIE, MEMBER_COOKIE, PARTNER_COOKIE } from './cookies'
+import type { DemoData } from './data'
+import { SessionPanel } from './SessionPanel'
 
 const cell = { borderBottom: '1px solid #eee', padding: '0.35rem 0.5rem 0.35rem 0' }
 const headCell = { ...cell, borderBottom: '1px solid #ccc', textAlign: 'left' as const }
@@ -31,33 +11,16 @@ const headCell = { ...cell, borderBottom: '1px solid #ccc', textAlign: 'left' as
  * Renders who this browser is, once per scope, and offers writes that only the admin
  * collection is allowed to make. Before the plugin the two scopes could not disagree,
  * because every collection wrote the same cookie.
+ *
+ * Shared by the Next.js page and the TanStack Start route: each loads {@link DemoData} its own
+ * way and wraps this in a `RefreshProvider`.
  */
-export default async function WhoAmIPage() {
-	const payload = await getPayload({ config })
-	const incoming = await nextHeaders()
-
-	const withScope = (scope: 'admin' | 'frontend') => {
-		const headers = new Headers(incoming)
-		headers.set(AUTH_SCOPE_HEADER, scope)
-		return headers
-	}
-
-	const [live, asAdmin, asFrontend, noteResult, settings] = await Promise.all([
-		payload.auth({ headers: new Headers(incoming) }),
-		payload.auth({ headers: withScope('admin') }),
-		payload.auth({ headers: withScope('frontend') }),
-		payload.find({
-			collection: 'notes',
-			where: { title: { equals: DEMO_NOTE_TITLE } },
-			limit: 1,
-			depth: 0,
-		}),
-		payload.findGlobal({ slug: 'site-settings', depth: 0 }),
-	])
-
-	const note = noteResult.docs[0]
-	const cookie = incoming.get('cookie') ?? ''
-	const holds = (name: string) => new RegExp(`(^|;\\s*)${name}=`).test(cookie)
+export const DemoPage = ({
+	data: { holds: held, note, scopeHeader: AUTH_SCOPE_HEADER, settings, users },
+}: {
+	data: DemoData
+}) => {
+	const holds = (name: string) => held[name] === true
 
 	const readActions: ApiAction[] = [
 		{
@@ -100,7 +63,8 @@ export default async function WhoAmIPage() {
 
 	const scopeActions: ApiAction[] = [
 		{
-			expectation: 'still the customer: the proxy overwrites the header, never merges it',
+			expectation:
+				'still the customer: the proxy or middleware overwrites the header, never merges it',
 			headers: { [AUTH_SCOPE_HEADER]: 'admin' },
 			label: 'GET /me, forged admin scope',
 			method: 'GET',
@@ -153,11 +117,18 @@ export default async function WhoAmIPage() {
 	]
 
 	return (
-		<main>
+		<main
+			style={{
+				fontFamily: 'system-ui, sans-serif',
+				lineHeight: 1.5,
+				maxWidth: '52rem',
+				padding: '2rem',
+			}}
+		>
 			<h1>Who am I?</h1>
 			<p>
 				This page is served under the website scope, so <code>req.user</code> here is{' '}
-				<strong data-testid="live-user">{describe(live.user as ResolvedUser)}</strong>.
+				<strong data-testid="live-user">{users.live}</strong>.
 			</p>
 
 			<table style={{ borderCollapse: 'collapse', marginBottom: '2rem', width: '100%' }}>
@@ -172,7 +143,7 @@ export default async function WhoAmIPage() {
 					<tr>
 						<td style={cell}>admin</td>
 						<td data-testid="scope-admin" style={cell}>
-							{describe(asAdmin.user as ResolvedUser)}
+							{users.admin}
 						</td>
 						<td style={cell}>
 							<code>{ADMIN_COOKIE}</code> {holds(ADMIN_COOKIE) ? '✅' : '❌'}
@@ -181,7 +152,7 @@ export default async function WhoAmIPage() {
 					<tr>
 						<td style={cell}>frontend</td>
 						<td data-testid="scope-frontend" style={cell}>
-							{describe(asFrontend.user as ResolvedUser)}
+							{users.frontend}
 						</td>
 						<td style={cell}>
 							<code>{PARTNER_COOKIE}</code> {holds(PARTNER_COOKIE) ? '✅' : '❌'} ·{' '}
@@ -296,19 +267,19 @@ export default async function WhoAmIPage() {
 
 			<h2>Scope edge cases</h2>
 			<p>
-				The proxy resolves a scope per request and always overwrites{' '}
-				<code>{AUTH_SCOPE_HEADER}</code>, so a client cannot pick its own. An API call it cannot
-				attribute falls back to <code>admin</code>, which can only ever mean "the frontend cookie is
-				not honoured", never a wrongly authenticated request.
+				The proxy (Next.js) or request middleware (TanStack Start) resolves a scope per request and
+				always overwrites <code>{AUTH_SCOPE_HEADER}</code>, so a client cannot pick its own. An API
+				call it cannot attribute falls back to <code>admin</code>, which can only ever mean "the
+				frontend cookie is not honoured", never a wrongly authenticated request.
 			</p>
 			<ApiConsole actions={scopeActions} title="What a client can and cannot influence" />
 
 			<p>
-				Note: <code>{note?.title}</code> · touchCount <strong>{note?.touchCount ?? 0}</strong> ·
-				last touched by <code>{note?.lastTouchedBy ?? 'nobody'}</code>
+				Note: <code>{note.title}</code> · touchCount <strong>{note.touchCount}</strong> · last
+				touched by <code>{note.lastTouchedBy}</code>
 				<br />
-				Global headline: <code>{settings.headline ?? 'none'}</code> · last touched by{' '}
-				<code>{settings.lastTouchedBy ?? 'nobody'}</code>
+				Global headline: <code>{settings.headline}</code> · last touched by{' '}
+				<code>{settings.lastTouchedBy}</code>
 			</p>
 
 			<h2>Try this</h2>

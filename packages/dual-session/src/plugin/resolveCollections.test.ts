@@ -1,4 +1,4 @@
-import type { CollectionSlug, TypedUser } from 'payload'
+import type { CollectionSlug, User } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { resolveCollections } from './resolveCollections'
@@ -35,7 +35,7 @@ describe('resolveCollections', () => {
 	})
 
 	it('carries a custom predicate through untouched', () => {
-		const isolate = (user: TypedUser) => user.id === 1
+		const isolate = (user: User) => user.id === 1
 
 		expect(resolve([{ slug: slug('users'), isolate }])[0]?.isolate).toBe(isolate)
 	})

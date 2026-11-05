@@ -1,4 +1,4 @@
-import type { Collection, PayloadRequest, TypedUser } from 'payload'
+import type { Collection, PayloadRequest, User } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 
 import type { ResolvedIsolatedCollection } from '../types'
@@ -7,7 +7,7 @@ import { warnIfAdminMisclassified } from './misclassification'
 const STAFF_COOKIE = 'payload-staff-token'
 const SHARED_COOKIE = 'payload-token'
 
-const admin = { email: 'admin@10xmedia.de', id: 1 } as unknown as TypedUser
+const admin = { email: 'admin@10xmedia.de', id: 1 } as unknown as User
 
 const entry: ResolvedIsolatedCollection = {
 	slug: 'staff' as ResolvedIsolatedCollection['slug'],
@@ -91,7 +91,7 @@ describe('warnIfAdminMisclassified', () => {
 
 	it('asks the gate about the user who just logged in, not the request', async () => {
 		const { req, warn } = request()
-		const seen: (null | TypedUser)[] = []
+		const seen: (null | User)[] = []
 
 		await warnIfAdminMisclassified({
 			collection: collection(({ req: given }) => {

@@ -27,6 +27,21 @@ describe('resolveAuthScope', () => {
 		).toBe('frontend')
 	})
 
+	it('attributes a server function call by its referer, whatever its path', () => {
+		const call = (referer?: string) =>
+			resolveAuthScope({
+				isServerFunction: true,
+				origin: 'https://site.test',
+				pathname: '/_serverFn/abc123',
+				referer,
+				secFetchSite: 'same-origin',
+			})
+
+		expect(call('https://site.test/admin/collections/pages')).toBe('admin')
+		expect(call('https://site.test/members')).toBe('frontend')
+		expect(call()).toBeUndefined()
+	})
+
 	it('treats everything else as frontend scope', () => {
 		expect(resolveAuthScope({ pathname: '/' })).toBe('frontend')
 		expect(resolveAuthScope({ pathname: '/members/profile' })).toBe('frontend')

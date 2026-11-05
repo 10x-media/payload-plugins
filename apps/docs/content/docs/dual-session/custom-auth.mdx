@@ -41,19 +41,14 @@ On an isolated collection that writes the shared cookie, which both bypasses the
 
 ```ts title="lib/auth/callback.ts"
 import { generateIsolatedAuthCookie } from '@10x-media/dual-session'
-import { getFieldsToSign, jwtSign } from 'payload'
+import { createAuthToken } from 'payload'
 
-const collection = payload.collections.customers
-
-const { token } = await jwtSign({
-  fieldsToSign: getFieldsToSign({
-    collectionConfig: collection.config,
-    email: user.email,
-    sid: user._sid,
-    user,
-  }),
-  secret: payload.secret,
-  tokenExpiration: collection.config.auth.tokenExpiration,
+// Starts a login session for the user and signs the same token a password login returns.
+const { token } = await createAuthToken({
+  collectionConfig: payload.collections.customers.config,
+  email: user.email,
+  req,
+  user,
 })
 
 headers.append(
@@ -61,6 +56,8 @@ headers.append(
   generateIsolatedAuthCookie({ collection: 'customers', payload, token })
 )
 ```
+
+A strategy that already starts the session itself and carries `_sid` on the user can keep signing with `jwtSign` and `getFieldsToSign`; the plugin accepts either token.
 
 The cookie name is resolved from the plugin's registered options, so a `cookieName` override is honoured and nothing is hardcoded. If the collection is not one the plugin isolates, the call throws rather than silently writing the shared cookie.
 
@@ -105,6 +102,10 @@ const name = resolveIsolatedCookieName({ collection: 'customers', payload })
 Pass `user` here too on a collection split by role, or the call throws for the same reason.
 
 Or just call `POST /api/customers/logout`, which the plugin already shadows and which runs the real logout operation, ending the session server-side too.
+
+## Payload's own `login`, `logout` and `refresh` helpers
+
+The server-side helpers the framework adapters export (`login`, `logout`, `refresh` from `@payloadcms/next/auth`, or from `@payloadcms/tanstack-start/server`) always write the shared cookie. Do not use them for an isolated collection: `login` signs the customer into `payload-token` and replaces the admin session there, and `logout` for an isolated user expires `payload-token`, ending the admin session and leaving the customer's. Call the REST endpoints instead, or mint the token yourself and write it with `generateIsolatedAuthCookie` as above. For the collection behind the admin panel they behave as they always did.
 
 ## What does not work
 
