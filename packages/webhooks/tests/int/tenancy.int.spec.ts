@@ -608,6 +608,34 @@ describe('the REST surface, as another tenant', () => {
 		}
 	})
 
+	/** Access is asked again on a replay: the stored body may be one the owner can no longer read. */
+	it('refuses a replay once the owner can no longer read the document', async () => {
+		const post = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'moving', tenant: 'a' },
+			overrideAccess: true,
+		})
+		const original = String((await deliveriesFor(subA))[0]?.id)
+		await booted.payload.update({
+			collection: 'posts',
+			id: post.id,
+			data: { tenant: 'b' },
+			overrideAccess: true,
+		})
+		hits = []
+		const res = await rest('a@test.dev', `POST /webhook-deliveries/${original}/redeliver`)
+		expect(res.status).toBe(202)
+		const { id, status } = (await res.json()) as { id: string; status: string }
+		expect(status).toBe('dead')
+		expect(hits).toHaveLength(0)
+		const replay = await booted.payload.findByID({
+			collection: 'webhook-deliveries',
+			id,
+			overrideAccess: true,
+		})
+		expect(String(replay.error)).toMatch(/can no longer read this document/)
+	})
+
 	/** Review Focus 5. Runs last: it reassigns subA. */
 	it('refuses replaying a delivery after its subscription changed owner', async () => {
 		await booted.payload.update({

@@ -23,7 +23,8 @@ import { rowInfo } from './resolveSubscriptions'
  * per document, every time it would fire.
  *
  * The checks read other collections' committed state, so they stay out of this write's
- * transaction.
+ * transaction. They carry the caller's headers, so `resolve` and `canActAs` can read a cookie;
+ * the owner's own read access in `canReadCollection` is asked without them.
  */
 export const makeOwnerGuard =
 	(args: {
@@ -35,6 +36,7 @@ export const makeOwnerGuard =
 		const { ownership } = args
 		const checkReq = await actingReq(req, {
 			detached: true,
+			headers: true,
 			user: req.user as OwnerUser | null,
 		})
 		const subscription = rowInfo({ ...(originalDoc ?? {}), ...data })

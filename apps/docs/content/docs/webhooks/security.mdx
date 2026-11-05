@@ -12,7 +12,7 @@ A delivery is an HTTP request made from inside your network to a URL somebody ty
 - **`https:` only.** `delivery.allowHttp: true` lifts it.
 - **Public addresses only.** Loopback, private (RFC 1918), link-local (which includes the cloud metadata address `169.254.169.254`), carrier-grade NAT, unique-local, multicast and reserved ranges are refused, in IPv4 and IPv6, including IPv4-mapped, NAT64, 6to4 and Teredo forms. `delivery.allowPrivateAddresses: true` lifts it.
 
-It is enforced three times. On save, the URL is parsed (which folds decimal, hex, octal and short spellings of an address into one form) and its hostname resolved, so the form says why. When a delivery is decided, the stored URL is judged again, so a row saved earlier or written past the form is refused as `dead` without spending retries. And when the socket opens: the request goes through a dispatcher whose DNS lookup refuses any non-public address, with every address in the answer having to pass. That last check uses the lookup the connection itself uses, so there is no gap between checking a name and connecting to it for a rebinding name to exploit. Redirects are never followed.
+It is enforced three times. On save, the URL is parsed (which folds decimal, hex, octal and short spellings of an address into one form) and its hostname resolved, so the form says why. The lookup waits at most two seconds and is made on the save itself, not while the admin form re-validates as you type; a name that does not resolve in time is left to the send. When a delivery is decided, the stored URL is judged again, so a row saved earlier or written past the form is refused as `dead` without spending retries. And when the socket opens: the request goes through a dispatcher whose DNS lookup refuses any non-public address, with every address in the answer having to pass. That last check uses the lookup the connection itself uses, so there is no gap between checking a name and connecting to it for a rebinding name to exploit. Redirects are never followed.
 
 ```ts title="payload.config.ts"
 // Local development, where the receiver is on localhost:
@@ -25,6 +25,18 @@ webhooks({
 ```
 
 [Code subscriptions](/webhooks/subscriptions#code-subscriptions) are exempt from both rules. Their URLs are in your repository, and an internal receiver is a normal thing for one to point at.
+
+**Proxies.** The guarded dispatcher connects directly. It ignores `HTTP_PROXY`, `HTTPS_PROXY` and a dispatcher installed with `setGlobalDispatcher`, because a proxy would resolve the name itself, past the check. On a network where outbound traffic has to go through an egress proxy, the only way to deliver to admin-managed subscriptions is `allowPrivateAddresses: true`, which turns the guard off. Deliveries then go through undici's global dispatcher, which does not read the proxy variables by itself, so install one that does, and pair it with `allowedHosts` so the proxy is not the only check left:
+
+```ts title="payload.config.ts"
+import { EnvHttpProxyAgent, setGlobalDispatcher } from 'undici'
+
+setGlobalDispatcher(new EnvHttpProxyAgent())
+
+webhooks({
+  delivery: { allowPrivateAddresses: true, allowedHosts: ['hooks.example.com'] },
+})
+```
 
 **Limits.** The policy does not stop a tenant pointing a webhook at someone else's public server; rate limits on subscription creation are yours to set. A receiver reachable only through NAT64 or 6to4 is refused. With `allowPrivateAddresses` on, the first 2,000 characters of whatever an internal address answers are stored in the delivery log, readable by whoever may read that row, so pair it with `allowedHosts`. An egress firewall remains the stronger control if you have one.
 

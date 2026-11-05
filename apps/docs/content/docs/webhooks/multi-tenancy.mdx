@@ -94,20 +94,33 @@ webhooks({
 
 **On delete.** The same read happens in `beforeDelete`, while the document still exists.
 
+**Before every queued attempt and every replay.** The body is fixed when the write happens, so access is asked again before it is sent: a retry an hour later, or a replay from the delivery log, is refused as `dead` once the owner can no longer read the document, and so is one whose document has been deleted since. A delete cannot be re-read, so for one the owner must still be able to read the collection. A check that cannot be made (the database is down, your read access throws) is a failed attempt rather than a refusal: a queued delivery is retried as usual, and a replay answers with an error and records nothing. Only access is asked again, not the body: a replay stays the event it was. If the owner lost read access to one *field* after the write, a stored body that already held it still carries it; revoke the document, or delete the delivery rows, when that matters.
+
 Things to know:
 
 - An owner-bound subscription never receives `previousData`. The previous version cannot be re-read as the owner, and a document that moved from one tenant to another would otherwise show the new tenant the old one's data.
 - A subscription whose owner cannot be resolved (the user was deleted, the field is empty) is skipped, with a warning in the log. It fails closed.
 - Such a subscription, or one whose owner has since lost access to a collection, can still be switched off, renamed, have its secret rotated, or be deleted. It cannot be given new events until its owner can read them, or a new owner unless the caller may name one.
-- Your read access runs on a request the plugin builds for the owner. It has `req.user`, the locale and the write's transaction, and **no headers or cookies**. Access rules that pick a tenant from a cookie or a header see none; key them on the user.
-- That read joins the write's transaction, which is how it sees a document that is not committed yet, but it cannot end it. If your read access or a read hook throws for the owner, that is logged and read as a denial for that subscription, and the write is unaffected.
+- Your read access runs on a request the plugin builds for the owner. It has `req.user` and the locale, at dispatch the write's transaction too, and **no headers or cookies**: those belong to the writer, not the owner. The re-check before a queued attempt or a replay reads committed data, outside any transaction, in the locale of the job or of the one replaying. Access rules that pick a tenant from a cookie or a header see none; key them on the user.
+- At dispatch that read joins the write's transaction, which is how it sees a document that is not committed yet, but it cannot end it. If your read access or a read hook throws for the owner, that is logged and read as a denial for that subscription, and the write is unaffected.
 - On a collection with drafts the owner is read the latest version. A draft save therefore sends the draft to owners who may read drafts, and nothing to owners who may only read published content.
 
-`transform` still runs, on the owner's view, and is still the tool for reshaping the body. It is not the tenant boundary and does not need to be.
+`transform` still runs, on the owner's view, and is still the tool for reshaping the body. It is not the tenant boundary and does not need to be. It is handed `owner`, whose view `doc` is, and the write's own `req`. So `req.user` is the editor who saved, not the receiver: redact by `owner`, never by `req.user`. `owner` is unset for the body global subscriptions get.
 
 ## Who may own a subscription
 
-`owner.resolve` says who a subscription acts as. It is handed a request of its own, outside the transaction of the write being dispatched, so it reads committed data and a lookup that fails (the owner was deleted) cannot roll that write back. It is called once per subscription per request.
+`owner.resolve` says who a subscription acts as. It is handed a request of its own, outside the transaction of the write being dispatched, so it reads committed data and a lookup that fails (the owner was deleted) cannot roll that write back. It is called once per subscription per request, and again before every queued attempt and replay.
+
+That request carries the user and the headers (cookies included) of whoever is calling at that point, which is not always the same person:
+
+| Where `resolve` is asked | `req.user` and headers |
+|---|---|
+| A subscription is saved | the one saving it |
+| A write is dispatched | the one writing the document |
+| A delivery is replayed | the one replaying it |
+| A queued attempt runs | whatever started the job run: none for `autoRun` or a script, the caller's for a request to `/api/payload-jobs/run` (a cron's `Authorization` header, for one), never the writer's |
+
+So derive the owner from the subscription, as the example does from `subscription.record.owner`, never from `req`. An answer that changed with the caller would make a queued attempt see a different owner than its write did, and the attempt would be refused as made for another owner. `canActAs` is handed the same kind of request, the caller's user and headers, so a flag your application keeps in a cookie can inform it.
 
 Whether the *caller* may name that owner is a separate question, asked on create and whenever a save changes the owner:
 
@@ -158,7 +171,7 @@ Both callbacks get the write's own `req`. A Local API call made with it that thr
 
 ## Redelivery
 
-Replaying a delivery requires read access to the delivery **and** to its subscription. A replay keeps the original's owner columns. If the subscription has changed owner since, the replay is refused and recorded as `dead`: the stored body was built for the previous owner. A queued delivery is held to the same rule each time it is attempted, so reassigning a subscription never sends the new owner what was queued for the old one. Deliveries made before `owner` was configured carry no owner and are refused the same way.
+Replaying a delivery requires read access to the delivery **and** to its subscription. A replay keeps the original's owner columns. If the subscription has changed owner since, the replay is refused and recorded as `dead`: the stored body was built for the previous owner. Under `enforceOwnerAccess` it is also refused once the owner can no longer read the document. A queued delivery is held to the same rules each time it is attempted, so reassigning a subscription never sends the new owner what was queued for the old one, and revoking access takes effect for what is already queued. Deliveries made before `owner` was configured carry no owner and are refused the same way.
 
 ## Use queue mode
 
@@ -166,4 +179,6 @@ A tenant's receiver being slow must not slow your writes. Set `delivery: { mode:
 
 ## Migrating
 
-This release indexes the subscriptions' `events`, which on a SQL adapter adds an index to the events table, so every SQL install needs a migration, `owner` or not. `owner` also adds `ownerId` and `ownerCollection` to the delivery log, and the example adds `owner` to subscriptions. On a SQL adapter run a migration (`pnpm payload migrate:create webhook-multi-tenant`). Existing subscriptions have no owner and stop delivering under `enforceOwnerAccess` until you assign one, through the Local API or the admin as an operator.
+This release indexes the subscriptions' `events`, which on a SQL adapter adds an index to the events table, so every SQL install needs a migration, `owner` or not. `owner` also adds `ownerId`, `ownerCollection` and `documentId` to the delivery log, and the example adds `owner` to subscriptions. On a SQL adapter run a migration (`pnpm payload migrate:create webhook-multi-tenant`). Existing subscriptions have no owner and stop delivering under `enforceOwnerAccess` until you assign one, through the Local API or the admin as an operator.
+
+Turning `owner` on, with or without `enforceOwnerAccess`, also affects deliveries that are already queued. They were made before ownership and record no owner, so once a subscription resolves to a user, its queued deliveries count as made for someone else and are marked `dead` when their attempt runs. Let the queue drain before deploying. A replay of such a row is refused the same way, so what did not drain is only delivered again by the next write to its document.

@@ -500,6 +500,8 @@ export const registerWebhooks = (args: {
 					queue: delivery.queue,
 					urlPolicy: delivery.urlPolicy,
 					ownership,
+					enforceOwnerAccess,
+					eventSources,
 				},
 				deliveryId: id,
 				payload: req.payload,
@@ -525,6 +527,8 @@ export const registerWebhooks = (args: {
 			retries: delivery.retries,
 			urlPolicy: delivery.urlPolicy,
 			ownership,
+			enforceOwnerAccess,
+			eventSources,
 		})
 	)
 

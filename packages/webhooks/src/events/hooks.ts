@@ -309,6 +309,7 @@ const dispatch = async (args: {
 	 * row it is for, and the consumer's `transform` runs in here, so a throw leaves no row behind;
 	 * a view that failed is remembered as null so it is logged once and not once per subscriber.
 	 * An owner view carries no `previousData`: the previous version cannot be re-read as the owner.
+	 * `transform` is told whose view it is given; `req` stays the writer's.
 	 */
 	const templates = new Map<string, WebhookBody | null>()
 	const templateFor = (verdict: DeliveryAuthorization & { allowed: true }): WebhookBody | null => {
@@ -326,6 +327,7 @@ const dispatch = async (args: {
 				operation,
 				doc: verdict.doc ?? doc,
 				previousDoc: verdict.doc ? undefined : previousDoc,
+				owner: verdict.doc && verdict.owner && !verdict.owner.global ? verdict.owner : undefined,
 				occurredAt,
 				config: deps.config,
 				req,
@@ -379,6 +381,8 @@ const dispatch = async (args: {
 					status: 'pending',
 					attempt: 0,
 					...ownerStamp(verdict.owner),
+					// What a queued attempt or a replay re-reads as the owner, under enforceOwnerAccess.
+					...(deps.ownership ? { documentId: String(doc.id) } : {}),
 				},
 				overrideAccess: true,
 				req,
@@ -526,7 +530,11 @@ export const makeBeforeDelete =
 		}
 		const clearance: DeleteClearance = new Map()
 		try {
-			const guardReq = await actingReq(req, { detached: true, user: req.user as OwnerUser | null })
+			const guardReq = await actingReq(req, {
+				detached: true,
+				headers: true,
+				user: req.user as OwnerUser | null,
+			})
 			const reads: OwnerReads = new Map()
 			let scope: Where | null = null
 			if (deps.config.scope) {

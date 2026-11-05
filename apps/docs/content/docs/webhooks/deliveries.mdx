@@ -75,6 +75,7 @@ Unset, the log is never pruned.
 | `error`, `durationMs`, `jobId` | Failure message, round-trip time, and the Payload job id when queued. |
 | `payload` | The exact JSON body that was sent. |
 | `ownerId`, `ownerCollection` | Who the delivery was made for. Present when [`owner`](/webhooks/multi-tenancy) is configured; empty for code and global subscriptions. |
+| `documentId` | The id of the document the event is about, which a queued attempt or a replay re-reads as the owner under `enforceOwnerAccess`. Present when `owner` is configured. |
 
 ## Redelivery
 

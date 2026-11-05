@@ -2,7 +2,7 @@ import type { CollectionSlug, JsonObject, TaskConfig } from 'payload'
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription, SubscriptionOwnership } from '../options'
-import { ANOTHER_OWNER_REASON, madeForAnotherOwner } from '../plugin/owner'
+import { actingReq, ownerRefusal } from '../plugin/owner'
 import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
 import { deriveDeliveryStatus } from './deriveDeliveryStatus'
 import type { UrlPolicy } from './destination'
@@ -18,6 +18,10 @@ export type DeliverTaskDeps = {
 	urlPolicy: UrlPolicy
 	/** Set when `owner` is configured: an attempt is then held to the owner the row was made for. */
 	ownership?: SubscriptionOwnership
+	/** Re-check, before each attempt, that the owner can still read what the delivery is about. */
+	enforceOwnerAccess?: boolean
+	/** Event id to the slug of the collection that emits it. */
+	eventSources?: Record<string, string>
 }
 
 /** Native Payload jobs task that performs one queued delivery attempt. */
@@ -36,13 +40,17 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 				overrideAccess: true,
 				req,
 			})
+			// On a request of its own. A run works through its jobs concurrently, and Payload isolates only
+			// the transaction id of each job's request: `context`, where the window onto sealed secrets
+			// is kept, is shared, so the first task to close the window would close it on the others and
+			// they would refuse to send. The subscription is committed state, so nothing is lost.
 			const subscription = await resolveSubscriptionById({
 				id: String(delivery.subscriptionId),
 				source: delivery.subscriptionSource,
 				codeSubscriptions: deps.codeSubscriptions,
 				subscriptionsSlug: deps.subscriptionsSlug,
 				payload,
-				req,
+				req: await actingReq(req, { detached: true }),
 			})
 			// Includes an undecryptable secret: retrying cannot fix a key problem, so the row dies
 			// here rather than throwing, and is never POSTed unsigned.
@@ -57,27 +65,48 @@ export const buildDeliverTask = (deps: DeliverTaskDeps): TaskConfig =>
 				})
 				return { output: {} }
 			}
+			const attempt = Number(job.totalTried ?? 0) + 1
 			// Between the write that queued this and the attempt running, or between two attempts, the
-			// subscription may have been handed to another owner. The body is the previous owner's view.
-			if (
-				await madeForAnotherOwner({
+			// subscription may have been handed to another owner, or its owner may have lost access to
+			// the document. Either way the body is no longer theirs to receive. A check that could not
+			// be made is a failed attempt, not a refusal, so the job's retries still apply to it.
+			let refusal: string | null
+			try {
+				refusal = await ownerRefusal({
 					ownership: deps.ownership,
+					enforce: deps.enforceOwnerAccess ?? false,
 					subscription: decision.subscription,
 					row: delivery,
+					eventSources: deps.eventSources ?? {},
 					req,
 				})
-			) {
+			} catch (err) {
+				const message = err instanceof Error ? err.message : String(err)
 				await payload.update({
 					collection: deps.deliveriesSlug as CollectionSlug,
 					id: deliveryId,
-					data: { status: 'dead', error: ANOTHER_OWNER_REASON },
+					data: {
+						status: deriveDeliveryStatus({ ok: false, attempt, maxRetries: deps.retries }),
+						attempt,
+						error: `the owner's access could not be checked, so it was not sent: ${message}`,
+						jobId: String(job.id),
+					},
+					overrideAccess: true,
+					req,
+				})
+				throw err
+			}
+			if (refusal) {
+				await payload.update({
+					collection: deps.deliveriesSlug as CollectionSlug,
+					id: deliveryId,
+					data: { status: 'dead', error: refusal },
 					overrideAccess: true,
 					req,
 				})
 				return { output: {} }
 			}
 
-			const attempt = Number(job.totalTried ?? 0) + 1
 			const result = await sendDelivery({
 				subscription: decision.subscription,
 				deliveryId,

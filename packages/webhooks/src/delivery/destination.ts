@@ -140,15 +140,25 @@ export const guardedDispatcher = (): Agent => {
 	return agent
 }
 
+/** How long a save waits on the DNS answer for its URL before saving without it. */
+export const SAVE_LOOKUP_TIMEOUT_MS = 2_000
+
 /**
  * Whether a hostname currently resolves to an address deliveries are not sent to. For the save
- * form only: it gives the operator the reason now instead of in a dead delivery row. A name that
- * does not resolve is not judged here, since the receiver may not be deployed yet; the send is
- * what enforces.
+ * only: it gives the operator the reason now instead of in a dead delivery row. A name that does
+ * not resolve, or does not answer within `timeoutMs`, is not judged here, since the receiver may
+ * not be deployed yet; the send is what enforces. A lookup that times out still runs to its end
+ * on the threadpool, which is why the form's per-keystroke validation does not ask at all.
  */
-export const resolvesToBlocked = (hostname: string): Promise<boolean> =>
+export const resolvesToBlocked = (
+	hostname: string,
+	timeoutMs: number = SAVE_LOOKUP_TIMEOUT_MS
+): Promise<boolean> =>
 	new Promise((resolve) => {
+		const timer = setTimeout(() => resolve(false), timeoutMs)
+		timer.unref?.()
 		transport.lookup(hostname, { all: true }, (err, addresses) => {
+			clearTimeout(timer)
 			resolve(!err && addresses.some((a) => !isPublicAddress(a.address)))
 		})
 	})

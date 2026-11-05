@@ -8,6 +8,7 @@ import {
 	type TypedUser,
 } from 'payload'
 
+import { eventId } from '../events/eventTypes'
 import type {
 	OwnerUser,
 	SubscriptionOwner,
@@ -26,9 +27,11 @@ const OWNER_MEMO_CONTEXT = 'webhooksOwnerMemo'
  *
  * Payload's `createLocalReq` writes `user` onto whatever request it is handed, so reusing the
  * live request with another user would re-authenticate the caller's own write. The fresh one
- * carries no headers or cookies and an empty context, because the owner is not the caller:
- * a flag the writer's request was given (an internal job marking itself privileged, another
- * dispatch's open window onto sealed fields) must not widen what the owner is shown.
+ * carries an empty context, and no headers or cookies unless `headers` asks for the caller's,
+ * because the owner is not the caller: a flag the writer's request was given (an internal job
+ * marking itself privileged, a tenant cookie, another dispatch's open window onto sealed fields)
+ * must not widen what the owner is shown. `headers` is for the questions asked about the caller
+ * (`owner.resolve`, `owner.canActAs`), never for a read made as the owner.
  *
  * Unless `detached`, it joins the caller's transaction, so a read as the owner sees the document
  * the write has not committed yet. It joins without the power to end it. Payload rolls a
@@ -42,12 +45,13 @@ const OWNER_MEMO_CONTEXT = 'webhooksOwnerMemo'
  */
 export const actingReq = (
 	req: PayloadRequest,
-	options: { detached?: boolean; user?: OwnerUser | null } = {}
+	options: { detached?: boolean; headers?: boolean; user?: OwnerUser | null } = {}
 ): Promise<PayloadRequest> =>
 	createLocalReq(
 		{
 			req: {
 				context: {},
+				...(options.headers && req.headers ? { headers: req.headers } : {}),
 				fallbackLocale: req.fallbackLocale,
 				i18n: req.i18n,
 				locale: req.locale,
@@ -70,7 +74,8 @@ export const actingReq = (
  * The resolver is handed a request of its own, outside the caller's transaction. Payload rolls a
  * transaction back when a Local API call on it throws, even a caught one, so a resolver looking
  * up a user who has since been deleted would otherwise take the write that triggered it down
- * with it. An owner is committed state, so nothing is lost by reading it from outside.
+ * with it. An owner is committed state, so nothing is lost by reading it from outside. It does
+ * carry the caller's headers, whoever the caller is where it is asked: see `owner.resolve`.
  */
 export const resolveOwner = async (args: {
 	ownership: SubscriptionOwnership
@@ -84,7 +89,11 @@ export const resolveOwner = async (args: {
 	try {
 		resolved = await args.ownership.resolve({
 			subscription: args.subscription,
-			req: await actingReq(args.req, { detached: true, user: args.req.user as OwnerUser | null }),
+			req: await actingReq(args.req, {
+				detached: true,
+				headers: true,
+				user: args.req.user as OwnerUser | null,
+			}),
 		})
 	} catch (err) {
 		args.req.payload.logger.error(
@@ -203,7 +212,8 @@ export const canReadCollection = async (args: {
  *
  * `disableErrors` turns a flat `false` from read access into an empty result. Anything else that
  * throws here (an access function, a read hook) is caught below and read as a denial, and cannot
- * touch the write: see `actingReq`.
+ * touch the write: see `actingReq`. With `rethrow` it is thrown instead, for a caller that can try
+ * again later and should not record a failure to check as a verdict.
  */
 const readAsOwner = async (args: {
 	req: PayloadRequest
@@ -211,6 +221,7 @@ const readAsOwner = async (args: {
 	id: number | string
 	user: OwnerUser
 	detached?: boolean
+	rethrow?: boolean
 }): Promise<Record<string, unknown> | null> => {
 	try {
 		const res = await args.req.payload.find({
@@ -228,6 +239,9 @@ const readAsOwner = async (args: {
 		const docs: JsonObject[] = res.docs
 		return docs[0] ?? null
 	} catch (err) {
+		if (args.rethrow && !(err instanceof Forbidden)) {
+			throw err
+		}
 		if (!(err instanceof Forbidden)) {
 			args.req.payload.logger.error(
 				`@10x-media/webhooks: reading ${args.collection} ${String(args.id)} as a subscription owner failed, so nothing was delivered on its behalf: ${err instanceof Error ? err.message : String(err)}`
@@ -340,36 +354,92 @@ export const authorizeDelivery = async (args: {
 	return doc ? { allowed: true, owner, doc } : DENIED
 }
 
-/**
- * Whether a stored delivery was made for a different owner than its subscription acts as now.
- *
- * The body of an owner-bound delivery is that owner's view of the document. If the subscription
- * has since been handed to someone else, sending it (a replay, or a queued attempt that had not
- * run yet) would give the previous owner's view to the new one. A row with no owner recorded,
- * made before `owner` was configured or for a global subscription, counts as made for nobody.
- */
-export const madeForAnotherOwner = async (args: {
-	ownership: SubscriptionOwnership | undefined
-	subscription: ResolvedSubscription | null
-	row: Record<string, unknown>
-	req: PayloadRequest
-}): Promise<boolean> => {
-	if (!args.ownership || !args.subscription) {
-		return false
-	}
-	const now = ownerStamp(
-		await resolveOwner({
-			ownership: args.ownership,
-			subscription: subscriptionInfo(args.subscription),
-			req: args.req,
-		})
-	)
-	return (
-		(now.ownerId ?? '') !== String(args.row.ownerId ?? '') ||
-		(now.ownerCollection ?? '') !== String(args.row.ownerCollection ?? '')
-	)
-}
-
-/** What a delivery refused for that reason records. */
+/** What a delivery refused because its subscription changed owner records. */
 export const ANOTHER_OWNER_REASON =
 	'the subscription acts as a different owner than this delivery was made for (it changed owner, or the delivery predates ownership), so it was not sent'
+
+/** What a delivery refused because its subscription has no owner any more records. */
+export const NO_OWNER_REASON =
+	'the subscription has no resolvable owner (it was removed, or owner.resolve failed) and enforceOwnerAccess is on, so it was not sent'
+
+/** What a delivery refused because its owner can no longer read the document records. */
+export const OWNER_LOST_ACCESS_REASON =
+	"the subscription's owner can no longer read this document (access was revoked, or the document is gone), so it was not sent"
+
+/**
+ * Why a stored delivery may not be sent now, on behalf of the owner its subscription acts as, or
+ * null when it may. Asked before every queued attempt and every replay.
+ *
+ * First, who it was made for. The body of an owner-bound delivery is that owner's view of the
+ * document. If the subscription has since been handed to someone else, sending it would give the
+ * previous owner's view to the new one. A row with no owner recorded, made before `owner` was
+ * configured or for a global subscription, counts as made for nobody.
+ *
+ * Then, under `enforceOwnerAccess`, whether that owner may still read what the delivery is
+ * about. The body is fixed when the write happens, so without this a revoked access would only
+ * take effect from the next write, and a retry or a replay hours later would still send. Create
+ * and update events re-read the document as the owner, the way dispatch does. A deleted document
+ * cannot be read by anyone, so a delete asks whether the owner can still read its collection.
+ * Only access is asked again: the body is not rebuilt, so a replay stays the event it was, and a
+ * field the owner lost read access to after the write still travels in a body that held it.
+ *
+ * A re-read that fails for any reason but a denial (the database, a throwing access function)
+ * throws rather than refusing: it says nothing about access, and a queued attempt that throws is
+ * retried, where a refusal would end it for good.
+ */
+export const ownerRefusal = async (args: {
+	ownership: SubscriptionOwnership | undefined
+	enforce: boolean
+	subscription: ResolvedSubscription | null
+	row: Record<string, unknown>
+	/** Event id to the slug of the collection that emits it. */
+	eventSources: Record<string, string>
+	req: PayloadRequest
+}): Promise<string | null> => {
+	if (!args.ownership || !args.subscription) {
+		return null
+	}
+	const owner = await resolveOwner({
+		ownership: args.ownership,
+		subscription: subscriptionInfo(args.subscription),
+		req: args.req,
+	})
+	// Before the comparison below, which would report an owner that is gone as a changed one.
+	if (args.enforce && !owner) {
+		return NO_OWNER_REASON
+	}
+	const now = ownerStamp(owner)
+	if (
+		(now.ownerId ?? '') !== String(args.row.ownerId ?? '') ||
+		(now.ownerCollection ?? '') !== String(args.row.ownerCollection ?? '')
+	) {
+		return ANOTHER_OWNER_REASON
+	}
+	if (!args.enforce || !owner || owner.global) {
+		return null
+	}
+	const event = String(args.row.event ?? '')
+	const collection = args.eventSources[event]
+	// No longer a source, so there is no read access left to judge it by.
+	if (!collection) {
+		return OWNER_LOST_ACCESS_REASON
+	}
+	if (event === eventId(collection, 'delete')) {
+		return (await canReadCollection({ req: args.req, collection, user: owner.user }))
+			? null
+			: OWNER_LOST_ACCESS_REASON
+	}
+	const id = args.row.documentId
+	if (typeof id !== 'string' && typeof id !== 'number') {
+		return OWNER_LOST_ACCESS_REASON
+	}
+	const doc = await readAsOwner({
+		req: args.req,
+		collection,
+		id,
+		user: owner.user,
+		detached: true,
+		rethrow: true,
+	})
+	return doc ? null : OWNER_LOST_ACCESS_REASON
+}

@@ -5,8 +5,9 @@ import {
 	type RequestContext,
 	ValidationError,
 } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { GENERATED_SECRET_KEY, SECRET_BYTES, SECRET_PREFIX } from '../constants'
+import { transport } from '../delivery/destination'
 import { isNormalizedSecret, secretKey } from '../secrets/format'
 import { secretHintName, secretSetName } from '../secrets/secretFields'
 import { keys } from '../translations/keys'
@@ -291,6 +292,45 @@ describe('buildSubscriptionsCollection', () => {
 			expect(await validate('https://10.0.0.5/hook')).toBe(keys.urlPrivateAddress)
 			expect(await validate('https://[::1]/hook')).toBe(keys.urlPrivateAddress)
 			expect(await validate('https://93.184.216.34/hook')).toBe(true)
+		})
+
+		/**
+		 * After a first submit the admin re-validates on every debounced change, half-typed hosts
+		 * included. Only the save itself asks DNS what a name resolves to.
+		 */
+		it('resolves the host on save, not on every change the admin form validates', async () => {
+			const strict = buildSubscriptionsCollection({
+				slug: 'webhook-subscriptions',
+				events: [],
+				hidden: false,
+				urlPolicy: { allowHttp: false, allowPrivateAddresses: false },
+			})
+			const url = find(strict, 'url') as {
+				validate: (v: unknown, o: unknown) => Promise<string | true>
+			}
+			const lookup = vi
+				.spyOn(transport, 'lookup')
+				.mockImplementation(((
+					_host: string,
+					_options: unknown,
+					callback: (err: null, addresses: { address: string; family: number }[]) => void
+				) =>
+					callback(null, [
+						{ address: '10.0.0.5', family: 4 },
+					])) as unknown as typeof transport.lookup)
+			try {
+				const options = (event: 'onChange' | 'submit') => ({ event, req: { t: (k: string) => k } })
+				expect(await url.validate('https://internal.example.com/hook', options('onChange'))).toBe(
+					true
+				)
+				expect(lookup).not.toHaveBeenCalled()
+				expect(await url.validate('https://internal.example.com/hook', options('submit'))).toBe(
+					keys.urlPrivateAddress
+				)
+				expect(lookup).toHaveBeenCalledTimes(1)
+			} finally {
+				lookup.mockRestore()
+			}
 		})
 	})
 

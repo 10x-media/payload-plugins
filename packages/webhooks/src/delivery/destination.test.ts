@@ -1,5 +1,11 @@
-import { describe, expect, it } from 'vitest'
-import { isPublicAddress, type UrlPolicy, urlRefusal } from './destination'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+	isPublicAddress,
+	resolvesToBlocked,
+	transport,
+	type UrlPolicy,
+	urlRefusal,
+} from './destination'
 
 const strict: UrlPolicy = { allowHttp: false, allowPrivateAddresses: false }
 
@@ -97,5 +103,38 @@ describe('urlRefusal', () => {
 		expect(
 			urlRefusal('http://127.0.0.1:9000/hook', { ...strict, allowedHosts: ['x.test'] }, 'code')
 		).toBe('host')
+	})
+})
+
+describe('resolvesToBlocked', () => {
+	afterEach(() => {
+		vi.restoreAllMocks()
+	})
+
+	const answer = (address: string) =>
+		vi
+			.spyOn(transport, 'lookup')
+			.mockImplementation(((
+				_host: string,
+				_options: unknown,
+				callback: (err: null, addresses: { address: string; family: number }[]) => void
+			) => callback(null, [{ address, family: 4 }])) as unknown as typeof transport.lookup)
+
+	it('judges a name by every address it resolves to', async () => {
+		answer('10.0.0.5')
+		expect(await resolvesToBlocked('internal.example.com')).toBe(true)
+		vi.restoreAllMocks()
+		answer('93.184.216.34')
+		expect(await resolvesToBlocked('public.example.com')).toBe(false)
+	})
+
+	/** A slow or silent resolver must not hold the save up: the send is what enforces. */
+	it('gives up on a lookup that does not answer in time, without judging the name', async () => {
+		vi.spyOn(transport, 'lookup').mockImplementation(
+			(() => {}) as unknown as typeof transport.lookup
+		)
+		const started = Date.now()
+		expect(await resolvesToBlocked('slow.example.com', 20)).toBe(false)
+		expect(Date.now() - started).toBeLessThan(1_000)
 	})
 })

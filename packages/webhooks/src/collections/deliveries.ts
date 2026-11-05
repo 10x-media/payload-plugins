@@ -54,10 +54,14 @@ export const buildDeliveriesCollection = (args: {
 		{ name: 'payload', type: 'json' },
 		// Present only when `owner` is configured, so an install that does not use ownership gets no
 		// new columns. Text rather than a relationship: the owner can live in any auth collection.
+		// `documentId` is the document the event is about, which a queued attempt or a replay
+		// re-reads as the owner under enforceOwnerAccess; the body cannot be relied on for it,
+		// since `transform` may reshape it.
 		...(args.ownerStamp
 			? ([
 					{ name: 'ownerId', type: 'text', index: true, admin: { readOnly: true } },
 					{ name: 'ownerCollection', type: 'text', admin: { readOnly: true } },
+					{ name: 'documentId', type: 'text', admin: { readOnly: true } },
 				] satisfies Field[])
 			: []),
 	],

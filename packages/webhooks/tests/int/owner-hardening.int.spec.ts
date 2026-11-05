@@ -37,7 +37,10 @@ const users: CollectionConfig = {
 	],
 }
 
-/** A field only a request carrying a context flag may read, the way an internal job might. */
+/**
+ * Fields only a request carrying a context flag or a header may read, the way an internal job or
+ * a privileged client might.
+ */
 const posts = tenanted('posts', {
 	fields: [
 		{ name: 'title', type: 'text' },
@@ -46,6 +49,11 @@ const posts = tenanted('posts', {
 			name: 'contextNote',
 			type: 'text',
 			access: { read: ({ req }) => req.context?.privileged === true },
+		},
+		{
+			name: 'headerNote',
+			type: 'text',
+			access: { read: ({ req }) => req.headers?.get('x-privileged') === '1' },
 		},
 	],
 })
@@ -72,6 +80,12 @@ let sinkUrl: string
 let hits: { path: string; body: Record<string, unknown> }[] = []
 /** Every subscription `owner.resolve` was asked about, by name. */
 let resolved: string[] = []
+/** The `x-tenant` header `owner.resolve` saw, once per call. */
+let resolveHeaders: (string | null)[] = []
+/** Whose view each `transform` call was handed, by owner id. */
+let transformedFor: (string | null)[] = []
+/** The `x-tenant` header `owner.canActAs` saw, once per call. */
+let canActAsHeaders: (string | null)[] = []
 
 const boot = (mode: DeliveryMode) =>
 	bootPayload({
@@ -79,7 +93,13 @@ const boot = (mode: DeliveryMode) =>
 		collections: [users, posts, fragile, articles, notes],
 		plugin: webhooks({
 			collections: {
-				posts: { scope: ({ doc }) => ({ tenant: { equals: doc.tenant } }) },
+				posts: {
+					scope: ({ doc }) => ({ tenant: { equals: doc.tenant } }),
+					transform: ({ doc, owner }) => {
+						transformedFor.push(owner ? String(owner.user.id) : null)
+						return doc
+					},
+				},
 				fragile: true,
 				articles: true,
 				// The subscriptions collection has no such field, so the query this builds is invalid.
@@ -93,6 +113,7 @@ const boot = (mode: DeliveryMode) =>
 			owner: {
 				resolve: async ({ subscription, req }) => {
 					resolved.push(String(subscription.record.name))
+					resolveHeaders.push(req.headers.get('x-tenant'))
 					const ownerId = subscription.record.owner
 					if (typeof ownerId !== 'string' && typeof ownerId !== 'number') {
 						return null
@@ -106,6 +127,11 @@ const boot = (mode: DeliveryMode) =>
 						req,
 					})
 					return user ? { user: { ...user, collection: 'users' } } : null
+				},
+				// The default rule, a user acting as themselves, plus a record of the headers it saw.
+				canActAs: ({ owner, req }) => {
+					canActAsHeaders.push(req.headers.get('x-tenant'))
+					return Boolean(req.user && !owner.global && String(owner.user.id) === String(req.user.id))
 				},
 			},
 			subscriptionsCollection: {
@@ -225,6 +251,9 @@ describe('owner access, the paths around the happy one (inline)', () => {
 	beforeEach(() => {
 		hits = []
 		resolved = []
+		resolveHeaders = []
+		transformedFor = []
+		canActAsHeaders = []
 	})
 
 	/**
@@ -262,6 +291,66 @@ describe('owner access, the paths around the happy one (inline)', () => {
 		})
 		expect(pathsHit()).toEqual(['/pa'])
 		expect(dataAt('/pa')).not.toHaveProperty('contextNote')
+	})
+
+	/**
+	 * `resolve` is a question about the caller's application, which may keep flags in a cookie, so
+	 * it sees the writer's headers. The read made as the owner is not the writer's, so it does not.
+	 */
+	it('hands owner.resolve the headers of the writer, and reads as the owner without them', async () => {
+		const req = await createLocalReq(
+			{ req: { headers: new Headers({ 'x-tenant': 'a', 'x-privileged': '1' }) } },
+			booted.payload
+		)
+		await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'x', tenant: 'a', headerNote: 'for privileged clients' },
+			overrideAccess: true,
+			req,
+		})
+		expect(pathsHit()).toEqual(['/pa'])
+		expect(resolveHeaders).toContain('a')
+		expect(dataAt('/pa').title).toBe('x')
+		expect(dataAt('/pa')).not.toHaveProperty('headerNote')
+	})
+
+	/** Whether the caller may name an owner is a question about the caller, cookies included. */
+	it('hands owner.canActAs the headers of the one saving the subscription', async () => {
+		const req = await createLocalReq(
+			{ req: { headers: new Headers({ 'x-tenant': 'a' }) }, user: memberA },
+			booted.payload
+		)
+		const saved = await booted.payload.create({
+			collection: 'webhook-subscriptions',
+			data: {
+				name: 'self',
+				url: `${sinkUrl}/self`,
+				enabled: true,
+				events: ['posts.created'],
+				owner: memberA.id,
+				tenant: 'z',
+			},
+			overrideAccess: false,
+			user: memberA,
+			req,
+		})
+		expect(canActAsHeaders).toEqual(['a'])
+		await booted.payload.delete({
+			collection: 'webhook-subscriptions',
+			id: saved.id,
+			overrideAccess: true,
+		})
+	})
+
+	/** `req` in a transform is the writer's, so it is told separately whose view it shapes. */
+	it('tells transform whose view of the document it is shaping', async () => {
+		await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'x', tenant: 'b' },
+			overrideAccess: true,
+		})
+		expect(pathsHit()).toEqual(['/pb'])
+		expect(transformedFor).toEqual([String(memberB.id)])
 	})
 
 	/** A draft save does not touch the main document, so the owner has to be read the draft. */
@@ -538,5 +627,139 @@ describe('owner access in queue mode', () => {
 		})
 		expect(rows.docs[0]?.status).toBe('dead')
 		expect(String(rows.docs[0]?.error)).toMatch(/changed owner/)
+	})
+
+	/**
+	 * The body is fixed at the write, so a revoked access has to be asked about again before each
+	 * attempt. Otherwise a retry hours later would still send what the owner may no longer read.
+	 */
+	it('does not deliver a queued body once the owner can no longer read the document', async () => {
+		const id = await subscribe('qr', memberA, ['posts.created'])
+		const post = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'moving', tenant: 'a' },
+			overrideAccess: true,
+		})
+		await booted.payload.update({
+			collection: 'posts',
+			id: post.id,
+			data: { tenant: 'b' },
+			overrideAccess: true,
+		})
+		await booted.payload.jobs.run()
+		expect(hits).toHaveLength(0)
+		const rows = await booted.payload.find({
+			collection: 'webhook-deliveries',
+			where: { subscriptionId: { equals: id } },
+			overrideAccess: true,
+		})
+		expect(rows.docs).toHaveLength(1)
+		expect(rows.docs[0]?.documentId).toBe(String(post.id))
+		expect(rows.docs[0]?.status).toBe('dead')
+		expect(String(rows.docs[0]?.error)).toMatch(/can no longer read this document/)
+		await booted.payload.delete({ collection: 'webhook-subscriptions', id, overrideAccess: true })
+	})
+
+	/**
+	 * A run works through its jobs concurrently on one request whose `context` they share, and the
+	 * window onto sealed secrets lives there. Shared, the first task to finish would close it on the
+	 * others, and they would refuse to send rather than send unsigned.
+	 */
+	it('delivers every job of a run, each with its own window onto the sealed secrets', async () => {
+		const ids = await Promise.all(
+			['qc1', 'qc2', 'qc3'].map((name) => subscribe(name, memberA, ['posts.created']))
+		)
+		await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'fanned out', tenant: 'a' },
+			overrideAccess: true,
+		})
+		await booted.payload.jobs.run()
+		expect(pathsHit().filter((p) => p.startsWith('/qc'))).toEqual(['/qc1', '/qc2', '/qc3'])
+		for (const id of ids) {
+			await booted.payload.delete({ collection: 'webhook-subscriptions', id, overrideAccess: true })
+		}
+	})
+
+	/** The delete branch has to let a delete through when nothing changed, or it would drop them all. */
+	it('delivers a queued delete while the owner can still read the collection', async () => {
+		const id = await subscribe('qk', memberA, ['posts.deleted'])
+		const post = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'going', tenant: 'a' },
+			overrideAccess: true,
+		})
+		await booted.payload.delete({ collection: 'posts', id: post.id, overrideAccess: true })
+		await booted.payload.jobs.run()
+		expect(pathsHit()).toEqual(['/qk'])
+		await booted.payload.delete({ collection: 'webhook-subscriptions', id, overrideAccess: true })
+	})
+
+	/**
+	 * A re-read that fails says nothing about access. It is a failed attempt, so the job's retries
+	 * apply, rather than a refusal that ends the delivery as if access had been revoked.
+	 */
+	it('records a check that could not be made as a failed attempt, not as a revoked access', async () => {
+		const id = await subscribe('qe', memberA, ['posts.created'])
+		await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'unlucky', tenant: 'a' },
+			overrideAccess: true,
+		})
+		const collection = booted.payload.collections.posts
+		if (!collection) {
+			throw new Error('the posts collection is not registered')
+		}
+		const configured = collection.config.access.read
+		collection.config.access.read = () => {
+			throw new Error('database unavailable')
+		}
+		try {
+			await booted.payload.jobs.run()
+		} finally {
+			collection.config.access.read = configured
+		}
+		expect(hits).toHaveLength(0)
+		const rows = await booted.payload.find({
+			collection: 'webhook-deliveries',
+			where: { subscriptionId: { equals: id } },
+			overrideAccess: true,
+		})
+		expect(rows.docs).toHaveLength(1)
+		expect(String(rows.docs[0]?.error)).toMatch(/could not be checked.*database unavailable/)
+		expect(String(rows.docs[0]?.error)).not.toMatch(/can no longer read/)
+		await booted.payload.delete({ collection: 'webhook-subscriptions', id, overrideAccess: true })
+	})
+
+	/** A deleted document cannot be re-read, so a delete asks about the collection instead. */
+	it('does not deliver a queued delete once the owner can no longer read the collection', async () => {
+		const id = await subscribe('qd', memberA, ['posts.deleted'])
+		const post = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'going', tenant: 'a' },
+			overrideAccess: true,
+		})
+		await booted.payload.delete({ collection: 'posts', id: post.id, overrideAccess: true })
+		const collection = booted.payload.collections.posts
+		if (!collection) {
+			throw new Error('the posts collection is not registered')
+		}
+		const configured = collection.config.access.read
+		collection.config.access.read = ({ req }) => (req.user as Who)?.role === 'admin'
+		try {
+			await booted.payload.jobs.run()
+		} finally {
+			collection.config.access.read = configured
+		}
+		expect(hits).toHaveLength(0)
+		const rows = await booted.payload.find({
+			collection: 'webhook-deliveries',
+			where: { subscriptionId: { equals: id } },
+			overrideAccess: true,
+		})
+		expect(rows.docs).toHaveLength(1)
+		expect(rows.docs[0]?.status).toBe('dead')
+		expect(String(rows.docs[0]?.error)).toMatch(/can no longer read this document/)
+		await booted.payload.delete({ collection: 'webhook-subscriptions', id, overrideAccess: true })
 	})
 })

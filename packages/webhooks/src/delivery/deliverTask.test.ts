@@ -28,8 +28,14 @@ const makeReq = (subscriptionRow: Record<string, unknown> | null) => {
 			updates.push(args.data)
 			return Promise.resolve({})
 		}),
+		config: {},
 	} as unknown as Payload
-	const req = { payload, context: {} } as unknown as PayloadRequest
+	// The task reads the subscription on a request it builds from this one, which needs i18n.
+	const req = {
+		payload,
+		context: {},
+		i18n: { t: (key: string) => key },
+	} as unknown as PayloadRequest
 	return { req, updates }
 }
 

@@ -1,6 +1,7 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, PayloadRequest } from 'payload'
+import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { GENERATED_SECRET_KEY } from '../../src/constants'
 import { pruneDeliveries, webhooks } from '../../src/index'
@@ -454,6 +455,68 @@ describeForDb('webhooks owner access cross-db', {}, (db) => {
 		expect(kept.totalDocs).toBe(1)
 		paths = []
 		await booted.payload.delete({ collection: 'posts', id: post.id, overrideAccess: true })
+		expect(paths).toEqual(['/a'])
+	})
+
+	/**
+	 * A replay re-reads the document as the owner by the id the row recorded, which is text on
+	 * every adapter while the document id is a serial on SQL ones. A delete asks about the
+	 * collection instead, since the document is gone.
+	 */
+	it(`asks again on a replay whether the owner can still read what it is about, on ${db}`, async () => {
+		const { token } = await booted.payload.login({
+			collection: 'users',
+			data: { email: 'a@test.dev', password: 'test1234' },
+		})
+		const replay = async (id: number | string) => {
+			const res = await handleEndpoints({
+				config: booted.payload.config,
+				payloadInstanceCacheKey: booted.cacheKey,
+				request: new Request(`http://localhost:3000/api/webhook-deliveries/${id}/redeliver`, {
+					method: 'POST',
+					headers: { Authorization: `JWT ${token}` },
+				}),
+			})
+			expect(res.status).toBe(202)
+			return ((await res.json()) as { status: string }).status
+		}
+		const subscription = await booted.payload.find({
+			collection: 'webhook-subscriptions',
+			where: { name: { equals: 'a' } },
+			overrideAccess: true,
+		})
+		const subscriptionId = String(subscription.docs[0]?.id)
+		const latest = async (event: string) =>
+			(
+				await booted.payload.find({
+					collection: 'webhook-deliveries',
+					where: { subscriptionId: { equals: subscriptionId }, event: { equals: event } },
+					sort: '-createdAt',
+					limit: 1,
+					overrideAccess: true,
+				})
+			).docs[0]?.id as number | string
+		const post = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'replayed', tenant: 'a' },
+			overrideAccess: true,
+		})
+		const created = await latest('posts.created')
+		paths = []
+		expect(await replay(created)).toBe('success')
+		expect(paths).toEqual(['/a'])
+		await booted.payload.update({
+			collection: 'posts',
+			id: post.id,
+			data: { tenant: 'b' },
+			overrideAccess: true,
+		})
+		paths = []
+		expect(await replay(created)).toBe('dead')
+		expect(paths).toEqual([])
+		const deleted = await latest('posts.deleted')
+		paths = []
+		expect(await replay(deleted)).toBe('success')
 		expect(paths).toEqual(['/a'])
 	})
 

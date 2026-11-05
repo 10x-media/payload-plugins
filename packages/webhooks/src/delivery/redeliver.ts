@@ -2,7 +2,7 @@ import type { CollectionSlug, JsonObject, Payload, PayloadRequest } from 'payloa
 
 import { WEBHOOK_DELIVER_TASK } from '../constants'
 import type { CodeSubscription, SubscriptionOwnership } from '../options'
-import { ANOTHER_OWNER_REASON, madeForAnotherOwner } from '../plugin/owner'
+import { ownerRefusal } from '../plugin/owner'
 import { decideDelivery, resolveSubscriptionById } from '../plugin/resolveSubscriptions'
 import type { UrlPolicy } from './destination'
 import { messageId, sendDelivery } from './sendDelivery'
@@ -18,6 +18,10 @@ export type RedeliverDeps = {
 	urlPolicy: UrlPolicy
 	/** Set when `owner` is configured: a replay is then held to the owner it was made for. */
 	ownership?: SubscriptionOwnership
+	/** Re-check that the owner can still read what the delivery is about. */
+	enforceOwnerAccess?: boolean
+	/** Event id to the slug of the collection that emits it. */
+	eventSources?: Record<string, string>
 }
 
 /**
@@ -54,11 +58,15 @@ export const redeliverDelivery = async (args: {
 		req,
 	})
 	// The stored body was built for whoever owned the subscription then. If it acts as someone else
-	// now, replaying would hand the previous owner's view of the document to the new one.
-	const ownerChanged = await madeForAnotherOwner({
+	// now, replaying would hand the previous owner's view of the document to the new one, and if the
+	// owner has lost access since, it would hand them what they may no longer read. A check that
+	// could not be made throws before the new row exists, so the caller gets an error, not a replay.
+	const refusal = await ownerRefusal({
 		ownership: deps.ownership,
+		enforce: deps.enforceOwnerAccess ?? false,
 		subscription,
 		row: original,
+		eventSources: deps.eventSources ?? {},
 		req,
 	})
 	const created = await payload.create({
@@ -75,6 +83,7 @@ export const redeliverDelivery = async (args: {
 			...(typeof original.ownerId === 'string'
 				? { ownerId: original.ownerId, ownerCollection: original.ownerCollection }
 				: {}),
+			...(typeof original.documentId === 'string' ? { documentId: original.documentId } : {}),
 		},
 		overrideAccess: true,
 		req,
@@ -90,11 +99,11 @@ export const redeliverDelivery = async (args: {
 		req,
 	})
 
-	if (ownerChanged) {
+	if (refusal) {
 		await payload.update({
 			collection: deps.deliveriesSlug as CollectionSlug,
 			id: newId,
-			data: { status: 'dead', error: ANOTHER_OWNER_REASON },
+			data: { status: 'dead', error: refusal },
 			overrideAccess: true,
 			req,
 		})

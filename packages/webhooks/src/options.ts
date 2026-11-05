@@ -84,14 +84,19 @@ export type SubscriptionOwner = { global: true; user?: never } | { global?: fals
 
 export type SubscriptionOwnership = {
 	/**
-	 * Called when a subscription is saved and for every candidate subscription at dispatch (once
-	 * per subscription per request). `null` means no owner could be determined, which under
-	 * `enforceOwnerAccess` rejects the save and skips the delivery. Never return
-	 * `{ global: true }` just because an owner field is empty, unless only operators can create
-	 * subscriptions. Code subscriptions are always global and never reach this.
+	 * Called when a subscription is saved, for every candidate subscription at dispatch (once
+	 * per subscription per request), and before every queued attempt and replay. `null` means no
+	 * owner could be determined, which under `enforceOwnerAccess` rejects the save and skips the
+	 * delivery. Never return `{ global: true }` just because an owner field is empty, unless only
+	 * operators can create subscriptions. Code subscriptions are always global and never reach this.
 	 *
 	 * `req` is a request of its own, outside the transaction of the write being dispatched: it
-	 * reads committed data, and nothing it does can roll that write back.
+	 * reads committed data, and nothing it does can roll that write back. It carries the user and
+	 * the headers of whoever is calling where it is asked: the one saving the subscription, the
+	 * one whose write is dispatched, the one replaying a delivery, and in a queued attempt the job
+	 * runner's request, which usually has neither. So derive the owner from the subscription, never
+	 * from `req`: an answer that changed with the caller would make a queued attempt see a
+	 * different owner than its write did, and refuse it as made for another owner.
 	 */
 	resolve: (args: {
 		subscription: WebhookSubscriptionInfo
@@ -101,8 +106,8 @@ export type SubscriptionOwnership = {
 	 * Whether the caller may save a subscription that acts as `owner`. Asked on create and whenever
 	 * a save changes who the owner is. Without it, a logged-in user may only act as themselves and
 	 * never as the global owner. Server code, a Local API call with no user on it, is trusted and
-	 * not asked. `req` is a request of the plugin's own carrying the caller's user, not the
-	 * caller's request: it has no headers.
+	 * not asked. `req` is a request of the plugin's own carrying the caller's user and headers
+	 * (cookies included), outside the caller's transaction, with an empty `context`.
 	 */
 	canActAs?: (args: { owner: SubscriptionOwner; req: PayloadRequest }) => MaybePromise<boolean>
 }
@@ -123,11 +128,20 @@ export type CollectionWebhookConfig = {
 	 * when `includePreviousData` is set, to `previousData` as well, so redaction cannot
 	 * be bypassed through the prior document. `target` names the slot being built; on
 	 * the `previousData` call `doc` is the prior document and `previousDoc` is undefined.
+	 *
+	 * It is synchronous: the body is built from what it returns, so a promise is not awaited.
+	 *
+	 * Under `enforceOwnerAccess`, `doc` for an owner-bound subscription is the owner's view and
+	 * `owner` says whose. `req` is always the write's own request, so `req.user` is the writer,
+	 * not the receiver: redact by `owner`, never by `req.user`. `owner` is unset for the view
+	 * given to global subscriptions, and whenever enforcement is off, when one body is shared by
+	 * every subscriber.
 	 */
 	transform?: (args: {
 		doc: Record<string, unknown>
 		previousDoc?: Record<string, unknown>
 		operation: WebhookOperation
+		owner?: { user: OwnerUser }
 		req: PayloadRequest
 		target: 'data' | 'previousData'
 	}) => unknown

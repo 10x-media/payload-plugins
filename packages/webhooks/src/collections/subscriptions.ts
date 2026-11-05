@@ -197,7 +197,11 @@ const makeValidateUrl =
 	(policy: UrlPolicy) =>
 	async (
 		value: string | null | undefined,
-		{ previousValue, req }: { previousValue?: unknown; req: PayloadRequest }
+		{
+			event,
+			previousValue,
+			req,
+		}: { event?: 'onChange' | 'submit'; previousValue?: unknown; req: PayloadRequest }
 	): Promise<string | true> => {
 		if (typeof value !== 'string' || value.trim() === '') {
 			return req.t('validation:required')
@@ -209,9 +213,15 @@ const makeValidateUrl =
 		if (refusal) {
 			return asTranslate(req.t)(REFUSAL_KEY[refusal])
 		}
-		// Told now rather than through a dead delivery row. The socket enforces the same rule on
-		// every send, so a name that changes its answer later gains nothing by passing here.
-		if (!policy.allowPrivateAddresses && (await resolvesToBlocked(hostOf(value)))) {
+		// Told on save rather than through a dead delivery row. The socket enforces the same rule on
+		// every send, so a name that changes its answer later gains nothing by passing here. The
+		// admin re-validates on every debounced change once a form was submitted (`onChange`), half
+		// typed hosts included, and a lookup cannot be cancelled, so only the save itself asks DNS.
+		if (
+			event !== 'onChange' &&
+			!policy.allowPrivateAddresses &&
+			(await resolvesToBlocked(hostOf(value)))
+		) {
 			return asTranslate(req.t)(keys.urlPrivateAddress)
 		}
 		return true
