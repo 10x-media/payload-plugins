@@ -137,7 +137,7 @@ Pick the bump by what a consumer experiences:
 - **minor**: new feature, option, or export
 - **patch**: bug fix or internal change with no public API change
 
-The repo is in beta pre-mode (`.changeset/pre.json`, tag `beta`). While in pre-mode every release publishes as `0.x.y-beta.N` regardless of bump type, but the bump you choose is still recorded and determines the version when the project later exits pre-mode and cuts a stable release. Choose the correct bump even during beta.
+The repo is in beta pre-mode (`.changeset/pre.json`, tag `beta`). In pre-mode a package's version is its `initialVersions` entry (`0.0.0`) bumped by the highest bump of the cycle, so a single `major` changeset moves it to `1.0.0-beta.N`. Until a package leaves beta, use `minor` for a breaking change too, and say what breaks and what to do in the changeset itself. `pnpm exec changeset status --verbose` shows the version a release would cut.
 
 A release of one plugin does not release the plugins that list it in `peerDependencies` while the new version still satisfies their range (`onlyUpdatePeerDependentsWhenOutOfRange` in `.changeset/config.json`). Without it, changesets gives every peer dependent a major bump on any minor of its peer, so a `fields` feature alone would push `webhooks` from `0.1.0-beta.5` to `1.0.0-beta.6`. A plugin that needs the newer version raises its own peer range in `package.json` and ships a changeset for that, which releases it as usual. A version that leaves a dependent's range still bumps that dependent to major.
 
@@ -171,7 +171,7 @@ Commits follow [Conventional Commits](https://www.conventionalcommits.org), enfo
 - **scope** (optional, encouraged): the package short name (`jobs`, `automations`, `webhooks`), or `harness`, `docs`, `repo` for cross-cutting work.
 - **summary**: imperative, lower-case, no trailing period.
 
-Examples: `feat(jobs): add stuck-job sweeper`, `fix(harness): close the pg pool before stopping the container`, `docs(jobs): document the multi-node worker`. The commit `type` does not drive the release; the Changeset does. A breaking change still needs a `major` Changeset.
+Examples: `feat(jobs): add stuck-job sweeper`, `fix(harness): close the pg pool before stopping the container`, `docs(jobs): document the multi-node worker`. The commit `type` does not drive the release; the Changeset does. During beta a breaking change is a `minor` Changeset that says so (see above).
 
 ## PR flow
 

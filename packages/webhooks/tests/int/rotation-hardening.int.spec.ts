@@ -7,6 +7,7 @@ import { webhooks } from '../../src/index'
 import { resolveSecretRotationOptions } from '../../src/options'
 import { generateSecret } from '../../src/secrets/format'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
+import { LOCAL_SINK } from './localSink'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -46,7 +47,10 @@ describe('rotation hardening', () => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db: 'mongo',
 			collections: [posts],
 		})
@@ -190,7 +194,10 @@ describe('the rotate-secret endpoint handler', () => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db: 'mongo',
 			collections: [posts],
 		})

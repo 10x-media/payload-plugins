@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { WEBHOOK_DELIVER_TASK } from '../constants'
+import { transport } from './destination'
 import type { RedeliverDeps } from './redeliver'
 import { redeliverDelivery } from './redeliver'
 
@@ -11,6 +12,7 @@ const deps: RedeliverDeps = {
 	mode: 'inline',
 	timeoutMs: 5000,
 	queue: 'webhooks',
+	urlPolicy: { allowHttp: true, allowPrivateAddresses: true },
 }
 
 const original = {
@@ -63,7 +65,7 @@ describe('redeliverDelivery', () => {
 			events: ['posts.updated'],
 			enabled: false,
 		})
-		const fetchSpy = vi.spyOn(globalThis, 'fetch')
+		const fetchSpy = vi.spyOn(transport, 'fetch')
 
 		const result = await redeliverDelivery({ deps, deliveryId: 'del-1', payload, req })
 
@@ -82,7 +84,7 @@ describe('redeliverDelivery', () => {
 			events: ['posts.updated'],
 			enabled: false,
 		})
-		const fetchSpy = vi.spyOn(globalThis, 'fetch')
+		const fetchSpy = vi.spyOn(transport, 'fetch')
 
 		await redeliverDelivery({ deps, deliveryId: 'del-1', payload, req })
 
@@ -96,10 +98,9 @@ describe('redeliverDelivery', () => {
 	it('reports whether an inline replay was accepted or rejected by the receiver', async () => {
 		const row = { id: 'sub-1', url: 'https://receiver.test/hook', events: [], enabled: true }
 		const answer = (status: number) =>
-			vi.stubGlobal(
-				'fetch',
-				vi.fn().mockResolvedValue({ ok: status < 400, status, text: async () => '' })
-			)
+			vi
+				.spyOn(transport, 'fetch')
+				.mockResolvedValue({ ok: status < 400, status, body: null } as never)
 
 		answer(200)
 		const accepted = await redeliverDelivery({
@@ -118,7 +119,7 @@ describe('redeliverDelivery', () => {
 			req,
 		})
 		expect(rejected.status).toBe('dead')
-		vi.unstubAllGlobals()
+		vi.restoreAllMocks()
 	})
 
 	/** The task would refuse it anyway when it ran; saying so now beats reporting it as queued. */
@@ -144,7 +145,7 @@ describe('redeliverDelivery', () => {
 
 	it('marks the new delivery dead when the subscription is missing, falling back to the stored endpoint', async () => {
 		const { payload, updates, creates } = makePayload(null)
-		const fetchSpy = vi.spyOn(globalThis, 'fetch')
+		const fetchSpy = vi.spyOn(transport, 'fetch')
 
 		await redeliverDelivery({ deps, deliveryId: 'del-1', payload, req })
 
@@ -160,21 +161,14 @@ describe('redeliverDelivery', () => {
 			events: ['posts.updated'],
 			enabled: true,
 		})
-		vi.stubGlobal(
-			'fetch',
-			vi.fn().mockResolvedValue({
-				ok: true,
-				status: 200,
-				text: async () => '',
-			})
-		)
+		vi.spyOn(transport, 'fetch').mockResolvedValue({ ok: true, status: 200, body: null } as never)
 
 		const result = await redeliverDelivery({ deps, deliveryId: 'del-1', payload, req })
 
 		expect(result.id).toBe('del-2')
 		expect(creates[0]?.endpoint).toBe('https://receiver.test/new-hook')
 		expect(creates[0]?.endpoint).not.toBe(original.endpoint)
-		vi.unstubAllGlobals()
+		vi.restoreAllMocks()
 	})
 
 	it('stores the live subscription url on the new row when it differs from the original endpoint (queue mode)', async () => {

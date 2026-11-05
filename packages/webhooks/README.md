@@ -16,6 +16,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 - **[Standard Webhooks](https://www.standardwebhooks.com/) signing**: HMAC-SHA256 over `${id}.${timestamp}.${body}`, base64, under `webhook-signature`, so receivers verify with an off-the-shelf library.
 - **Write-only secrets**, AES-256-GCM encrypted at rest via `@10x-media/fields`, shown once and stripped from every read.
 - **Secret rotation** with a grace period that signs with both secrets until receivers have switched over.
+- **Multi-tenant safe**: owner-bound subscriptions that only receive what their owner can read, per-subscription filters, and an SSRF policy on subscription URLs.
 - **Delivery log** with status, response code, duration, the exact body sent, and one-click redelivery.
 - **Jobs family interop**: installing `@10x-media/jobs` switches delivery to the queue automatically.
 - **Typed translations** with per-key overrides via `@10x-media/webhooks/i18n`.
@@ -57,6 +58,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/webhooks):
 - [Deliveries](https://docs.10xmedia.de/webhooks/deliveries)
 - [Signing and secrets](https://docs.10xmedia.de/webhooks/signing)
 - [Security model](https://docs.10xmedia.de/webhooks/security)
+- [Multi-tenancy](https://docs.10xmedia.de/webhooks/multi-tenancy)
 - [i18n](https://docs.10xmedia.de/webhooks/i18n)
 
 ## License
