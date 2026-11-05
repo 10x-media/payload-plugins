@@ -10,6 +10,8 @@ description: Use when the user has finished a code change in a plugin and needs 
    - **major**: breaking change to public API (export removed/renamed, option shape changed in a non-additive way)
    - **minor**: new public feature, new options, new exports
    - **patch**: bug fix, doc fix, internal refactor with no API surface change
+
+   While the repo is in beta pre-mode (`.changeset/pre.json` exists), do not use **major**: it moves the package to `1.0.0-beta.N`. Use **minor** for a breaking change and describe what breaks, and what to do, in the changeset itself.
 3. Run: `pnpm changeset`. Use space to select packages, then pick the bump and write the user-facing changelog line.
 4. The line should describe what the user gets, not what the implementer did. Good: "Add retry policy option to automations". Bad: "Refactor jobs.ts to extract policy logic".
 5. Commit the resulting `.changeset/*.md` file with the code change in the same PR.
