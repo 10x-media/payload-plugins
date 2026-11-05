@@ -129,7 +129,7 @@ export type UiOptions = {
 	 */
 	documentAction?: boolean
 	/**
-	 * How the bar, the collapsed chip, and the frontend banner name users:
+	 * How the bar and the frontend banner name users:
 	 * `'title'` is the collection's `useAsTitle` (falls back to the email),
 	 * `'email'` is the email.
 	 * @default 'title'

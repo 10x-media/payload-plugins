@@ -6,8 +6,6 @@ export const pt: Record<TranslationKey, string> = {
 	[keys.collectionSingular]: 'Sessão de impersonação',
 	[keys.confirm]: 'Personificar',
 	[keys.confirmTitle]: 'Personificar este utilizador?',
-	[keys.collapseBar]: 'Recolher a barra de impersonação',
-	[keys.expandBar]: 'Expandir a barra de impersonação',
 	[keys.endSession]: 'Terminar sessão',
 	[keys.endSessionBody]: 'Isto termina a impersonação. O alvo volta a ser ele próprio.',
 	[keys.errorAlreadyImpersonating]: 'Já existe uma impersonação ativa',

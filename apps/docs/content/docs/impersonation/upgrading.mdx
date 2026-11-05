@@ -35,6 +35,8 @@ Payload 3's default access let any signed-in user through. Payload 4's lets only
 
 ## What looks different
 
-The bar, chip and switcher use Payload 4's tokens. Swap mode keeps the warning tone; the admin side of a parallel session moves from the success tokens (green in Payload 3's light theme) to Payload 4's selected blue, the family of its `success` pill. The switcher is Payload 4's drawer, with its list search and a collection menu button. Payload 4 versions every collection by default; the sessions collection opts out (`versions: false`), since the plugin writes its rows and nobody edits them.
+The bar moved from the bottom of the screen to Payload's `header` slot, above the nav and the content: Payload 4 pins the list pagination to the bottom, which a fixed bar would always cover. It is one line in the flow of the page, so there is nothing to collapse any more; the collapsed chip is gone, and so are the `collapseBar` and `expandBar` translations. Admin pages without the nav, such as `/admin/unauthorized`, still pin the bar to the bottom. If another plugin also uses the `header` slot, the two stack.
+
+The bar and switcher use Payload 4's tokens. Swap mode keeps the warning tone; the admin side of a parallel session moves from the success tokens (green in Payload 3's light theme) to Payload 4's selected blue, the family of its `success` pill. The switcher is Payload 4's drawer, with its list search and a collection menu button. Payload 4 versions every collection by default; the sessions collection opts out (`versions: false`), since the plugin writes its rows and nobody edits them.
 
 On Postgres, the plugin's tables are unchanged; Payload 4's own schema changes come with Payload's migration.

@@ -6,8 +6,6 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.collectionSingular]: '가장 세션',
 	[keys.confirm]: '가장하기',
 	[keys.confirmTitle]: '이 사용자로 가장할까요?',
-	[keys.collapseBar]: '가장 막대 접기',
-	[keys.expandBar]: '가장 막대 펼치기',
 	[keys.endSession]: '세션 종료',
 	[keys.endSessionBody]: '가장을 종료합니다. 대상은 다시 본인으로 로그인됩니다.',
 	[keys.errorAlreadyImpersonating]: '이미 가장 중입니다',

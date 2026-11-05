@@ -20,8 +20,8 @@ import { errorKey } from '../translations/errorKey'
 import { keys, type TranslationKey } from '../translations/keys'
 import { fillTemplate, messageFor } from '../translations/lookup'
 import { asAuthUser, boundSid } from '../types'
-import { ImpersonationBar } from './ImpersonationBar'
 import { ImpersonationClientConfig } from './ImpersonationConfig'
+import { ImpersonationFixedBar } from './ImpersonationHeader'
 
 export type ImpersonationProviderProps = ServerProps & { children?: ReactNode }
 
@@ -144,30 +144,29 @@ export const ImpersonationProvider = async ({
 		? message(keys.endSession)
 		: fillTemplate(message(keys.returnTo), '{{name}}', String(impersonatorLabel))
 
+	const bar = {
+		actingAs,
+		adminRoute: payload.config.routes.admin,
+		apiPath,
+		frontendUrl: payload.config.serverURL || undefined,
+		impersonatorLocale: locale,
+		messages: {
+			errors: Object.fromEntries(FAILURE_CODES.map((code) => [code, message(errorKey(code))])),
+		},
+		openWebsite: message(keys.openWebsite),
+		pluginName: message(keys.pluginName),
+		returnTo,
+		sessionEndsAt: barSource.absoluteExpiresAt,
+		sessionEndsAtTemplate: message(keys.sessionEndsAt),
+		sessionEndsInTemplate: message(keys.sessionEndsIn),
+		showFrontendLink: isImpersonatorSide,
+		tone: isImpersonatorSide ? ('quiet' as const) : ('warning' as const),
+	}
+
 	return (
-		<ImpersonationClientConfig value={clientValue}>
+		<ImpersonationClientConfig value={{ ...clientValue, bar }}>
 			{children}
-			<ImpersonationBar
-				actingAs={actingAs}
-				adminRoute={payload.config.routes.admin}
-				apiPath={apiPath}
-				frontendUrl={payload.config.serverURL || undefined}
-				impersonatorLocale={locale}
-				messages={{
-					collapseBar: message(keys.collapseBar),
-					errors: Object.fromEntries(FAILURE_CODES.map((code) => [code, message(errorKey(code))])),
-					expandBar: message(keys.expandBar),
-				}}
-				openWebsite={message(keys.openWebsite)}
-				pluginName={message(keys.pluginName)}
-				returnTo={returnTo}
-				sessionEndsAt={barSource.absoluteExpiresAt}
-				sessionEndsAtTemplate={message(keys.sessionEndsAt)}
-				sessionEndsInTemplate={message(keys.sessionEndsIn)}
-				showFrontendLink={isImpersonatorSide}
-				targetName={targetName}
-				tone={isImpersonatorSide ? 'quiet' : 'warning'}
-			/>
+			<ImpersonationFixedBar />
 		</ImpersonationClientConfig>
 	)
 }

@@ -3,6 +3,7 @@ import { ImpersonationDocumentButton as ImpersonationDocumentButton_29b217e54847
 import { EndSessionMenuItem as EndSessionMenuItem_29b217e54847fa4511622a965ae4f895 } from '@10x-media/impersonation/client'
 import { LLMInstructionsDescription as LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { LLMInstructionsCell as LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { ImpersonationHeader as ImpersonationHeader_29b217e54847fa4511622a965ae4f895 } from '@10x-media/impersonation/client'
 import { ImpersonationAction as ImpersonationAction_59e9dfcbfaee95b3a2ecff56d5d216e8 } from '@10x-media/impersonation/rsc'
 import { ImpersonationProvider as ImpersonationProvider_59e9dfcbfaee95b3a2ecff56d5d216e8 } from '@10x-media/impersonation/rsc'
 import { WelcomeWidget as WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
@@ -20,6 +21,7 @@ export const importMap = {
   "@10x-media/impersonation/client#EndSessionMenuItem": EndSessionMenuItem_29b217e54847fa4511622a965ae4f895,
   "@payloadcms/ui#LLMInstructionsDescription": LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui/rsc#LLMInstructionsCell": LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a,
+  "@10x-media/impersonation/client#ImpersonationHeader": ImpersonationHeader_29b217e54847fa4511622a965ae4f895,
   "@10x-media/impersonation/rsc#ImpersonationAction": ImpersonationAction_59e9dfcbfaee95b3a2ecff56d5d216e8,
   "@10x-media/impersonation/rsc#ImpersonationProvider": ImpersonationProvider_59e9dfcbfaee95b3a2ecff56d5d216e8,
   "@payloadcms/ui/rsc#WelcomeWidget": WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a,

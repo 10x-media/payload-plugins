@@ -9,8 +9,6 @@ export const keys = {
 	collectionSingular: 'impersonation:collectionSingular',
 	confirm: 'impersonation:confirm',
 	confirmTitle: 'impersonation:confirmTitle',
-	collapseBar: 'impersonation:collapseBar',
-	expandBar: 'impersonation:expandBar',
 	endSession: 'impersonation:endSession',
 	endSessionBody: 'impersonation:endSessionBody',
 	errorAlreadyImpersonating: 'impersonation:errorAlreadyImpersonating',

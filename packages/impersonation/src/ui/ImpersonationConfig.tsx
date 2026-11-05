@@ -4,11 +4,14 @@ import type { Where } from 'payload'
 import { createContext, type ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 
 import type { ImpersonationStatus } from '../getImpersonation'
+import type { ImpersonationBarProps } from './ImpersonationBar'
 
 export type TargetFilterMap = Record<string, true | Where>
 
 export type ImpersonationClientOptions = {
 	apiPath: string
+	/** The admin bar's props, when this request is part of an impersonation and the bar is on. */
+	bar?: Omit<ImpersonationBarProps, 'placement'>
 	cardEmail: boolean
 	reasonMode: 'off' | 'optional' | 'required'
 	sessionCollection: string

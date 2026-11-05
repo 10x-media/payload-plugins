@@ -6,8 +6,6 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.collectionSingular]: 'Сеанс імперсонації',
 	[keys.confirm]: 'Імперсонувати',
 	[keys.confirmTitle]: 'Імперсонувати цього користувача?',
-	[keys.collapseBar]: 'Згорнути панель імперсонації',
-	[keys.expandBar]: 'Розгорнути панель імперсонації',
 	[keys.endSession]: 'Завершити сеанс',
 	[keys.endSessionBody]: 'Імперсонацію буде завершено. Ціль знову ввійде як вона сама.',
 	[keys.errorAlreadyImpersonating]: 'Імперсонація вже триває',

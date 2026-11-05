@@ -6,8 +6,6 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.collectionSingular]: "Session d'usurpation",
 	[keys.confirm]: 'Usurper',
 	[keys.confirmTitle]: 'Usurper cet utilisateur ?',
-	[keys.collapseBar]: "Réduire la barre d'impersonation",
-	[keys.expandBar]: "Développer la barre d'impersonation",
 	[keys.endSession]: 'Terminer la session',
 	[keys.endSessionBody]: "Cela met fin à l'impersonation. La cible redevient elle-même.",
 	[keys.errorAlreadyImpersonating]: 'Usurpation déjà en cours',
