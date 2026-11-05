@@ -3,11 +3,13 @@
 # @10x-media/dedupe
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/dedupe` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/dedupe` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/dedupe).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/dedupe@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/dedupe) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
 Find duplicate documents in any Payload collection and merge a group of them into one from the admin.
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 ## Features
 
@@ -23,7 +25,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Quick start
 
 ```bash
-pnpm add @10x-media/dedupe
+pnpm add @10x-media/dedupe@alpha
 ```
 
 ```ts

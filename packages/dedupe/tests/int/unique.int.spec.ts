@@ -26,7 +26,12 @@ describeForDb('dedupe unique values', {}, (db) => {
 	let n = 0
 
 	const create = (collection: CollectionSlug, data: Record<string, unknown>) =>
-		fixture.booted.payload.create({ collection, data: data as never, depth: 0 }) as Promise<Doc>
+		fixture.booted.payload.create({
+			overrideAccess: true,
+			collection,
+			data: data as never,
+			depth: 0,
+		}) as Promise<Doc>
 	const find = (collection: CollectionSlug, id: number | string) =>
 		fixture.booted.payload.findByID({
 			collection,
@@ -58,6 +63,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 			label: `label-${n}`,
 		})
 		await fixture.booted.payload.update({
+			overrideAccess: true,
 			collection: ACCOUNTS,
 			id: doc.id,
 			data: {
@@ -126,6 +132,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 			[absorbed, 'g'],
 		] as const) {
 			await fixture.booted.payload.update({
+				overrideAccess: true,
 				collection: ACCOUNTS,
 				id: doc.id,
 				data: { contact: { email: `${mark}${n}@contact.test`, phone: `phone-${mark}` } } as never,
@@ -207,6 +214,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 				_status: 'published',
 			})
 			await fixture.booted.payload.update({
+				overrideAccess: true,
 				collection: POSTS,
 				id: doc.id,
 				locale: 'de',
@@ -217,6 +225,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 		const survivor = await post('ds1')
 		const absorbed = await post('ds2')
 		await fixture.booted.payload.update({
+			overrideAccess: true,
 			collection: POSTS,
 			id: absorbed.id,
 			locale: 'de',
@@ -225,6 +234,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 		})
 		await applyMerge(args(POSTS, [survivor, absorbed], take('slug@en')))
 		const latest = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: POSTS,
 			id: absorbed.id,
 			draft: true,
@@ -247,6 +257,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 				[absorbed, ['y-alias', 'z-alias']],
 			] as const) {
 				await fixture.booted.payload.update({
+					overrideAccess: true,
 					collection: ACCOUNTS,
 					id: doc.id,
 					data: { aliases } as never,
@@ -297,6 +308,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 			[absorbed, 'us'],
 		] as const) {
 			await fixture.booted.payload.update({
+				overrideAccess: true,
 				collection: ACCOUNTS,
 				id: doc.id,
 				data: { region, externalId: '' } as never,
@@ -369,6 +381,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 			const absorbed = await account()
 			for (const doc of [survivor, absorbed]) {
 				await fixture.booted.payload.update({
+					overrideAccess: true,
 					collection: ACCOUNTS,
 					id: doc.id,
 					data: rows(String(doc.id)) as never,
@@ -405,6 +418,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 				card: { title: `card ${badge}`, lines: [{ text: 'line', badge }] },
 			})
 			await fixture.booted.payload.update({
+				overrideAccess: true,
 				collection: TEAMS,
 				id: doc.id,
 				locale: 'de' as never,
@@ -426,6 +440,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 		})
 		await applyMerge(merge)
 		const gone = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: TEAMS,
 			id: absorbed.id,
 			depth: 0,
@@ -436,6 +451,7 @@ describeForDb('dedupe unique values', {}, (db) => {
 		expect(card.title).toBe(`card gone-${n}`)
 		expect(card.lines[0]?.badge).toBe(`merged-${absorbed.id} gone-${n}`)
 		const german = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: TEAMS,
 			id: absorbed.id,
 			depth: 0,

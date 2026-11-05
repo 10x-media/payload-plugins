@@ -5,29 +5,50 @@
 /* Queue ------------------------------------------------------------------- */
 
 .dedupe-queue {
-	padding-bottom: var(--spacing-view-bottom);
-}
-
-.dedupe-queue .list-controls {
-	margin-block: var(--base);
-}
-
-/* Five tabs do not always fit beside the title, depending on the width, the nav and the
-   language: then they go under it and wrap. */
-.dedupe-queue .list-header__content {
 	display: flex;
-	flex-wrap: wrap;
-	align-items: flex-end;
-	justify-content: space-between;
-	gap: calc(var(--base) / 2) var(--base);
+	flex: 1;
+	flex-direction: column;
+	width: 100%;
 }
 
-.dedupe-queue .list-header__actions {
-	min-width: 0;
+.dedupe-queue__sub-header {
+	flex-basis: 100%;
+	padding-top: var(--spacer-2-5);
 }
 
-.dedupe-queue .default-list-view-tabs {
-	flex-wrap: wrap;
+.dedupe-queue__notice {
+	padding-top: var(--spacer-3);
+}
+
+.dedupe-choice__button .btn__label {
+	display: inline-flex;
+	gap: var(--spacer-1);
+	max-width: 280px;
+}
+
+.dedupe-choice__value {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+	color: var(--color-text-secondary);
+}
+
+.dedupe-choice__button--active .dedupe-choice__value {
+	color: inherit;
+	font-weight: var(--text-body-medium-bold-font-weight);
+}
+
+/* The group opens from its first column, drawn as the list view draws a linked cell. */
+.dedupe-queue__table td.cell-documents > a {
+	font-weight: var(--text-body-medium-bold-font-weight);
+	text-decoration-line: underline;
+	text-decoration-color: var(--color-border);
+	text-underline-offset: 2px;
+	text-underline-position: from-font;
+}
+
+.dedupe-queue__table td.cell-documents > a:hover {
+	text-decoration-color: var(--color-text);
 }
 
 /* The admin gives every cell room for text; a percentage needs none of it. */
@@ -41,16 +62,20 @@
 }
 
 .dedupe-signals__apart {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 /* Merge ------------------------------------------------------------------- */
 
+/* Fills the page as the list view does, so the footer sits at the bottom of the window even
+   below a short merge; the screen carries the gutter itself, so the footer can span it. */
 .dedupe-merge {
 	display: flex;
+	flex: 1;
 	flex-direction: column;
-	gap: var(--base);
-	padding-bottom: calc(var(--base) * 2);
+	gap: var(--spacer-3);
+	width: 100%;
+	padding-inline: var(--gutter-h);
 }
 
 .dedupe-merge__header {
@@ -58,12 +83,17 @@
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: space-between;
-	gap: var(--base);
+	gap: var(--spacer-3);
 }
 
 /* Cut short like the title of Payload's edit view. */
 .dedupe-merge__header h1 {
 	margin: 0;
+	color: var(--color-text);
+	font-size: var(--text-heading-xl-font-size);
+	font-weight: var(--text-heading-xl-font-weight);
+	line-height: var(--text-heading-xl-line-height);
+	letter-spacing: var(--text-heading-xl-letter-spacing);
 	min-width: 0;
 	max-width: 100%;
 	overflow: hidden;
@@ -85,7 +115,7 @@
 .dedupe-merge__grid {
 	display: grid;
 	grid-template-columns: repeat(var(--dedupe-docs), minmax(0, 1fr));
-	column-gap: var(--base);
+	column-gap: var(--spacer-3);
 	align-items: stretch;
 }
 
@@ -105,12 +135,12 @@
 	top: 0;
 	z-index: 3;
 	overflow-x: hidden;
-	border-bottom: 1px solid var(--theme-elevation-100);
-	background: var(--theme-bg);
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
+	background: var(--color-bg);
 }
 
 .dedupe-merge__grid {
-	padding-bottom: calc(var(--base) / 2);
+	padding-bottom: var(--spacer-2);
 	overflow-x: auto;
 	scroll-snap-type: x mandatory;
 }
@@ -133,15 +163,15 @@
 	container: dedupe-head / inline-size;
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 4);
+	gap: var(--spacer-1);
 	min-width: 0;
-	padding: calc(var(--base) * 0.75) 0 calc(var(--base) / 2);
+	padding: var(--spacer-2-5) 0 var(--spacer-2);
 }
 
 .dedupe-merge__head-title {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) / 4);
+	gap: var(--spacer-1);
 	min-width: 0;
 }
 
@@ -150,10 +180,9 @@
 	min-width: 0;
 	overflow: hidden;
 	font: inherit;
-	/* The admin's h4. */
-	font-size: calc(var(--base) * 0.8);
-	font-weight: 600;
-	line-height: var(--base);
+	font-size: var(--text-body-large-bold-font-size);
+	font-weight: var(--text-body-large-bold-font-weight);
+	line-height: var(--text-body-large-bold-line-height);
 	text-align: start;
 	text-decoration: underline;
 	text-overflow: ellipsis;
@@ -164,19 +193,20 @@
 .dedupe-merge__head-meta {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0 var(--base);
+	gap: 0 var(--spacer-3);
 	margin: 0;
-	font-size: 0.85em;
+	font-size: var(--text-body-small-font-size);
+	line-height: var(--text-body-small-line-height);
 }
 
 .dedupe-merge__head-meta > div {
 	display: flex;
-	gap: calc(var(--base) / 4);
+	gap: var(--spacer-1);
 	white-space: nowrap;
 }
 
 .dedupe-merge__head-meta dt {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .dedupe-merge__head-meta dd {
@@ -194,17 +224,17 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: calc(var(--base) / 4) calc(var(--base) / 2);
+	gap: var(--spacer-1) var(--spacer-2);
 	min-width: 0;
-	padding: calc(var(--base) * 1.25) 0 calc(var(--base) / 2);
-	background: var(--theme-bg);
+	padding: var(--spacer-4) 0 var(--spacer-2);
+	background: var(--color-bg);
 }
 
 .dedupe-merge__label-name {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) / 4);
-	font-weight: 600;
+	gap: var(--spacer-1);
+	font-weight: var(--text-body-medium-bold-font-weight);
 	overflow-wrap: anywhere;
 }
 
@@ -224,15 +254,20 @@
 	align-items: center;
 	width: 100%;
 	min-width: 0;
-	min-height: 40px;
+	min-height: var(--field-min-height-large);
 	margin: 0;
 	padding-block: 0;
-	padding-inline: calc(var(--base) / 2) calc(var(--base) * 0.75);
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-input-bg);
-	box-shadow: 0 2px 2px -1px rgb(0 0 0 / 0.1);
+	padding-inline: var(--spacer-2) var(--spacer-2-5);
+	border: var(--stroke-width-small) solid var(--field-color-border);
+	border-radius: var(--field-border-radius);
+	background: var(--field-color-bg);
 	cursor: pointer;
+}
+
+/* Payload spaces the radio or check from its label with a gap; here the label's own margin
+   does, so the square before the separator stays as wide as the field is tall. */
+:is(.dedupe-merge__field, .dedupe-merge__line) :is(.radio-input, .checkbox-input__wrap) {
+	gap: 0;
 }
 
 .dedupe-merge__field > .radio-input {
@@ -250,15 +285,15 @@
 	align-items: center;
 	min-width: 0;
 	margin: 0;
-	margin-inline-start: calc(var(--base) / 2);
-	padding: calc(var(--base) * 0.4) 0;
-	padding-inline-start: calc(var(--base) * 0.75);
-	border-inline-start: 1px solid var(--theme-elevation-150);
+	margin-inline-start: var(--spacer-2);
+	padding: var(--spacer-1-5) 0;
+	padding-inline-start: var(--spacer-2-5);
+	border-inline-start: var(--stroke-width-small) solid var(--field-color-border);
 	overflow-wrap: anywhere;
 }
 
 label.dedupe-merge__field:hover {
-	border-color: var(--theme-elevation-250);
+	border-color: var(--field-color-border-hover);
 }
 
 /* A section's outcome the reviewer has no say in: drawn picked, and nothing to click. */
@@ -267,19 +302,19 @@ label.dedupe-merge__field--fixed {
 }
 
 label.dedupe-merge__field--fixed.dedupe-merge__cell--picked:hover {
-	border-color: var(--theme-elevation-700);
+	border-color: var(--color-border-selected-strong);
 }
 
 .dedupe-merge__field.dedupe-merge__cell--picked,
 .dedupe-merge__list:has(.checkbox-input--checked:not(.checkbox-input--read-only)) {
-	border-color: var(--theme-elevation-700);
+	border-color: var(--color-border-selected-strong);
 }
 
 /* A value that cannot be picked here, as the admin draws a read-only input. */
 .dedupe-merge__field--read-only {
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-400);
-	box-shadow: none;
+	background: var(--field-color-bg-readonly);
+	border-color: var(--field-color-border-readonly);
+	color: var(--field-color-text-readonly);
 	cursor: default;
 }
 
@@ -288,7 +323,13 @@ label.dedupe-merge__field--fixed.dedupe-merge__cell--picked:hover {
 	flex-shrink: 0;
 }
 
+/* Payload's version view tints a changed field's whole row (`--diff-*-parent-bg`) and pulls it
+   8px past its content; in a cell that row would cover the field's border, so only the marks on
+   the changed words stay, in the version view's own `--diff-*-pill-*` colours. */
 .dedupe-merge__cell .html-diff {
+	margin-block: 0;
+	padding-block: 0;
+	background: none;
 	font-size: inherit;
 }
 
@@ -317,21 +358,20 @@ label.dedupe-merge__field--fixed.dedupe-merge__cell--picked:hover {
 	margin: 0;
 	padding: 0;
 	list-style: none;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-input-bg);
-	box-shadow: 0 2px 2px -1px rgb(0 0 0 / 0.1);
+	border: var(--stroke-width-small) solid var(--field-color-border);
+	border-radius: var(--field-border-radius);
+	background: var(--field-color-bg);
 }
 
 div.dedupe-merge__list {
-	padding: calc(var(--base) * 0.4) calc(var(--base) * 0.75);
+	padding: var(--spacer-1-5) var(--field-padding-inline);
 }
 
-/* No rows: as tall as one closed row (a 24px line, the header's 8px padding, a border), not
-   as tall as the longest list beside it. */
+/* No rows: as tall as one closed row (Payload's toggle is `--spacer-5` tall), not as tall as
+   the longest list beside it. */
 div.dedupe-merge__list--rows {
 	align-self: start;
-	min-height: calc(24px + 2 * 8px + 2px);
+	min-height: var(--spacer-5);
 }
 
 .dedupe-merge__item {
@@ -341,7 +381,7 @@ div.dedupe-merge__list--rows {
 }
 
 .dedupe-merge__item + .dedupe-merge__item {
-	border-top: 1px solid var(--theme-elevation-150);
+	border-top: var(--stroke-width-small) solid var(--field-color-border);
 }
 
 .dedupe-merge__line {
@@ -349,10 +389,10 @@ div.dedupe-merge__list--rows {
 	flex: 1 1 auto;
 	align-items: center;
 	min-width: 0;
-	min-height: 40px;
+	min-height: var(--field-min-height-large);
 	margin: 0;
 	padding-block: 0;
-	padding-inline: calc(var(--base) / 2) calc(var(--base) * 0.75);
+	padding-inline: var(--spacer-2) var(--spacer-2-5);
 }
 
 /* Rows of an array or blocks as the document's own form draws them, read-only. The field's own
@@ -381,13 +421,13 @@ div.dedupe-merge__list--rows {
 	> :is(.array-field__draggable-rows, .blocks-field__rows) {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 2);
+	gap: var(--spacer-2);
 }
 
 /* A nested list's header in a narrow column: its buttons go under the title rather than breaking it. */
 .dedupe-merge__rows :is(.array-field__header-wrap, .blocks-field__header-wrap) {
 	flex-wrap: wrap;
-	row-gap: calc(var(--base) / 4);
+	row-gap: var(--spacer-1);
 }
 
 .dedupe-merge__rows :is(.array-field__header-content, .blocks-field__heading-with-error) h3,
@@ -401,7 +441,7 @@ div.dedupe-merge__list--rows {
 
 /* Payload clips the header to cut a long label short, and its focus glow on the check spreads
    6px: the clip grows by as much on every side, and the header keeps its height. */
-.dedupe-merge__rows .collapsible__header-wrap--has-drag-handle {
+.dedupe-merge__rows .collapsible__header-wrap {
 	left: 0;
 	margin-block: -6px;
 	padding-block: 6px;
@@ -417,14 +457,14 @@ div.dedupe-merge__list--rows {
 }
 
 .dedupe-merge__rows .collapsible:has(> .collapsible__toggle-wrap .checkbox-input--checked) {
-	border-color: var(--theme-elevation-700);
+	border-color: var(--color-border-selected-strong);
 }
 
 /* The header lets a click through to the toggle under it; the check takes its own. */
 .dedupe-merge__row-pick {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) * 0.5);
+	gap: var(--spacer-2);
 	min-width: 0;
 }
 
@@ -462,7 +502,7 @@ div.dedupe-merge__list--rows {
 .dedupe-merge__drawn {
 	flex: 1 1 auto;
 	min-width: 0;
-	padding-block: calc(var(--base) / 2);
+	padding-block: var(--spacer-2);
 }
 
 /* The cell spaces the component; the outer margin it keeps for a form goes, an inline one too. */
@@ -478,36 +518,38 @@ div.dedupe-merge__list--rows {
 /* A component draws no diff: a value that differs from the primary's is marked on its cell,
    in the colour the version view marks a change with. */
 .dedupe-merge__cell--differs {
-	box-shadow: inset 3px 0 0 var(--theme-success-500);
+	box-shadow: inset 3px 0 0 var(--color-border-success-strong);
 }
 
-/* Laid out as Payload's block header: its parts stretch to one height, the block's name too. */
+/* Laid out as Payload's block header (`.blocks-field__block-header`): number, pill and name
+   centred on one line. */
 .dedupe-merge__row-name {
 	display: flex;
-	gap: calc(var(--base) * 0.375);
+	align-items: center;
+	gap: var(--spacer-2);
 }
 
 /* A value another document holds, drawn as the admin draws what cannot be changed. */
 .dedupe-merge__line.checkbox-input--read-only {
-	color: var(--theme-elevation-400);
+	color: var(--color-text-tertiary);
 }
 
 .dedupe-merge__value--empty {
-	color: var(--theme-elevation-400);
+	color: var(--color-text-tertiary);
 	font-style: italic;
 }
 
 .dedupe-merge__releases {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 2);
+	gap: var(--spacer-2);
 }
 
 /* The matrix, the documents that move and what the merged-in documents give up. */
 .dedupe-merge__body {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) / 2);
+	gap: var(--spacer-2);
 }
 
 /* Answers for the survivor or documents the reviewer has just changed are on their way. */
@@ -516,7 +558,8 @@ div.dedupe-merge__list--rows {
 	transition: opacity 0.2s;
 }
 
-/* Stays in reach at the end of a long screen; above the sticky headers of any card. */
+/* Pinned to the bottom of the window as the list view's page controls are, its border from
+   the sidebar to the window's edge; above the sticky headers of any card. */
 .dedupe-merge__footer {
 	position: sticky;
 	bottom: 0;
@@ -525,33 +568,19 @@ div.dedupe-merge__list--rows {
 	flex-wrap: wrap;
 	align-items: center;
 	justify-content: flex-end;
-	gap: calc(var(--base) / 2);
-	padding-block: calc(var(--base) / 2);
-	background: var(--theme-bg);
-	border-top: 1px solid var(--theme-elevation-100);
+	gap: var(--spacer-2);
+	margin-top: auto;
+	margin-inline: calc(-1 * var(--gutter-h));
+	padding: var(--spacer-2-5) var(--gutter-h);
+	background: var(--color-bg);
+	border-top: var(--stroke-width-small) solid var(--color-border);
 }
 
 .dedupe-merge__toggles {
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--base) / 2) var(--base);
+	gap: var(--spacer-2) var(--spacer-3);
 	margin-inline-end: auto;
-}
-
-.dedupe-merge__toggles .checkbox-input__input {
-	zoom: 0.75;
-}
-
-.dedupe-merge__toggles .checkbox-input label.field-label {
-	padding-left: calc(var(--base) / 3);
-	font-size: 0.9em;
-}
-
-.dedupe-merge__footer .btn {
-	margin: 0;
-	/* Payload's input height, `base(2)`, compiled to px: the button's padding follows
-	   `--base`, which shrinks on small screens while the input does not. */
-	height: 40px;
 }
 
 /* A narrow column puts the name on a line of its own under the buttons. */
@@ -577,385 +606,566 @@ div.dedupe-merge__list--rows {
 	}
 }
 
-/* Rich text as the version view draws it: Payload's own Lexical diff styles, which load only on
-   that view, scoped to a rich text cell. */
+/* Rich text as the version view draws it: Payload's own Lexical diff styles
+   (`@payloadcms/richtext-lexical` field/Diff), which load only on that view, scoped to a rich
+   text cell. */
 /* biome-ignore-start lint/style/noDescendingSpecificity: Payload's rules, in Payload's order */
-.dedupe-merge__rich-text .html-diff {
-	font-family: var(--font-serif);
-	font-size: 16px;
-	letter-spacing: 0.02em;
+.dedupe-merge__rich-text {
+	.html-diff {
+		font-size: var(--text-body-large-font-size);
+		font-weight: var(--text-body-large-font-weight);
+		line-height: var(--text-body-large-line-height);
+		letter-spacing: -0.0325px;
+	}
+
+	blockquote {
+		font-size: var(--text-body-large-font-size);
+		line-height: 1.5;
+		letter-spacing: normal;
+		margin-inline: var(--spacer-1);
+		padding-inline-start: var(--spacer-2-5);
+		padding-block: var(--spacer-1);
+		position: relative;
+		border-inline-start: var(--stroke-width-medium) solid currentColor;
+	}
+
+	.html-diff:has([data-match-type="create"]) blockquote {
+		color: var(--diff-create-pill-color);
+	}
+
+	.html-diff:has([data-match-type="delete"]) blockquote {
+		color: var(--diff-delete-pill-color);
+	}
+
+	a {
+		color: var(--color-text-brand);
+		text-decoration: underline;
+	}
+
+	h1,
+	h2,
+	h3,
+	h4,
+	h5,
+	h6 {
+		font-weight: 550;
+		line-height: 1.2;
+	}
+
+	h1 {
+		font-size: 2rem;
+		letter-spacing: -0.544px;
+	}
+	h2 {
+		font-size: 1.5rem;
+		line-height: 2rem;
+		letter-spacing: var(--text-heading-large-letter-spacing);
+	}
+	h3 {
+		font-size: 1.25rem;
+		letter-spacing: -0.34px;
+	}
+	h4 {
+		font-size: 1rem;
+		letter-spacing: -0.272px;
+	}
+	h5 {
+		font-size: 0.8125rem;
+		letter-spacing: -0.221px;
+	}
+	h6 {
+		font-size: 0.6875rem;
+		letter-spacing: -0.187px;
+	}
+
+	> .html-diff > :first-child {
+		margin-top: 0;
+	}
+
+	> .html-diff > :last-child {
+		margin-bottom: 0;
+	}
+
+	p {
+		margin: 0;
+	}
+
+	code {
+		border: var(--stroke-width-small) solid var(--color-border);
+		color: var(--color-text);
+		padding: var(--spacer-1);
+		font-family: "SF Mono", Menlo, Consolas, Monaco, monospace;
+		font-size: var(--text-body-medium-font-size);
+		font-weight: var(--text-body-medium-font-weight);
+		border-radius: var(--radius-small);
+		box-decoration-break: clone;
+		-webkit-box-decoration-break: clone;
+	}
+
+	hr {
+		margin: 0;
+		border: none;
+		border-top: var(--stroke-width-small) solid currentColor;
+	}
+
+	.html-diff:has([data-match-type="create"]) hr {
+		color: var(--diff-create-pill-color);
+	}
+
+	.html-diff:has([data-match-type="delete"]) hr {
+		color: var(--diff-delete-pill-color);
+	}
+
+	ul {
+		list-style: disc;
+		padding: 0;
+		margin: 0;
+	}
+
+	ol {
+		list-style: decimal;
+		padding: 0;
+		margin: 0;
+	}
+
+	li {
+		font-size: var(--text-body-large-font-size);
+		margin-block: 0 var(--spacer-1);
+		margin-inline-start: var(--spacer-4);
+		position: relative;
+		z-index: 0;
+
+		&:has(> [data-match-type="create"])::before,
+		&:has(> [data-match-type="delete"])::before {
+			content: "";
+			position: absolute;
+			inset: 0;
+			inset-inline-start: calc(var(--spacer-4) * -1);
+			border-radius: var(--radius-medium);
+			z-index: -1;
+		}
+
+		&:has(> [data-match-type="create"])::before {
+			background-color: var(--diff-create-pill-bg);
+		}
+
+		&:has(> [data-match-type="delete"])::before {
+			background-color: var(--diff-delete-pill-bg);
+		}
+
+		&.nestedListItem:last-child {
+			margin-block-end: 0;
+		}
+
+		&:last-child {
+			margin-block-end: 0;
+		}
+	}
 }
 
-.dedupe-merge__rich-text .html-diff blockquote {
-	font-size: 16px;
-	margin-block: 16px;
-	margin-inline: 0;
-	padding-inline-start: 12px;
-	padding-block: 4px;
-	position: relative;
-}
+.dedupe-merge__rich-text {
+	ul.list-check {
+		padding-inline-start: 0;
+	}
 
-.dedupe-merge__rich-text .html-diff blockquote:after {
-	content: "";
-	position: absolute;
-	top: 0;
-	bottom: 0;
-	inset-inline-start: 0;
-	width: 4px;
-	background-color: var(--theme-elevation-150);
-}
+	.checkboxItem {
+		list-style-type: none;
+	}
 
-.dedupe-merge__rich-text .html-diff blockquote:has([data-match-type="create"]):after {
-	background-color: var(--theme-success-150);
-}
+	.checkboxItem__wrapper {
+		display: flex;
+		align-items: center;
+	}
 
-.dedupe-merge__rich-text .html-diff blockquote:has([data-match-type="delete"]):after {
-	background-color: var(--theme-error-150);
-}
+	.checkboxItem__icon {
+		width: var(--spacer-3);
+		height: var(--spacer-3);
+		margin-inline-end: var(--spacer-2);
+		border: var(--stroke-width-small) solid var(--color-text);
+		border-radius: var(--radius-medium);
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		pointer-events: none;
 
-.dedupe-merge__rich-text .html-diff a {
-	border-bottom: 1px dotted;
-	text-decoration: none;
-}
+		&[data-match-type="create"] {
+			background-color: var(--color-bg-brand-tertiary);
+			border-color: var(--color-border-brand-strong);
+			color: var(--color-text-brand);
+		}
 
-.dedupe-merge__rich-text .html-diff h1 {
-	padding: 14px 0 11px;
-	line-height: 30px;
-	font-weight: 600;
-	font-size: 28px;
-	font-family: var(--font-body);
-}
+		&[data-match-type="delete"] {
+			border-color: var(--diff-delete-pill-color);
+		}
+	}
 
-.dedupe-merge__rich-text .html-diff h2 {
-	padding: 14px 0 10px;
-	line-height: 28px;
-	font-weight: 600;
-	font-size: 25px;
-	font-family: var(--font-body);
-}
+	/* Override HTMLDiff generic [data-match-type] styles - specificity must beat 0,4,1 from HTMLDiff */
+	.checkboxItem__icon.checkboxItem__icon[data-enable-match="true"][data-match-type="create"],
+	.checkboxItem__icon.checkboxItem__icon[data-enable-match="true"][data-match-type="delete"] {
+		border-radius: var(--radius-medium);
+		padding: 0;
+	}
 
-.dedupe-merge__rich-text .html-diff h3 {
-	padding: 12px 0 9px;
-	line-height: 28px;
-	font-weight: 600;
-	font-size: 22px;
-	font-family: var(--font-body);
-}
+	.checkboxItem__icon.checkboxItem__icon[data-enable-match="true"][data-match-type="create"] {
+		background-color: var(--color-bg-brand-tertiary);
+		color: var(--color-text-brand);
+	}
 
-.dedupe-merge__rich-text .html-diff h4 {
-	padding: 8px 0 7px;
-	line-height: 30px;
-	font-weight: 600;
-	font-size: 21px;
-	font-family: var(--font-body);
-}
+	.checkboxItem__icon.checkboxItem__icon[data-enable-match="true"][data-match-type="delete"] {
+		background-color: transparent;
+		color: var(--diff-delete-pill-color);
+	}
 
-.dedupe-merge__rich-text .html-diff h5 {
-	padding: 6px 0;
-	line-height: 28px;
-	font-weight: 600;
-	font-size: 18px;
-	font-family: var(--font-body);
-}
+	.checkboxItem--nested {
+		margin-inline-start: var(--spacer-4);
+	}
 
-.dedupe-merge__rich-text .html-diff h6 {
-	padding: 11px 0 5px;
-	line-height: 10px;
-	font-weight: 600;
-	font-size: 15px;
-	font-family: var(--font-body);
-}
+	/* Match editor's hierarchical ordered list numbering (1, A, a, I, i) */
+	ol.list-number {
+		list-style-type: decimal;
+	}
 
-.dedupe-merge__rich-text .html-diff p {
-	padding: 8px 0;
-}
+	ol.list-number ol.list-number {
+		list-style-type: upper-alpha;
+	}
 
-.dedupe-merge__rich-text .html-diff p:first-child {
-	padding: 0 0 8px;
-}
+	ol.list-number ol.list-number ol.list-number {
+		list-style-type: lower-alpha;
+	}
 
-.dedupe-merge__rich-text .html-diff ul,
-.dedupe-merge__rich-text .html-diff ol {
-	padding-top: 8px;
-	padding-bottom: 8px;
-}
+	ol.list-number ol.list-number ol.list-number ol.list-number {
+		list-style-type: upper-roman;
+	}
 
-.dedupe-merge__rich-text .html-diff ul.list-check {
-	padding-left: 0;
-}
-
-.dedupe-merge__rich-text .checkboxItem {
-	list-style-type: none;
-}
-
-.dedupe-merge__rich-text .checkboxItem__wrapper {
-	display: flex;
-	align-items: center;
-}
-
-.dedupe-merge__rich-text .checkboxItem__icon {
-	width: 16px;
-	height: 16px;
-	margin-right: 8px;
-	border: 1px solid var(--theme-text);
-	border-radius: 3px;
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	pointer-events: none;
-}
-
-.dedupe-merge__rich-text .checkboxItem__icon .icon--check {
-	height: 11px;
-}
-
-.dedupe-merge__rich-text .checkboxItem__icon[data-match-type="create"] {
-	border-color: var(--diff-create-pill-color);
-}
-
-.dedupe-merge__rich-text .checkboxItem__icon[data-match-type="delete"] {
-	border-color: var(--diff-delete-pill-color);
-}
-
-.dedupe-merge__rich-text .checkboxItem--nested {
-	margin-left: 1.5rem;
+	ol.list-number ol.list-number ol.list-number ol.list-number ol.list-number {
+		list-style-type: lower-roman;
+	}
 }
 
 .dedupe-merge__rich-text .lexical-relationship-diff {
-	font-size: 13px;
-	line-height: 20px;
-	font-weight: 400;
-	box-shadow: 0 2px 2px -1px #0000001a;
-	min-width: calc(var(--base) * 8);
 	max-width: fit-content;
-	display: flex;
+	display: inline-flex;
 	align-items: center;
-	background-color: var(--theme-input-bg);
-	border-radius: 3px;
-	border: 1px solid var(--theme-elevation-100);
+	background-color: var(--color-bg-brand-tertiary);
+	outline: var(--stroke-width-small) solid var(--color-border-brand);
+	outline-offset: calc(var(--stroke-width-small) * -1);
+	border-radius: var(--radius-medium);
 	position: relative;
-	font-family: var(--font-body);
-	margin-block: 10px;
-	max-height: calc(var(--base) * 4);
-	padding: 12px;
+	z-index: 2;
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	line-height: var(--text-body-medium-line-height);
+	margin-block: var(--spacer-2);
+	padding: var(--spacer-1);
+
+	&[data-match-type="create"] {
+		background-color: var(--diff-create-parent-bg);
+		outline-color: var(--diff-create-pill-border);
+
+		.lexical-relationship-diff__pill {
+			background-color: var(--color-bg-brand);
+			color: var(--color-text-onbrand);
+		}
+
+		.lexical-relationship-diff__info {
+			color: var(--diff-create-parent-color);
+		}
+	}
+
+	&[data-match-type="delete"] {
+		background-color: var(--diff-delete-parent-bg);
+		outline-color: var(--diff-delete-pill-border);
+		text-decoration-line: none;
+
+		.lexical-relationship-diff__pill {
+			background-color: var(--color-bg-danger);
+			color: var(--color-text-oncomponent);
+
+			* {
+				text-decoration-line: none;
+				color: var(--color-text-oncomponent);
+				background-color: transparent;
+			}
+		}
+
+		.lexical-relationship-diff__info {
+			color: var(--color-text-danger);
+			text-decoration-line: line-through;
+		}
+	}
 }
 
-.dedupe-merge__rich-text .lexical-relationship-diff[data-match-type="create"] {
-	border-color: var(--diff-create-pill-border);
+/* Override HTMLDiff generic [data-match-type] styles - specificity must beat 0,4,1 from HTMLDiff */
+.dedupe-merge__rich-text .html-diff
+	.lexical-relationship-diff.lexical-relationship-diff[data-enable-match="true"][data-match-type="create"],
+.dedupe-merge__rich-text
+	.html-diff
+	.lexical-relationship-diff.lexical-relationship-diff[data-enable-match="true"][data-match-type="delete"] {
+	border-radius: var(--radius-medium);
+	padding: var(--spacer-1);
+	text-decoration-line: none;
+}
+
+.dedupe-merge__rich-text
+	.html-diff
+	.lexical-relationship-diff.lexical-relationship-diff[data-enable-match="true"][data-match-type="create"] {
+	background-color: var(--diff-create-parent-bg);
+	outline-color: var(--diff-create-pill-border);
 	color: var(--diff-create-parent-color);
 }
 
 .dedupe-merge__rich-text
-	.lexical-relationship-diff[data-match-type="create"]
-	.lexical-relationship-diff__collectionLabel {
-	color: var(--diff-create-link-color);
+	.html-diff
+	.lexical-relationship-diff.lexical-relationship-diff[data-enable-match="true"][data-match-type="delete"] {
+	background-color: var(--diff-delete-parent-bg);
+	outline-color: var(--diff-delete-pill-border);
 }
 
-.dedupe-merge__rich-text
-	.lexical-relationship-diff[data-match-type="create"]
-	.lexical-relationship-diff__title
-	* {
-	color: var(--diff-create-parent-color);
+.dedupe-merge__rich-text .lexical-relationship-diff__pill {
+	display: inline-flex;
+	align-items: center;
+	border-radius: var(--radius-medium);
+	padding-inline: var(--spacer-1);
+	background-color: var(--color-bg-brand);
+	color: var(--color-text-onbrand);
+	white-space: nowrap;
+	flex-shrink: 0;
 }
 
-.dedupe-merge__rich-text .lexical-relationship-diff[data-match-type="delete"] {
-	border-color: var(--diff-delete-pill-border);
-	color: var(--diff-delete-parent-color);
-	text-decoration-line: none;
-	background-color: var(--diff-delete-pill-bg);
-}
-
-.dedupe-merge__rich-text
-	.lexical-relationship-diff[data-match-type="delete"]
-	.lexical-relationship-diff__collectionLabel {
-	color: var(--diff-delete-link-color);
-}
-
-.dedupe-merge__rich-text .lexical-relationship-diff[data-match-type="delete"] * {
-	text-decoration-line: none;
-	color: var(--diff-delete-parent-color);
-}
-
-.dedupe-merge__rich-text .lexical-relationship-diff__card {
-	width: 100%;
-	flex-grow: 1;
-	display: flex;
-	align-items: flex-start;
-	flex-direction: column;
-	justify-content: space-between;
-}
-
-.dedupe-merge__rich-text .lexical-relationship-diff__title {
-	display: flex;
-	flex-direction: row;
-	font-weight: 600;
-}
-
-.dedupe-merge__rich-text .lexical-relationship-diff__collectionLabel {
+.dedupe-merge__rich-text .lexical-relationship-diff__info {
+	padding-inline: var(--spacer-1);
+	font-weight: var(--text-body-medium-font-weight);
+	color: var(--color-text-brand);
+	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
-	white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+	.dedupe-merge__rich-text .html-diff .lexical-relationship-diff {
+		max-width: unset;
+		display: flex;
+		border-radius: 0;
+		outline: none;
+		margin: 0;
+	}
 }
 
 .dedupe-merge__rich-text .lexical-unknown-diff {
-	font-size: 13px;
-	line-height: 20px;
-	font-weight: 400;
-	box-shadow: 0 2px 2px -1px #0000001a;
+	box-shadow: var(--elevation-100-canvas);
 	max-width: fit-content;
 	display: flex;
 	align-items: center;
-	background: var(--theme-input-bg);
-	border-radius: 3px;
-	border: 1px solid var(--theme-elevation-100);
+	background: var(--color-bg);
+	border-radius: var(--radius-medium);
+	border: var(--stroke-width-small) solid var(--color-border);
 	position: relative;
-	font-family: var(--font-body);
-	margin-block: 10px;
-	max-height: calc(var(--base) * 4);
-	padding: 5px;
+	margin-block: calc(var(--spacer-1) * 2.5);
+	max-height: calc(var(--spacer-5) * 2.5);
+	padding: calc(var(--spacer-1) * 1.25);
+
+	&[data-match-type="create"] {
+		border-color: var(--diff-create-pill-border);
+		color: var(--diff-create-parent-color);
+	}
+
+	&[data-match-type="delete"] {
+		border-color: var(--diff-delete-pill-border);
+		color: var(--diff-delete-parent-color);
+		text-decoration-line: none;
+		background-color: var(--diff-delete-pill-bg);
+
+		* {
+			text-decoration-line: none;
+			color: var(--diff-delete-parent-color);
+		}
+	}
 }
 
 .dedupe-merge__rich-text .lexical-unknown-diff__specifier {
-	font-family:
-		SF Mono,
-		Menlo,
-		Consolas,
-		Monaco,
-		monospace;
+	font-family: "SF Mono", Menlo, Consolas, Monaco, monospace;
 }
 
-.dedupe-merge__rich-text .lexical-unknown-diff[data-match-type="create"] {
-	border-color: var(--diff-create-pill-border);
-	color: var(--diff-create-parent-color);
-}
+.dedupe-merge__rich-text {
+	.lexical-upload-diff {
+		min-width: 100%;
+		max-width: fit-content;
+		display: flex;
+		align-items: center;
+		background-color: var(--color-bg);
+		border-radius: var(--radius-medium);
+		outline: var(--stroke-width-small) solid var(--color-border);
+		outline-offset: calc(var(--stroke-width-small) * -1);
+		position: relative;
+		z-index: 2;
+		padding: var(--spacer-2);
 
-.dedupe-merge__rich-text .lexical-unknown-diff[data-match-type="delete"] {
-	border-color: var(--diff-delete-pill-border);
-	color: var(--diff-delete-parent-color);
-	text-decoration-line: none;
-	background-color: var(--diff-delete-pill-bg);
-}
+		&[data-match-type="create"] {
+			background-color: var(--diff-create-parent-bg);
+			outline-color: var(--diff-create-pill-border);
+			color: var(--diff-create-parent-color);
 
-.dedupe-merge__rich-text .lexical-unknown-diff[data-match-type="delete"] * {
-	text-decoration-line: none;
-	color: var(--diff-delete-parent-color);
-}
+			.lexical-upload-diff__thumbnail {
+				background-color: var(--diff-create-pill-bg);
+			}
 
-.dedupe-merge__rich-text .lexical-upload-diff {
-	font-size: 13px;
-	line-height: 20px;
-	font-weight: 400;
-	box-shadow: 0 2px 2px -1px #0000001a;
-	min-width: calc(var(--base) * 10);
-	max-width: fit-content;
-	display: flex;
-	align-items: center;
-	background-color: var(--theme-input-bg);
-	border-radius: 3px;
-	border: 1px solid var(--theme-elevation-100);
-	position: relative;
-	font-family: var(--font-body);
-	margin-block: 10px;
-	max-height: calc(var(--base) * 3);
-	padding: 12px;
-}
+			.lexical-upload-diff__info {
+				color: var(--diff-create-parent-color);
+			}
 
-.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="create"] {
-	border-color: var(--diff-create-pill-border);
-	color: var(--diff-create-parent-color);
-}
+			.lexical-upload-diff__meta {
+				color: var(--diff-create-parent-color);
+			}
+		}
 
-.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="create"] * {
-	color: var(--diff-create-parent-color);
-}
+		&[data-match-type="delete"] {
+			text-decoration-line: none;
+			background-color: var(--diff-delete-parent-bg);
+			outline-color: var(--diff-delete-pill-border);
+			color: var(--diff-delete-parent-color);
 
-.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="create"] .lexical-upload-diff__meta,
-.dedupe-merge__rich-text
-	.lexical-upload-diff[data-match-type="create"]
-	.lexical-upload-diff__meta
-	* {
-	color: var(--diff-create-link-color);
-}
+			.lexical-upload-diff__thumbnail {
+				background-color: var(--diff-delete-pill-bg);
+			}
 
-.dedupe-merge__rich-text
-	.lexical-upload-diff[data-match-type="create"]
+			.lexical-upload-diff__info {
+				color: var(--diff-delete-parent-color);
+
+				strong {
+					text-decoration-line: line-through;
+					text-decoration-color: var(--diff-delete-parent-color);
+				}
+			}
+
+			.lexical-upload-diff__meta {
+				text-decoration-line: line-through;
+				text-decoration-color: var(--diff-delete-parent-color);
+				color: var(--diff-delete-parent-color);
+			}
+		}
+	}
+
+	/* Override HTMLDiff generic [data-match-type] styles - specificity must beat 0,4,1 from HTMLDiff */
+	.lexical-upload-diff.lexical-upload-diff[data-enable-match="true"][data-match-type="create"],
+	.lexical-upload-diff.lexical-upload-diff[data-enable-match="true"][data-match-type="delete"] {
+		border-radius: var(--radius-medium);
+		padding: var(--spacer-2);
+		text-decoration-line: none;
+	}
+
+	.lexical-upload-diff.lexical-upload-diff[data-enable-match="true"][data-match-type="create"] {
+		background-color: var(--diff-create-parent-bg);
+		color: var(--diff-create-parent-color);
+	}
+
+	.lexical-upload-diff.lexical-upload-diff[data-enable-match="true"][data-match-type="delete"] {
+		background-color: var(--diff-delete-parent-bg);
+		color: var(--diff-delete-parent-color);
+	}
+
+	.lexical-upload-diff__card {
+		display: flex;
+		flex-direction: row;
+		align-items: center;
+		width: 100%;
+		gap: var(--spacer-2-5);
+	}
+
 	.lexical-upload-diff__thumbnail {
-	border-radius: 0;
-	border-color: var(--diff-create-pill-border);
-	background-color: none;
-}
+		width: var(--spacer-6);
+		height: var(--spacer-6);
+		position: relative;
+		overflow: hidden;
+		flex-shrink: 0;
+		border-radius: var(--radius-medium);
+		background-color: var(--color-bg-secondary);
 
-.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="delete"] {
-	border-color: var(--diff-delete-pill-border);
-	text-decoration-line: none;
-	color: var(--diff-delete-parent-color);
-	background-color: var(--diff-delete-pill-bg);
-}
+		img,
+		svg {
+			position: absolute;
+			object-fit: cover;
+			width: 100%;
+			height: 100%;
+		}
+	}
 
-.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="delete"] .lexical-upload-diff__meta,
-.dedupe-merge__rich-text
-	.lexical-upload-diff[data-match-type="delete"]
-	.lexical-upload-diff__meta
-	* {
-	color: var(--diff-delete-link-color);
-}
+	.lexical-upload-diff__info {
+		flex: 1 0 0;
+		display: flex;
+		flex-direction: column;
+		justify-content: center;
+		gap: var(--spacer-1);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
+		overflow: hidden;
+		min-width: var(--stroke-width-small);
 
-.dedupe-merge__rich-text .lexical-upload-diff[data-match-type="delete"] * {
-	text-decoration-line: none;
-	color: var(--diff-delete-parent-color);
-}
+		strong {
+			font-weight: 600;
+			white-space: nowrap;
+			overflow: hidden;
+			text-overflow: ellipsis;
+		}
+	}
 
-.dedupe-merge__rich-text
-	.lexical-upload-diff[data-match-type="delete"]
-	.lexical-upload-diff__thumbnail {
-	border-radius: 0;
-	border-color: var(--diff-delete-pill-border);
-	background-color: none;
-}
+	.lexical-upload-diff__meta {
+		font-size: var(--text-body-medium-font-size);
+		color: var(--color-text-secondary);
+		white-space: nowrap;
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
 
-.dedupe-merge__rich-text .lexical-upload-diff__card {
-	display: flex;
-	flex-direction: row;
-	align-items: center;
-	width: 100%;
-}
+	/* Style uploads based on ancestor data-match-type (e.g. from diff wrappers) */
+	[data-match-type="create"] .lexical-upload-diff__info {
+		color: var(--diff-create-parent-color);
+	}
 
-.dedupe-merge__rich-text .lexical-upload-diff__thumbnail {
-	width: calc(var(--base) * 3 - 24px);
-	height: calc(var(--base) * 3 - 24px);
-	position: relative;
-	overflow: hidden;
-	flex-shrink: 0;
-	border-radius: 0;
-	border: 1px solid var(--theme-elevation-100);
-}
+	[data-match-type="create"] .lexical-upload-diff__meta.lexical-upload-diff__meta {
+		color: var(--diff-create-parent-color);
+	}
 
-.dedupe-merge__rich-text .lexical-upload-diff__thumbnail img,
-.dedupe-merge__rich-text .lexical-upload-diff__thumbnail svg {
-	position: absolute;
-	object-fit: cover;
-	width: 100%;
-	height: 100%;
-	border-radius: 0;
-}
+	[data-match-type="create"] .lexical-upload-diff__thumbnail {
+		background-color: var(--diff-create-pill-bg);
+	}
 
-.dedupe-merge__rich-text .lexical-upload-diff__info {
-	flex-grow: 1;
-	display: flex;
-	align-items: flex-start;
-	flex-direction: column;
-	padding: calc(var(--base) * 0.25) calc(var(--base) * 0.75);
-	justify-content: space-between;
-	font-weight: 400;
-}
+	[data-match-type="create"] .lexical-upload-diff {
+		background-color: var(--diff-create-parent-bg);
+		outline-color: var(--diff-create-pill-border);
+	}
 
-.dedupe-merge__rich-text .lexical-upload-diff__info strong {
-	font-weight: 600;
-}
+	[data-match-type="delete"] .lexical-upload-diff__info {
+		color: var(--diff-delete-parent-color);
 
-.dedupe-merge__rich-text .lexical-upload-diff__meta {
-	overflow: hidden;
-	text-overflow: ellipsis;
-	white-space: nowrap;
+		strong {
+			text-decoration-line: line-through;
+			text-decoration-color: var(--diff-delete-parent-color);
+		}
+	}
+
+	[data-match-type="delete"] .lexical-upload-diff__meta.lexical-upload-diff__meta {
+		text-decoration-line: line-through;
+		text-decoration-color: var(--diff-delete-parent-color);
+		color: var(--diff-delete-parent-color);
+	}
+
+	[data-match-type="delete"] .lexical-upload-diff__thumbnail {
+		background-color: var(--diff-delete-pill-bg);
+	}
+
+	[data-match-type="delete"] .lexical-upload-diff {
+		background-color: var(--diff-delete-parent-bg);
+		outline-color: var(--diff-delete-pill-border);
+	}
 }
 /* biome-ignore-end lint/style/noDescendingSpecificity: Payload's rules, in Payload's order */
+
+/* A tab's count drawn as the Versions tab's, set off from the label; on the active tab, whose
+   pill shares its fill, it takes the page's. */
+.dedupe-queue .default-list-view-tabs__button .pill-version-count {
+	margin-inline-start: var(--spacer-1-5);
+}
+
+.dedupe-queue .default-list-view-tabs__button--active .pill-version-count {
+	background-color: var(--color-bg);
+}

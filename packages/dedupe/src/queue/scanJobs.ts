@@ -15,14 +15,13 @@ export type PendingScan = { jobId: string; running: boolean }
 type JobRow = {
 	id: number | string
 	input?: { collection?: unknown } | null
-	processing?: boolean | null
+	processingUntil?: Date | string | null
 }
 
 /**
  * The scans waiting or running, by collection, as Payload counts a job runnable: not
- * completed and without a final error. Found by concurrency key, which Payload adds and
- * indexes only with `jobs.enableConcurrencyControl`; without it, among every pending scan by
- * the input it was queued with, of which there are a handful at most.
+ * completed and without a final error. Found by the concurrency key Payload indexes. Running
+ * is a processing lease that has not lapsed; a lapsed one is waiting to be claimed again.
  */
 export const pendingScans = async (args: {
 	req: PayloadRequest
@@ -31,14 +30,11 @@ export const pendingScans = async (args: {
 	const { req, collections } = args
 	const pending = new Map<string, PendingScan>()
 	if (collections.length === 0) return pending
-	const keyed = req.payload.config.jobs?.enableConcurrencyControl === true
 	const where: Where = {
 		and: [
 			{ completedAt: { exists: false } },
 			{ error: { exists: false } },
-			keyed
-				? { concurrencyKey: { in: collections.map(scanKey) } }
-				: { taskSlug: { equals: SCAN_TASK_SLUG } },
+			{ concurrencyKey: { in: collections.map(scanKey) } },
 		],
 	}
 	const { docs } = await req.payload.db.find<JobRow>({
@@ -51,7 +47,10 @@ export const pendingScans = async (args: {
 	for (const job of docs) {
 		const collection = job.input?.collection
 		if (typeof collection !== 'string' || !collections.includes(collection)) continue
-		const running = job.processing === true
+		const running =
+			job.processingUntil !== null &&
+			job.processingUntil !== undefined &&
+			new Date(job.processingUntil).getTime() > Date.now()
 		const known = pending.get(collection)
 		if (!known || (running && !known.running)) {
 			pending.set(collection, { jobId: String(job.id), running })
@@ -81,10 +80,13 @@ export const queueScans = async (args: {
 			queued.push({ collection: col.slug, jobId: known.jobId, alreadyQueued: true })
 			continue
 		}
+		// The caller has checked `access.scan`; the jobs' own access is not the reviewer's to pass.
 		const job = (await req.payload.jobs.queue({
 			task: SCAN_TASK_SLUG as never,
 			input: { collection: col.slug } as never,
+			overrideAccess: true,
 			queue: ctx.options.scanQueue,
+			req,
 		})) as { id: number | string }
 		queued.push({ collection: col.slug, jobId: String(job.id), alreadyQueued: false })
 	}

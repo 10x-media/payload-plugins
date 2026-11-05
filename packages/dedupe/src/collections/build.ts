@@ -8,14 +8,17 @@ const never: Access = () => false
  * The plugin's pairs; the keys collection below belongs to the built-in adapter. Both are
  * written through the database layer only, so they carry no hooks and no validation of their
  * own; document ids are stored as text because a relationship to a trashed or deleted
- * document renders as nothing.
+ * document renders as nothing. Nobody edits them, so they opt out of Payload's default
+ * versions and authorship.
  */
 export const buildCollections = (read: Access): CollectionConfig[] => [
 	{
 		slug: PAIRS_SLUG,
 		admin: { hidden: true, useAsTitle: 'pairKey' },
 		access: { create: never, delete: never, read, update: never },
+		authorship: false,
 		disableDuplicate: true,
+		versions: false,
 		indexes: [
 			{ fields: ['target', 'status', 'score'] },
 			{ fields: ['target', 'status', 'lead', 'score'] },
@@ -53,8 +56,10 @@ export const buildKeysCollection = (read: Access): CollectionConfig => ({
 	slug: KEYS_SLUG,
 	admin: { hidden: true },
 	access: { create: never, delete: never, read, update: never },
+	authorship: false,
 	disableDuplicate: true,
 	timestamps: false,
+	versions: false,
 	indexes: [{ fields: ['target', 'key'] }, { fields: ['target', 'doc'] }],
 	fields: [
 		{ name: 'target', type: 'text', required: true, index: true },

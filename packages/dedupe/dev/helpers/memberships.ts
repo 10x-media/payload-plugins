@@ -19,6 +19,7 @@ const byClub = async (
 	ids: (number | string)[]
 ): Promise<Map<string, Membership[]>> => {
 	const { docs } = await req.payload.find({
+		overrideAccess: true,
 		collection: MEMBERSHIPS,
 		where: { customer: { in: ids } },
 		depth: 0,
@@ -79,10 +80,17 @@ export const moveMemberships = async ({
 		if (!kept) throw new Error(`No membership picked for club ${club}`)
 		for (const member of members) {
 			if (member.id === kept.id) continue
-			await req.payload.delete({ collection: MEMBERSHIPS, id: member.id, depth: 0, req })
+			await req.payload.delete({
+				overrideAccess: true,
+				collection: MEMBERSHIPS,
+				id: member.id,
+				depth: 0,
+				req,
+			})
 		}
 		if (String(kept.customer) !== String(survivorId)) {
 			await req.payload.update({
+				overrideAccess: true,
 				collection: MEMBERSHIPS,
 				id: kept.id,
 				data: { customer: survivorId },

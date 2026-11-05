@@ -1,5 +1,5 @@
 import { describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq, initTransaction, killTransaction } from 'payload'
+import { createPayloadRequest, initTransaction, killTransaction } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 
 import { PAIRS_SLUG } from '../../src/collections/slugs'
@@ -14,7 +14,7 @@ describeForDb('dedupe check on the jobs queue', {}, (db) => {
 	let fixture: Awaited<ReturnType<typeof bootDedupe>>
 	let n = 0
 
-	const runJobs = () => fixture.booted.payload.jobs.run({ queue: 'dedupe' })
+	const runJobs = () => fixture.booted.payload.jobs.run({ overrideAccess: true, queue: 'dedupe' })
 	const found = (id: number | string) =>
 		emitted.filter(
 			(event) =>
@@ -49,9 +49,10 @@ describeForDb('dedupe check on the jobs queue', {}, (db) => {
 		n++
 		await fixture.customer(twin('a'))
 		await runJobs()
-		const req = await createLocalReq({}, fixture.booted.payload)
+		const req = await createPayloadRequest({ payload: fixture.booted.payload })
 		await initTransaction(req)
 		const lost = (await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			data: twin('b') as never,
 			depth: 0,
@@ -91,7 +92,7 @@ describeForDb('dedupe check on the jobs queue', {}, (db) => {
 		await runJobs()
 		const ctx = getContext(fixture.booted.payload)
 		const col = getCollectionContext(fixture.booted.payload, CUSTOMERS)
-		const req = await createLocalReq({}, fixture.booted.payload)
+		const req = await createPayloadRequest({ payload: fixture.booted.payload })
 		const row = await upsertPair({
 			req,
 			ctx,
@@ -113,6 +114,7 @@ describeForDb('dedupe check on the jobs queue', {}, (db) => {
 		await fixture.customer(twin('a'))
 		await runJobs()
 		const skipped = (await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			data: twin('b') as never,
 			depth: 0,
@@ -128,6 +130,7 @@ describeForDb('dedupe check on the jobs queue', {}, (db) => {
 		await fixture.customer(twin('a'))
 		await runJobs()
 		const skipped = (await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			data: twin('b') as never,
 			depth: 0,
@@ -140,7 +143,7 @@ describeForDb('dedupe check on the jobs queue', {}, (db) => {
 
 	it('answers a scan already pending with its job instead of queuing another', async () => {
 		const ctx = getContext(fixture.booted.payload)
-		const req = await createLocalReq({}, fixture.booted.payload)
+		const req = await createPayloadRequest({ payload: fixture.booted.payload })
 		const matched = [...ctx.collections.values()].filter((col) => col.options.match)
 		const customers = getCollectionContext(fixture.booted.payload, CUSTOMERS)
 		const [first] = await queueScans({ req, ctx, cols: [customers] })

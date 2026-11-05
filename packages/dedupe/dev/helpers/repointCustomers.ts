@@ -13,6 +13,7 @@ export const repointCustomers = async ({
 }: BeforeRemoveArgs): Promise<void> => {
 	const { payload } = req
 	await payload.update({
+		overrideAccess: true,
 		collection: 'orders',
 		where: { customer: { in: absorbedIds } },
 		data: { customer: survivorId },
@@ -22,6 +23,7 @@ export const repointCustomers = async ({
 
 	const gone = new Set(absorbedIds.map(String))
 	const { docs } = await payload.find({
+		overrideAccess: true,
 		collection: 'trips',
 		where: { participants: { in: absorbedIds } },
 		depth: 0,
@@ -35,6 +37,7 @@ export const repointCustomers = async ({
 			if (!participants.some((kept) => String(kept) === String(next))) participants.push(next)
 		}
 		await payload.update({
+			overrideAccess: true,
 			collection: 'trips',
 			id: trip.id,
 			data: { participants },

@@ -118,7 +118,11 @@ describeForDb('dedupe beforeRemove hook', {}, (db) => {
 			return handed?.snapshots[String(gone.id)] ?? {}
 		}
 		const ticket = (data: Record<string, unknown>) =>
-			payload.create({ collection: TICKETS, data: data as never }) as Promise<Doc>
+			payload.create({
+				overrideAccess: true,
+				collection: TICKETS,
+				data: data as never,
+			}) as Promise<Doc>
 		const copy = await merged(
 			TICKETS,
 			await ticket({ title: `Hidden copy ${n}` }),
@@ -129,6 +133,7 @@ describeForDb('dedupe beforeRemove hook', {}, (db) => {
 		const USERS = 'users' as CollectionSlug
 		const user = (email: string) =>
 			payload.create({
+				overrideAccess: true,
 				collection: USERS,
 				data: { email, password: 'password' } as never,
 			}) as Promise<Doc>
@@ -154,6 +159,7 @@ describeForDb('dedupe beforeRemove hook', {}, (db) => {
 			refuse = false
 		}
 		const still = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: gone.id,
 			depth: 0,
@@ -168,20 +174,23 @@ describeForDb('dedupe beforeRemove hook', {}, (db) => {
 		const [keep, gone] = await twins()
 		const { payload } = fixture.booted
 		const order = (await payload.create({
+			overrideAccess: true,
 			collection: ORDERS,
 			data: { number: `O-${n}`, customer: gone.id } as never,
 		})) as Doc
 		const both = (await payload.create({
+			overrideAccess: true,
 			collection: TRIPS,
 			data: { title: `Both ${n}`, participants: [keep.id, gone.id] } as never,
 		})) as Doc
 		const one = (await payload.create({
+			overrideAccess: true,
 			collection: TRIPS,
 			data: { title: `One ${n}`, participants: [gone.id] } as never,
 		})) as Doc
 		await merge(keep, [gone])
 		const read = async (collection: CollectionSlug, id: number | string) =>
-			(await payload.findByID({ collection, id, depth: 0 })) as Doc
+			(await payload.findByID({ overrideAccess: true, collection, id, depth: 0 })) as Doc
 		expect((await read(ORDERS, order.id)).customer).toEqual(keep.id)
 		expect((await read(TRIPS, both.id)).participants).toEqual([keep.id])
 		expect((await read(TRIPS, one.id)).participants).toEqual([keep.id])

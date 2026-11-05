@@ -43,9 +43,9 @@ A matching field adds its `weight`, a near match part of it, a differing one `on
 
 Every save indexes the document and, unless `checkOnSave: false`, queues a `dedupe-check` job that compares it with its look-alikes and opens or refreshes their pairs; a pair that no longer qualifies is deleted. The scan compares a whole collection: run it with "Scan now" in the queue, or schedule it with `scan.cron`.
 
-A scan is one `dedupe-scan` job per collection. "Scan now" and the schedule queue one only for a collection that has none waiting or running, and answer with the pending one otherwise; the queue shows the button as queued or running meanwhile. Pending scans are found by concurrency key with `jobs.enableConcurrencyControl` on, and by the job's input without it.
+A scan is one `dedupe-scan` job per collection. "Scan now" and the schedule queue one only for a collection that has none waiting or running, and answer with the pending one otherwise; the queue shows the button as queued or running meanwhile. Each scan job carries a concurrency key per collection, so Payload never runs two scans of one collection at once.
 
-Both need a job worker for the `dedupe` queue (and for `scanQueue`, when set), for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. The check then runs inside the save's transaction: a check that fails, such as on an adapter that is down, is logged and the save goes through. Across servers, set `jobs.enableConcurrencyControl`.
+Both need a job worker for the `dedupe` queue (and for `scanQueue`, when set), for example `jobs.autoRun: [{ cron: '* * * * *', queue: 'dedupe' }]`. Without one, set `disableJobsQueue: true` and both run inside the request. The check then runs inside the save's transaction: a check that fails, such as on an adapter that is down, is logged and the save goes through.
 
 Every group of pairs keeps its strongest pair marked as its lead, settled after each write that adds, removes, rescores or decides a pair, and for the whole collection at the end of a scan. The queue reads a page of leads and walks only the groups it shows, so a page costs about the same however many pairs are stored. Pairs stored by an earlier version get their leads the first time the queue opens.
 
@@ -206,7 +206,14 @@ export const typesenseAdapter = ({ url, apiKey }: { url: string; apiKey: string 
                 overrideAccess: true,
                 disableErrors: true,
               })
-              if (doc && doc._status !== 'draft') await upsert(req, collection, doc)
+              // Read in every locale, `_status` holds one status per locale where each is
+              // published on its own: published in any of them keeps the document searchable.
+              const status = doc?._status as Record<string, string> | string | undefined
+              const published =
+                status && typeof status === 'object'
+                  ? Object.values(status).some((value) => value !== 'draft')
+                  : status !== 'draft'
+              if (doc && published) await upsert(req, collection, doc)
               else await drop(collection, id)
               return { output: {} }
             },

@@ -7,6 +7,12 @@ import { mergeConfig } from 'vitest/config'
 // biome-ignore lint/plugin/noProcessEnv: vitest config env boundary
 const isMatrixRun = Boolean(process.env.DB_MATRIX)
 
+// Every Postgres boot starts a container of its own, so a many-core machine otherwise starts one
+// per core at once and the boots outlast the hook timeout.
+// biome-ignore lint/plugin/noProcessEnv: vitest config env boundary
+const postgresLane = process.env.DB_MATRIX === 'postgres'
+const POSTGRES_MAX_WORKERS = 4
+
 // Test selection is controlled by package.json scripts that pass explicit
 // paths. Default `test` runs everything below; `test:unit`/`test:int`/
 // `test:matrix` narrow the include glob. Unit tests are co-located with their
@@ -14,6 +20,7 @@ const isMatrixRun = Boolean(process.env.DB_MATRIX)
 export default mergeConfig(sharedVitestConfig, {
 	test: {
 		dangerouslyIgnoreUnhandledErrors: isMatrixRun,
+		...(postgresLane ? { maxWorkers: POSTGRES_MAX_WORKERS } : {}),
 		include: ['tests/int/**/*.int.spec.ts', 'src/**/*.test.ts'],
 		exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**'],
 	},

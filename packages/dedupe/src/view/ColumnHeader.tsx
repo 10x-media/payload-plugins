@@ -92,22 +92,30 @@ export const ColumnHeader = ({
 				) : null}
 				<Button
 					aria-label={payloadT('general:editLabel', { label: doc.title })}
-					buttonStyle="icon-label"
+					buttonStyle="ghost"
 					className={`${baseClass}__head-edit`}
 					icon="edit"
-					iconStyle="none"
 					margin={false}
 					onClick={openDrawer}
+					round
 					tooltip={payloadT('general:edit')}
 				/>
 				<Popup
-					button={
-						<span aria-label={payloadT('general:moreOptions')} role="img">
-							<MoreIcon />
-						</span>
-					}
-					buttonClassName={`${baseClass}__menu`}
 					horizontalAlign="right"
+					popupType="menu"
+					renderButton={({ active, onClick, onKeyDown, ...aria }) => (
+						<Button
+							aria-label={payloadT('general:moreOptions')}
+							buttonStyle="ghost"
+							className={`${baseClass}__menu`}
+							extraButtonProps={{ ...aria, onKeyDown }}
+							icon={<MoreIcon />}
+							margin={false}
+							onClick={onClick}
+							round
+							selected={active}
+						/>
+					)}
 					render={({ close }) => (
 						<PopupList.ButtonGroup>
 							<PopupList.Button
@@ -130,6 +138,7 @@ export const ColumnHeader = ({
 							) : null}
 						</PopupList.ButtonGroup>
 					)}
+					theme="auto"
 					verticalAlign="bottom"
 				/>
 			</div>

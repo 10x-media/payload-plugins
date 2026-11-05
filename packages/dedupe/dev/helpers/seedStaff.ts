@@ -7,14 +7,19 @@ const STAFF = 'staff' as CollectionSlug
  * multi-tenant plugin does not scope. Idempotent.
  */
 export const seedStaff = async (payload: Payload): Promise<void> => {
-	const existing = await payload.count({ collection: STAFF })
+	const existing = await payload.count({ overrideAccess: true, collection: STAFF })
 	if (existing.totalDocs > 0) return
 	const docs = [
 		{ name: 'Oksana Melnyk', email: 'oksana.melnyk@staff.example', tenant: 'kyiv' },
 		{ name: 'Oksana Melnyk', email: 'o.melnyk@staff.example', tenant: 'lviv' },
 	]
 	for (const data of docs) {
-		await payload.create({ collection: STAFF, data: data as never, disableTransaction: true })
+		await payload.create({
+			overrideAccess: true,
+			collection: STAFF,
+			data: data as never,
+			disableTransaction: true,
+		})
 	}
 	payload.logger.info('Seeded dev staff')
 }

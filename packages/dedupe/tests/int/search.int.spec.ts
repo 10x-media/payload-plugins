@@ -125,6 +125,7 @@ describeForDb('dedupe search', {}, (db) => {
 		expect((await pairsOf(CUSTOMERS, a.id)).some((pair) => pair.status === 'open')).toBe(true)
 		// Written past the plugin's hooks, as an import would: the pair no longer holds.
 		await fixture.booted.payload.update({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: b.id,
 			data: { name: 'Entirely Different', phone: '0000000000' } as never,
@@ -219,11 +220,13 @@ describeForDb('dedupe search', {}, (db) => {
 		n++
 		const create = (title: string) =>
 			fixture.booted.payload.create({
+				overrideAccess: true,
 				collection: POSTS,
 				data: { title, _status: 'published' } as never,
 			}) as Promise<Doc>
 		const first = await create(`Unpublished Twin ${n}`)
 		await fixture.booted.payload.update({
+			overrideAccess: true,
 			collection: POSTS,
 			id: first.id,
 			data: { _status: 'draft' } as never,
@@ -237,6 +240,7 @@ describeForDb('dedupe search', {}, (db) => {
 		n++
 		const create = (title: string) =>
 			fixture.booted.payload.create({
+				overrideAccess: true,
 				collection: POSTS,
 				data: { title, _status: 'published' } as never,
 			}) as Promise<Doc>
@@ -248,6 +252,7 @@ describeForDb('dedupe search', {}, (db) => {
 		)
 		await decidePair({ req: fixture.req, ctx: ctx(), pair: apart as never, status: 'dismissed' })
 		await fixture.booted.payload.update({
+			overrideAccess: true,
 			collection: POSTS,
 			id: first.id,
 			data: { _status: 'draft' } as never,
@@ -266,6 +271,7 @@ describeForDb('dedupe search', {}, (db) => {
 		const kept = await fixture.customer({ ...twin, email: 'rolled.a@search.test' })
 		const { req, id } = await inTransaction()
 		await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			data: { ...twin, email: 'rolled.b@search.test' } as never,
 			req,
@@ -283,6 +289,7 @@ describeForDb('dedupe search', {}, (db) => {
 		const { req, id } = await inTransaction()
 		const update = (docId: number | string, data: Record<string, unknown>) =>
 			fixture.booted.payload.update({
+				overrideAccess: true,
 				collection: CUSTOMERS,
 				id: docId,
 				data: data as never,
@@ -302,11 +309,13 @@ describeForDb('dedupe search', {}, (db) => {
 		n++
 		const create = (title: string) =>
 			fixture.booted.payload.create({
+				overrideAccess: true,
 				collection: POSTS,
 				data: { title, _status: 'published' } as never,
 			}) as Promise<Doc>
 		const first = await create(`Drafted Twin ${n}`)
 		await fixture.booted.payload.update({
+			overrideAccess: true,
 			collection: POSTS,
 			id: first.id,
 			draft: true,
@@ -326,6 +335,7 @@ describeForDb('dedupe search', {}, (db) => {
 		const spy = vi.spyOn(fixture.booted.payload.db, 'create')
 		try {
 			await fixture.booted.payload.update({
+				overrideAccess: true,
 				collection: CUSTOMERS,
 				id: doc.id,
 				data: { note: 'a note, not a match field' } as never,
@@ -359,6 +369,7 @@ describeForDb('dedupe search', {}, (db) => {
 	it('merges rows that hold rows of their own, which the database keys by id', async () => {
 		const team = (person: string, number: string) =>
 			fixture.booted.payload.create({
+				overrideAccess: true,
 				collection: TEAMS,
 				data: { name: 'Team', members: [{ person, phones: [{ number }] }] } as never,
 				depth: 0,
@@ -381,6 +392,7 @@ describeForDb('dedupe search', {}, (db) => {
 			},
 		})
 		const merged = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: TEAMS,
 			id: primary.id,
 			depth: 0,
@@ -393,11 +405,13 @@ describeForDb('dedupe search', {}, (db) => {
 
 	it('takes a localized group whole from another document, the rows in it included', async () => {
 		const primary = (await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: TEAMS,
 			data: { name: 'Carded', card: { title: 'Mine' } } as never,
 			depth: 0,
 		})) as Doc
 		const other = (await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: TEAMS,
 			data: { name: 'Carded', card: { title: 'Theirs', lines: [{ text: 'line' }] } } as never,
 			depth: 0,
@@ -411,6 +425,7 @@ describeForDb('dedupe search', {}, (db) => {
 			choices: { 'card@en': { doc: String(other.id) } },
 		})
 		const merged = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: TEAMS,
 			id: primary.id,
 			depth: 0,
@@ -421,11 +436,13 @@ describeForDb('dedupe search', {}, (db) => {
 
 	it('lets go of a unique value in the rows of a localized group the survivor takes', async () => {
 		const primary = (await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: TEAMS,
 			data: { name: 'Badged', card: { title: 'Mine' } } as never,
 			depth: 0,
 		})) as Doc
 		const other = (await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: TEAMS,
 			data: { name: 'Badged', card: { title: 'Theirs', lines: [{ badge: 'B-1' }] } } as never,
 			depth: 0,
@@ -439,6 +456,7 @@ describeForDb('dedupe search', {}, (db) => {
 			choices: { 'card@en': { doc: String(other.id) } },
 		})
 		const merged = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: TEAMS,
 			id: primary.id,
 			depth: 0,
@@ -448,11 +466,13 @@ describeForDb('dedupe search', {}, (db) => {
 
 	it('fills a localized group the primary left empty from the other document', async () => {
 		const primary = (await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: TEAMS,
 			data: { name: 'Blank card' } as never,
 			depth: 0,
 		})) as Doc
 		const other = (await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: TEAMS,
 			data: { name: 'Blank card', card: { title: 'Theirs' } } as never,
 			depth: 0,
@@ -475,6 +495,7 @@ describeForDb('dedupe search', {}, (db) => {
 	it('merges rows of a block the config names, whose rows hold rows too', async () => {
 		const team = (label: string) =>
 			fixture.booted.payload.create({
+				overrideAccess: true,
 				collection: TEAMS,
 				data: { name: 'Board', boards: [{ blockType: 'roster', seats: [{ label }] }] } as never,
 				depth: 0,
@@ -497,6 +518,7 @@ describeForDb('dedupe search', {}, (db) => {
 			},
 		})
 		const merged = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: TEAMS,
 			id: primary.id,
 			depth: 0,
@@ -511,6 +533,7 @@ describeForDb('dedupe search without the check on save', {}, (db) => {
 
 	const post = (title: string) =>
 		fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: POSTS,
 			data: { title, _status: 'published' } as never,
 		}) as Promise<Doc>
@@ -549,6 +572,7 @@ describeForDb('dedupe search without the check on save', {}, (db) => {
 		const doc = await post('Quiet Unpublished')
 		expect(await fixture.keysFor(doc.id, POSTS)).not.toEqual([])
 		await fixture.booted.payload.update({
+			overrideAccess: true,
 			collection: POSTS,
 			id: doc.id,
 			data: { _status: 'draft' } as never,

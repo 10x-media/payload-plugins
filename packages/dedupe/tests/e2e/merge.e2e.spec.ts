@@ -233,7 +233,7 @@ test('a list keeps the primary items and takes the ones checked in other documen
 	await pick(page, 'profile.score', a.id)
 	await mergeButton(page).click()
 	await page
-		.locator('.payload__modal-item')
+		.locator('.dedupe-merge__confirm-modal:visible')
 		.getByRole('button', { name: 'Merge 3 documents' })
 		.click()
 	await expect(page).toHaveURL(new RegExp(`/admin/collections/customers/${a.id}`), {
@@ -284,7 +284,7 @@ test('array rows are the admin rows, read-only, and the same row in two document
 	await pick(page, 'profile.score', first.id)
 	await mergeButton(page).click()
 	await page
-		.locator('.payload__modal-item')
+		.locator('.dedupe-merge__confirm-modal:visible')
 		.getByRole('button', { name: 'Merge 2 documents' })
 		.click()
 	await expect(page).toHaveURL(new RegExp(`/admin/collections/customers/${first.id}`), {
@@ -378,7 +378,7 @@ test('what a merged-in document gives up is said in red, only for a document tha
 	const releases = page.locator('.dedupe-merge__releases')
 	await expect(releases).toHaveCount(1)
 	await expect(releases).toContainText(`${MARK} release Kowalski goes to the trash`)
-	await expect(releases.locator('.banner')).toHaveClass(/banner--type-error/)
+	await expect(releases.locator('.banner')).toHaveClass(/banner--type-danger/)
 })
 
 test('a relationship shows the related title rather than its id', async ({ page, context }) => {
@@ -438,7 +438,7 @@ test("a column's menu keeps all of that document's values; the heads carry no ch
 	await expect(page.locator('.dedupe-merge__head .checkbox-input')).toHaveCount(0)
 
 	await columnMenu(page, `${MARK} takeall Kowalski`).click()
-	await page.getByRole('button', { name: 'Keep all values' }).click()
+	await page.getByRole('menuitem', { name: 'Keep all values' }).click()
 	for (const key of ['note', 'email', 'profile.score']) {
 		await expect(cell(page, key, b.id), key).toHaveClass(/dedupe-merge__cell--picked/)
 	}
@@ -478,12 +478,13 @@ test('two documents share the width, more show two columns and the edge of a thi
 	expect(three.column).toBeCloseTo(three.width * 0.4, 0)
 
 	await page.setViewportSize({ width: 390, height: 900 })
-	const phone = await measure()
-	expect(phone.scrolls).toBe(true)
-	expect(phone.column, 'the edge of the next column shows it swipes').toBeCloseTo(
-		phone.width * 0.9,
-		0
-	)
+	// The grid lays itself out again after the resize; measure once it has.
+	await expect
+		.poll(async () => {
+			const phone = await measure()
+			return phone.scrolls && Math.abs(phone.column - phone.width * 0.9) < 0.5
+		}, 'the edge of the next column shows it swipes')
+		.toBe(true)
 })
 
 test('a localized field is one row per language, and a choice in one leaves the other', async ({
@@ -534,9 +535,9 @@ test('a document taken out of the merge, once confirmed, leaves its column and t
 
 	const remove = async () => {
 		await columnMenu(page, `${MARK} remove Kowalsky`).click()
-		await page.getByRole('button', { name: 'Remove from this merge' }).click()
+		await page.getByRole('menuitem', { name: 'Remove from this merge' }).click()
 	}
-	const modal = page.locator('.payload__modal-item')
+	const modal = page.locator('.dedupe-merge__remove-modal:visible')
 	await remove()
 	await expect(modal).toContainText(`Remove ${MARK} remove Kowalsky from this merge?`)
 	await modal.getByRole('button', { name: 'Cancel' }).click()
@@ -550,8 +551,8 @@ test('a document taken out of the merge, once confirmed, leaves its column and t
 	await expect(mergeButton(page)).toHaveText('Merge 2 documents')
 	// Two documents are the least a merge takes: neither can be taken out now.
 	await columnMenu(page, `${MARK} remove Kowalski`).click()
-	await expect(page.getByRole('button', { name: 'Keep all values' })).toBeVisible()
-	await expect(page.getByRole('button', { name: 'Remove from this merge' })).toHaveCount(0)
+	await expect(page.getByRole('menuitem', { name: 'Keep all values' })).toBeVisible()
+	await expect(page.getByRole('menuitem', { name: 'Remove from this merge' })).toHaveCount(0)
 })
 
 test('making another document primary keeps the page, without a reload', async ({
@@ -585,7 +586,11 @@ test("a document's name opens it in a new tab, and its edit button in a drawer, 
 	await expect.soft(name).toHaveAttribute('target', '_blank')
 
 	await head.getByRole('button', { name: `Edit ${String(group[0]?.name)}` }).click()
-	await expect(page.locator('.drawer--is-open .id-label a')).toHaveAttribute('href', doc)
+	const drawer = page.getByRole('dialog', { name: /Editing/ })
+	await expect(drawer.getByRole('heading', { level: 3 }).getByRole('link')).toHaveAttribute(
+		'href',
+		doc
+	)
 	await expect(page).toHaveURL(new RegExp(`survivor=${group[0]?.id}`))
 })
 
@@ -660,7 +665,7 @@ test('applying merges the whole group and deletes its pairs', async ({ page, con
 	// Payload portals the modal, so the confirm button is addressed through it rather than by
 	// position among the two buttons that now share a label.
 	await page
-		.locator('.payload__modal-item')
+		.locator('.dedupe-merge__confirm-modal:visible')
 		.getByRole('button', { name: 'Merge 3 documents' })
 		.click()
 
@@ -696,7 +701,7 @@ test('a document edited after the plan was built refuses to merge', async ({ pag
 	await mergeButton(page).click()
 	await expect(page.getByText('Apply this merge?')).toBeVisible()
 	await page
-		.locator('.payload__modal-item')
+		.locator('.dedupe-merge__confirm-modal:visible')
 		.getByRole('button', { name: 'Merge 2 documents' })
 		.click()
 
@@ -710,7 +715,7 @@ test('without two different documents the merge screen returns to the queue and 
 	for (const query of ['', '?collection=ghosts&docs=1,2', '?collection=customers&docs=1,1']) {
 		await page.goto(`${MERGE_PATH}${query}`)
 		await expect(page).toHaveURL(/\/admin\/dedupe\?missingPair=1$/)
-		await expect(page.locator('.dedupe-queue .banner--type-error')).toContainText(
+		await expect(page.locator('.dedupe-queue .banner--type-danger')).toContainText(
 			'needs a collection and two document ids'
 		)
 	}
@@ -735,10 +740,10 @@ test('a document deleted or in the trash sends the merge screen to the queue of 
 		await expect(page, label).toHaveURL(
 			new RegExp(`/admin/dedupe\\?collection=customers&notFound=${b.id}$`)
 		)
-		await expect(page.locator('.dedupe-queue .banner--type-error')).toHaveText(
+		await expect(page.locator('.dedupe-queue .banner--type-danger')).toHaveText(
 			`The document with ID ${b.id} could not be found. It may have been deleted or never existed, or you may not have access to it.`
 		)
-		await expect(page.locator('.step-nav__last')).toHaveText('Customers')
+		await expect(page.getByLabel('Breadcrumb').locator('.step-nav__last')).toHaveText('Customers')
 	}
 })
 

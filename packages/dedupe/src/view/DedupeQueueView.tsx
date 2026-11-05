@@ -1,6 +1,4 @@
-import { DefaultTemplate } from '@payloadcms/next/templates'
-import { Gutter } from '@payloadcms/ui'
-import { redirect } from 'next/navigation'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps, Params } from 'payload'
 
 import { getContext } from '../plugin/context'
@@ -12,6 +10,8 @@ export async function DedupeQueueView({
 	params,
 	searchParams,
 	basePath,
+	server,
+	viewActions,
 }: AdminViewServerProps & { basePath: `/${string}` }) {
 	const { req } = initPageResult
 	const { user } = req
@@ -19,7 +19,9 @@ export async function DedupeQueueView({
 
 	const ctx = getContext(req.payload)
 	if (!user || !(await ctx.options.access.review({ req }))) {
-		redirect(authRedirectUrl({ config: req.payload.config, params, searchParams: sp, user }))
+		return server.redirect(
+			authRedirectUrl({ config: req.payload.config, params, searchParams: sp, user })
+		)
 	}
 
 	return (
@@ -31,12 +33,11 @@ export async function DedupeQueueView({
 			permissions={initPageResult.permissions}
 			searchParams={searchParams}
 			user={user}
+			viewActions={viewActions}
 			visibleEntities={initPageResult.visibleEntities}
 			req={req}
 		>
-			<Gutter>
-				<DedupeQueue basePath={basePath} req={req} searchParams={sp} />
-			</Gutter>
+			<DedupeQueue basePath={basePath} req={req} searchParams={sp} />
 		</DefaultTemplate>
 	)
 }

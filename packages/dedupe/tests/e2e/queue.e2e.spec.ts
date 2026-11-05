@@ -161,7 +161,9 @@ test('each status tab counts the rows it lists, one per group', async ({ page, c
 	] as const) {
 		// One page of the largest size holds every row the dev seed and this suite make.
 		await page.goto(`${QUEUE_PATH}?collection=customers&status=${status}&limit=100`)
-		await expect(page.locator('.dedupe-queue__table, .dedupe-queue__message').first()).toBeVisible()
+		await expect(
+			page.locator('.dedupe-queue__table, .dedupe-queue .no-results').first()
+		).toBeVisible()
 		const rows = await page.locator('.dedupe-queue__table tbody tr').count()
 		await expect(queueTab(page, label)).toHaveText(new RegExp(`${label}\\s*${rows}$`))
 	}
@@ -224,7 +226,7 @@ test('the search bar keeps the groups with a document the list search of the col
 	}
 
 	await openQueue(page)
-	const search = page.locator('.search-bar .search-filter__input')
+	const search = page.locator('.list-controls #search-filter-input')
 	// Worded and searched as the customers list does it, by its listSearchableFields.
 	await expect.soft(search).toHaveAttribute('placeholder', 'Search by Name Or Email')
 	await search.fill('golf@e2e')
@@ -277,18 +279,18 @@ test("the queue names its collection filter in the breadcrumbs, the level the me
 
 	await page.locator('.step-nav').getByRole('link', { name: 'Customers' }).click()
 	await expect(page).toHaveURL(/collection=customers/)
-	await expect(page.locator('.step-nav__last')).toHaveText('Customers')
+	await expect(page.getByLabel('Breadcrumb').locator('.step-nav__last')).toHaveText('Customers')
 	const queue = page.locator('.step-nav').getByRole('link', { name: 'Duplicates' })
 	await expect(queue).toHaveAttribute('href', QUEUE_PATH)
 
 	await queue.click()
-	await expect(page.locator('.step-nav__last')).toHaveText('Duplicates')
+	await expect(page.getByLabel('Breadcrumb').locator('.step-nav__last')).toHaveText('Duplicates')
 })
 
 test('an empty status says so instead of showing an empty table', async ({ page }) => {
 	await openQueue(page, 'dismissed')
 	const table = page.locator('.dedupe-queue__table')
-	const message = page.locator('.dedupe-queue__message')
+	const message = page.locator('.dedupe-queue .no-results__description')
 	if ((await table.count()) === 0) {
 		await expect(message).toHaveText('Nothing to review.')
 	} else {

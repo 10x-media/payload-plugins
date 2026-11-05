@@ -22,17 +22,17 @@ const box: CSSProperties = {
 	alignItems: 'center',
 	gap: 8,
 	padding: '6px 10px',
-	border: '1px dashed var(--theme-elevation-400)',
+	border: '1px dashed var(--color-border-strong)',
 	borderRadius: 6,
-	background: 'var(--theme-elevation-50)',
+	background: 'var(--color-bg-secondary)',
 }
 
 const input: CSSProperties = {
-	border: '1px solid var(--theme-elevation-150)',
+	border: '1px solid var(--field-color-border)',
 	borderRadius: 4,
 	padding: '4px 8px',
-	background: 'var(--theme-input-bg)',
-	color: 'var(--theme-text)',
+	background: 'var(--field-color-bg)',
+	color: 'var(--color-text)',
 }
 
 const Shell = ({ label, children }: { label: string; children: ReactNode }) => (
@@ -53,7 +53,7 @@ export const ColorField = ({ path, field, readOnly }: FieldProps) => {
 					height: 24,
 					borderRadius: '50%',
 					background: value || 'transparent',
-					border: '1px solid var(--theme-elevation-300)',
+					border: '1px solid var(--color-border)',
 				}}
 			/>
 			<input
@@ -141,7 +141,7 @@ export const MoneyField = ({ path, field, readOnly }: FieldProps) => {
 
 /** A description drawn by a component rather than given as a string. */
 export const WebsiteDescription = () => (
-	<div className="field-description" style={{ color: 'var(--theme-success-500)' }}>
+	<div className="field-description" style={{ color: 'var(--color-text-success)' }}>
 		Custom description component: the public URL, with <code>https://</code>.
 	</div>
 )
@@ -174,8 +174,8 @@ export const ChipsArrayField = ({ path, field }: FieldProps) => {
 		}))
 	)
 	const colors: Record<string, string> = {
-		warning: 'var(--theme-warning-500)',
-		success: 'var(--theme-success-500)',
+		warning: 'var(--color-bg-warning)',
+		success: 'var(--color-bg-success)',
 	}
 	return (
 		<Shell label={labelOf(field)}>
@@ -187,7 +187,7 @@ export const ChipsArrayField = ({ path, field }: FieldProps) => {
 						padding: '2px 10px',
 						borderRadius: 999,
 						color: '#fff',
-						background: colors[row.tone ?? ''] ?? 'var(--theme-elevation-500)',
+						background: colors[row.tone ?? ''] ?? 'var(--color-icon-secondary)',
 					}}
 				>
 					{row.text}

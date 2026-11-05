@@ -11,11 +11,11 @@ import {
 	useConfig,
 	useLocale,
 	useModal,
+	useRouter,
 	useStepNav,
 	useWindowInfo,
 } from '@payloadcms/ui'
 import { formatDate } from '@payloadcms/ui/shared'
-import { useRouter } from 'next/navigation'
 import { formatAdminURL } from 'payload/shared'
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -113,7 +113,7 @@ export function MergeClient({
 		getEntityConfig,
 	} = useConfig()
 	const { setStepNav } = useStepNav()
-	const { code: locale } = useLocale()
+	const locale = useLocale()?.code
 	const { openModal } = useModal()
 	const [docs, setDocs] = useState(initialDocs)
 	const [survivor, setSurvivor] = useState(initialSurvivor)
@@ -248,21 +248,21 @@ export function MergeClient({
 		}
 	}, [plan, stale, choices, apiRoute, collection, survivor, absorbed, locale, t])
 
-	// The address follows the screen without a navigation, so the matrix stays where it is.
+	// The address follows the screen without a navigation, so the matrix stays where it is. Through
+	// the router adapter: TanStack Start reloads the route on a plain `history.replaceState`, which
+	// would remount the screen and drop the choices made.
 	const remember = useCallback(
 		(nextDocs: string[], nextSurvivor: string) => {
-			window.history.replaceState(
-				null,
-				'',
-				mergeUrl({
-					mergePath: `${queuePath}/merge`,
-					collection,
-					docs: nextDocs,
-					survivor: nextSurvivor,
-				})
-			)
+			const url = mergeUrl({
+				mergePath: `${queuePath}/merge`,
+				collection,
+				docs: nextDocs,
+				survivor: nextSurvivor,
+			})
+			if (router.replaceState) router.replaceState(url)
+			else window.history.replaceState(null, '', url)
 		},
-		[queuePath, collection]
+		[queuePath, collection, router]
 	)
 
 	const makeSurvivor = useCallback(
@@ -439,7 +439,7 @@ export function MergeClient({
 	if (error) {
 		return (
 			<div className={baseClass}>
-				<Banner type="error">{error}</Banner>
+				<Banner type="danger">{error}</Banner>
 			</div>
 		)
 	}
@@ -481,7 +481,7 @@ export function MergeClient({
 				</Banner>
 			))}
 			{plan.transactions === 'refused' ? (
-				<Banner type="error">{t(keys.transactionsRequired)}</Banner>
+				<Banner type="danger">{t(keys.transactionsRequired)}</Banner>
 			) : null}
 
 			<div
@@ -519,7 +519,7 @@ export function MergeClient({
 
 				{(answer ?? plan).refusal ? (
 					<div className={`${baseClass}__releases`}>
-						<Banner type="error">
+						<Banner type="danger">
 							{t(keys.mayNotApply)} {(answer ?? plan).refusal}
 						</Banner>
 					</div>
@@ -527,25 +527,25 @@ export function MergeClient({
 
 				{(answer ?? plan).blocked ? (
 					<div className={`${baseClass}__releases`}>
-						<Banner type="error">{(answer ?? plan).blocked}</Banner>
+						<Banner type="danger">{(answer ?? plan).blocked}</Banner>
 					</div>
 				) : null}
 
 				{plan.survivorDraft ? (
 					<div className={`${baseClass}__releases`}>
-						<Banner type="error">{t(keys.survivorDraft, { title: titleOf(survivor) })}</Banner>
+						<Banner type="danger">{t(keys.survivorDraft, { title: titleOf(survivor) })}</Banner>
 					</div>
 				) : null}
 
 				{plan.draftsDeleted.map((id) => (
 					<div className={`${baseClass}__releases`} key={id}>
-						<Banner type="error">{t(keys.draftDeleted, { title: titleOf(id) })}</Banner>
+						<Banner type="danger">{t(keys.draftDeleted, { title: titleOf(id) })}</Banner>
 					</div>
 				))}
 
 				{answer && answer.cleared.length > 0 ? (
 					<div className={`${baseClass}__releases`}>
-						<Banner type="info">
+						<Banner type="default">
 							{t(keys.pointersCleared, {
 								fields: fieldList(decisions, answer.cleared),
 								survivor: titleOf(survivor),
@@ -556,9 +556,9 @@ export function MergeClient({
 
 				{releases.map(([id, release]) => (
 					<div className={`${baseClass}__releases`} key={id}>
-						{deletesNote.has(id) ? <Banner type="error">{deletesNote.get(id)}</Banner> : null}
+						{deletesNote.has(id) ? <Banner type="danger">{deletesNote.get(id)}</Banner> : null}
 						{release.marked.length > 0 ? (
-							<Banner type="error">
+							<Banner type="danger">
 								{t(keys.releaseMarked, {
 									title: titleOf(id),
 									survivor: titleOf(survivor),
@@ -567,7 +567,7 @@ export function MergeClient({
 							</Banner>
 						) : null}
 						{release.emptied.length > 0 ? (
-							<Banner type="error">
+							<Banner type="danger">
 								{t(keys.releaseEmptied, {
 									title: titleOf(id),
 									survivor: titleOf(survivor),
@@ -601,7 +601,7 @@ export function MergeClient({
 						disabled={busy}
 						margin={false}
 						onClick={() => void decide('reopen')}
-						size="large"
+						size="medium"
 					>
 						{t(keys.reopen)}
 					</Button>
@@ -612,7 +612,7 @@ export function MergeClient({
 							disabled={busy}
 							margin={false}
 							onClick={() => void decide('dismiss')}
-							size="large"
+							size="medium"
 						>
 							{t(keys.dismiss)}
 						</Button>
@@ -621,7 +621,7 @@ export function MergeClient({
 							disabled={busy || !answer?.readyToApply || currentSections.waiting.length > 0}
 							margin={false}
 							onClick={() => openModal(CONFIRM_MODAL)}
-							size="large"
+							size="medium"
 						>
 							{t(keys.mergeCount, { count: String(docs.length) })}
 						</Button>
@@ -631,6 +631,7 @@ export function MergeClient({
 
 			<ConfirmationModal
 				body={t(keys.removeBody)}
+				className={`${baseClass}__remove-modal`}
 				confirmLabel={t(keys.removeFromMerge)}
 				heading={t(keys.removeHeading, { title: removing ? titleOf(removing) : '' })}
 				modalSlug={REMOVE_MODAL}
@@ -639,6 +640,7 @@ export function MergeClient({
 				}}
 			/>
 			<ConfirmationModal
+				className={`${baseClass}__confirm-modal`}
 				body={[
 					t(keys.confirmBody, {
 						absorbed: absorbed.map(titleOf).join(', '),

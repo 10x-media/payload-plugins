@@ -106,8 +106,8 @@ export type MergePlan = {
 	/** Keys of decisions whose required value came from the most similar document. */
 	filled: string[]
 	/**
-	 * Locales written as a draft, then published with the write locale: every value Payload
-	 * requires there and the result leaves empty, the survivor lacked before the merge.
+	 * Locales written as a draft and left unpublished: the survivor is a draft there, where each
+	 * locale is published on its own.
 	 */
 	drafted: string[]
 }

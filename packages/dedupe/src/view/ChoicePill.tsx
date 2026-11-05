@@ -1,13 +1,14 @@
 'use client'
 
-import { ChevronIcon, Pill, Popup, PopupList } from '@payloadcms/ui'
+import { Button, ChevronIcon, Popup, PopupList } from '@payloadcms/ui'
 
 type Choice = { label: string; value: string }
 
 /**
- * A pill carrying the current value that opens the admin's own popover to change it: the
- * shape the list view uses for Columns and Filters, so the queue adds no second kind of
- * control. The popover is portalled, so nothing around it can clip it.
+ * A trigger carrying the current value that opens the admin's own popover to change it, drawn
+ * as the list view's Filters button (secondary, chevron, selected while open or narrowing the
+ * list), so the queue adds no second kind of control. The popover is portalled, so nothing
+ * around it can clip it.
  */
 export const ChoicePill = ({
 	groupLabel,
@@ -21,18 +22,13 @@ export const ChoicePill = ({
 	value: string
 }) => {
 	const selected = options.find((option) => option.value === value) ?? options[0]
+	const narrowed = selected !== options[0]
 
 	return (
 		<Popup
-			// No `onClick`: `Popup` wraps its trigger in a button, and `Pill` renders one of its
-			// own as soon as it is given a handler.
-			button={
-				<Pill icon={<ChevronIcon />} pillStyle="light" size="small">
-					{`${groupLabel}: ${selected?.label ?? ''}`}
-				</Pill>
-			}
 			className="dedupe-choice"
-			horizontalAlign="left"
+			horizontalAlign="right"
+			popupAriaLabel={groupLabel}
 			render={({ close }) => (
 				<PopupList.ButtonGroup>
 					{options.map((option) => (
@@ -49,7 +45,26 @@ export const ChoicePill = ({
 					))}
 				</PopupList.ButtonGroup>
 			)}
-			size="medium"
+			renderButton={({ active: open, onClick, onKeyDown, ...aria }) => (
+				<Button
+					buttonStyle="secondary"
+					className={['dedupe-choice__button', narrowed && 'dedupe-choice__button--active']
+						.filter(Boolean)
+						.join(' ')}
+					extraButtonProps={{ ...aria, onKeyDown }}
+					icon={<ChevronIcon direction={open ? 'up' : 'down'} size={16} />}
+					margin={false}
+					onClick={onClick}
+					selected={open || narrowed}
+					size="medium"
+				>
+					<span className="dedupe-choice__label">{groupLabel}</span>
+					<span className="dedupe-choice__value" title={selected?.label}>
+						{selected?.label ?? ''}
+					</span>
+				</Button>
+			)}
+			theme="auto"
 			verticalAlign="bottom"
 		/>
 	)

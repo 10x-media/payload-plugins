@@ -92,7 +92,7 @@ dedupe({
 
 An answer the config has no locale for is ignored, and a code the config does not have stops the app at startup.
 
-In every locale the merge writes, a required value the primary lacks comes from the most similar document of the group that has it. Where none has it, the merge is refused, naming the field and the locale, with one exception: on a collection with drafts, a locale whose missing values the primary lacked before the merge is written as a draft and published with the write locale, which Payload checks alone, as it publishes any draft. The merge leaves that locale as incomplete as it found it. Drafts merged with `draft: true` are not checked.
+In every locale the merge writes, a required value the primary lacks comes from the most similar document of the group that has it. Where none has it, the merge is refused, naming the field and the locale, with one exception: on a collection with drafts and localized fields, Payload publishes each locale on its own, and the merge keeps the primary's status per locale. A locale the primary is a draft in is written as a draft and stays unpublished, so it is not checked, unless the collection validates drafts; a locale the primary is published in is published with the merged values. The values the locales share are written in a locale the primary is published in. Drafts merged with `draft: true` are not checked.
 
 ## Applying
 
@@ -114,7 +114,7 @@ The merge is refused when:
 - the collection's access denies the reviewer `read` on a document, `update` on the primary, `delete` on a merged-in one, or `update` on one that goes to the trash;
 - a field's `update` access refuses a value the merge writes, asked with the write as `data`, or refuses the reviewer the change of a unique value a merged-in document gives up;
 - a `manual` conflict is open;
-- unless `draft` is set, the primary has an unpublished draft or a document was never published;
+- unless `draft` is set, the primary has an unpublished draft in a locale it is published in, or a document was never published in any locale;
 - another editor has a document of the group open.
 
 A merged-in document with unpublished changes is marked `Changed`, as Payload marks it. The merge takes its published values; the changes go to the trash with it, as Payload's own trash takes them, or are deleted with it.

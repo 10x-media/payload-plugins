@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { type CollectionSlug, createLocalReq } from 'payload'
+import { type CollectionSlug, createPayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { PAIRS_SLUG } from '../../src/collections/slugs'
@@ -29,21 +29,24 @@ describeForDb('dedupe cross-db', {}, (db) => {
 
 	it(`indexes, scans and merges against ${db}`, async () => {
 		const a = await booted.payload.create({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			data: { name: 'Ivan Petrenko', email: 'ivan@mail.com', phone: '0501234567' } as never,
 			depth: 0,
 		})
 		const b = await booted.payload.create({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			data: { name: 'Petrenko Ivan', phone: '+380501234567', tags: ['t'] } as never,
 			depth: 0,
 		})
 
 		const user = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'users' as CollectionSlug,
 			data: { email: 'reviewer@example.com', password: 'password' } as never,
 		})
-		const req = await createLocalReq({ user: user as never }, booted.payload)
+		const req = await createPayloadRequest({ user: user as never, payload: booted.payload })
 		const ctx = getContext(booted.payload)
 		const col = getCollectionContext(booted.payload, 'customers')
 		const summary = await runScan({ req, ctx, col })
@@ -58,6 +61,7 @@ describeForDb('dedupe cross-db', {}, (db) => {
 
 		await applyMerge({ req, ctx, col, survivorId: a.id, absorbedIds: [b.id], choices: {} })
 		const merged = (await booted.payload.findByID({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: a.id,
 			depth: 0,

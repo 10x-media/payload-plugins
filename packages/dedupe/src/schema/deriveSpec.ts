@@ -57,7 +57,6 @@ const UPLOAD_FIELDS = new Set([
 type SpecSource = Pick<SanitizedCollectionConfig, 'flattenedFields'> & {
 	auth?: unknown
 	upload?: unknown
-	folders?: unknown
 }
 
 const childrenOf = (field: FlattenedField, known: Known): FlattenedField[] =>
@@ -80,9 +79,19 @@ const policyWithin = (fields: FlattenedField[], prefix: string, known: Known): s
 	return null
 }
 
-/** The field is drawn by a `Field` component of its own. */
-const hasComponent = (field: FlattenedField): boolean =>
-	Boolean((field.admin as { components?: { Field?: unknown } } | undefined)?.components?.Field)
+/** Payload's component that draws nothing, as on a folder or tag field the header picks for. */
+const NULL_FIELD = '@payloadcms/ui#NullField'
+
+/**
+ * The field is drawn by a `Field` component of its own. One drawn as nothing, as Payload draws
+ * a folder or tag field, is shown as its value instead: the cell would otherwise be empty.
+ */
+const hasComponent = (field: FlattenedField): boolean => {
+	const Field = (field.admin as { components?: { Field?: unknown } } | undefined)?.components?.Field
+	if (!Field) return false
+	const path = typeof Field === 'string' ? Field : (Field as { path?: unknown }).path
+	return path !== NULL_FIELD
+}
 
 /** A group or list the merge takes whole: drawn as one by its own component, and not split. */
 const whole = (field: FlattenedField): boolean =>
@@ -176,14 +185,8 @@ const walk = (args: {
  * together. Arrays, blocks and every `hasMany` field are leaves merged as lists. A policy
  * declared on the field through `admin.custom.dedupe` replaces the type default.
  */
-export const deriveSpec = (
-	collection: SpecSource,
-	folderField = 'folder',
-	known?: Known
-): MergeFieldSpec[] => {
+export const deriveSpec = (collection: SpecSource, known?: Known): MergeFieldSpec[] => {
 	const skip = new Set(SYSTEM_FIELDS)
-	// The folder Payload files the document in, where the collection has folders.
-	if (collection.folders) skip.add(folderField)
 	if (collection.auth) for (const name of AUTH_FIELDS) skip.add(name)
 	if (collection.upload) for (const name of UPLOAD_FIELDS) skip.add(name)
 	const out: MergeFieldSpec[] = []

@@ -26,7 +26,12 @@ describeForDb('dedupe merge guards', {}, (db) => {
 
 	const ctx = () => getContext(fixture.booted.payload)
 	const create = (collection: CollectionSlug, data: Record<string, unknown>) =>
-		fixture.booted.payload.create({ collection, data: data as never, depth: 0 }) as Promise<Doc>
+		fixture.booted.payload.create({
+			overrideAccess: true,
+			collection,
+			data: data as never,
+			depth: 0,
+		}) as Promise<Doc>
 	const group = (
 		req: PayloadRequest,
 		collection: CollectionSlug,
@@ -90,6 +95,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 			)
 		)
 		const merged = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: STAFF,
 			id: pair[0]?.id as string,
 			depth: 0,
@@ -102,6 +108,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		const keep = await create(STAFF, { name: 'Buddy twin', buddy: gone.id })
 		await applyMerge(group(fixture.req, STAFF, [keep.id, gone.id]))
 		const merged = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: STAFF,
 			id: keep.id,
 			depth: 0,
@@ -156,6 +163,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 			choices: { salary: { doc: String(pair[1].id) } },
 		})
 		const merged = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: STAFF,
 			id: pair[0].id,
 			depth: 0,
@@ -221,6 +229,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		})
 		await applyMerge(group(fixture.req, KITS, [keep.id, gone.id]))
 		const merged = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: KITS,
 			id: keep.id,
 			depth: 0,
@@ -288,6 +297,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 			await create(STAFF, { name: 'Locked twin' }),
 		] as [Doc, Doc]
 		const editor = await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: 'users' as CollectionSlug,
 			data: { email: 'editor-lock@example.com', password: 'password' } as never,
 		})
@@ -322,6 +332,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 			await create(STAFF, { name: 'Orphan lock' }),
 		] as [Doc, Doc]
 		const editor = await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: 'users' as CollectionSlug,
 			data: { email: 'editor-gone@example.com', password: 'password' } as never,
 		})
@@ -332,7 +343,11 @@ describeForDb('dedupe merge guards', {}, (db) => {
 				user: { relationTo: 'users', value: editor.id },
 			},
 		})
-		await fixture.booted.payload.delete({ collection: 'users' as CollectionSlug, id: editor.id })
+		await fixture.booted.payload.delete({
+			overrideAccess: true,
+			collection: 'users' as CollectionSlug,
+			id: editor.id,
+		})
 		try {
 			const plan = await buildPlanResponse(
 				group(
@@ -492,6 +507,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 		const limited = await reqFor(fixture.booted, 'limited-trasher@example.com')
 		await applyMerge(group(limited, STAFF, [keep.id, gone.id]))
 		const trashed = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: STAFF,
 			id: gone.id,
 			trash: true,
@@ -532,6 +548,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 			message: 'You may not change "Rank".',
 		})
 		const after = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: STAFF,
 			id: keep.id,
 			depth: 0,
@@ -637,6 +654,7 @@ describeForDb('dedupe merge guards', {}, (db) => {
 	}
 	const stored = (id: number | string) =>
 		fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: FRAGILE,
 			id,
 			depth: 0,
@@ -756,6 +774,7 @@ describeForDb('dedupe merge guards, told by the plan', {}, (db) => {
 	it('tells a reviewer who may not merge before they try', async () => {
 		const create = (data: Record<string, unknown>) =>
 			fixture.booted.payload.create({
+				overrideAccess: true,
 				collection: STAFF,
 				data: data as never,
 				depth: 0,
@@ -793,7 +812,12 @@ describeForDb('dedupe merge guards, merged-in documents deleted', {}, (db) => {
 	it('refuses at the plan, as at the apply, a merge that deletes a document before the survivor is written', async () => {
 		const { payload } = fixture.booted
 		const create = (data: Record<string, unknown>) =>
-			payload.create({ collection: FRAGILE, data: data as never, depth: 0 }) as Promise<Doc>
+			payload.create({
+				overrideAccess: true,
+				collection: FRAGILE,
+				data: data as never,
+				depth: 0,
+			}) as Promise<Doc>
 		const survivor = await create({ title: 'keeps', seat: 21 })
 		const absorbed = await create({ title: 'other', seat: 22 })
 		const merge = {

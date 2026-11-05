@@ -169,30 +169,25 @@ const diffConverters = (
 					data-id={id}
 					data-slug={node.relationTo}
 				>
-					<div className="lexical-relationship-diff__card">
-						<div className="lexical-relationship-diff__collectionLabel">
-							{req.i18n.t('fields:labelRelationship', {
-								label: related?.labels?.singular
-									? getTranslation(related.labels.singular, req.i18n)
-									: related?.slug,
-							})}
-						</div>
+					{related?.labels?.singular ? (
+						<span className="lexical-relationship-diff__pill" data-enable-match="false">
+							{getTranslation(related.labels.singular, req.i18n)}
+						</span>
+					) : null}
+					<strong className="lexical-relationship-diff__info" data-enable-match="false">
 						{title && data ? (
-							<strong className="lexical-relationship-diff__title" data-enable-match="false">
-								<a
-									className="lexical-relationship-diff__link"
-									data-enable-match="false"
-									href={adminURL(node.relationTo, data.id)}
-									rel="noopener noreferrer"
-									target="_blank"
-								>
-									{String(title)}
-								</a>
-							</strong>
+							<a
+								data-enable-match="false"
+								href={adminURL(node.relationTo, data.id)}
+								rel="noopener noreferrer"
+								target="_blank"
+							>
+								{String(title)}
+							</a>
 						) : (
-							<strong>{String(id)}</strong>
+							String(id)
 						)}
-					</div>
+					</strong>
 				</div>
 			)
 		},
@@ -216,12 +211,7 @@ const diffConverters = (
 				>
 					<div className="lexical-upload-diff__card">
 						<div className="lexical-upload-diff__thumbnail">
-							{thumbnail ? (
-								// biome-ignore lint/performance/noImgElement: markup for a diff, drawn once on the server, as Payload's own is
-								<img alt={alt} src={thumbnail} />
-							) : (
-								fileIcon
-							)}
+							{thumbnail ? <img alt={alt} src={thumbnail} /> : fileIcon}
 						</div>
 						<div className="lexical-upload-diff__info" data-enable-match="false">
 							<strong>{file.filename}</strong>

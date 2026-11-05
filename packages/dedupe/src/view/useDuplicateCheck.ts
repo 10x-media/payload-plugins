@@ -40,7 +40,7 @@ export const useDuplicateCheck = ({
 	const { id } = useDocumentInfo()
 	const { getData } = useForm()
 	// The candidates are named in the language the admin shows.
-	const { code: locale } = useLocale()
+	const locale = useLocale()?.code
 	const {
 		config: {
 			routes: { api: apiRoute },

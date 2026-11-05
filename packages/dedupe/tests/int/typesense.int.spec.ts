@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { type CollectionConfig, type CollectionSlug, createLocalReq } from 'payload'
+import { type CollectionConfig, type CollectionSlug, createPayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { typesenseAdapter } from '../../dev/helpers/typesenseAdapter'
@@ -55,10 +55,11 @@ describeForDb('typesense adapter', { dbs: URL ? ['mongo'] : [] }, (db) => {
 	it('finds a document by a name typed with typos the blocking keys miss, until it is deleted', async () => {
 		const { payload } = booted
 		const saved = (await payload.create({
+			overrideAccess: true,
 			collection: PEOPLE,
 			data: { name: 'Iryna Tkachenko', email: 'iryna@kyiv.example' } as never,
 		})) as { id: string }
-		const req = await createLocalReq({}, payload)
+		const req = await createPayloadRequest({ payload: payload })
 		const find = () =>
 			adapter.findCandidates({
 				req,
@@ -68,7 +69,7 @@ describeForDb('typesense adapter', { dbs: URL ? ['mongo'] : [] }, (db) => {
 			})
 		expect(await find()).toEqual([{ id: String(saved.id) }])
 
-		await payload.delete({ collection: PEOPLE, id: saved.id })
+		await payload.delete({ overrideAccess: true, collection: PEOPLE, id: saved.id })
 		expect(await find()).toEqual([])
 	})
 })

@@ -5,6 +5,7 @@ import type {
 	PayloadRequest,
 } from 'payload'
 import { isLive, type LoadedDoc, loadDoc, localRequest } from '../merge/load'
+import { statusIn } from '../merge/status'
 import type { ResolvedOptions } from '../options'
 import { checkDocument } from '../queue/live'
 import { closePairsFor } from '../queue/pairs'
@@ -42,9 +43,11 @@ const fileDocument = async (args: {
 		}
 		return
 	}
+	// Whoever saved may not queue jobs themselves; the check is the plugin's, not theirs.
 	await req.payload.jobs.queue({
 		task: CHECK_TASK_SLUG as never,
 		input: { collection: col.slug, id: String(doc.id) } as never,
+		overrideAccess: true,
 		queue: ctx.options.queue,
 		req,
 	})
@@ -72,12 +75,14 @@ const afterChange: CollectionAfterChangeHook = async ({ collection, doc, req }) 
 	}
 	if (!col.options.match) return doc
 	// A draft saved over a published document leaves that one as it was. Taken off publication,
-	// a document leaves the index and its open pairs, as in the trash, until published again.
-	if (col.hasDrafts && !col.options.draft && saved._status === 'draft') {
+	// a document leaves the index and its open pairs, as in the trash, until published again; in
+	// every locale, where each is published on its own.
+	if (col.hasDrafts && !col.options.draft && statusIn(saved, req.locale) === 'draft') {
 		const published = (await req.payload.findByID({
 			collection: col.slug,
 			id: saved.id,
 			depth: 0,
+			...(ctx.localeCodes ? { locale: 'all' as const } : {}),
 			select: { _status: true, deletedAt: true },
 			overrideAccess: true,
 			disableErrors: true,

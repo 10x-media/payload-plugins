@@ -15,8 +15,12 @@ const openListMenu = async (page: Page) => {
 	return content
 }
 
-/** A disabled `PopupList.Button` renders as a div, so "disabled" is a class, not a state. */
-const entry = (menu: ReturnType<Page['locator']>) => menu.locator('.popup-button-list__button')
+/**
+ * The plugin's entry. A disabled `PopupList.Button` renders as a div, so "disabled" is a class,
+ * not a state. Payload 4 adds its own "Edit agent instructions" entry to the same menu.
+ */
+const entry = (menu: ReturnType<Page['locator']>) =>
+	menu.locator('.popup-button-list__button').filter({ hasNotText: /agent instructions/i })
 
 const rowCheckbox = (page: Page, title: string) =>
 	page

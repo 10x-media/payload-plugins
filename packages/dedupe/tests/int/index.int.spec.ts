@@ -47,6 +47,7 @@ describeForDb('dedupe index', {}, (db) => {
 		})
 		expect((await pairsFor(first.id)).map((pair) => pair.status)).toEqual(['open'])
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: second.id,
 			data: { name: 'Quite Someone Else', phone: '0991112233' } as never,
@@ -70,6 +71,7 @@ describeForDb('dedupe index', {}, (db) => {
 		})
 		expect((await pairsFor(first.id)).map((pair) => pair.status)).toEqual(['open'])
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: second.id,
 			data: { tenant: 'south' } as never,
@@ -92,6 +94,7 @@ describeForDb('dedupe index', {}, (db) => {
 			tenant: 'north',
 		})
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: second.id,
 			data: { tenant: 'south' } as never,
@@ -99,6 +102,7 @@ describeForDb('dedupe index', {}, (db) => {
 		expect(await pairsFor(first.id)).toEqual([])
 		const before = emitted.length
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: second.id,
 			data: { tenant: 'north' } as never,
@@ -128,6 +132,7 @@ describeForDb('dedupe index', {}, (db) => {
 		]
 		for (const twin of twins) {
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: CUSTOMERS,
 				id: twin.id,
 				data: { tenant: 'south' } as never,
@@ -253,6 +258,7 @@ describeForDb('dedupe index', {}, (db) => {
 		it('writes blocking keys on save, including every locale of a localized field', async () => {
 			const { booted, keysFor } = fixture
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: CUSTOMERS,
 				id: ivan.id,
 				data: { name: 'Іван Петренко' } as never,

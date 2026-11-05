@@ -38,7 +38,11 @@ describeForDb('dedupe fields with components of their own', {}, (db) => {
 	})
 
 	const card = (data: Partial<Card>) =>
-		fixture.booted.payload.create({ collection: CARDS, data: data as never }) as Promise<Card>
+		fixture.booted.payload.create({
+			overrideAccess: true,
+			collection: CARDS,
+			data: data as never,
+		}) as Promise<Card>
 	const args = ([keep, gone]: [Card, Card], choices: Record<string, MergeChoice> = {}) => ({
 		req: fixture.req,
 		ctx: getContext(fixture.booted.payload),
@@ -48,7 +52,12 @@ describeForDb('dedupe fields with components of their own', {}, (db) => {
 		choices,
 	})
 	const stored = async (id: number | string) =>
-		(await fixture.booted.payload.findByID({ collection: CARDS, id, depth: 0 })) as Card
+		(await fixture.booted.payload.findByID({
+			overrideAccess: true,
+			collection: CARDS,
+			id,
+			depth: 0,
+		})) as Card
 
 	const twins = async () => {
 		n++
