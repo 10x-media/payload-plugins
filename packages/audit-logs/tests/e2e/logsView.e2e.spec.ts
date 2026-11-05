@@ -11,7 +11,7 @@ test.describe('signed in', () => {
 
 		expect(await rows(page).count()).toBeGreaterThan(0)
 		await expect(page.locator('.al-view')).toBeVisible()
-		await expect(page.locator('.al-pagination__info')).toBeVisible()
+		await expect(page.locator('.page-controls__page-info')).toBeVisible()
 	})
 
 	test('a row expands to show its diff', async ({ page }) => {
@@ -61,6 +61,35 @@ test.describe('signed in', () => {
 		expect(new Set(badges.map((b) => b.trim().toLowerCase()))).toEqual(new Set(['create']))
 	})
 
+	// Next hands the view a repeated key as an array, TanStack Start as `operation[0]`,
+	// `operation[1]`; both have to narrow the list.
+	test('several operations from the url keep only those operations', async ({ page }) => {
+		await gotoLogs(page, '?operation=create&operation=delete')
+
+		await expect(page.locator('.al-choice--active').first()).toContainText('Create')
+		const badges = await rows(page).locator('.al-badge--op').allTextContents()
+		expect(badges.length).toBeGreaterThan(0)
+		expect(badges.every((b) => ['create', 'delete'].includes(b.trim().toLowerCase()))).toBe(true)
+	})
+
+	test('the event popup stages a switch until Apply', async ({ page }) => {
+		await gotoLogs(page)
+
+		await page.locator('.al-choice').filter({ hasText: 'Event' }).click()
+		const update = page
+			.locator('.al-event-filter__item')
+			.filter({ has: page.getByText('Update', { exact: true }) })
+		await update.locator('.switch').click()
+		await expect(page).not.toHaveURL(/operation=update/)
+
+		await page.getByRole('button', { name: 'Apply' }).click()
+		await expect(page).toHaveURL(/operation=update/)
+		// The URL moves before the new list renders, on TanStack Start visibly so.
+		const badges = rows(page).locator('.al-badge--op')
+		await expect(badges.filter({ hasNotText: /^update$/i })).toHaveCount(0)
+		await expect(badges.first()).toHaveText(/update/i)
+	})
+
 	test('a filter that matches nothing shows the empty state', async ({ page }) => {
 		await page.goto('/admin/audit-logs?documentId=does-not-exist')
 
@@ -68,11 +97,25 @@ test.describe('signed in', () => {
 		expect(await rows(page).count()).toBe(0)
 	})
 
-	test('the debug bar offers the retention jobs', async ({ page }) => {
+	test('the header offers the retention jobs', async ({ page }) => {
 		await gotoLogs(page)
 
 		// The stand sets `debug: true` with retention configured, so both buttons render.
-		await expect(page.locator('.al-debug-bar .btn')).toHaveCount(2)
+		const header = page.locator('.al-view__header')
+		await expect(header.getByRole('button', { name: 'Run Archive' })).toBeVisible()
+		await expect(header.getByRole('button', { name: 'Run Delete' })).toBeVisible()
+	})
+
+	test('a document shows core authorship through the plugin field', async ({ page }) => {
+		const id = await createDoc(page, 'posts', { title: 'Authorship test' })
+		await page.goto(`/admin/collections/posts/${id}`)
+
+		// The stand turns `authorshipFields` on for posts.
+		for (const name of ['createdBy', 'updatedBy']) {
+			await expect(page.locator(`#field-${name} .audit-relationship-field__link`)).toHaveText(
+				'dev@10xmedia.de'
+			)
+		}
 	})
 
 	test('an excluded field never reaches the log', async ({ page }) => {

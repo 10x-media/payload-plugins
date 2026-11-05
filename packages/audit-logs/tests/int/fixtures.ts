@@ -56,6 +56,7 @@ export const TEST_PASSWORD = 'password'
 /** Creates the auth user every spec logs its writes against. */
 export const seedUser = async (payload: Payload) => {
 	return payload.create({
+		overrideAccess: true,
 		collection: 'users',
 		data: { email: TEST_EMAIL, password: TEST_PASSWORD, name: 'Audit User' },
 	})
@@ -97,3 +98,19 @@ export type AuditLogDoc = {
 	ipAddress?: string
 	userAgent?: string
 }
+
+/** The import-map path of the plugin's read-only relationship component. */
+export const PLUGIN_FIELD = '@10x-media/audit-logs/client#AuditRelationshipField'
+
+type NamedField = {
+	admin?: { components?: { Field?: unknown }; hidden?: boolean }
+	name: string
+	relationTo?: unknown
+}
+
+/** A top-level data field by name, typed loosely enough to read its admin settings. */
+export const fieldNamed = (fields: unknown[] | undefined, name: string): NamedField | undefined =>
+	(fields ?? []).find(
+		(field): field is NamedField =>
+			typeof field === 'object' && field !== null && (field as NamedField).name === name
+	)

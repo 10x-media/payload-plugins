@@ -63,6 +63,7 @@ describe('audit log entries', () => {
 
 	it('records the impersonator stamped on the acting user', async () => {
 		const admin = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: 'impersonator@example.com', password: 'password', name: 'Impersonator' },
 		})
@@ -170,7 +171,11 @@ describe('audit log entries', () => {
 			title: 'Ordered',
 			sections: [{ heading: 'A' }, { heading: 'B' }],
 		})
-		const seeded = await booted.payload.findByID({ collection: 'posts', id: doc.id })
+		const seeded = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'posts',
+			id: doc.id,
+		})
 		const sections = (seeded.sections ?? []) as { heading?: string; id?: string }[]
 
 		await booted.payload.update({

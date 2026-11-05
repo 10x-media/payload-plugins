@@ -1,152 +1,91 @@
 ---
 title: Audit fields
-description: createdBy and lastModifiedBy on the document itself, stamped automatically or placed by hand.
+description: Payload's own createdBy and updatedBy, shown on the document through the plugin's read-only field.
 ---
 
-Audit fields answer "who owns this document right now" from the document, with no join into the log. They are half of the plugin and work with the log switched off entirely:
+Audit fields answer "who owns this document right now" from the document, with no join into the log. On Payload 4 they are Payload's: its `authorship` adds `createdBy` and `updatedBy` to every collection and global when the config has an auth collection, and stamps them on every write. They are hidden in the admin by default, and the plugin writes nothing to them.
+
+`authorshipFields` makes them visible, drawn by the plugin's read-only component. It works with the log switched off entirely:
 
 ```ts title="payload.config.ts"
 auditLogs({
-  collections: {
-    posts: { auditFields: true },
-  },
+  authorshipFields: true,
 })
 ```
 
-That adds two read-only relationship fields, `createdBy` and `lastModifiedBy`. A `beforeChange` hook fills the first on create and the second on every save.
-
-Enable just one by naming it:
+`true` covers every collection and global the config has when the plugin runs. Name them to cover only some:
 
 ```ts
-auditFields: { lastModifiedBy: true }
-```
-
-An omitted key is off, so this adds `lastModifiedBy` and nothing else.
-
-## Automatic fields
-
-| Option | Default | Description |
-|---|---|---|
-| `name` | `createdBy` / `lastModifiedBy` | Field name in the database and in form state. |
-| `label` | `Created By` / `Last Modified By` | Admin label. |
-| `relationTo` | every auth collection found | What the field relates to. |
-| `admin` | `{}` | Merged over the plugin's defaults (`readOnly: true` plus its own component). |
-| `disableCustomComponent` | `false` | Fall back to Payload's relationship UI. |
-| `overrides` | none | Receives the built field, returns the modified one. |
-
-```ts
-auditFields: {
-  createdBy: {
-    name: 'author',
-    label: 'Author',
-    relationTo: 'users',
-    admin: { position: 'sidebar' },
-    overrides: (field) => ({ ...field, access: { update: () => false } }),
-  },
-}
-```
-
-`overrides` is a composition seam: you get the finished field and hand back your version, so you extend rather than replace. `hasMany` is forced back to `false` afterwards, because the hook writes one user.
-
-### Defaults across collections
-
-Repeating the same field config per collection gets old. `defaults` applies to every automatic audit field the plugin creates:
-
-```ts title="payload.config.ts"
 auditLogs({
-  defaults: {
-    createdBy: { admin: { hidden: true } },
-    lastModifiedBy: { label: 'Modified By' },
-  },
-  collections: {
-    posts: true,
-    pages: {
-      auditFields: {
-        createdBy: { name: 'author' }, // name from here, hidden from defaults
-      },
-    },
-  },
+  authorshipFields: { collections: ['posts', 'pages'], globals: ['site-settings'] },
 })
 ```
 
-Per-collection options are merged on top. `false` still wins over any default.
+Off by default: without it, the fields are stored and queryable as usual and stay out of the edit view.
+
+## What Payload does with them
+
+Payload owns the stamping, the storage and the access:
+
+- `createdBy` is set on create, `updatedBy` on every create and update, from `req.user`.
+- Both are relationships to every auth collection, stored as `{ relationTo, value }`.
+- Nobody can write them through the API; an update that sends them is ignored.
+- `authorship: false` on a collection or global turns both off, `authorship: { updatedBy: false }` one of them. Payload's [authorship docs](https://payloadcms.com/docs/configuration/collections) have the details.
+
+The plugin respects all of it. A field that `authorship` switches off gets nothing, and a collection that declares its own `createdBy` or `updatedBy` keeps its field as declared, which Payload then leaves alone too.
 
 ## The field component
 
-By default the plugin replaces the relationship select with a read-only component showing the user as plain text. If the current user can read the related collection, it becomes a link that opens the document in a drawer; if not, it stays text. Nobody gets a select they cannot use.
+The plugin replaces the relationship select with a read-only component showing the user as plain text. If the current user can read the related collection, it becomes a link that opens the document in a drawer; if not, it stays text. Nobody gets a select they cannot use.
 
-Opt out per field with `disableCustomComponent: true`, or replace it outright:
-
-```ts
-createdBy: {
-  admin: {
-    components: { Field: '/components/MyAuthorField#MyAuthorField' },
-  },
-}
-```
-
-## Placing fields by hand
-
-The automatic fields land at the root of the document. To put them inside a group, tab, or collapsible, add them yourself with the exported factories and tell the plugin where they went:
+To label, place or draw them differently, declare the fields yourself with Payload's factories and leave `authorshipFields` off for that collection:
 
 ```ts title="collections/Posts.ts"
-import {
-  auditRelationshipField,
-  createdByField,
-  lastModifiedByField,
-} from '@10x-media/audit-logs'
+import { createCreatedByField, createUpdatedByField } from 'payload'
 
 export const Posts: CollectionConfig = {
   slug: 'posts',
   fields: [
-    {
-      name: 'meta',
-      type: 'group',
-      fields: [
-        createdByField({ relationTo: 'users' }),
-        lastModifiedByField({ relationTo: 'users' }),
-        auditRelationshipField({ name: 'reviewedBy', label: 'Reviewed By', relationTo: 'users' }),
-      ],
-    },
+    // ...
+    createCreatedByField({
+      overrides: {
+        admin: {
+          components: { Field: '@10x-media/audit-logs/client#AuditRelationshipField' },
+          hidden: false,
+          position: 'sidebar',
+        },
+        label: 'Author',
+      },
+    }),
+    createUpdatedByField({ overrides: { admin: { hidden: false } } }),
   ],
 }
 ```
 
-```ts title="payload.config.ts"
-auditLogs({
-  collections: {
-    posts: {
-      auditFields: {
-        createdBy: { isManual: true, path: 'meta.createdBy' },
-        lastModifiedBy: { isManual: true, path: 'meta.lastModifiedBy' },
-      },
-    },
-  },
-})
+The factories bring Payload's hooks and access along, so the fields are still stamped; Payload sees the names taken and adds nothing. They belong at the top level of the fields, where Payload looks for them.
+
+## Fields of your own
+
+`auditRelationshipField` builds a read-only relationship drawn by the same component, for a field the plugin and Payload do not manage. Filling it is your job; it exists so a `reviewedBy` looks and behaves like the two Payload owns:
+
+```ts title="collections/Posts.ts"
+import { auditRelationshipField } from '@10x-media/audit-logs'
+
+export const Posts: CollectionConfig = {
+  slug: 'posts',
+  fields: [
+    auditRelationshipField({ name: 'reviewedBy', label: 'Reviewed By', relationTo: 'users' }),
+  ],
+}
 ```
 
 | Option | Default | Description |
 |---|---|---|
-| `path` | required | Full dot path including the field name. |
-| `isPolymorphic` | `false` | Set when your field declares `relationTo: [...]`. |
-| `relationTo` | every auth collection found | Used to check the acting user belongs to one of them before writing. |
+| `name` | required | Field name in the database and in form state. |
+| `relationTo` | required | The collection or collections it relates to. |
+| `label` | none | Admin label. |
+| `admin` | `{}` | Merged over the plugin's (`readOnly: true` and its component). `admin.components.Field` wins. |
 
-`auditRelationshipField` builds a field the plugin does not manage, styled to match. Filling it is your job; it exists so a `reviewedBy` looks and behaves like the two the plugin owns.
+## Coming from the Payload 3 line
 
-## More than one auth collection
-
-With two or more auth collections the fields become polymorphic on their own, storing `{ relationTo, value }` instead of a plain id. Nothing to configure.
-
-Pin a field to one collection when the others should not appear in it:
-
-```ts
-createdBy: { relationTo: 'users' }
-```
-
-A user from a collection outside `relationTo` saving that document leaves the field untouched. No error, and no wrong value written.
-
-## Globals
-
-A global has no create, so the plugin decides by looking at the field: if `createdBy` is empty it fills both, otherwise it updates `lastModifiedBy` only.
-
-The useful consequence is that adding the plugin to a global that already has content backfills `createdBy` on the next save rather than leaving it blank forever.
+The plugin used to add and stamp its own `createdBy` and `lastModifiedBy`. They are gone, with `auditFields`, `defaults`, `createdByField` and `lastModifiedByField`; [Upgrading](/audit-logs/upgrading#payload-4) has the data to move across.

@@ -72,7 +72,7 @@ describe('host hooks on an audited collection', () => {
 		booted = await bootPayload({
 			plugin: auditLogs({
 				collections: {
-					orders: { auditFields: true, auditLog: true },
+					orders: { auditLog: true },
 					'order-events': { auditLog: true },
 					exploding: { auditLog: true },
 				},
@@ -133,25 +133,6 @@ describe('host hooks on an audited collection', () => {
 		).find((l) => l.operation === 'update')
 
 		expect(update?.diff?.total).toEqual({ before: 3, after: 7 })
-	})
-
-	it('lets a host beforeChange win over the plugin audit field', async () => {
-		const other = await booted.payload.create({
-			collection: 'users',
-			data: { email: 'second@example.com', password: 'password' },
-		})
-		const otherReq = { user: { ...other, collection: 'users' } } as unknown as PayloadRequest
-
-		const doc = await booted.payload.create({
-			collection: 'orders',
-			data: { reference: 'ownership' },
-			req: otherReq,
-			depth: 0,
-		})
-
-		// The plugin registers its beforeChange first on purpose, so the host's runs last.
-		expect(String(doc.lastTouchedBy)).toBe(String(other.id))
-		expect(String(doc.createdBy)).toBe(String(other.id))
 	})
 
 	it('logs the write a host afterChange makes into another audited collection', async () => {

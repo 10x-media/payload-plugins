@@ -91,7 +91,7 @@ export function UserPill({ adminRoute, impersonator, popover, user }: Props) {
 				<PillPopup
 					button={
 						<span className="al-user__more" title={t(keys.aboutUser)}>
-							<ChevronIcon direction="down" />
+							<ChevronIcon direction="down" size={16} />
 							<span className="al-visually-hidden">{t(keys.aboutUser)}</span>
 						</span>
 					}

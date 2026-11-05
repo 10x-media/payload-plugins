@@ -16,7 +16,6 @@ export const ko: Record<TranslationKey, string> = {
 	[keys.noEntries]: '감사 로그 항목이 없습니다.',
 
 	// Pagination
-	[keys.paginationInfo]: '{{total}}개 중 {{from}}–{{to}}',
 
 	// Debug bar
 	[keys.debug]: '디버그',

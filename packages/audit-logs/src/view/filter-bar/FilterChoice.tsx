@@ -1,31 +1,50 @@
 'use client'
 
-import { ChevronIcon, Pill } from '@payloadcms/ui'
+import { Button, ChevronIcon } from '@payloadcms/ui'
+import type { ComponentProps } from 'react'
 
 type Props = {
 	active: boolean
-	controls: string
+	/** Extra trigger props, such as the ones a `Popup` hands its `renderButton`. */
+	buttonProps?: Partial<ComponentProps<typeof Button>>
+	controls?: string
 	label: string
-	onToggle: () => void
+	onToggle?: () => void
 	open: boolean
 	value: string
 }
 
 /**
- * One fixed filter: a pill that always carries its current value, "All" included,
- * and toggles its editor open below the bar, the way the list view toggles its
- * columns and filters. Fixed rather than added on demand, so the bar stays one row.
+ * One fixed filter: a trigger that always carries its current value, "All"
+ * included, drawn as the list view's Filters button (secondary, chevron, selected
+ * while open or filtering). Fixed rather than added on demand, so the bar stays
+ * one row.
  */
-export function FilterChoice({ active, controls, label, onToggle, open, value }: Props) {
+export function FilterChoice({
+	active,
+	buttonProps,
+	controls,
+	label,
+	onToggle,
+	open,
+	value,
+}: Props) {
 	return (
-		<Pill
-			aria-controls={controls}
-			aria-expanded={open}
-			className={`al-choice${active ? ' al-choice--active' : ''}${open ? ' al-choice--open' : ''}`}
-			icon={<ChevronIcon direction={open ? 'up' : 'down'} />}
-			onClick={onToggle}
-			pillStyle="light"
-			size="small"
+		<Button
+			{...buttonProps}
+			buttonStyle="secondary"
+			className={['al-choice', active && 'al-choice--active', open && 'al-choice--open']
+				.filter(Boolean)
+				.join(' ')}
+			extraButtonProps={{
+				...buttonProps?.extraButtonProps,
+				...(controls && { 'aria-controls': controls, 'aria-expanded': open }),
+			}}
+			icon={<ChevronIcon direction={open ? 'up' : 'down'} size={16} />}
+			margin={false}
+			onClick={onToggle ?? buttonProps?.onClick}
+			selected={open || active}
+			size="medium"
 		>
 			<span className="al-choice__label">{label}</span>
 			{value && (
@@ -33,6 +52,6 @@ export function FilterChoice({ active, controls, label, onToggle, open, value }:
 					{value}
 				</span>
 			)}
-		</Pill>
+		</Button>
 	)
 }

@@ -7,11 +7,9 @@ import {
 } from '../hooks/afterAuthCollection'
 import { afterChangeCollectionAuditLog } from '../hooks/afterChangeCollection'
 import { afterDeleteCollectionAuditLog } from '../hooks/afterDeleteCollection'
-import { beforeChangeCollectionAuditField } from '../hooks/beforeChangeCollection'
 import type { AuditOptions, AuditPluginConfig } from '../types'
 import { buildFieldMap } from '../utilities/buildFieldMap'
 import { isTenantScoped } from '../utilities/tenantScope'
-import { buildAuditConfig } from './auditFields'
 import type { PluginContext } from './context'
 import { resolveAuditLogConfig, resolveAuthConfig } from './resolveOptions'
 
@@ -73,27 +71,9 @@ const registerCollection = (
 	// Not listed means not audited, auth events included.
 	if (!collectionOptions) return collection
 
-	const { createdByHookConfig, fields, hasActiveFields, lastModifiedByHookConfig } =
-		buildAuditConfig(
-			collection.fields,
-			collectionOptions,
-			ctx.defaultRelationTo,
-			pluginOptions.defaults
-		)
-
 	const auditLogConfig = resolveAuditLogConfig(collectionOptions)
 
 	let hooks: CollectionHooks = { ...collection.hooks }
-
-	if (!pluginOptions.disabled && hasActiveFields) {
-		hooks.beforeChange = [
-			beforeChangeCollectionAuditField({
-				createdBy: createdByHookConfig,
-				lastModifiedBy: lastModifiedByHookConfig,
-			}),
-			...(hooks.beforeChange ?? []),
-		]
-	}
 
 	if (!pluginOptions.disabled && auditLogConfig !== false) {
 		const anonymize = pluginOptions.anonymize?.[slug]
@@ -108,7 +88,9 @@ const registerCollection = (
 				? ctx.tenantFieldName
 				: undefined
 		const fieldMap =
-			pluginOptions.normalizeRelationships !== false ? buildFieldMap(fields) : undefined
+			pluginOptions.normalizeRelationships !== false
+				? buildFieldMap(collection.fields, { blocks: ctx.configBlocks })
+				: undefined
 
 		hooks.afterChange = [
 			...(hooks.afterChange ?? []),
@@ -162,7 +144,7 @@ const registerCollection = (
 		hooks = withAuthHooks({ auditOptions: collectionOptions, ctx, hooks, slug })
 	}
 
-	return { ...collection, fields, hooks }
+	return { ...collection, hooks }
 }
 
 export const registerCollections = (

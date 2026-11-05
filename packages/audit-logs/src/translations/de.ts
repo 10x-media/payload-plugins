@@ -21,7 +21,6 @@ export const de: Record<TranslationKey, string> = {
 	[keys.noEntries]: 'Keine Audit-Protokoll-Einträge gefunden.',
 
 	// Pagination
-	[keys.paginationInfo]: '{{from}}–{{to}} von {{total}}',
 
 	// Debug bar
 	[keys.debug]: 'Debug',

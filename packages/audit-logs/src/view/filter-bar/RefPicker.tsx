@@ -57,7 +57,7 @@ export function RefPicker({
 
 	return (
 		<div className="al-ref-picker">
-			<div className="al-filterpopover__editor-label">{label}</div>
+			<div className="al-panel__label">{label}</div>
 			{/* The row is the input: it carries the one border, so the drawer button sits
 			    inside the field rather than beside it. */}
 			<div className="al-attached">
@@ -123,7 +123,7 @@ export function ValuesInput({ label, onChange, options = [], placeholder, values
 
 	return (
 		<div className="al-ref-picker">
-			<div className="al-filterpopover__editor-label">{label}</div>
+			<div className="al-panel__label">{label}</div>
 			<ReactSelect
 				isClearable
 				isCreatable

@@ -79,31 +79,32 @@ export default buildConfig({
 			// picked in the nav. The same `collections` object as the multi-tenant plugin,
 			// so `tenant-settings` shows there as a global.
 			multiTenancy: { collections: tenantCollections },
+			// Payload's own createdBy / updatedBy, shown on the collections that had the
+			// plugin's audit fields before Payload 4.
+			authorshipFields: { collections: ['posts', 'pages', 'articles', 'orders', 'notes'] },
 			collections: {
 				posts: {
-					auditFields: true,
 					auditLog: {
 						excludeFields: ['internalNotes'],
 						snapshotOnCreate: true,
 						snapshotOnDelete: true,
 					},
 				},
-				// Opted in for the log only: no createdBy / lastModifiedBy columns.
 				tags: { auditLog: true },
 				// Two collections with drafts and autosave, differing only in `drafts`.
 				// Type into each, wait for the autosave, then compare the log.
-				pages: { auditFields: true, auditLog: { drafts: 'ignore' } },
-				articles: { auditFields: true, auditLog: { drafts: 'log' } },
+				pages: { auditLog: { drafts: 'ignore' } },
+				articles: { auditLog: { drafts: 'log' } },
 				// Both audited, so one save on an order produces two entries: the order itself
 				// and the event its afterChange hook writes.
-				orders: { auditFields: true, auditLog: true },
+				orders: { auditLog: true },
 				'order-events': { auditLog: true },
 				// Auth events only. Document edits stay out, which is the common shape for
 				// an auth collection: password hashes and login counters would flood the log.
 				users: { auth: { login: true, forgotPassword: true, failedLogin: true } },
 				customers: { auth: { login: true, failedLogin: true } },
 				// Tenant-scoped: entries carry the note's tenant and show in the tenant view.
-				notes: { auditFields: true, auditLog: true },
+				notes: { auditLog: true },
 				'tenant-settings': { auditLog: true },
 				tenants: { auditLog: true },
 			},

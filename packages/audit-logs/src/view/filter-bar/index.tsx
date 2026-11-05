@@ -1,6 +1,6 @@
 'use client'
 
-import { AnimateHeight, Button, ReactSelect } from '@payloadcms/ui'
+import { Button, ReactSelect } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useEffect, useState } from 'react'
 import { keys } from '../../translations/keys'
@@ -9,7 +9,7 @@ import { splitRef } from '../filterQuery'
 import type { Filters } from '../types'
 import { CollectionEditor } from './CollectionEditor'
 import { DateEditor, dateFilterValue } from './DateEditor'
-import { EventEditor, eventFilterValue } from './EventEditor'
+import { EventFilter } from './EventEditor'
 import { FilterChoice } from './FilterChoice'
 import { MoreFilters } from './MoreFilters'
 import { RefPicker } from './RefPicker'
@@ -20,10 +20,11 @@ const PANEL_ID = 'al-filterbar-panel'
 type PillArgs = { id: string; label: string; value: string }
 
 /**
- * One row: a fixed pill per common filter, each always showing its value, then
- * "More filters" for the rare ones. A pill opens its editor in a panel below the
- * bar, one at a time, the way the list view opens columns and filters. Changes
- * are staged and applied together, since every apply is a full server render.
+ * The list controls band: a fixed trigger per common filter, each always showing
+ * its value, then "More filters" for the rare ones. Event is a set of switches and
+ * opens as a popup, like the list view's Columns; the filters made of fields open
+ * a section under the band, one at a time, like its Filters. Changes are staged
+ * and applied together, since every apply is a full server render.
  */
 export function FilterBar({
 	collectionOptions,
@@ -42,10 +43,9 @@ export function FilterBar({
 }: FilterBarProps) {
 	const { t } = useTranslation()
 	const [staged, setStaged] = useState<Filters>(filters)
+	// The open section. The others are unmounted, so an editor's draft state starts
+	// fresh on reopen.
 	const [panel, setPanel] = useState<string>()
-	// The panel that is collapsing keeps its content until the animation ends. Every
-	// other panel is unmounted, so an editor's draft state starts fresh on reopen.
-	const [closing, setClosing] = useState<string>()
 	// Server-resolved titles, plus whatever the drawers pick before the next apply.
 	const [labels, setLabels] = useState(refLabels)
 
@@ -56,14 +56,8 @@ export function FilterBar({
 		setLabels((current) => ({ ...current, ...refLabels }))
 	}, [refLabels])
 
-	const toggle = (id: string) => {
-		setClosing(panel)
-		setPanel(panel === id ? undefined : id)
-	}
-	const close = useCallback(() => {
-		setClosing(panel)
-		setPanel(undefined)
-	}, [panel])
+	const toggle = (id: string) => setPanel(panel === id ? undefined : id)
+	const close = useCallback(() => setPanel(undefined), [])
 	const onLabel = useCallback(
 		(ref: string, label: string) => setLabels((current) => ({ ...current, [ref]: label })),
 		[]
@@ -112,14 +106,6 @@ export function FilterBar({
 	const editorFor = (id: string): React.ReactNode => {
 		const shared = { setStaged, staged }
 		switch (id) {
-			case 'event':
-				return (
-					<EventEditor
-						{...shared}
-						customEventTypes={customEventTypes}
-						eventTypeLabels={eventTypeLabels}
-					/>
-				)
 			case 'scope':
 				return (
 					<CollectionEditor
@@ -149,7 +135,7 @@ export function FilterBar({
 				return (
 					<div className="al-panel-grid">
 						<div className="al-ref-picker">
-							<div className="al-filterpopover__editor-label">{t(keys.filterTenant)}</div>
+							<div className="al-panel__label">{t(keys.filterTenant)}</div>
 							<ReactSelect
 								isClearable
 								isMulti
@@ -190,15 +176,6 @@ export function FilterBar({
 		}
 	}
 
-	const panelIds = [
-		'event',
-		'scope',
-		...(userCollections.length > 0 ? ['user'] : []),
-		'date',
-		...(tenantOptions && tenantOptions.length > 0 ? ['tenant'] : []),
-		'more',
-	]
-
 	const choice = ({ active, id, label, value }: PillArgs & { active: boolean }) => (
 		<FilterChoice
 			active={active}
@@ -212,76 +189,73 @@ export function FilterBar({
 
 	return (
 		<div className="al-filterbar">
-			<div className="al-filterbar__row">
-				{choice({
-					active: Boolean(staged.operations?.length || staged.eventTypes?.length),
-					id: 'event',
-					label: t(keys.filterEvent),
-					value: eventFilterValue(staged, eventTypeLabels, t),
-				})}
-				{choice({
-					active: Boolean(scopeValue),
-					id: 'scope',
-					label: t(keys.filterCollection),
-					value: scopeValue || t(keys.filterAll),
-				})}
-				{userCollections.length > 0 &&
-					choice({
-						active: Boolean(userValue),
-						id: 'user',
-						label: t(keys.filterUser),
-						value: userValue || t(keys.filterAll),
-					})}
-				{choice({
-					active: Boolean(staged.dateFrom || staged.dateTo),
-					id: 'date',
-					label: t(keys.filterDate),
-					value: dateFilterValue(staged, t),
-				})}
-				{tenantOptions &&
-					tenantOptions.length > 0 &&
-					choice({
-						active: Boolean(tenantValue),
-						id: 'tenant',
-						label: t(keys.filterTenant),
-						value: tenantValue || t(keys.filterAll),
-					})}
+			<div className="list-controls al-filterbar__controls">
+				<div className="list-controls__search-row al-filterbar__row">
+					<div className="al-filterbar__choices">
+						<EventFilter
+							{...{ setStaged, staged }}
+							customEventTypes={customEventTypes}
+							eventTypeLabels={eventTypeLabels}
+						/>
+						{choice({
+							active: Boolean(scopeValue),
+							id: 'scope',
+							label: t(keys.filterCollection),
+							value: scopeValue || t(keys.filterAll),
+						})}
+						{userCollections.length > 0 &&
+							choice({
+								active: Boolean(userValue),
+								id: 'user',
+								label: t(keys.filterUser),
+								value: userValue || t(keys.filterAll),
+							})}
+						{choice({
+							active: Boolean(staged.dateFrom || staged.dateTo),
+							id: 'date',
+							label: t(keys.filterDate),
+							value: dateFilterValue(staged, t),
+						})}
+						{tenantOptions &&
+							tenantOptions.length > 0 &&
+							choice({
+								active: Boolean(tenantValue),
+								id: 'tenant',
+								label: t(keys.filterTenant),
+								value: tenantValue || t(keys.filterAll),
+							})}
+						{choice({
+							active: Boolean(moreValue),
+							id: 'more',
+							label: t(keys.moreFilters),
+							value: moreValue,
+						})}
+					</div>
 
-				{choice({
-					active: Boolean(moreValue),
-					id: 'more',
-					label: t(keys.moreFilters),
-					value: moreValue,
-				})}
+					<div className="list-controls__spacer" />
 
-				<span className="al-filterbar__spacer" />
-
-				{isDirty && (
-					<Button onClick={handleApply} margin={false} buttonStyle="primary" size="small">
-						{t(keys.apply)}
-					</Button>
-				)}
-				{hasActiveFilters && (
-					<Button onClick={handleClear} margin={false} buttonStyle="subtle" size="small">
-						{t(keys.clearAll)}
-					</Button>
-				)}
+					{(isDirty || hasActiveFilters) && (
+						<div className="list-controls__actions">
+							{isDirty && (
+								<Button buttonStyle="primary" margin={false} onClick={handleApply} size="medium">
+									{t(keys.apply)}
+								</Button>
+							)}
+							{hasActiveFilters && (
+								<Button buttonStyle="ghost" margin={false} onClick={handleClear} size="medium">
+									{t(keys.clearAll)}
+								</Button>
+							)}
+						</div>
+					)}
+				</div>
 			</div>
 
-			{/* One per pill, like the list view: the open one expands while the previous
-			    one collapses. */}
-			{panelIds.map((id) => (
-				<AnimateHeight
-					className="al-filterbar__panel"
-					height={panel === id ? 'auto' : 0}
-					id={`${PANEL_ID}-${id}`}
-					key={id}
-				>
-					<div className="al-filterbar__panel-inner">
-						{(panel === id || closing === id) && editorFor(id)}
-					</div>
-				</AnimateHeight>
-			))}
+			{panel && (
+				<div className="al-filterbar__panel" id={`${PANEL_ID}-${panel}`}>
+					{editorFor(panel)}
+				</div>
+			)}
 		</div>
 	)
 }

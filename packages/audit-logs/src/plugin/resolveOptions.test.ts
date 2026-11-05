@@ -3,79 +3,12 @@ import { describe, expect, it } from 'vitest'
 import {
 	customEventTypeOptions,
 	DEFAULT_AUDIT_LOG_OPERATIONS,
-	isPolymorphicRelationTo,
-	mergeWithDefaults,
 	payloadAPILabels,
 	resolveAuditLogConfig,
 	resolveAuthConfig,
-	resolveFieldOptions,
 	resolveGlobalAuditLogConfig,
-	resolveHookPath,
 	resolvePayloadAPIOptions,
 } from './resolveOptions'
-
-describe('isPolymorphicRelationTo', () => {
-	it('needs two or more collections', () => {
-		expect(isPolymorphicRelationTo('users')).toBe(false)
-		expect(isPolymorphicRelationTo(['users'])).toBe(false)
-		expect(isPolymorphicRelationTo(['users', 'admins'])).toBe(true)
-	})
-})
-
-describe('resolveFieldOptions', () => {
-	it('true enables both fields with no overrides', () => {
-		expect(resolveFieldOptions(true, 'createdBy')).toEqual({})
-		expect(resolveFieldOptions(true, 'lastModifiedBy')).toEqual({})
-	})
-
-	it('is off unless auditFields is set', () => {
-		expect(resolveFieldOptions({}, 'createdBy')).toBe(false)
-		expect(resolveFieldOptions({ auditLog: true }, 'createdBy')).toBe(false)
-	})
-
-	it('auditFields: true enables both', () => {
-		expect(resolveFieldOptions({ auditFields: true }, 'createdBy')).toEqual({})
-		expect(resolveFieldOptions({ auditFields: true }, 'lastModifiedBy')).toEqual({})
-	})
-
-	it('picks one field without enabling the other', () => {
-		const options = { auditFields: { createdBy: { name: 'author' } } } as const
-		expect(resolveFieldOptions(options, 'createdBy')).toEqual({ name: 'author' })
-		expect(resolveFieldOptions(options, 'lastModifiedBy')).toBe(false)
-	})
-})
-
-describe('resolveHookPath', () => {
-	it('manual fields declare their own path', () => {
-		expect(resolveHookPath({ isManual: true, path: 'meta.author' }, 'createdBy')).toBe(
-			'meta.author'
-		)
-	})
-
-	it('automatic fields fall back to the default name', () => {
-		expect(resolveHookPath({}, 'createdBy')).toBe('createdBy')
-		expect(resolveHookPath({ name: 'author' }, 'createdBy')).toBe('author')
-	})
-})
-
-describe('mergeWithDefaults', () => {
-	it('per-entity options win over plugin defaults', () => {
-		expect(
-			mergeWithDefaults({ name: 'author' }, { name: 'creator', disableCustomComponent: true })
-		).toEqual({ name: 'author', disableCustomComponent: true })
-	})
-
-	it('leaves disabled and manual options alone', () => {
-		expect(mergeWithDefaults(false, { name: 'creator' })).toBe(false)
-		const manual = { isManual: true, path: 'meta.author' } as const
-		expect(mergeWithDefaults(manual, { name: 'creator' })).toBe(manual)
-	})
-
-	it('passes options through when there are no defaults', () => {
-		const options = { name: 'author' }
-		expect(mergeWithDefaults(options, undefined)).toBe(options)
-	})
-})
 
 describe('resolveAuditLogConfig', () => {
 	it('true logs all three operations without snapshots', () => {
@@ -88,7 +21,7 @@ describe('resolveAuditLogConfig', () => {
 
 	it('is off unless auditLog is set', () => {
 		expect(resolveAuditLogConfig({})).toBe(false)
-		expect(resolveAuditLogConfig({ auditFields: true })).toBe(false)
+		expect(resolveAuditLogConfig({ auth: true })).toBe(false)
 		expect(resolveAuditLogConfig({ auditLog: false })).toBe(false)
 	})
 

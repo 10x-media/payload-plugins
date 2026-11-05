@@ -88,6 +88,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
+    'payload-llm-instructions': PayloadLlmInstruction;
   };
   collectionsJoins: {};
   collectionsSelect: {
@@ -111,6 +112,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
+    'payload-llm-instructions': PayloadLlmInstructionsSelect<false> | PayloadLlmInstructionsSelect<true>;
   };
   db: {
     defaultIDType: string;
@@ -126,7 +128,11 @@ export interface Config {
   };
   locale: 'en' | 'de';
   widgets: {
+    welcome: WelcomeWidget;
     collections: CollectionsWidget;
+    'collection-query': CollectionQueryWidget;
+    activity: ActivityWidget;
+    'upload-dropzone': UploadDropzoneWidget;
   };
   user: User | Customer;
   jobs: {
@@ -231,7 +237,7 @@ export interface Post {
         relationTo: 'customers';
         value: string | Customer;
       } | null);
-  lastModifiedBy?:
+  updatedBy?:
     | ({
         relationTo: 'users';
         value: string | User;
@@ -251,6 +257,24 @@ export interface Tag {
   id: string;
   name: string;
   color?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
 }
@@ -268,6 +292,24 @@ export interface User {
         id?: string | null;
       }[]
     | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -275,6 +317,7 @@ export interface User {
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
+  resetPasswordRequestedAt?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -282,6 +325,8 @@ export interface User {
         id: string;
         createdAt?: string | null;
         expiresAt: string;
+        refreshCount?: number | null;
+        refreshedAt?: string | null;
       }[]
     | null;
   password?: string | null;
@@ -294,17 +339,24 @@ export interface User {
 export interface Department {
   id: string;
   name: string;
-  updatedAt: string;
-  createdAt: string;
-}
-/**
- * This interface was referenced by `Config`'s JSON-Schema
- * via the `definition` "tenants".
- */
-export interface Tenant {
-  id: string;
-  name: string;
-  slug: string;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
 }
@@ -315,6 +367,24 @@ export interface Tenant {
 export interface Customer {
   id: string;
   name?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -322,6 +392,7 @@ export interface Customer {
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
+  resetPasswordRequestedAt?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -329,10 +400,41 @@ export interface Customer {
         id: string;
         createdAt?: string | null;
         expiresAt: string;
+        refreshCount?: number | null;
+        refreshedAt?: string | null;
       }[]
     | null;
   password?: string | null;
   collection: 'customers';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "tenants".
+ */
+export interface Tenant {
+  id: string;
+  name: string;
+  slug: string;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -352,7 +454,7 @@ export interface Page {
         relationTo: 'customers';
         value: string | Customer;
       } | null);
-  lastModifiedBy?:
+  updatedBy?:
     | ({
         relationTo: 'users';
         value: string | User;
@@ -383,7 +485,7 @@ export interface Article {
         relationTo: 'customers';
         value: string | Customer;
       } | null);
-  lastModifiedBy?:
+  updatedBy?:
     | ({
         relationTo: 'users';
         value: string | User;
@@ -422,7 +524,7 @@ export interface Order {
         relationTo: 'customers';
         value: string | Customer;
       } | null);
-  lastModifiedBy?:
+  updatedBy?:
     | ({
         relationTo: 'users';
         value: string | User;
@@ -442,6 +544,24 @@ export interface OrderEvent {
   id: string;
   order?: (string | null) | Order;
   kind?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
 }
@@ -452,6 +572,24 @@ export interface OrderEvent {
 export interface Media {
   id: string;
   alt?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
   url?: string | null;
@@ -461,6 +599,16 @@ export interface Media {
   filesize?: number | null;
   width?: number | null;
   height?: number | null;
+  original?: {
+    filename?: string | null;
+    url?: string | null;
+    mimeType?: string | null;
+    filesize?: number | null;
+    width?: number | null;
+    height?: number | null;
+    prefix?: string | null;
+    _objectKey?: string | null;
+  };
   focalX?: number | null;
   focalY?: number | null;
 }
@@ -483,7 +631,7 @@ export interface Note {
         relationTo: 'customers';
         value: string | Customer;
       } | null);
-  lastModifiedBy?:
+  updatedBy?:
     | ({
         relationTo: 'users';
         value: string | User;
@@ -505,6 +653,24 @@ export interface TenantSetting {
   siteName: string;
   supportEmail?: string | null;
   maintenance?: boolean | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
 }
@@ -605,6 +771,24 @@ export interface ImpersonationSession {
   impersonatorLocale?: string | null;
   absoluteExpiresAt?: string | null;
   targetLocked?: boolean | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
   updatedAt: string;
   createdAt: string;
 }
@@ -652,6 +836,15 @@ export interface PayloadJob {
     | number
     | boolean
     | null;
+  meta?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   completedAt?: string | null;
   totalTried?: number | null;
   /**
@@ -679,7 +872,7 @@ export interface PayloadJob {
         completedAt: string;
         taskSlug: 'inline' | 'audit-logs-archive' | 'audit-logs-delete';
         taskID: string;
-        input?:
+        input:
           | {
               [k: string]: unknown;
             }
@@ -707,22 +900,22 @@ export interface PayloadJob {
           | number
           | boolean
           | null;
+        parent?: {
+          taskSlug?: ('inline' | 'audit-logs-archive' | 'audit-logs-delete') | null;
+          taskID?: string | null;
+        };
         id?: string | null;
       }[]
     | null;
   taskSlug?: ('inline' | 'audit-logs-archive' | 'audit-logs-delete') | null;
   queue?: string | null;
   waitUntil?: string | null;
-  processing?: boolean | null;
-  meta?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
+  processingUntil?: string | null;
+  processingToken?: string | null;
+  /**
+   * Used for concurrency control. Jobs with the same key are subject to exclusive/supersedes rules.
+   */
+  concurrencyKey?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -847,6 +1040,38 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions".
+ */
+export interface PayloadLlmInstruction {
+  id: string;
+  entitySlug: string;
+  title?: string | null;
+  entityType: 'collection' | 'global';
+  additionalInstructions?: string | null;
+  systemInstructions?: string | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "posts_select".
  */
 export interface PostsSelect<T extends boolean = true> {
@@ -892,7 +1117,7 @@ export interface PostsSelect<T extends boolean = true> {
         publishAt?: T;
       };
   createdBy?: T;
-  lastModifiedBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -905,7 +1130,7 @@ export interface PagesSelect<T extends boolean = true> {
   slug?: T;
   body?: T;
   createdBy?: T;
-  lastModifiedBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -919,7 +1144,7 @@ export interface ArticlesSelect<T extends boolean = true> {
   slug?: T;
   body?: T;
   createdBy?: T;
-  lastModifiedBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   _status?: T;
@@ -941,7 +1166,7 @@ export interface OrdersSelect<T extends boolean = true> {
   total?: T;
   lastTouchedBy?: T;
   createdBy?: T;
-  lastModifiedBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -952,6 +1177,8 @@ export interface OrdersSelect<T extends boolean = true> {
 export interface OrderEventsSelect<T extends boolean = true> {
   order?: T;
   kind?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -962,6 +1189,8 @@ export interface OrderEventsSelect<T extends boolean = true> {
 export interface TagsSelect<T extends boolean = true> {
   name?: T;
   color?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -971,6 +1200,8 @@ export interface TagsSelect<T extends boolean = true> {
  */
 export interface MediaSelect<T extends boolean = true> {
   alt?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   url?: T;
@@ -980,6 +1211,18 @@ export interface MediaSelect<T extends boolean = true> {
   filesize?: T;
   width?: T;
   height?: T;
+  original?:
+    | T
+    | {
+        filename?: T;
+        url?: T;
+        mimeType?: T;
+        filesize?: T;
+        width?: T;
+        height?: T;
+        prefix?: T;
+        _objectKey?: T;
+      };
   focalX?: T;
   focalY?: T;
 }
@@ -996,6 +1239,8 @@ export interface UsersSelect<T extends boolean = true> {
         tenant?: T;
         id?: T;
       };
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -1003,6 +1248,7 @@ export interface UsersSelect<T extends boolean = true> {
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  resetPasswordRequestedAt?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -1011,6 +1257,8 @@ export interface UsersSelect<T extends boolean = true> {
         id?: T;
         createdAt?: T;
         expiresAt?: T;
+        refreshCount?: T;
+        refreshedAt?: T;
       };
 }
 /**
@@ -1019,6 +1267,8 @@ export interface UsersSelect<T extends boolean = true> {
  */
 export interface CustomersSelect<T extends boolean = true> {
   name?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -1026,6 +1276,7 @@ export interface CustomersSelect<T extends boolean = true> {
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  resetPasswordRequestedAt?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -1034,6 +1285,8 @@ export interface CustomersSelect<T extends boolean = true> {
         id?: T;
         createdAt?: T;
         expiresAt?: T;
+        refreshCount?: T;
+        refreshedAt?: T;
       };
 }
 /**
@@ -1042,6 +1295,8 @@ export interface CustomersSelect<T extends boolean = true> {
  */
 export interface DepartmentsSelect<T extends boolean = true> {
   name?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1052,6 +1307,8 @@ export interface DepartmentsSelect<T extends boolean = true> {
 export interface TenantsSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1065,7 +1322,7 @@ export interface NotesSelect<T extends boolean = true> {
   body?: T;
   pinned?: T;
   createdBy?: T;
-  lastModifiedBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1078,6 +1335,8 @@ export interface TenantSettingsSelect<T extends boolean = true> {
   siteName?: T;
   supportEmail?: T;
   maintenance?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1140,6 +1399,8 @@ export interface ImpersonationSessionsSelect<T extends boolean = true> {
   impersonatorLocale?: T;
   absoluteExpiresAt?: T;
   targetLocked?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1158,6 +1419,7 @@ export interface PayloadKvSelect<T extends boolean = true> {
 export interface PayloadJobsSelect<T extends boolean = true> {
   input?: T;
   taskStatus?: T;
+  meta?: T;
   completedAt?: T;
   totalTried?: T;
   hasError?: T;
@@ -1173,13 +1435,20 @@ export interface PayloadJobsSelect<T extends boolean = true> {
         output?: T;
         state?: T;
         error?: T;
+        parent?:
+          | T
+          | {
+              taskSlug?: T;
+              taskID?: T;
+            };
         id?: T;
       };
   taskSlug?: T;
   queue?: T;
   waitUntil?: T;
-  processing?: T;
-  meta?: T;
+  processingUntil?: T;
+  processingToken?: T;
+  concurrencyKey?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1217,6 +1486,22 @@ export interface PayloadMigrationsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions_select".
+ */
+export interface PayloadLlmInstructionsSelect<T extends boolean = true> {
+  id?: T;
+  entitySlug?: T;
+  title?: T;
+  entityType?: T;
+  additionalInstructions?: T;
+  systemInstructions?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "site-settings".
  */
 export interface SiteSetting {
@@ -1243,7 +1528,7 @@ export interface SiteSetting {
         relationTo: 'customers';
         value: string | Customer;
       } | null);
-  lastModifiedBy?:
+  updatedBy?:
     | ({
         relationTo: 'users';
         value: string | User;
@@ -1294,7 +1579,7 @@ export interface SiteSettingsSelect<T extends boolean = true> {
         id?: T;
       };
   createdBy?: T;
-  lastModifiedBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   globalType?: T;
@@ -1311,6 +1596,16 @@ export interface PayloadJobsStatsSelect<T extends boolean = true> {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "welcome_widget".
+ */
+export interface WelcomeWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections_widget".
  */
 export interface CollectionsWidget {
@@ -1318,6 +1613,80 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-query_widget".
+ */
+export interface CollectionQueryWidget {
+  data?: {
+    title?: string | null;
+    relatedCollection:
+      | 'posts'
+      | 'pages'
+      | 'articles'
+      | 'orders'
+      | 'order-events'
+      | 'tags'
+      | 'media'
+      | 'users'
+      | 'customers'
+      | 'departments'
+      | 'tenants'
+      | 'notes'
+      | 'tenant-settings'
+      | 'audit-logs';
+    where?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    sortField?: string | null;
+    sortDirection?: ('asc' | 'desc') | null;
+    limit?: number | null;
+  };
+  width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activity_widget".
+ */
+export interface ActivityWidget {
+  data?: {
+    excludedCollections?:
+      | (
+          | 'posts'
+          | 'pages'
+          | 'articles'
+          | 'orders'
+          | 'order-events'
+          | 'tags'
+          | 'media'
+          | 'users'
+          | 'customers'
+          | 'departments'
+          | 'tenants'
+          | 'notes'
+          | 'tenant-settings'
+          | 'audit-logs'
+        )[]
+      | null;
+  };
+  width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "upload-dropzone_widget".
+ */
+export interface UploadDropzoneWidget {
+  data?: {
+    excludedCollections?: 'media'[] | null;
+  };
+  width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema

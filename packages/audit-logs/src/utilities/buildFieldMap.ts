@@ -1,4 +1,4 @@
-import type { Field } from 'payload'
+import type { Block, Field } from 'payload'
 import { fieldAffectsData, tabHasName } from 'payload/shared'
 
 export type FieldKind = 'rel-single' | 'rel-many' | 'join'
@@ -18,8 +18,18 @@ export type FieldMap = Map<string, FieldKind>
  *  - Named group / named tab → adds a path segment
  *  - Unnamed group / unnamed tab / row / collapsible → fields inlined at same level
  *  - array / blocks → adds a path segment, then recurses under `fieldName.*` wildcard
+ *
+ * A blocks field may name a block by slug; `blocks` (the config's `blocks`)
+ * resolves those. A slug it does not list is skipped.
  */
-export function buildFieldMap(fields: Field[], prefix = '', map: FieldMap = new Map()): FieldMap {
+export function buildFieldMap(
+	fields: Field[],
+	{
+		blocks: configBlocks = [],
+		map = new Map(),
+		prefix = '',
+	}: { blocks?: Block[]; map?: FieldMap; prefix?: string } = {}
+): FieldMap {
 	for (const field of fields) {
 		switch (field.type) {
 			case 'relationship':
@@ -33,28 +43,32 @@ export function buildFieldMap(fields: Field[], prefix = '', map: FieldMap = new 
 			case 'group':
 				// groupHasName from payload/shared is typed for client fields only, check inline instead
 				if ('name' in field && fieldAffectsData(field)) {
-					buildFieldMap(field.fields, prefix ? `${prefix}.${field.name}` : field.name, map)
+					buildFieldMap(field.fields, {
+						blocks: configBlocks,
+						map,
+						prefix: prefix ? `${prefix}.${field.name}` : field.name,
+					})
 				} else {
-					buildFieldMap(field.fields, prefix, map)
+					buildFieldMap(field.fields, { blocks: configBlocks, map, prefix })
 				}
 				break
 
 			case 'row':
 			case 'collapsible':
-				buildFieldMap(field.fields, prefix, map)
+				buildFieldMap(field.fields, { blocks: configBlocks, map, prefix })
 				break
 
 			case 'tabs':
 				for (const tab of field.tabs) {
-					buildFieldMap(
-						tab.fields,
-						tabHasName(tab)
+					buildFieldMap(tab.fields, {
+						blocks: configBlocks,
+						map,
+						prefix: tabHasName(tab)
 							? prefix
 								? `${prefix}.${String(tab.name)}`
 								: String(tab.name)
 							: prefix,
-						map
-					)
+					})
 				}
 				break
 
@@ -66,12 +80,23 @@ export function buildFieldMap(fields: Field[], prefix = '', map: FieldMap = new 
 				break
 
 			case 'array':
-				buildFieldMap(field.fields, prefix ? `${prefix}.${field.name}.*` : `${field.name}.*`, map)
+				buildFieldMap(field.fields, {
+					blocks: configBlocks,
+					map,
+					prefix: prefix ? `${prefix}.${field.name}.*` : `${field.name}.*`,
+				})
 				break
 
 			case 'blocks':
-				for (const block of field.blocks) {
-					buildFieldMap(block.fields, prefix ? `${prefix}.${field.name}.*` : `${field.name}.*`, map)
+				for (const entry of field.blocks) {
+					const block =
+						typeof entry === 'string' ? configBlocks.find((b) => b.slug === entry) : entry
+					if (!block) continue
+					buildFieldMap(block.fields, {
+						blocks: configBlocks,
+						map,
+						prefix: prefix ? `${prefix}.${field.name}.*` : `${field.name}.*`,
+					})
 				}
 				break
 		}

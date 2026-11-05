@@ -9,15 +9,23 @@ import { createAuditEvent } from '../../src/index'
  * - `beforeValidate` normalizes the reference to upper case
  * - `beforeChange` derives `total` from the lines, so the stored value is never what was
  *   submitted
- * - `beforeChange` also sets `lastTouchedBy`, proving a host hook wins over the plugin's
- *   own audit-field hook, which is registered first on purpose
+ * - `beforeChange` also sets `lastTouchedBy`, a host-stamped relationship the diff shows
+ *   next to core's own `updatedBy`
  * - `afterChange` writes to `order-events`, which is audited too, so one save produces
  *   two entries
  * - `afterChange` also records an `order_paid` custom event when the status moves to
  *   paid, so a custom event can be produced by hand, impersonated or not
+ *
+ * Customers place orders, so access admits any signed-in user: Payload 4's default
+ * only admits the `admin.user` collection.
  */
 export const orders: CollectionConfig = {
 	slug: 'orders',
+	access: {
+		create: ({ req }) => Boolean(req.user),
+		read: ({ req }) => Boolean(req.user),
+		update: ({ req }) => Boolean(req.user),
+	},
 	admin: { useAsTitle: 'reference', group: 'Audit logs' },
 	fields: [
 		{ name: 'reference', type: 'text', required: true },
@@ -51,9 +59,11 @@ export const orders: CollectionConfig = {
 		],
 		afterChange: [
 			async ({ doc, operation, previousDoc, req }) => {
+				// A system write on the customer's request: their access does not reach order-events.
 				await req.payload.create({
 					collection: 'order-events',
 					data: { order: doc.id, kind: operation === 'create' ? 'opened' : 'changed' },
+					overrideAccess: true,
 					req,
 				})
 				if (doc.status === 'paid' && previousDoc?.status !== 'paid') {

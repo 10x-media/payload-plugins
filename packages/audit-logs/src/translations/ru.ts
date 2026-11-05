@@ -16,7 +16,6 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.noEntries]: 'Записи аудита не найдены.',
 
 	// Pagination
-	[keys.paginationInfo]: '{{from}}–{{to}} из {{total}}',
 
 	// Debug bar
 	[keys.debug]: 'Отладка',

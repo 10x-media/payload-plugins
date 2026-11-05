@@ -1,36 +1,38 @@
+/* Payload 4 lays out each native field type itself (label, wrap, description in a
+   column); a custom type restates it. */
+.field-type.audit-relationship-field,
 .audit-relationship-field__wrap {
-	margin-top: 0;
+	display: flex;
+	flex-direction: column;
+	gap: var(--spacer-2);
 }
 .audit-relationship-field__value {
-	padding: calc(var(--base) * 0.1) 0;
 	display: flex;
 	align-items: center;
+	min-height: var(--field-min-height-large);
+	color: var(--color-text);
 }
 .audit-relationship-field__link {
-	background: none;
-	border: none;
 	padding: 0;
-	cursor: pointer;
-	font-size: inherit;
-	font-family: inherit;
-	color: var(--theme-text);
-	text-decoration: underline;
-	text-decoration-color: var(--theme-elevation-400);
-	text-underline-offset: 2px;
+	border: none;
+	background: none;
+	color: var(--color-text);
+	font: inherit;
 	line-height: inherit;
+	cursor: pointer;
+	text-decoration: underline;
+	text-decoration-color: var(--color-border);
+	text-underline-offset: 2px;
 }
 .audit-relationship-field__link:hover {
-	text-decoration-color: var(--theme-text);
+	text-decoration-color: var(--color-text);
 }
 .audit-relationship-field__link:focus-visible {
-	outline: 2px solid var(--theme-elevation-500);
-	outline-offset: 2px;
-	border-radius: 2px;
-}
-.audit-relationship-field__text {
-	color: var(--theme-text);
+	outline: var(--accessibility-outline);
+	outline-offset: var(--accessibility-outline-offset);
+	border-radius: var(--radius-small);
 }
 .audit-relationship-field__empty,
 .audit-relationship-field__loading {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }

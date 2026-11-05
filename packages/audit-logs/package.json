@@ -20,7 +20,9 @@
 		"node": ">=24.22.1"
 	},
 	"type": "module",
-	"sideEffects": false,
+	"sideEffects": [
+		"*.css"
+	],
 	"exports": {
 		".": {
 			"development": "./src/index.ts",
@@ -80,10 +82,8 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/next": "^4.0.0-beta.6",
-		"@payloadcms/ui": "^4.0.0-beta.6",
-		"next": "^16.4.0",
-		"payload": "^4.0.0-beta.6",
+		"@payloadcms/ui": "^4.0.0-beta.7",
+		"payload": "^4.0.0-beta.7",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},
@@ -95,14 +95,12 @@
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
-		"@payloadcms/next": "catalog:",
 		"@payloadcms/translations": "catalog:",
 		"@payloadcms/ui": "catalog:",
 		"@playwright/test": "catalog:",
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
-		"next": "catalog:",
 		"payload": "catalog:",
 		"playwright": "catalog:",
 		"react": "catalog:",

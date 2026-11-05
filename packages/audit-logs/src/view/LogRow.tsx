@@ -1,7 +1,6 @@
 'use client'
 
-import { ChevronIcon, ExternalLinkIcon, Link } from '@payloadcms/ui'
-import { useSearchParams } from 'next/navigation'
+import { ChevronIcon, Link, NewTabIcon, useSearchParams } from '@payloadcms/ui'
 import { formatAdminURL } from 'payload/shared'
 import { type ReactNode, useMemo, useState } from 'react'
 import { keys } from '../translations/keys'
@@ -129,7 +128,11 @@ export function LogRow({
 						aria-hidden
 						className={`al-row__toggle${!isExpandable ? ' al-row__toggle--hidden' : ''}`}
 					>
-						<ChevronIcon direction={expanded ? 'down' : 'right'} className="al-row__toggle-icon" />
+						<ChevronIcon
+							className="al-row__toggle-icon"
+							direction={expanded ? 'down' : 'right'}
+							size={16}
+						/>
 					</span>
 
 					<span className="al-row__op-col">
@@ -147,7 +150,7 @@ export function LogRow({
 								title={`${isGlobal ? t(keys.viewGlobal) : t(keys.viewDocument)}: ${entitySlug}`}
 							>
 								<span className="al-row__collection-name">{entityName}</span>
-								<ExternalLinkIcon />
+								<NewTabIcon size={16} />
 							</Link>
 						) : (
 							<span className="al-row__collection" title={entitySlug}>
@@ -199,7 +202,7 @@ export function LogRow({
 										target="_blank"
 										title={t(keys.viewDocument)}
 									>
-										<ExternalLinkIcon />
+										<NewTabIcon size={16} />
 									</Link>
 								)}
 							</span>

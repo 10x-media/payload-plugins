@@ -57,11 +57,12 @@ describe('retention: archive then delete', () => {
 		await booted.payload.create({ collection: 'posts', data: { title: 'Two' }, req })
 
 		await booted.payload.jobs.queue({
+			overrideAccess: true,
 			task: 'audit-logs-archive',
 			input: undefined,
 			queue: 'audit-retention',
 		})
-		await booted.payload.jobs.run({ queue: 'audit-retention' })
+		await booted.payload.jobs.run({ overrideAccess: true, queue: 'audit-retention' })
 
 		const uploads = await booted.payload.find({ collection: 'media', overrideAccess: true })
 		expect(uploads.docs).toHaveLength(1)
@@ -73,11 +74,12 @@ describe('retention: archive then delete', () => {
 
 	it('leaves already archived entries alone on a second run', async () => {
 		await booted.payload.jobs.queue({
+			overrideAccess: true,
 			task: 'audit-logs-archive',
 			input: undefined,
 			queue: 'audit-retention',
 		})
-		await booted.payload.jobs.run({ queue: 'audit-retention' })
+		await booted.payload.jobs.run({ overrideAccess: true, queue: 'audit-retention' })
 
 		const uploads = await booted.payload.find({ collection: 'media', overrideAccess: true })
 		expect(uploads.docs).toHaveLength(1)
@@ -91,11 +93,12 @@ describe('retention: archive then delete', () => {
 		})
 
 		await booted.payload.jobs.queue({
+			overrideAccess: true,
 			task: 'audit-logs-delete',
 			input: undefined,
 			queue: 'audit-retention',
 		})
-		await booted.payload.jobs.run({ queue: 'audit-retention' })
+		await booted.payload.jobs.run({ overrideAccess: true, queue: 'audit-retention' })
 
 		const remaining = await readLogs(booted.payload)
 		expect(remaining).toHaveLength(1)
@@ -135,11 +138,12 @@ describe('retention: delete without archive', () => {
 		expect(await readLogs(booted.payload)).toHaveLength(1)
 
 		await booted.payload.jobs.queue({
+			overrideAccess: true,
 			task: 'audit-logs-delete',
 			input: undefined,
 			queue: 'audit-retention',
 		})
-		await booted.payload.jobs.run({ queue: 'audit-retention' })
+		await booted.payload.jobs.run({ overrideAccess: true, queue: 'audit-retention' })
 
 		expect(await readLogs(booted.payload)).toHaveLength(0)
 	})
@@ -178,11 +182,12 @@ describe('retention: archive contents', () => {
 		await booted.payload.create({ collection: 'posts', data: { title: 'Archived' }, req })
 
 		await booted.payload.jobs.queue({
+			overrideAccess: true,
 			task: 'audit-logs-archive',
 			input: undefined,
 			queue: 'audit-retention',
 		})
-		await booted.payload.jobs.run({ queue: 'audit-retention' })
+		await booted.payload.jobs.run({ overrideAccess: true, queue: 'audit-retention' })
 
 		const uploads = await booted.payload.find({ collection: 'media', overrideAccess: true })
 		const upload = uploads.docs[0]

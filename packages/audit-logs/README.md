@@ -3,19 +3,21 @@
 # @10x-media/audit-logs
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/audit-logs` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/audit-logs` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/audit-logs).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/audit-logs@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/audit-logs) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
-Audit logging for Payload v3. Stamps `createdBy` and `lastModifiedBy` on the documents you choose, and records a separate entry with a field-level diff for every change, in a queryable collection with its own admin view.
+Audit logging for Payload. Records a separate entry with a field-level diff for every change, in a queryable collection with its own admin view, and shows Payload's own `createdBy` and `updatedBy` on the document.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/audit-logs?style=flat-square)](https://www.npmjs.com/package/@10x-media/audit-logs)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 ## Features
 
 - **A diff per change**, flat and dot-notated, so only what changed is stored. Array and blocks rows are keyed by row id, so a reorder is one `__order__` entry rather than a rewritten array.
 - **Relationships normalized to ids** from the collection schema, so a populated hook payload never reads as a change.
-- **`createdBy` / `lastModifiedBy`** as read-only relationship fields, added automatically or placed by hand inside a group or tab, polymorphic when you have several auth collections.
+- **`createdBy` / `updatedBy`** on the document: Payload 4 stamps them, `authorshipFields` shows them through a read-only field that links to the user.
 - **Auth events**: logins and password resets, opted into per collection alongside its other options.
 - **Custom events** through `createAuditEvent`, for the things that matter but are not field changes.
 - **Anonymization** per collection: keep the changed path, drop the value, in diffs and snapshots alike.
@@ -31,7 +33,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Quick start
 
 ```bash
-pnpm add @10x-media/audit-logs
+pnpm add @10x-media/audit-logs@alpha
 ```
 
 ```ts
@@ -50,7 +52,7 @@ export default buildConfig({
 
 Run `payload generate:importmap`, then open `/admin/audit-logs`.
 
-Auditing is opt-*in*: nothing is recorded until you list it. `true` enables both the fields and the log; use an object for one or the other.
+Auditing is opt-*in*: nothing is recorded until you list it. `true` enables the log with defaults; use an object to narrow it.
 
 Every write to an audited collection writes a row, including writes from other plugins' hooks and from migrations. Configure [data retention](https://docs.10xmedia.de/audit-logs/data-retention) before enabling this on anything busy.
 
@@ -70,6 +72,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/audit-logs):
 - [Data retention](https://docs.10xmedia.de/audit-logs/data-retention)
 - [Multi-tenancy](https://docs.10xmedia.de/audit-logs/multi-tenancy)
 - [i18n](https://docs.10xmedia.de/audit-logs/i18n)
+- [Upgrading](https://docs.10xmedia.de/audit-logs/upgrading)
 
 ## License
 

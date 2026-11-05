@@ -27,10 +27,7 @@ describeForDb('auditLogs cross-db', {}, (db) => {
 		booted = await bootPayload({
 			plugin: auditLogs({
 				collections: {
-					posts: {
-						auditFields: true,
-						auditLog: { snapshotOnCreate: true, snapshotOnDelete: true },
-					},
+					posts: { auditLog: { snapshotOnCreate: true, snapshotOnDelete: true } },
 					users: { auth: true },
 				},
 				globals: { 'site-settings': true },
@@ -73,6 +70,7 @@ describeForDb('auditLogs cross-db', {}, (db) => {
 	// the entry (`set null`, or `cascade` on a `_rels` row) when the user is deleted.
 	it('keeps the user on the entry after the user is deleted', async () => {
 		const gone = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: 'gone@example.com', password: 'password' },
 		})
@@ -81,7 +79,7 @@ describeForDb('auditLogs cross-db', {}, (db) => {
 			data: { title: 'Before leaving' },
 			req: { user: { ...gone, collection: 'users' } } as unknown as PayloadRequest,
 		})
-		await booted.payload.delete({ collection: 'users', id: gone.id })
+		await booted.payload.delete({ overrideAccess: true, collection: 'users', id: gone.id })
 
 		const [log] = await readLogs(booted.payload, {
 			and: [{ documentId: { equals: String(doc.id) } }, { operation: { equals: 'create' } }],
@@ -234,8 +232,13 @@ describeForDb('auditLogs cross-db', {}, (db) => {
 		// reads that depend on it, never the write. Worth pinning per adapter, since the
 		// dropped field is a row in a side table on Postgres and a key in the document on Mongo.
 		it('keeps writing entries, without the dropped field', async () => {
-			const doc = await stripped.payload.create({ collection: 'posts', data: { title: 'before' } })
+			const doc = await stripped.payload.create({
+				overrideAccess: true,
+				collection: 'posts',
+				data: { title: 'before' },
+			})
 			await stripped.payload.update({
+				overrideAccess: true,
 				collection: 'posts',
 				id: doc.id,
 				data: { title: 'after' },

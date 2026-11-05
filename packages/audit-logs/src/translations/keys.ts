@@ -13,8 +13,6 @@ export const keys = {
 
 	noEntries: 'auditLogs:noEntries',
 
-	paginationInfo: 'auditLogs:paginationInfo',
-
 	debug: 'auditLogs:debug',
 	queuing: 'auditLogs:queuing',
 	runArchive: 'auditLogs:runArchive',
