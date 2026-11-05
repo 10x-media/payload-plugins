@@ -18,13 +18,7 @@ import {
 	useRowLabel,
 	useServerFunctions,
 } from '@payloadcms/ui'
-import type {
-	ClientField,
-	FormState,
-	SanitizedFieldsPermissions,
-	SelectType,
-	TypedUser,
-} from 'payload'
+import type { ClientField, FormState, SanitizedFieldsPermissions, SelectType, User } from 'payload'
 import { toWords } from 'payload/shared'
 import { createContext, type ReactNode, use, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -260,7 +254,7 @@ const FieldForm = ({
 	return (
 		<DocumentInfoProvider
 			collectionSlug={collection}
-			currentEditor={user as TypedUser}
+			currentEditor={user as User}
 			hasPublishedDoc={false}
 			initialData={{}}
 			isLocked={false}
@@ -294,7 +288,7 @@ const Built = ({
 	state: FormStates[string] | undefined
 	children: (form: FormState) => ReactNode
 }) => {
-	if (state && 'error' in state) return <Banner type="error">{state.error}</Banner>
+	if (state && 'error' in state) return <Banner type="danger">{state.error}</Banner>
 	if (!state) return <ShimmerEffect height={40} />
 	return children(state.state)
 }

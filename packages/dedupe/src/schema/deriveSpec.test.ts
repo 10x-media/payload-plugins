@@ -50,17 +50,16 @@ const fields: FlattenedField[] = [
 ]
 
 describe('deriveSpec', () => {
-	it("merges a host field named like Payload's folder field where the collection has no folders", () => {
-		const host = deriveSpec({ flattenedFields: [{ name: 'folder', type: 'text' }] })
-		expect(host.map((entry) => entry.path)).toEqual(['folder'])
-		const foldered = deriveSpec(
-			{
-				flattenedFields: [{ name: 'dir', type: 'relationship', relationTo: 'payload-folders' }],
-				folders: {},
-			},
-			'dir'
-		)
-		expect(foldered).toEqual([])
+	it('merges a folder or tag field as its value, though Payload draws it as nothing', () => {
+		const folder: FlattenedField = {
+			name: '_h_folders',
+			type: 'relationship',
+			relationTo: 'folders',
+			admin: { components: { Field: '@payloadcms/ui#NullField' } },
+		}
+		expect(deriveSpec({ flattenedFields: [folder] })).toMatchObject([
+			{ path: '_h_folders', type: 'relationship', component: false },
+		])
 	})
 
 	it('refuses a merge policy set where the merge never reads it', () => {
@@ -84,8 +83,7 @@ describe('deriveSpec', () => {
 		const shared: FlattenedField = {
 			name: 'body',
 			type: 'blocks',
-			blocks: [],
-			blockReferences: ['quote'],
+			blocks: ['quote'],
 		}
 		const known = [
 			{
@@ -96,9 +94,7 @@ describe('deriveSpec', () => {
 				],
 			},
 		] as never
-		expect(() => deriveSpec({ flattenedFields: [shared] }, 'folder', known)).toThrow(
-			/"body.by".*policy/
-		)
+		expect(() => deriveSpec({ flattenedFields: [shared] }, known)).toThrow(/"body.by".*policy/)
 		const hidden: FlattenedField = {
 			name: 'ref',
 			type: 'text',

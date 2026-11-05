@@ -1,7 +1,6 @@
 'use client'
 
-import { Link } from '@payloadcms/ui'
-import { usePathname } from 'next/navigation'
+import { Link, usePathname } from '@payloadcms/ui'
 
 const HREF = '/admin/dedupe'
 

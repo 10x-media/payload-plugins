@@ -8,7 +8,7 @@ import {
 	killTransaction,
 	type PayloadRequest,
 } from 'payload'
-import { toWords } from 'payload/shared'
+import { hasDraftValidationEnabled, toWords } from 'payload/shared'
 
 import {
 	type CollectionContext,
@@ -47,12 +47,12 @@ import {
 	loadDocs,
 	loadMergeGroup,
 	localRequest,
-	publishesDrafts,
 	READ_REFUSED,
 	readableTitle,
 	validatesWrite,
 } from './load'
 import { planMerge } from './plan'
+import { draftLocales } from './status'
 import { releaseUnique } from './unique'
 import { resolveWriteLocale } from './writeLocale'
 
@@ -346,7 +346,8 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 		writeLocale,
 		similar,
 		validates: validatesWrite(col),
-		publishesDrafts: publishesDrafts(col),
+		draftLocales: draftLocales(col, survivor, ctx.localeCodes),
+		validatesDrafts: hasDraftValidationEnabled(col.config),
 	})
 	const missing = missingRefusal(req, col, plan.missing)
 	if (missing) throw new APIError(missing, 409, undefined, true)
@@ -616,17 +617,29 @@ export const applyMerge = async (args: ApplyMergeArgs): Promise<ApplyMergeResult
 				context: dedupeContext(),
 				req: localRequest(req),
 			})
-		// A drafted locale goes last, as a draft: the publish after it starts from the newest
-		// version and checks the write locale alone, as Payload publishes any draft.
-		const drafted = (entry: { locale?: string }) =>
-			entry.locale !== undefined && plan.drafted.includes(entry.locale)
-		for (const entry of writes.filter((entry) => !drafted(entry))) {
-			await write(entry.locale, entry.data, draft)
-			written = true
-		}
-		for (const entry of writes.filter(drafted)) await write(entry.locale, entry.data, true)
-		if (plan.drafted.length > 0 && writeLocale) {
-			await write(writeLocale, { _status: 'published' }, false)
+		if (plan.drafted.length === 0) {
+			for (const entry of writes) {
+				await write(entry.locale, entry.data, draft)
+				written = true
+			}
+		} else {
+			// A locale the survivor is a draft in stays one. Payload drafts every locale on a draft
+			// save that changes a value they share, and core's `updatedBy` is one as soon as the
+			// reviewer did not save the survivor last; so the drafts go first, and every locale the
+			// survivor is published in is published after them, from the values it holds.
+			const drafted = (entry: { locale?: string }) =>
+				entry.locale !== undefined && plan.drafted.includes(entry.locale)
+			for (const entry of writes.filter(drafted)) {
+				await write(entry.locale, entry.data, true)
+				written = true
+			}
+			const published = (ctx.localeCodes ?? []).filter(
+				(locale) => !draftLocales(col, survivor, ctx.localeCodes).includes(locale)
+			)
+			for (const locale of published) {
+				const data = writes.find((entry) => entry.locale === locale)?.data ?? {}
+				await write(locale, { ...data, _status: 'published' }, false)
+			}
 		}
 
 		for (const id of late) {

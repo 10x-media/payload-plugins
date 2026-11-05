@@ -185,7 +185,9 @@ export const openQueue = async (page: Page, status?: string): Promise<void> => {
 	await page.goto(`${QUEUE_PATH}?${query}`)
 	// The container renders before the fetch resolves, so wait for whichever of the two
 	// outcomes the queue settles on.
-	await expect(page.locator('.dedupe-queue__table, .dedupe-queue__message').first()).toBeVisible()
+	await expect(
+		page.locator('.dedupe-queue__table, .dedupe-queue .no-results').first()
+	).toBeVisible()
 }
 
 export const openMerge = async (

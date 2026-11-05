@@ -12,6 +12,7 @@ import { pairKeyFor } from '../match/keys'
 import { type CollectionContext, getContext, type PluginContext, tenantOf } from '../plugin/context'
 import { fieldReadable } from './access'
 import { isEmpty } from './compare'
+import { isPublished, statusIn, statusPerLocale } from './status'
 
 export type LoadedDoc = Record<string, unknown> & { id: number | string }
 
@@ -94,24 +95,43 @@ export const localRequest = (req: PayloadRequest): PayloadRequest => {
 /**
  * Whether the document's latest version is a draft over what it published: Payload's `changed`.
  * On the survivor it refuses the merge, which writes on top of that draft and would publish it.
+ * Where each locale is published on its own, a locale published on the document whose newest
+ * version is a draft there; with `locale`, that locale only.
  */
 export const hasNewerDraft = async (args: {
 	req: PayloadRequest
 	col: CollectionContext
 	id: number | string
+	locale?: string | null
 }): Promise<boolean> => {
 	const { req, col, id } = args
 	if (!col.hasDrafts) return false
-	const latest = await req.payload.findByID({
-		collection: col.slug,
-		id,
-		depth: 0,
-		draft: true,
-		overrideAccess: true,
-		disableErrors: true,
-		req: localRequest(req),
-	})
-	return latest?._status === 'draft'
+	const perLocale = statusPerLocale(col)
+	const read = (draft: boolean) =>
+		req.payload.findByID({
+			collection: col.slug,
+			id,
+			depth: 0,
+			draft,
+			...(perLocale ? { locale: 'all' as const, select: { _status: true } } : {}),
+			overrideAccess: true,
+			disableErrors: true,
+			req: localRequest(req),
+		})
+	const latest = await read(true)
+	if (!latest) return false
+	if (!perLocale) return latest._status === 'draft'
+	const published = await read(false)
+	if (!published) return false
+	const status = (published as { _status?: unknown })._status
+	const locales =
+		status && typeof status === 'object' ? Object.keys(status as Record<string, unknown>) : []
+	return locales
+		.filter((locale) => !args.locale || locale === args.locale)
+		.some(
+			(locale) =>
+				statusIn(published, locale) === 'published' && statusIn(latest, locale) === 'draft'
+		)
 }
 
 /**
@@ -197,13 +217,12 @@ export const checkGroup = (args: {
 }
 
 /**
- * A document the plugin compares: not in the trash, and published when it merges the
- * published state. Only an explicit draft is left out: a status cleared to nothing counts as
- * published, as in Payload's access examples.
+ * A document the plugin compares: not in the trash, and published, in some locale where each
+ * is published on its own, when it merges the published state.
  */
 export const isLive = (col: CollectionContext, doc: LoadedDoc): boolean => {
 	if (doc.deletedAt) return false
-	if (col.hasDrafts && !col.options.draft && doc._status === 'draft') return false
+	if (col.hasDrafts && !col.options.draft && !isPublished(doc)) return false
 	return true
 }
 
@@ -278,7 +297,7 @@ export const docAllowed = async (args: {
 	// In the form Payload hands it over: a number on SQL, as the endpoints read it a string.
 	const id = parseDocumentID({ id: args.id, collectionSlug: col.slug, payload: req.payload })
 	const access = col.config.access[operation]
-	const result = await access({ req, id, data })
+	const result = await access({ req, id, data, slug: col.slug })
 	if (typeof result === 'boolean') return result
 	const count = await req.payload.count({
 		collection: col.slug,
@@ -309,17 +328,6 @@ export const validatesWrite = (col: CollectionContext): boolean => {
 	const drafts = col.config.versions?.drafts
 	const draft = col.hasDrafts && col.options.draft
 	return !draft || (typeof drafts === 'object' && drafts.validate === true)
-}
-
-/**
- * Whether the merge publishes over drafts: the published state is merged, and Payload saves a
- * draft unchecked, so a locale can be written as one and published with the write locale.
- */
-export const publishesDrafts = (col: CollectionContext): boolean => {
-	const drafts = col.config.versions?.drafts
-	return (
-		col.hasDrafts && !col.options.draft && !(typeof drafts === 'object' && drafts.validate === true)
-	)
 }
 
 /** The absorbed ids, the one whose pair with the survivor scores highest first. */

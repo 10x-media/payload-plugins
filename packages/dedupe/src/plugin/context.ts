@@ -117,11 +117,7 @@ const buildCollectionContext = (
 
 	// Every document of a merge shares the tenant, and nothing may move the survivor to another.
 	const spec = resolveSpec(
-		deriveSpec(
-			config,
-			payload.config.folders ? payload.config.folders.fieldName : undefined,
-			payload.config.blocks
-		),
+		deriveSpec(config, payload.config.blocks),
 		options.fields,
 		options.slug
 	).map((entry) =>

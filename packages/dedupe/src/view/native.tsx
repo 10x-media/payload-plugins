@@ -1,64 +1,24 @@
 'use client'
 
 import { getTranslation, type I18nClient } from '@payloadcms/translations'
-import {
-	Button,
-	PageControlsComponent,
-	SearchFilter,
-	SearchIcon,
-	ViewDescription,
-} from '@payloadcms/ui'
+import { Button, ListSearchFilter, PageControlsComponent } from '@payloadcms/ui'
 import type { ClientCollectionConfig, ClientField, Column } from 'payload'
 import { fieldAffectsData, flattenTopLevelFields } from 'payload/shared'
 import type React from 'react'
 
 /**
- * Copies of admin markup for pieces `@payloadcms/ui` keeps internal: the list header and tabs,
- * the search bar and its placeholder, the empty-list notice, a table column and a single radio;
- * and the page controls wired to the plugin's own navigation. The admin loads that package's
- * whole stylesheet, so the class names alone reproduce the appearance; only the behaviour is the
- * plugin's own. The same approach as folder-picker's `native.tsx`.
+ * Admin markup for list pieces `@payloadcms/ui` does not hand out whole: the controls band
+ * around the search, the "All / Trash" tabs, a table column and a single radio; and the page
+ * controls wired to the plugin's own navigation. The admin loads that package's whole
+ * stylesheet, so the class names alone reproduce the appearance; only the behaviour is the
+ * plugin's own.
  */
-
-const listHeaderClass = 'list-header'
 
 /**
- * The list view's header: title, the pill actions beside it, the tabs on the right, a line
- * under it, and the description below.
+ * The list view's controls band: the search on the left, the triggers on the right, a line
+ * under it, full bleed as the list view draws it.
  */
-export const ListHeader = ({
-	actions,
-	description,
-	title,
-	titleActions,
-}: {
-	actions?: React.ReactNode
-	description?: string
-	title: string
-	titleActions?: React.ReactNode
-}) => (
-	<header className={listHeaderClass}>
-		<div className={`${listHeaderClass}__content`}>
-			<div className={`${listHeaderClass}__title-and-actions`}>
-				<h1 className={`${listHeaderClass}__title`}>{title}</h1>
-				{titleActions ? (
-					<div className={`${listHeaderClass}__title-actions`}>{titleActions}</div>
-				) : null}
-			</div>
-			{actions ? <div className={`${listHeaderClass}__actions`}>{actions}</div> : null}
-		</div>
-		{description ? (
-			<div className={`${listHeaderClass}__after-header-content`}>
-				<div className="collection-list__sub-header">
-					<ViewDescription description={description} />
-				</div>
-			</div>
-		) : null}
-	</header>
-)
-
-/** The list view's search bar, with the pills it carries on the right. */
-export const SearchBar = ({
+export const ListControls = ({
 	actions,
 	label,
 	onSearchChange,
@@ -69,10 +29,14 @@ export const SearchBar = ({
 	onSearchChange: (search: string) => void
 	search: string
 }) => (
-	<div className="search-bar">
-		<SearchIcon />
-		<SearchFilter handleChange={onSearchChange} label={label} searchQueryParam={search} />
-		{actions ? <div className="search-bar__actions">{actions}</div> : null}
+	<div className="list-controls">
+		<div className="list-controls__search-row">
+			<div className="list-controls__left">
+				<ListSearchFilter label={label} onSearchChange={onSearchChange} searchQueryParam={search} />
+			</div>
+			<div className="list-controls__spacer" />
+			{actions ? <div className="list-controls__actions">{actions}</div> : null}
+		</div>
 	</div>
 )
 
@@ -114,8 +78,8 @@ export const searchPlaceholder = (
 }
 
 /**
- * The list view's "All / Trash" switch, with a count beside each tab drawn as the document's
- * Versions tab draws its own.
+ * The list view's "All / Trash" switch: the current tab a pill, the others ghost buttons, each
+ * with its count.
  */
 export const ListTabs = <T extends string>({
 	onChange,
@@ -129,12 +93,10 @@ export const ListTabs = <T extends string>({
 	<div className="default-list-view-tabs">
 		{tabs.map((tab) => (
 			<Button
-				buttonStyle="tab"
+				buttonStyle={tab.value === value ? 'pill' : 'ghost'}
 				className={[
 					'default-list-view-tabs__button',
-					'doc-tab',
 					tab.value === value && 'default-list-view-tabs__button--active',
-					tab.value === value && 'doc-tab--active',
 				]
 					.filter(Boolean)
 					.join(' ')}
@@ -144,23 +106,15 @@ export const ListTabs = <T extends string>({
 				margin={false}
 				onClick={() => onChange(tab.value)}
 			>
-				<span className="doc-tab__label">
-					{tab.label}
-					{tab.count === undefined ? null : (
-						<>
-							{' '}
-							<span className="pill-version-count">{tab.count}</span>
-						</>
-					)}
-				</span>
+				{tab.label}
+				{tab.count === undefined ? null : <span className="pill-version-count">{tab.count}</span>}
 			</Button>
 		))}
 	</div>
 )
 
 /**
- * The list view's page controls on the plugin's own pages. The admin's component takes a
- * collection config only for its page sizes, so the plugin's are passed in that shape.
+ * The list view's page controls on the plugin's own pages, sticky at the bottom of the view.
  */
 export const ListPages = ({
 	limit,
@@ -178,9 +132,6 @@ export const ListPages = ({
 	totalPages: number
 }) => (
 	<PageControlsComponent
-		collectionConfig={
-			{ admin: { pagination: { limits: [10, 25, 50, 100] } } } as ClientCollectionConfig
-		}
 		data={{
 			docs: [],
 			hasNextPage: page < totalPages,
@@ -196,11 +147,8 @@ export const ListPages = ({
 		handlePageChange={async (next) => onPage(next)}
 		handlePerPageChange={async (next) => onLimit(next)}
 		limit={limit}
+		limits={[10, 25, 50, 100]}
 	/>
-)
-
-export const NoListResults = ({ children }: { children: React.ReactNode }) => (
-	<div className="no-results">{children}</div>
 )
 
 /**

@@ -105,11 +105,8 @@ export const blockOf = (
 	slug: unknown,
 	blocksMap: Record<string, ClientBlock> | undefined
 ): ClientBlock | undefined => {
-	const { blockReferences = [], blocks = [] } = field as {
-		blockReferences?: (ClientBlock | string)[]
-		blocks?: ClientBlock[]
-	}
-	return [...blocks, ...blockReferences]
+	const { blocks = [] } = field as { blocks?: (ClientBlock | string)[] }
+	return blocks
 		.map((block) => (typeof block === 'string' ? blocksMap?.[block] : block))
 		.find((block) => block?.slug === slug)
 }

@@ -6,6 +6,7 @@ import {
 	type PayloadRequest,
 	type SanitizedConfig,
 } from 'payload'
+import { hasDraftValidationEnabled } from 'payload/shared'
 import { PAIRS_SLUG } from '../collections/slugs'
 import { pairKeyFor } from '../match/keys'
 import type { CollectionContext, PluginContext } from '../plugin/context'
@@ -41,13 +42,13 @@ import {
 	type LoadedDoc,
 	loadDocs,
 	loadMergeGroup,
-	publishesDrafts,
 	READ_REFUSED,
 	readableTitle,
 	validatesWrite,
 } from './load'
 import { planMerge } from './plan'
 import { richTextHTML } from './richText'
+import { draftLocales, statusIn } from './status'
 import { releaseUnique, type UniqueRelease } from './unique'
 import { resolveWriteLocale } from './writeLocale'
 
@@ -122,10 +123,13 @@ const docRef = async ({
 	title: await readableTitle(req, col, doc),
 	createdAt: text(doc.createdAt),
 	updatedAt: text(doc.updatedAt),
+	// In the reader's locale, where each locale is published on its own.
 	status:
-		drafts && doc._status === 'published' && (await hasNewerDraft({ req, col, id: doc.id }))
+		drafts &&
+		statusIn(doc, req.locale) === 'published' &&
+		(await hasNewerDraft({ req, col, id: doc.id, locale: req.locale }))
 			? 'changed'
-			: text(doc._status),
+			: statusIn(doc, req.locale),
 })
 
 /** Adds every document `value` points at, to one collection or, polymorphic, to several. */
@@ -365,7 +369,8 @@ export const buildPlanResponse = async (args: {
 		writeLocale: await resolveWriteLocale({ req, ctx, col, survivor }),
 		similar,
 		validates: validatesWrite(col),
-		publishesDrafts: publishesDrafts(col),
+		draftLocales: draftLocales(col, survivor, ctx.localeCodes),
+		validatesDrafts: hasDraftValidationEnabled(col.config),
 	})
 
 	const decisions = await describeDecisions({

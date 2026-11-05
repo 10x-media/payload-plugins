@@ -3,7 +3,7 @@ import {
 	type CollectionConfig,
 	type CollectionSlug,
 	type Config,
-	createLocalReq,
+	createPayloadRequest,
 	type PayloadRequest,
 } from 'payload'
 
@@ -591,7 +591,7 @@ const teams: CollectionConfig = {
 			],
 		},
 		// A block the config names once for every collection, holding rows of its own.
-		{ name: 'boards', type: 'blocks', blocks: [], blockReferences: ['roster'] },
+		{ name: 'boards', type: 'blocks', blocks: ['roster'] },
 		// A localized group is one value per locale, rows and all.
 		{
 			name: 'card',
@@ -879,6 +879,7 @@ export const bootDedupe = async (db: SupportedDb, options?: Partial<DedupePlugin
 
 	const customer = (data: Record<string, unknown>, locale?: string) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			data: data as never,
 			...(locale ? { locale: locale as never } : {}),
@@ -891,8 +892,12 @@ export const bootDedupe = async (db: SupportedDb, options?: Partial<DedupePlugin
 /** A request signed in as a fresh user with this email. */
 export const reqFor = async (booted: BootedPayload, email: string): Promise<PayloadRequest> => {
 	const user = await booted.payload.create({
+		overrideAccess: true,
 		collection: 'users' as CollectionSlug,
 		data: { email, password: 'password' } as never,
 	})
-	return createLocalReq({ user: user as never }, booted.payload)
+	return createPayloadRequest({
+		user: { ...user, collection: 'users' } as never,
+		payload: booted.payload,
+	})
 }

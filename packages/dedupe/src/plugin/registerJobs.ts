@@ -16,28 +16,19 @@ export const CHECK_TASK_SLUG = 'dedupe-check'
  * `jobs.autoRun`, a cron hitting the run endpoint, or `payload.jobs.run`. Under
  * `disableJobsQueue` both run in the request, and only a schedule still needs the scan task
  * and the jobs collection it adds to the host's schema.
- *
- * Payload refuses to boot with a concurrency key while `jobs.enableConcurrencyControl` is
- * off, so the keys are set only when the host turned it on.
  */
 export const registerJobs = (config: Config, options: ResolvedOptions): void => {
 	const matched = options.collections.filter((entry) => entry.match)
 	if (matched.length === 0) return
-	const concurrency = config.jobs?.enableConcurrencyControl === true
 	const tasks: TaskConfig[] = []
 
 	if (!options.disableJobsQueue && matched.some((entry) => entry.checkOnSave)) {
 		tasks.push({
 			slug: CHECK_TASK_SLUG,
 			retries: 2,
-			// One check per collection at a time, so two look-alikes saved together do not both
-			// create the pair between them.
-			...(concurrency
-				? {
-						concurrency: ({ input }: { input?: { collection?: unknown } }) =>
-							`${CHECK_TASK_SLUG}:${String(input?.collection)}`,
-					}
-				: {}),
+			// No concurrency key: Payload 4 runs one job per key in a batch, so a key per collection
+			// would check one save per run. Two look-alikes checked at once meet on the pair's
+			// unique key, and the second updates the pair the first created.
 			inputSchema: [
 				{ name: 'collection', type: 'text', required: true },
 				{ name: 'id', type: 'text', required: true },
@@ -60,14 +51,9 @@ export const registerJobs = (config: Config, options: ResolvedOptions): void => 
 		tasks.push({
 			slug: SCAN_TASK_SLUG,
 			retries: 0,
-			// One scan of a collection at a time across servers; without the control, the
-			// per-instance lock in `runScan` is what holds.
-			...(concurrency
-				? {
-						concurrency: ({ input }: { input?: { collection?: unknown } }) =>
-							typeof input?.collection === 'string' ? scanKey(input.collection) : SCAN_TASK_SLUG,
-					}
-				: {}),
+			// One scan of a collection at a time across servers.
+			concurrency: ({ input }: { input?: { collection?: unknown } }) =>
+				typeof input?.collection === 'string' ? scanKey(input.collection) : SCAN_TASK_SLUG,
 			inputSchema: [{ name: 'collection', type: 'text' }],
 			outputSchema: [{ name: 'summaries', type: 'json' }],
 			...(options.scanCron

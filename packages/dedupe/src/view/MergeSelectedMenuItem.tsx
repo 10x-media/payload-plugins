@@ -1,7 +1,6 @@
 'use client'
 
-import { PopupList, useConfig, useListQuery, useSelection } from '@payloadcms/ui'
-import { useRouter } from 'next/navigation'
+import { PopupList, useConfig, useListQuery, useRouter, useSelection } from '@payloadcms/ui'
 import { formatAdminURL } from 'payload/shared'
 
 import { keys } from '../translations/keys'

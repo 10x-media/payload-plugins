@@ -1,0 +1,53 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x.
+---
+
+`@10x-media/dedupe` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin's options are unchanged, and it runs on Next.js and TanStack Start. This page covers what Payload 4 changes around it.
+
+## Checklist
+
+1. Upgrade `@10x-media/dedupe` with Payload: its peers are `payload`, `@payloadcms/ui`, `@payloadcms/translations` and the optional `@payloadcms/richtext-lexical` at `^4.0.0-beta.7`. `next` and `@payloadcms/next` are no longer peers.
+2. With `localization` in your config and a merged collection that has drafts and localized fields, run Payload's `localize-status` migration (see [Localized drafts](#localized-drafts)).
+3. Pass `overrideAccess: true` where your own code reads or writes documents without a user, and build requests with `createPayloadRequest` (see [Local API access](#local-api-access)).
+4. Drop `jobs.enableConcurrencyControl` from your config if you set it for the plugin (see [Jobs](#jobs)).
+5. On Postgres or SQLite, create and run a migration: `pnpm payload migrate:create` then `pnpm payload migrate`.
+6. Regenerate types and the import map (`pnpm payload generate:types`, `pnpm payload generate:importmap`).
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## Localized drafts
+
+With `localization` configured, Payload 4 keeps the `_status` of a drafts collection with localized fields per locale, and publishes each locale on its own. Migrate the stored status with Payload's own migration, which covers every such collection in the project:
+
+```bash
+pnpm payload migrate:create --file @payloadcms/db-mongodb/localize-status
+# or @payloadcms/db-postgres/localize-status, @payloadcms/db-sqlite/localize-status
+pnpm payload migrate
+```
+
+The merge follows the primary's status per locale: a locale the primary is published in is published with the merged values, a locale it is a draft in is written as a draft and stays unpublished. On Payload 3 the merge published every locale it wrote. A document counts as published, for the search and the queue, while any of its locales is.
+
+## Local API access
+
+Payload 4 applies access control in the Local API by default. The plugin's own reads and writes are unchanged: the merge still writes as the reviewer, and the plugin's internal work passes `overrideAccess: true` itself. Your own code around it changes:
+
+- `findDuplicates` and `jobs.queue` calls without a user need `overrideAccess: true`, or a `req` with a user allowed by the collection's access.
+- `createLocalReq({}, payload)` is now `createPayloadRequest({ payload })`. A user on that request needs its `collection`: `createPayloadRequest({ payload, user: { ...user, collection: 'users' } })`.
+- A search adapter's job handler runs without a user: its own `find` and `findByID` calls pass `overrideAccess: true`. Read in every locale, `_status` is an object by locale, so a check like `doc._status !== 'draft'` keeps every localized document; see the Typesense example in [Searching](/dedupe/searching).
+
+## Jobs
+
+Payload 4 removes `jobs.enableConcurrencyControl`: concurrency keys are always on. Each scan job carries a key per collection, so two scans of one collection never run at once, on one server or several. The check on save is not keyed, so the checks of many saves in one collection run side by side.
+
+## Schema
+
+- Blocks named by slug from the config's `blocks` (Payload 4 merges `blockReferences` into `blocks`) are compared and shown on the merge screen like inline ones.
+- Folders are a collection of your own on Payload 4, and a document's folder is a relationship field like any other. A folder or tag field that hides itself in the document form (`admin.components.Field: '@payloadcms/ui#NullField'`) is shown on the merge screen as its value, with a choice where the documents differ.
+- The pairs and keys collections opt out of Payload 4's default versions and authorship.
+
+## Admin
+
+- The queue is built from the list view's parts: Payload's list header with the Duplicates and Not duplicates tabs, a list-controls band with the search, the collection filter and **Scan now**, the table, and Payload's page controls pinned to the bottom.
+- The merge screen uses Payload 4's tokens and buttons: the column head's edit and menu buttons are ghost icon buttons, and the banners use Payload 4's banner types. Rich text differences are drawn with Payload 4's Lexical diff styles.
+- Styles of your own that target these screens with Payload 3 tokens (`--theme-*`, `--base`, `--style-radius-*`) resolve to nothing on Payload 4.

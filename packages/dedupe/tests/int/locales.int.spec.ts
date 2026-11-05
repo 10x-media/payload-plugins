@@ -40,6 +40,7 @@ describeForDb('dedupe write locale', {}, (db) => {
 	})
 	const stored = (collection: CollectionSlug, id: number | string) =>
 		fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection,
 			id,
 			depth: 0,
@@ -49,6 +50,7 @@ describeForDb('dedupe write locale', {}, (db) => {
 	/** A manual written in German only, as a tenant whose language is not the default one has it. */
 	const germanManual = async (mark: string, sealed: boolean) =>
 		(await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: MANUALS,
 			locale: 'de' as never,
 			data: { title: `${mark} de`, code: mark, motto: `${mark} motto`, sealed } as never,
@@ -69,50 +71,69 @@ describeForDb('dedupe write locale', {}, (db) => {
 		expect((merged.title as Locales).en ?? null).toBeNull()
 	})
 
-	/** Published in English, then a German draft published with English, unchecked: Roma's case. */
+	/**
+	 * Published in English. Payload 4 publishes each language on its own, so German stays a draft
+	 * unless `german` publishes it too.
+	 */
 	const brief = async (title: string, german?: Locales) => {
 		const { payload } = fixture.booted
 		const doc = (await payload.create({
+			overrideAccess: true,
 			collection: BRIEFS,
 			data: { title, _status: 'published' } as never,
 		})) as Doc
 		if (german) {
 			await payload.update({
+				overrideAccess: true,
 				collection: BRIEFS,
 				id: doc.id,
 				locale: 'de' as never,
-				draft: true,
-				data: german as never,
-			})
-			await payload.update({
-				collection: BRIEFS,
-				id: doc.id,
-				data: { _status: 'published' } as never,
+				data: { ...german, _status: 'published' } as never,
 			})
 		}
 		return doc
 	}
+	const latest = (id: number | string) =>
+		fixture.booted.payload.findByID({
+			overrideAccess: true,
+			collection: BRIEFS,
+			id,
+			draft: true,
+			depth: 0,
+			locale: 'all' as never,
+		}) as Promise<Doc>
 
-	it('publishes a language the primary lacked a required value in before, as Payload publishes a draft of it', async () => {
+	it('writes a language the primary is a draft in as a draft and leaves the rest published', async () => {
 		n++
 		const keep = await brief(`Keep ${n}`)
-		const gone = await brief(`Gone ${n}`, { subtitle: `sub ${n}` })
+		const gone = await brief(`Gone ${n}`, { title: `Gone ${n} de`, subtitle: `sub ${n}` })
 		const merge = args(BRIEFS, [keep, gone])
 		const plan = await buildPlanResponse(merge)
 		expect(plan.blocked).toBeNull()
 		expect(plan.readyToApply).toBe(true)
 		await applyMerge(merge)
 		const merged = await stored(BRIEFS, keep.id)
-		expect(merged._status).toBe('published')
-		expect((merged.subtitle as Locales).de).toBe(`sub ${n}`)
+		// SQL has no published locale row for German, so its status is left out there.
+		const status = merged._status as Locales
+		expect(status.en).toBe('published')
+		expect(status.de ?? 'draft').toBe('draft')
 		expect((merged.title as Locales).en).toBe(`Keep ${n}`)
-		const latest = (await fixture.booted.payload.findByID({
-			collection: BRIEFS,
-			id: keep.id,
-			draft: true,
-			depth: 0,
-		})) as Doc
-		expect(latest._status, 'no draft left on top of the merge').toBe('published')
+		expect((merged.subtitle as Locales | undefined)?.de ?? null, 'not published').toBeNull()
+		const draft = await latest(keep.id)
+		expect(draft._status, 'English stays published').toEqual({ en: 'published', de: 'draft' })
+		expect((draft.subtitle as Locales).de).toBe(`sub ${n}`)
+		expect((draft.title as Locales).de).toBe(`Gone ${n} de`)
+	})
+
+	it('publishes what it writes in a language the primary is published in', async () => {
+		n++
+		const keep = await brief(`Keep ${n}`, { title: `Keep ${n} de` })
+		const gone = await brief(`Gone ${n}`, { title: `Gone ${n} de`, subtitle: `sub ${n}` })
+		await applyMerge(args(BRIEFS, [keep, gone]))
+		const merged = await stored(BRIEFS, keep.id)
+		expect(merged._status).toEqual({ en: 'published', de: 'published' })
+		expect((merged.subtitle as Locales).de).toBe(`sub ${n}`)
+		expect((await latest(keep.id))._status).toEqual({ en: 'published', de: 'published' })
 	})
 
 	// SQL keeps a required localized value of a collection without drafts NOT NULL: no such
@@ -127,6 +148,7 @@ describeForDb('dedupe write locale', {}, (db) => {
 			// Payload saves no such language: written past it, through the database layer.
 			const manual = async (mark: string, subtitle?: string) => {
 				const created = (await payload.create({
+					overrideAccess: true,
 					collection: MANUALS,
 					data: { title: mark, code: mark, motto: mark } as never,
 				})) as Doc
@@ -154,10 +176,12 @@ describeForDb('dedupe write locale', {}, (db) => {
 		try {
 			const both = async (mark: string, price: number) => {
 				const doc = (await answered.booted.payload.create({
+					overrideAccess: true,
 					collection: BRIEFS,
 					data: { title: `${mark} en`, price, _status: 'published' } as never,
 				})) as Doc
 				await answered.booted.payload.update({
+					overrideAccess: true,
 					collection: BRIEFS,
 					id: doc.id,
 					locale: 'de' as never,

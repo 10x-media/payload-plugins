@@ -7,8 +7,8 @@ import {
 	useForm,
 	useFormInitializing,
 	useOperation,
+	useRouter,
 } from '@payloadcms/ui'
-import { useRouter } from 'next/navigation'
 import { formatAdminURL } from 'payload/shared'
 import { useEffect, useRef } from 'react'
 
@@ -88,7 +88,7 @@ export function NearDuplicateButton() {
 	const { open } = useOpenCreate()
 	if (!id) return null
 	return (
-		<Button buttonStyle="secondary" margin={false} onClick={() => open(getData())} size="small">
+		<Button buttonStyle="secondary" margin={false} onClick={() => open(getData())} size="medium">
 			{label}
 		</Button>
 	)
@@ -107,8 +107,8 @@ export function NearDuplicateListButton() {
 		open(usable[Math.floor(Math.random() * usable.length)])
 	}
 	return (
-		<div style={{ marginBottom: 'var(--base)' }}>
-			<Button buttonStyle="secondary" margin={false} onClick={() => void go()} size="small">
+		<div style={{ marginBottom: 'var(--spacer-3)' }}>
+			<Button buttonStyle="secondary" margin={false} onClick={() => void go()} size="medium">
 				{label}
 			</Button>
 		</div>

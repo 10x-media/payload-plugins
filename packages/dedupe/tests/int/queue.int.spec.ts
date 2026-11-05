@@ -1,5 +1,5 @@
 import { describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq, type Endpoint, type PayloadRequest } from 'payload'
+import { createPayloadRequest, type Endpoint, type PayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { PAIRS_SLUG } from '../../src/collections/slugs'
@@ -62,7 +62,11 @@ describeForDb('dedupe queue', {}, (db) => {
 		await customer({ name: 'Queue Person', email: 'queue@mail.com', phone: '0151 2345 6789' })
 		await customer({ name: 'Queue Person', email: 'queue.p@mail.com', phone: '+49 151 2345 6789' })
 		const lead = (email: string) =>
-			booted.payload.create({ collection: LEADS, data: { email } as never }) as Promise<Doc>
+			booted.payload.create({
+				overrideAccess: true,
+				collection: LEADS,
+				data: { email } as never,
+			}) as Promise<Doc>
 		await pairRow('leads', [await lead('lead-a@mail.com'), await lead('lead-b@mail.com')])
 		await pairRow('gone', [await lead('x@mail.com'), await lead('y@mail.com')])
 	})
@@ -158,6 +162,7 @@ describeForDb('dedupe queue', {}, (db) => {
 
 		it('leaves the document being edited out of its own candidates', async () => {
 			const { docs } = await fixture.booted.payload.find({
+				overrideAccess: true,
 				collection: 'customers',
 				where: { email: { equals: 'queue@mail.com' } },
 			})
@@ -184,12 +189,17 @@ describeForDb('dedupe queue', {}, (db) => {
 			phone: '0151 6666 1111',
 		})
 		await payload.update({
+			overrideAccess: true,
 			collection: 'customers' as never,
 			id: a.id,
 			locale: 'de' as never,
 			data: { name: 'Titelzwilling' } as never,
 		})
-		const de = await createLocalReq({ locale: 'de', user: fixture.req.user as never }, payload)
+		const de = await createPayloadRequest({
+			locale: 'de',
+			user: fixture.req.user as never,
+			payload: payload,
+		})
 		const result = await readQueue({
 			req: de,
 			ctx: getContext(payload),
@@ -219,7 +229,11 @@ describeForDb('dedupe queue', {}, (db) => {
 			)
 		}
 		const lead = (email: string) =>
-			fixture.booted.payload.create({ collection: LEADS, data: { email } as never }) as Promise<Doc>
+			fixture.booted.payload.create({
+				overrideAccess: true,
+				collection: LEADS,
+				data: { email } as never,
+			}) as Promise<Doc>
 		const statusOf = async (a: Doc, b: Doc) =>
 			(await findPairByKey(fixture.req, pairKeyFor('leads', a.id, b.id)))?.status
 
@@ -297,6 +311,7 @@ describeForDb('dedupe queue', {}, (db) => {
 		it('lists no group with a document the reader may not read, nor counts it', async () => {
 			const vault = (owner: string) =>
 				fixture.booted.payload.create({
+					overrideAccess: true,
 					collection: VAULTS,
 					data: { name: 'Owned vault', owner } as never,
 				}) as Promise<Doc>
@@ -379,6 +394,7 @@ describeForDb('dedupe queue', {}, (db) => {
 			expect((await raw('/dedupe/dismiss', { collection: 'customers', docs })).status).toBe(200)
 
 			await payload.update({
+				overrideAccess: true,
 				collection: 'customers' as never,
 				id: a.id,
 				data: { deletedAt: new Date().toISOString() } as never,
@@ -396,6 +412,7 @@ describeForDb('dedupe queue', {}, (db) => {
 			const binned = await dismissed()
 			expect(rowsWith(binned, b), 'a group with a document in the trash is not listed').toEqual([])
 			await payload.update({
+				overrideAccess: true,
 				collection: 'customers' as never,
 				id: a.id,
 				data: { deletedAt: null } as never,
@@ -406,7 +423,7 @@ describeForDb('dedupe queue', {}, (db) => {
 			expect(rowsWith(restored, b), 'restored, the group is back').toHaveLength(1)
 			expect(restored.counts.dismissed, 'the tab counts it again').toBe(binned.counts.dismissed + 1)
 
-			await payload.delete({ collection: 'customers' as never, id: a.id })
+			await payload.delete({ overrideAccess: true, collection: 'customers' as never, id: a.id })
 			expect(await status()).toBeUndefined()
 		})
 
@@ -434,6 +451,7 @@ describeForDb('dedupe queue', {}, (db) => {
 				(await findPairByKey(fixture.req, pairKeyFor('customers', keep.id, gone.id)))?.status
 			expect(await status()).toBeUndefined()
 			await payload.update({
+				overrideAccess: true,
 				collection: 'customers' as never,
 				id: gone.id,
 				data: { deletedAt: null } as never,
@@ -460,6 +478,7 @@ describeForDb('dedupe queue', {}, (db) => {
 				choices: {},
 			})
 			await payload.update({
+				overrideAccess: true,
 				collection: 'customers' as never,
 				id: gone.id,
 				data: { deletedAt: null } as never,
@@ -475,7 +494,7 @@ describeForDb('dedupe queue', {}, (db) => {
 			const [a, b] = [await lead('gone-a@mail.com'), await lead('gone-b@mail.com')] as [Doc, Doc]
 			const docs = [a, b].map((doc) => String(doc.id))
 			expect((await raw('/dedupe/dismiss', { collection: 'leads', docs })).status).toBe(200)
-			await fixture.booted.payload.delete({ collection: LEADS, id: a.id })
+			await fixture.booted.payload.delete({ overrideAccess: true, collection: LEADS, id: a.id })
 			expect(await statusOf(a, b)).toBeUndefined()
 		})
 	})
@@ -497,6 +516,7 @@ describeForDb('dedupe queue', {}, (db) => {
 	it('names a related document in the plan only to a reader who may read it', async () => {
 		const { booted, customer } = fixture
 		const company = (await booted.payload.create({
+			overrideAccess: true,
 			collection: 'companies',
 			data: { name: 'Secret GmbH' } as never,
 		})) as Doc
@@ -520,7 +540,11 @@ describeForDb('dedupe queue', {}, (db) => {
 	})
 	describe('search', () => {
 		const lead = (email: string) =>
-			fixture.booted.payload.create({ collection: LEADS, data: { email } as never }) as Promise<Doc>
+			fixture.booted.payload.create({
+				overrideAccess: true,
+				collection: LEADS,
+				data: { email } as never,
+			}) as Promise<Doc>
 
 		it('keeps the groups with a document the list search of its collection finds, whole', async () => {
 			const [a, b, c] = [
@@ -574,7 +598,11 @@ describeForDb('dedupe queue', {}, (db) => {
 
 	describe('groups', () => {
 		const lead = (email: string) =>
-			fixture.booted.payload.create({ collection: LEADS, data: { email } as never }) as Promise<Doc>
+			fixture.booted.payload.create({
+				overrideAccess: true,
+				collection: LEADS,
+				data: { email } as never,
+			}) as Promise<Doc>
 		const ids = (docs: Doc[]) => docs.map((doc) => String(doc.id)).sort()
 
 		it('shows documents linked by pairs in a chain as one row, the most alike first', async () => {
@@ -639,6 +667,7 @@ describeForDb('dedupe queue', {}, (db) => {
 		it('leaves out of that count the documents the reader may not read', async () => {
 			const vault = (owner: string) =>
 				fixture.booted.payload.create({
+					overrideAccess: true,
 					collection: VAULTS,
 					data: { name: 'Rest vault', owner } as never,
 				}) as Promise<Doc>

@@ -118,7 +118,7 @@ const findHidden = async (
 	for (const target of targets) {
 		const config = req.payload.collections[target as CollectionSlug]?.config
 		if (!config) continue
-		const access = await config.access.read({ req })
+		const access = await config.access.read({ req, slug: config.slug })
 		if (access === true) continue
 		const { docs: pairs } = await req.payload.db.find<GroupLink>({
 			collection: PAIRS_SLUG,

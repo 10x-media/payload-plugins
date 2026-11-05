@@ -4,14 +4,15 @@
 	"private": true,
 	"type": "module",
 	"scripts": {
+		"build": "vite build",
 		"dev": "vite dev",
 		"typecheck": "tsc -p tsconfig.json --noEmit",
-		"generate:importmap": "bash ../../../scripts/payload.sh . generate:importmap"
+		"generate:importmap": "bash ../../../scripts/payload.sh . generate:importmap",
+		"start": "srvx --prod --dir=. --static=dist/client --entry=dist/server/server.js"
 	},
 	"dependencies": {
 		"@10x-media/dedupe": "workspace:*",
 		"@10x-media/audit-logs": "workspace:*",
-		"@10x-media/form-variants": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
 		"@payloadcms/plugin-multi-tenant": "catalog:",
@@ -23,6 +24,7 @@
 		"payload": "catalog:",
 		"react": "catalog:",
 		"react-dom": "catalog:",
+		"srvx": "catalog:",
 		"vite": "catalog:"
 	},
 	"devDependencies": {

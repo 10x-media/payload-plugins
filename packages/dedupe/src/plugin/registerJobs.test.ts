@@ -14,14 +14,13 @@ describe('registerJobs', () => {
 		expect(tasksOf(config)).toEqual([CHECK_TASK_SLUG, SCAN_TASK_SLUG])
 	})
 
-	it('sets no concurrency key unless the host turns concurrency control on, which Payload requires', () => {
-		const plain = {} as Config
-		registerJobs(plain, resolveOptions({ collections: { customers: { match } } }))
-		expect(plain.jobs?.tasks?.every((task) => task.concurrency === undefined)).toBe(true)
-
-		const controlled = { jobs: { enableConcurrencyControl: true } } as Config
-		registerJobs(controlled, resolveOptions({ collections: { customers: { match } } }))
-		expect(controlled.jobs?.tasks?.every((task) => task.concurrency !== undefined)).toBe(true)
+	it('keys the scan by collection, one at a time, and leaves the check unkeyed to run in parallel', () => {
+		const config = {} as Config
+		registerJobs(config, resolveOptions({ collections: { customers: { match } } }))
+		const keyed = (slug: string) =>
+			config.jobs?.tasks?.find((task) => task.slug === slug)?.concurrency !== undefined
+		expect(keyed(SCAN_TASK_SLUG)).toBe(true)
+		expect(keyed(CHECK_TASK_SLUG)).toBe(false)
 	})
 
 	it('leaves the jobs queue alone when the scan runs in the request and nothing is scheduled', () => {

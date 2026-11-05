@@ -34,6 +34,7 @@ describeForDb('dedupe adapter', {}, (db) => {
 			findCandidates: async ({ req, collection, doc }) =>
 				(
 					await req.payload.find({
+						overrideAccess: true,
 						collection: collection as CollectionSlug,
 						depth: 0,
 						pagination: false,
@@ -86,7 +87,10 @@ describeForDb('dedupe adapter', {}, (db) => {
 			})
 			expect(summary.pairs).toBe(open.totalDocs)
 			// Every document of one tenant meets every other once, however many sides ask.
-			const { totalDocs } = await fixture.booted.payload.count({ collection: CUSTOMERS })
+			const { totalDocs } = await fixture.booted.payload.count({
+				overrideAccess: true,
+				collection: CUSTOMERS,
+			})
 			expect(summary.compared).toBe((totalDocs * (totalDocs - 1)) / 2)
 		})
 	})
@@ -211,6 +215,7 @@ describeForDb('dedupe adapter', {}, (db) => {
 			findCandidates: async ({ req, collection, doc }) =>
 				(
 					await req.payload.find({
+						overrideAccess: true,
 						collection: collection as CollectionSlug,
 						depth: 0,
 						pagination: false,
@@ -293,6 +298,7 @@ describeForDb('dedupe adapter', {}, (db) => {
 			findCandidates: async ({ req, collection, doc }) =>
 				(
 					await req.payload.find({
+						overrideAccess: true,
 						collection: collection as CollectionSlug,
 						depth: 0,
 						pagination: false,
@@ -355,6 +361,7 @@ describeForDb('dedupe adapter', {}, (db) => {
 		it("leaves the other collections on the plugin's adapter", async () => {
 			const create = (title: string) =>
 				fixture.booted.payload.create({
+					overrideAccess: true,
 					collection: POSTS,
 					data: { title, _status: 'published' } as never,
 				}) as Promise<{ id: number | string }>
@@ -372,6 +379,7 @@ describeForDb('dedupe scan with buckets across tenants', {}, (db) => {
 	const everyone = async (req: Parameters<DedupeAdapter['findCandidates']>[0]['req']) =>
 		(
 			await req.payload.find({
+				overrideAccess: true,
 				collection: CUSTOMERS,
 				depth: 0,
 				pagination: false,

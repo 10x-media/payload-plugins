@@ -55,7 +55,7 @@ declare module 'payload' {
  */
 export const dedupe = definePlugin<DedupePluginOptions>({
 	slug: '@10x-media/dedupe',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config, options = {} }): Config => {
 		const resolved = resolveOptions(options)
 		const keys = keysAdapter({
 			read: resolved.collectionAccess.read,

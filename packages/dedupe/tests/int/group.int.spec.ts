@@ -15,7 +15,12 @@ describeForDb('dedupe group merge', {}, (db) => {
 	let n = 0
 
 	const create = (collection: CollectionSlug, data: Record<string, unknown>) =>
-		fixture.booted.payload.create({ collection, data: data as never, depth: 0 }) as Promise<Doc>
+		fixture.booted.payload.create({
+			overrideAccess: true,
+			collection,
+			data: data as never,
+			depth: 0,
+		}) as Promise<Doc>
 	const find = (collection: CollectionSlug, id: number | string) =>
 		fixture.booted.payload.findByID({
 			collection,

@@ -21,7 +21,7 @@ const found = await findDuplicates({
 - `doc` may hold unsaved values; with an `id`, that document is left out. On a collection scoped by `multiTenancy`, it must hold the tenant field: without it, nothing is found.
 - `overrideAccess: false` leaves out documents `req.user` may not read.
 - `minScore` replaces the collection's `match.minScore` for this call, for example a lower one for a check before creating. It only filters the candidates the adapter offers: a lower one finds no document the adapter missed.
-- Without a request, make one with `createLocalReq({}, payload)`.
+- Without a request, make one with `createPayloadRequest({ payload })`.
 
 `score` runs from 0 to 1 and is not a probability. `signals` says why: one per match field that both documents fill, `{ path, kind, similarity }`.
 

@@ -19,7 +19,7 @@ export const customers: CollectionConfig = {
 			name: 'devPrefill',
 			type: 'ui',
 			admin: {
-				disableListColumn: true,
+				disabled: { column: true, filter: true },
 				components: { Field: '/components/NearDuplicate#DevPrefill' },
 			},
 		},

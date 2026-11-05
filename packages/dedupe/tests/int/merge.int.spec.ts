@@ -3,8 +3,8 @@ import {
 	APIError,
 	type CollectionBeforeChangeHook,
 	type CollectionSlug,
-	createLocalReq,
 	createPayloadRequest,
+	createPayloadRequestFromWebRequest,
 } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { applyMerge } from '../../src/merge/apply'
@@ -48,6 +48,7 @@ describeForDb('dedupe merge', {}, (db) => {
 		beforeAll(async () => {
 			const { booted, customer } = fixture
 			acme = (await booted.payload.create({
+				overrideAccess: true,
 				collection: COMPANIES,
 				data: { name: 'Acme' } as never,
 			})) as Doc
@@ -76,6 +77,7 @@ describeForDb('dedupe merge', {}, (db) => {
 				internalNote: 'theirs',
 			})
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: CUSTOMERS,
 				id: absorbed.id,
 				data: { name: 'Anna Schmidt (DE)', profile: { bio: 'Hallo DE' } } as never,
@@ -143,10 +145,12 @@ describeForDb('dedupe merge', {}, (db) => {
 			const { booted } = fixture
 			const limited = await reqFor(booted, 'limited@example.com')
 			const keep = (await booted.payload.create({
+				overrideAccess: true,
 				collection: LEADS,
 				data: { email: 'r@b.co' } as never,
 			})) as Doc
 			const drop = (await booted.payload.create({
+				overrideAccess: true,
 				collection: LEADS,
 				data: { email: 'r@b.co', source: 'ad' } as never,
 			})) as Doc
@@ -227,6 +231,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			expect(emitted.at(-1)).toMatchObject({ type: 'merge.applied', survivorId: result.survivorId })
 
 			const merged = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: CUSTOMERS,
 				id: survivor.id,
 				depth: 0,
@@ -263,6 +268,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			expect(gone.email).toBe(`merged-${absorbed.id}.anna.schmidt@mail.com.invalid`)
 
 			const hidden = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: CUSTOMERS,
 				id: absorbed.id,
 				depth: 0,
@@ -296,18 +302,29 @@ describeForDb('dedupe merge', {}, (db) => {
 			const ctx = getContext(booted.payload)
 			const col = getCollectionContext(booted.payload, 'leads')
 			const keep = (await booted.payload.create({
+				overrideAccess: true,
 				collection: LEADS,
 				data: { email: 'a@b.co' } as never,
 			})) as Doc
 			const drop = (await booted.payload.create({
+				overrideAccess: true,
 				collection: LEADS,
 				data: { email: 'a@b.co', source: 'ad' } as never,
 			})) as Doc
 			await applyMerge({ req, ctx, col, survivorId: keep.id, absorbedIds: [drop.id], choices: {} })
-			const merged = (await booted.payload.findByID({ collection: LEADS, id: keep.id })) as Doc
+			const merged = (await booted.payload.findByID({
+				overrideAccess: true,
+				collection: LEADS,
+				id: keep.id,
+			})) as Doc
 			expect(merged.source).toBe('ad')
 			expect(
-				await booted.payload.findByID({ collection: LEADS, id: drop.id, disableErrors: true })
+				await booted.payload.findByID({
+					overrideAccess: true,
+					collection: LEADS,
+					id: drop.id,
+					disableErrors: true,
+				})
 			).toBeNull()
 		})
 
@@ -315,13 +332,19 @@ describeForDb('dedupe merge', {}, (db) => {
 			const { booted, req } = fixture
 			const { payload } = booted
 			const staff = (data: Record<string, unknown>) =>
-				payload.create({ collection: STAFF, data: data as never, depth: 0 }) as Promise<Doc>
+				payload.create({
+					overrideAccess: true,
+					collection: STAFF,
+					data: data as never,
+					depth: 0,
+				}) as Promise<Doc>
 			const ours = await staff({
 				name: 'Tagged',
 				bonuses: [{ label: 'ours', tagline: 'hello', memos: [{ text: 'm1' }] }],
 			})
 			const [row] = ours.bonuses as { id: string }[]
 			await payload.update({
+				overrideAccess: true,
 				collection: STAFF,
 				id: ours.id,
 				locale: 'de' as never,
@@ -335,6 +358,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			})
 			const [their] = theirs.bonuses as { id: string }[]
 			await payload.update({
+				overrideAccess: true,
 				collection: STAFF,
 				id: theirs.id,
 				locale: 'de' as never,
@@ -373,6 +397,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			}
 			const rows = (
 				(await payload.findByID({
+					overrideAccess: true,
 					collection: STAFF,
 					id: ours.id,
 					depth: 0,
@@ -392,17 +417,27 @@ describeForDb('dedupe merge', {}, (db) => {
 			const { booted } = fixture
 			const { payload } = booted
 			const staff = (data: Record<string, unknown>) =>
-				payload.create({ collection: STAFF, data: data as never, depth: 0 }) as Promise<Doc>
+				payload.create({
+					overrideAccess: true,
+					collection: STAFF,
+					data: data as never,
+					depth: 0,
+				}) as Promise<Doc>
 			const ours = await staff({ name: 'Worded', bonuses: [{ label: 'ours', tagline: 'hello' }] })
 			const [row] = ours.bonuses as { id: string }[]
 			await payload.update({
+				overrideAccess: true,
 				collection: STAFF,
 				id: ours.id,
 				locale: 'de' as never,
 				data: { bonuses: [{ id: row?.id, label: 'ours', tagline: 'hallo' }] } as never,
 			})
 			const theirs = await staff({ name: 'Worded', bonuses: [{ label: 'theirs', tagline: 'hi' }] })
-			const de = await createLocalReq({ locale: 'de', user: fixture.req.user as never }, payload)
+			const de = await createPayloadRequest({
+				locale: 'de',
+				user: fixture.req.user as never,
+				payload: payload,
+			})
 			const plan = await buildPlanResponse({
 				req: de,
 				ctx: getContext(payload),
@@ -421,7 +456,7 @@ describeForDb('dedupe merge', {}, (db) => {
 
 		it('plans with the request Payload builds for a REST call, a web Request underneath', async () => {
 			const { payload } = fixture.booted
-			const req = await createPayloadRequest({
+			const req = await createPayloadRequestFromWebRequest({
 				config: payload.config,
 				request: new Request('http://localhost/api/dedupe/plan?locale=de', { method: 'POST' }),
 			})
@@ -444,7 +479,11 @@ describeForDb('dedupe merge', {}, (db) => {
 
 		it("leaves the request's locale be through the references a plan and a scan read per locale", async () => {
 			const { payload } = fixture.booted
-			const en = await createLocalReq({ locale: 'en', user: fixture.req.user as never }, payload)
+			const en = await createPayloadRequest({
+				locale: 'en',
+				user: fixture.req.user as never,
+				payload: payload,
+			})
 			const ctx = getContext(payload)
 			const col = getCollectionContext(payload, 'customers')
 			const pair = [
@@ -468,7 +507,12 @@ describeForDb('dedupe merge', {}, (db) => {
 			const { booted, req } = fixture
 			const { payload } = booted
 			const staff = (data: Record<string, unknown>) =>
-				payload.create({ collection: STAFF, data: data as never, depth: 0 }) as Promise<Doc>
+				payload.create({
+					overrideAccess: true,
+					collection: STAFF,
+					data: data as never,
+					depth: 0,
+				}) as Promise<Doc>
 			const ours = await staff({ name: 'Coded', bonuses: [{ label: 'ours' }] })
 			const theirs = await staff({
 				name: 'Coded',
@@ -483,6 +527,7 @@ describeForDb('dedupe merge', {}, (db) => {
 				choices: { bonuses: { items: [{ doc: String(theirs.id), index: 0 }] } },
 			})
 			const merged = (await payload.findByID({
+				overrideAccess: true,
 				collection: STAFF,
 				id: ours.id,
 				depth: 0,
@@ -497,10 +542,12 @@ describeForDb('dedupe merge', {}, (db) => {
 			const ctx = getContext(booted.payload)
 			const col = getCollectionContext(booted.payload, 'leads')
 			const keep = (await booted.payload.create({
+				overrideAccess: true,
 				collection: LEADS,
 				data: { email: 'clear@b.co', source: 'ad' } as never,
 			})) as Doc
 			const drop = (await booted.payload.create({
+				overrideAccess: true,
 				collection: LEADS,
 				data: { email: 'clear@b.co' } as never,
 			})) as Doc
@@ -512,7 +559,11 @@ describeForDb('dedupe merge', {}, (db) => {
 				absorbedIds: [drop.id],
 				choices: { source: { doc: String(drop.id) } },
 			})
-			const merged = (await booted.payload.findByID({ collection: LEADS, id: keep.id })) as Doc
+			const merged = (await booted.payload.findByID({
+				overrideAccess: true,
+				collection: LEADS,
+				id: keep.id,
+			})) as Doc
 			expect(merged.source ?? null).toBeNull()
 		})
 	})
@@ -520,6 +571,7 @@ describeForDb('dedupe merge', {}, (db) => {
 	describe('drafts', () => {
 		const article = (data: Record<string, unknown>, draft = false) =>
 			fixture.booted.payload.create({
+				overrideAccess: true,
 				collection: ARTICLES,
 				data: { _status: draft ? 'draft' : 'published', ...data } as never,
 				draft,
@@ -531,6 +583,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			const keep = await article({ title: 'Ferries', summary: 'published text' })
 			const drop = await article({ title: 'Ferries', summary: 'the same, twice' })
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: ARTICLES,
 				id: drop.id,
 				data: { title: 'Ferries (draft)' } as never,
@@ -558,6 +611,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			}
 			await applyMerge(args)
 			const gone = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: ARTICLES,
 				id: drop.id,
 				depth: 0,
@@ -573,6 +627,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			const keep = await article({ title: 'Trains', summary: 'published text' })
 			const drop = await article({ title: 'Trains', summary: 'the same, twice' })
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: ARTICLES,
 				id: keep.id,
 				data: { title: 'Trains (draft)' } as never,
@@ -592,12 +647,14 @@ describeForDb('dedupe merge', {}, (db) => {
 
 			// Nothing was published: the public title is the one it had, the draft is still there.
 			const published = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: ARTICLES,
 				id: keep.id,
 				depth: 0,
 			})) as Doc
 			expect(published.title).toBe('Trains')
 			const latest = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: ARTICLES,
 				id: keep.id,
 				draft: true,
@@ -610,12 +667,14 @@ describeForDb('dedupe merge', {}, (db) => {
 			const { booted, req } = fixture
 			const keep = await article({ title: 'Planes' })
 			const drop = (await booted.payload.create({
+				overrideAccess: true,
 				collection: ARTICLES,
 				data: { title: 'Planes', summary: 'first draft', _status: 'draft' } as never,
 				draft: true,
 				depth: 0,
 			})) as Doc
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: ARTICLES,
 				id: drop.id,
 				data: { summary: 'latest draft' } as never,
@@ -651,6 +710,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			const col = getCollectionContext(booted.payload, 'articles')
 			await applyMerge({ req, ctx, col, survivorId: keep.id, absorbedIds: [drop.id], choices: {} })
 			const merged = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: ARTICLES,
 				id: keep.id,
 				depth: 0,
@@ -663,6 +723,7 @@ describeForDb('dedupe merge', {}, (db) => {
 	it('draws rich text as the version view does: Lexical as HTML, a related document by title', async () => {
 		const { booted, req } = fixture
 		const acme = (await booted.payload.create({
+			overrideAccess: true,
 			collection: COMPANIES,
 			data: { name: 'Acme Rich' } as never,
 		})) as Doc
@@ -687,6 +748,7 @@ describeForDb('dedupe merge', {}, (db) => {
 		const body = (...children: unknown[]) => ({ root: block('root', children) })
 		const page = async (value: unknown) =>
 			(await booted.payload.create({
+				overrideAccess: true,
 				collection: PAGES,
 				data: { title: 'Rich', body: value } as never,
 			})) as Doc
@@ -783,6 +845,7 @@ describeForDb('dedupe merge', {}, (db) => {
 		const keys = async () => (await fixture.keysFor(keep.id, 'customers')).map((row) => row.key)
 		const before = await keys()
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: keep.id,
 			data: { email: 'mark-new@mail.com' } as never,
@@ -808,6 +871,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			choices: {},
 		})
 		const merged = (await booted.payload.findByID({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: keep.id,
 			depth: 0,
@@ -819,7 +883,11 @@ describeForDb('dedupe merge', {}, (db) => {
 		const { booted, req } = fixture
 		const TEAMS = 'teams' as CollectionSlug
 		const create = (data: Record<string, unknown>) =>
-			booted.payload.create({ collection: TEAMS, data: data as never }) as Promise<Doc>
+			booted.payload.create({
+				overrideAccess: true,
+				collection: TEAMS,
+				data: data as never,
+			}) as Promise<Doc>
 		const gone = await create({ name: 'Hidden parent' })
 		const keep = await create({ name: 'Hidden parent', parent: gone.id })
 		const plan = await buildPlanResponse({
@@ -840,6 +908,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			choices: {},
 		})
 		const merged = (await booted.payload.findByID({
+			overrideAccess: true,
 			collection: TEAMS,
 			id: keep.id,
 			depth: 0,
@@ -851,11 +920,13 @@ describeForDb('dedupe merge', {}, (db) => {
 		const { booted, req } = fixture
 		const TEAMS = 'teams' as CollectionSlug
 		const gone = (await booted.payload.create({
+			overrideAccess: true,
 			collection: TEAMS,
 			data: { name: 'Self Rows' } as never,
 			depth: 0,
 		})) as Doc
 		const keep = (await booted.payload.create({
+			overrideAccess: true,
 			collection: TEAMS,
 			locale: 'en' as never,
 			data: {
@@ -877,6 +948,7 @@ describeForDb('dedupe merge', {}, (db) => {
 
 		await applyMerge(args)
 		const merged = (await booted.payload.findByID({
+			overrideAccess: true,
 			collection: TEAMS,
 			id: keep.id,
 			locale: 'all' as never,
@@ -895,7 +967,11 @@ describeForDb('dedupe merge', {}, (db) => {
 	it('keeps the fields hidden from the API in the rows it takes from a merged-in document, a unique one too', async () => {
 		const { booted, req } = fixture
 		const create = (data: Record<string, unknown>) =>
-			booted.payload.create({ collection: TICKETS, data: data as never }) as Promise<Doc>
+			booted.payload.create({
+				overrideAccess: true,
+				collection: TICKETS,
+				data: data as never,
+			}) as Promise<Doc>
 		const keep = await create({ title: 'Stub twin', stubs: [{ code: 'A', barcode: 'a-1' }] })
 		const gone = await create({ title: 'Stub twin', stubs: [{ code: 'B', barcode: 'b-1' }] })
 		await applyMerge({
@@ -914,6 +990,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			},
 		})
 		const merged = (await booted.payload.findByID({
+			overrideAccess: true,
 			collection: TICKETS,
 			id: keep.id,
 			depth: 0,
@@ -928,7 +1005,11 @@ describeForDb('dedupe merge', {}, (db) => {
 	it('keeps a field hidden from the API in a group of a row it takes from a merged-in document', async () => {
 		const { booted, req } = fixture
 		const create = (data: Record<string, unknown>) =>
-			booted.payload.create({ collection: TICKETS, data: data as never }) as Promise<Doc>
+			booted.payload.create({
+				overrideAccess: true,
+				collection: TICKETS,
+				data: data as never,
+			}) as Promise<Doc>
 		const keep = await create({
 			title: 'Serial twin',
 			stubs: [{ code: 'A', extra: { serial: 's-a' } }],
@@ -953,6 +1034,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			},
 		})
 		const merged = (await booted.payload.findByID({
+			overrideAccess: true,
 			collection: TICKETS,
 			id: keep.id,
 			depth: 0,
@@ -976,7 +1058,11 @@ describeForDb('dedupe merge', {}, (db) => {
 		async () => {
 			const { booted, req } = fixture
 			const create = (data: Record<string, unknown>) =>
-				booted.payload.create({ collection: TICKETS, data: data as never }) as Promise<Doc>
+				booted.payload.create({
+					overrideAccess: true,
+					collection: TICKETS,
+					data: data as never,
+				}) as Promise<Doc>
 			// A copy made with its row ids, as a raw import does; on SQL a row id is unique.
 			const shared = '6a0000000000000000000001'
 			const keep = await create({
@@ -1003,6 +1089,7 @@ describeForDb('dedupe merge', {}, (db) => {
 				},
 			})
 			const merged = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: TICKETS,
 				id: keep.id,
 				depth: 0,
@@ -1024,6 +1111,7 @@ describeForDb('dedupe merge', {}, (db) => {
 		) => {
 			const { payload } = fixture.booted
 			const doc = (await payload.create({
+				overrideAccess: true,
 				collection: GUIDES,
 				data: { title: title.en, steps: steps.map((step) => ({ text: step.en })) } as never,
 			})) as Doc
@@ -1068,6 +1156,7 @@ describeForDb('dedupe merge', {}, (db) => {
 		})
 		const stored = (id: number | string) =>
 			fixture.booted.payload.findByID({
+				overrideAccess: true,
 				collection: GUIDES,
 				id,
 				depth: 0,
@@ -1118,6 +1207,7 @@ describeForDb('dedupe merge', {}, (db) => {
 		}) => {
 			const { payload } = fixture.booted
 			const created = (await payload.create({
+				overrideAccess: true,
 				collection: MANUALS,
 				data: {
 					title: 'seed',
@@ -1220,6 +1310,7 @@ describeForDb('dedupe merge', {}, (db) => {
 			const drop = await customer({ name: `Row ${round}`, email: `drop-${round}@row.test` })
 			await applyMerge({ req, ctx, col, survivorId: keep.id, absorbedIds: [drop.id], choices: {} })
 			const gone = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: CUSTOMERS,
 				id: drop.id,
 				trash: true,

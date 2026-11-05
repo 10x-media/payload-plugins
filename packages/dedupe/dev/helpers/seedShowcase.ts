@@ -8,9 +8,10 @@ const SHOWCASES = 'showcases' as CollectionSlug
  * parts, rows in common and rows of their own, and empty values. Idempotent.
  */
 export const seedShowcase = async (payload: Payload): Promise<void> => {
-	const existing = await payload.count({ collection: SHOWCASES })
+	const existing = await payload.count({ overrideAccess: true, collection: SHOWCASES })
 	if (existing.totalDocs > 0) return
 	const tenants = await payload.find({
+		overrideAccess: true,
 		collection: 'tenants' as CollectionSlug,
 		where: { slug: { equals: 'kyiv' } },
 		limit: 1,
@@ -71,6 +72,7 @@ export const seedShowcase = async (payload: Payload): Promise<void> => {
 	]
 	for (const data of docs) {
 		await payload.create({
+			overrideAccess: true,
 			collection: SHOWCASES,
 			data: { ...data, tenant } as never,
 			disableTransaction: true,

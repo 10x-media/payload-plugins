@@ -1,5 +1,5 @@
 import { crc32, deflateSync } from 'node:zlib'
-import { type CollectionSlug, createLocalReq, type GlobalSlug, type Payload } from 'payload'
+import { type CollectionSlug, createPayloadRequest, type GlobalSlug, type Payload } from 'payload'
 
 import { PAIRS_SLUG } from '../../src/collections/slugs'
 import { applyMerge } from '../../src/merge/apply'
@@ -75,22 +75,24 @@ const richText = (text: string) => ({
  * in both offices: the plugin must never pair them. Idempotent.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ overrideAccess: true, collection: 'users' })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const customerCount = await payload.count({ collection: CUSTOMERS })
+	const customerCount = await payload.count({ overrideAccess: true, collection: CUSTOMERS })
 	if (customerCount.totalDocs > 0) return
 
 	// Without a transaction: the multi-tenant plugin validates every relationship with a query
 	// of its own, which trips over the save's transaction on the in-memory replica set.
 	const create = (collection: CollectionSlug, data: Row, draft = false) =>
 		payload.create({
+			overrideAccess: true,
 			collection,
 			data: data as never,
 			draft,
@@ -601,6 +603,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	await create(TRIPS, { tenant: kyiv, title: 'Dnipro weekend', participants: [ivan, petrenko] })
 	await create(TRIPS, { tenant: berlin, title: 'Spreewald tour', participants: [mueller] })
 	await payload.updateGlobal({
+		overrideAccess: true,
 		slug: 'site' as GlobalSlug,
 		data: { featuredCustomer: mueller } as never,
 	})
@@ -658,9 +661,17 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 
 	// Every state a pair can be in, reached the way the admin reaches it.
 	const reviewer = (
-		await payload.find({ collection: 'users', where: { email: { equals: DEV_EMAIL } }, limit: 1 })
+		await payload.find({
+			overrideAccess: true,
+			collection: 'users',
+			where: { email: { equals: DEV_EMAIL } },
+			limit: 1,
+		})
 	).docs[0]
-	const req = await createLocalReq({ user: reviewer as never }, payload)
+	const req = await createPayloadRequest({
+		payload,
+		user: { ...reviewer, collection: 'users' } as never,
+	})
 	const ctx = getContext(payload)
 	const pairOf = async (a: number | string, b: number | string) => {
 		const [x, y] = [String(a), String(b)]
@@ -732,6 +743,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		ids: [customer('hans@berlin.example'), customer('h.weber@berlin.example')],
 	})
 	await payload.update({
+		overrideAccess: true,
 		collection: CUSTOMERS,
 		id: customer('melnyk.d@kyiv.example'),
 		data: { name: 'Taras Hnatyuk', phone: '+380 99 000 00 00' } as never,
@@ -746,6 +758,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	const image = async (name: string, colour: [number, number, number]) => {
 		const data = png(colour)
 		const doc = await payload.create({
+			overrideAccess: true,
 			collection: 'media' as CollectionSlug,
 			data: { alt: name } as never,
 			file: { data, mimetype: 'image/png', name: `${name}.png`, size: data.length },
@@ -930,6 +943,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	for (const row of specimens) {
 		const doc = await create(SPECIMENS, row)
 		await payload.update({
+			overrideAccess: true,
 			collection: SPECIMENS,
 			id: doc.id,
 			locale: 'de',
@@ -952,6 +966,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 		if (index < 2) {
 			await payload.update({
+				overrideAccess: true,
 				collection: SPECIMENS,
 				id: doc.id,
 				locale: 'de',

@@ -4,12 +4,12 @@ import type { MergeFieldSpec } from '../schema/types'
 export const isPlainObject = (value: unknown): value is Record<string, unknown> =>
 	value !== null && typeof value === 'object' && !Array.isArray(value)
 
-/** The blocks a blocks field allows: its own, and those it names from the config's `blocks`. */
+/** The blocks a blocks field allows: its own, and those it names by slug from the config's `blocks`. */
 export const blocksOf = (
 	field: FlattenedBlocksField,
 	known: readonly FlattenedBlock[] | undefined
 ): FlattenedBlock[] =>
-	[...field.blocks, ...(field.blockReferences ?? [])].flatMap((entry) => {
+	field.blocks.flatMap((entry) => {
 		const block = typeof entry === 'string' ? known?.find((one) => one.slug === entry) : entry
 		return block ? [block] : []
 	})

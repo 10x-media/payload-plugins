@@ -52,11 +52,12 @@ type PlanArgs = {
 	/** `false` where Payload does not validate the write, as when saving a draft. */
 	validates?: boolean
 	/**
-	 * The collection publishes over drafts: a locale whose required values the survivor lacked
-	 * before the merge is written as a draft and published with `writeLocale`, which Payload
-	 * checks alone, as it publishes any draft.
+	 * Locales the survivor is a draft in, where each locale is published on its own: written as
+	 * drafts and left unpublished. Payload checks them only where drafts are validated.
 	 */
-	publishesDrafts?: boolean
+	draftLocales?: readonly string[]
+	/** The collection validates drafts, so a locale written as one is checked too. */
+	validatesDrafts?: boolean
 }
 
 type Resolution = { proposed: unknown; source: DecisionSource; auto: boolean }
@@ -351,7 +352,8 @@ export const planMerge = ({
 	writeLocale,
 	similar = [],
 	validates = true,
-	publishesDrafts = false,
+	draftLocales = [],
+	validatesDrafts = false,
 }: PlanArgs): MergePlan => {
 	const docs = [survivor, ...absorbed]
 	const home: Home = {
@@ -431,7 +433,8 @@ export const planMerge = ({
 					writeLocale,
 					similar,
 					schema,
-					publishesDrafts,
+					draftLocales,
+					validatesDrafts,
 				})
 			: { missing: [], filled: [], drafted: [] }
 	return {
@@ -544,9 +547,8 @@ export const completeIn = (doc: Record<string, unknown>, locale: string, schema:
  * of it changes, and where a list whose rows hold values per language carries values in it. A
  * required field the result leaves empty there takes the value of the most similar document
  * that has one, unless the reviewer may not take it; what stays empty is missing. A language
- * other than `writeLocale` whose every gap the survivor had before the merge is `drafted`
- * instead, where the collection publishes over drafts. `decisions` and `byLocale` take the
- * values filled in.
+ * the survivor is a draft in is `drafted`: written as a draft, which Payload checks only where
+ * drafts are validated. `decisions` and `byLocale` take the values filled in.
  */
 const requireInWritten = (args: {
 	survivor: Doc
@@ -559,7 +561,8 @@ const requireInWritten = (args: {
 	writeLocale: string | null | undefined
 	similar: readonly string[]
 	schema: Schema
-	publishesDrafts: boolean
+	draftLocales: readonly string[]
+	validatesDrafts: boolean
 }): Pick<MergePlan, 'drafted' | 'filled' | 'missing'> => {
 	const { survivor, absorbed, decisions, base, byLocale, locales, writeLocale, schema } = args
 	const known = schema.blocks
@@ -567,7 +570,6 @@ const requireInWritten = (args: {
 	const at = new Map(decisions.map((decision, index) => [decision.key, index]))
 	const docs = [survivor, ...absorbed]
 	const order = [...new Set([...args.similar, ...absorbed.map((doc) => String(doc.id))])]
-	const before = readIn(survivor)
 	// What the survivor holds at `path` once merged: the plan's result, else what it stores.
 	const result = (path: string, locale?: string) => {
 		const index = at.get(locale ? `${path}@${locale}` : path)
@@ -591,6 +593,10 @@ const requireInWritten = (args: {
 	const filled: string[] = []
 	const drafted: string[] = []
 	for (const locale of written) {
+		if (args.draftLocales.includes(locale)) {
+			drafted.push(locale)
+			if (!args.validatesDrafts) continue
+		}
 		const open: Missing[] = []
 		for (const gap of gapsIn({ locale, schema, valueAt: result })) {
 			if (gap.kind !== 'value') {
@@ -624,17 +630,7 @@ const requireInWritten = (args: {
 			writePath(byLocale[locale], path, donor.value)
 			filled.push(key)
 		}
-		if (open.length === 0) continue
-		const lackedBefore = new Set(gapsIn({ locale, schema, valueAt: before }).map((gap) => gap.path))
-		if (
-			args.publishesDrafts &&
-			locale !== writeLocale &&
-			open.every((gap) => lackedBefore.has(gap.path))
-		) {
-			drafted.push(locale)
-		} else {
-			missing.push(...open)
-		}
+		missing.push(...open)
 	}
 	return { missing, filled, drafted }
 }

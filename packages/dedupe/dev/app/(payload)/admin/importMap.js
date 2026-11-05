@@ -1,12 +1,11 @@
+import { LLMInstructionsMenuItem as LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { WatchTenantCollection as WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
 import { TenantField as TenantField_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
 import { AssignTenantFieldTrigger as AssignTenantFieldTrigger_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
 import { DevPrefill as DevPrefill_a0093709d9c3511525e93cefc69657e2 } from '../../../components/NearDuplicate'
-import { AuditRelationshipField as AuditRelationshipField_5c28b1512d6ec4c987757370028f660d } from '@10x-media/audit-logs/client'
 import { MergeSelectedMenuItem as MergeSelectedMenuItem_1a48da5a6176fc2ea2e37c62a09adb5d } from '@10x-media/dedupe/client'
 import { NearDuplicateListButton as NearDuplicateListButton_a0093709d9c3511525e93cefc69657e2 } from '../../../components/NearDuplicate'
 import { NearDuplicateButton as NearDuplicateButton_a0093709d9c3511525e93cefc69657e2 } from '../../../components/NearDuplicate'
-import { VariantEditView as VariantEditView_654fa555539f4d3a2be3fc3df376f0d3 } from '@10x-media/form-variants/rsc'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { LexicalDiffComponent as LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -38,27 +37,36 @@ import { MoneyField as MoneyField_befe53322146a11bcfa01ada2679535d } from '../..
 import { ContactRowLabel as ContactRowLabel_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
 import { ChipsArrayField as ChipsArrayField_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
 import { SectionRowLabel as SectionRowLabel_befe53322146a11bcfa01ada2679535d } from '../../../components/Showcase'
+import { LLMInstructionsDescription as LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { FixedToolbarFeatureClient as FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864 } from '@payloadcms/richtext-lexical/client'
+import { LLMInstructionsCell as LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { DedupeNav as DedupeNav_94ddfb8478657067368bca3991301eda } from '../../../components/DedupeNav'
 import { TenantSelector as TenantSelector_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { TenantSelectionProvider as TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { AuditLogsView as AuditLogsView_d109efa364f92f646cad8031879d6db3 } from '@10x-media/audit-logs/rsc'
 import { DedupeQueueView as DedupeQueueView_70ef83bda0633d1fe4fba91d94f29124 } from '@10x-media/dedupe/rsc'
 import { DedupeMergeView as DedupeMergeView_70ef83bda0633d1fe4fba91d94f29124 } from '@10x-media/dedupe/rsc'
-import { CollectionCards as CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1 } from '@payloadcms/next/rsc'
+import { WelcomeWidget as WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { CollectionCards as CollectionCards_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { CollectionQueryWidget as CollectionQueryWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { QueryPresetsWhereField as QueryPresetsWhereField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { CollectionQuerySortField as CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { ActivityWidget as ActivityWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { CollectionFilter as CollectionFilter_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { UploadDropzoneWidget as UploadDropzoneWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
+import { UploadDropzoneCollectionsField as UploadDropzoneCollectionsField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { MembershipsSection as MembershipsSection_373a85c26942b02e9287ea02011c0269 } from '../../../components/MembershipsSection'
-import { DuplicateCheckStep as DuplicateCheckStep_f00521c9797d130da1438d242599c957 } from '../../../components/DuplicateCheckStep'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
+  "@payloadcms/ui#LLMInstructionsMenuItem": LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/plugin-multi-tenant/client#WatchTenantCollection": WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a,
   "@payloadcms/plugin-multi-tenant/client#TenantField": TenantField_1d0591e3cf4f332c83a86da13a0de59a,
   "@payloadcms/plugin-multi-tenant/client#AssignTenantFieldTrigger": AssignTenantFieldTrigger_1d0591e3cf4f332c83a86da13a0de59a,
   "/components/NearDuplicate#DevPrefill": DevPrefill_a0093709d9c3511525e93cefc69657e2,
-  "@10x-media/audit-logs/client#AuditRelationshipField": AuditRelationshipField_5c28b1512d6ec4c987757370028f660d,
   "@10x-media/dedupe/client#MergeSelectedMenuItem": MergeSelectedMenuItem_1a48da5a6176fc2ea2e37c62a09adb5d,
   "/components/NearDuplicate#NearDuplicateListButton": NearDuplicateListButton_a0093709d9c3511525e93cefc69657e2,
   "/components/NearDuplicate#NearDuplicateButton": NearDuplicateButton_a0093709d9c3511525e93cefc69657e2,
-  "@10x-media/form-variants/rsc#VariantEditView": VariantEditView_654fa555539f4d3a2be3fc3df376f0d3,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -90,13 +98,23 @@ export const importMap = {
   "/components/Showcase#ContactRowLabel": ContactRowLabel_befe53322146a11bcfa01ada2679535d,
   "/components/Showcase#ChipsArrayField": ChipsArrayField_befe53322146a11bcfa01ada2679535d,
   "/components/Showcase#SectionRowLabel": SectionRowLabel_befe53322146a11bcfa01ada2679535d,
+  "@payloadcms/ui#LLMInstructionsDescription": LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/richtext-lexical/client#FixedToolbarFeatureClient": FixedToolbarFeatureClient_e70f5e05f09f93e00b997edb1ef0c864,
+  "@payloadcms/ui/rsc#LLMInstructionsCell": LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a,
   "/components/DedupeNav#DedupeNav": DedupeNav_94ddfb8478657067368bca3991301eda,
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelector": TenantSelector_d6d5f193a167989e2ee7d14202901e62,
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelectionProvider": TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62,
   "@10x-media/audit-logs/rsc#AuditLogsView": AuditLogsView_d109efa364f92f646cad8031879d6db3,
   "@10x-media/dedupe/rsc#DedupeQueueView": DedupeQueueView_70ef83bda0633d1fe4fba91d94f29124,
   "@10x-media/dedupe/rsc#DedupeMergeView": DedupeMergeView_70ef83bda0633d1fe4fba91d94f29124,
-  "@payloadcms/next/rsc#CollectionCards": CollectionCards_f9c02e79a4aed9a3924487c0cd4cafb1,
-  "/components/MembershipsSection#MembershipsSection": MembershipsSection_373a85c26942b02e9287ea02011c0269,
-  "/components/DuplicateCheckStep#DuplicateCheckStep": DuplicateCheckStep_f00521c9797d130da1438d242599c957
+  "@payloadcms/ui/rsc#WelcomeWidget": WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui/rsc#CollectionCards": CollectionCards_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui/rsc#CollectionQueryWidget": CollectionQueryWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui#QueryPresetsWhereField": QueryPresetsWhereField_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/ui#CollectionQuerySortField": CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/ui/rsc#ActivityWidget": ActivityWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui#CollectionFilter": CollectionFilter_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/ui/rsc#UploadDropzoneWidget": UploadDropzoneWidget_ab83ff7e88da8d3530831f296ec4756a,
+  "@payloadcms/ui#UploadDropzoneCollectionsField": UploadDropzoneCollectionsField_3817bf644402e67bfe6577f60ef982de,
+  "/components/MembershipsSection#MembershipsSection": MembershipsSection_373a85c26942b02e9287ea02011c0269
 }

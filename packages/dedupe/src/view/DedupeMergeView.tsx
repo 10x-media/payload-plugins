@@ -1,7 +1,5 @@
-import { DefaultTemplate } from '@payloadcms/next/templates'
-import { Gutter } from '@payloadcms/ui'
 import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
-import { redirect } from 'next/navigation'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps, CollectionSlug, Params } from 'payload'
 import { formatAdminURL } from 'payload/shared'
 
@@ -14,6 +12,8 @@ export async function DedupeMergeView({
 	params,
 	searchParams,
 	basePath,
+	server,
+	viewActions,
 }: AdminViewServerProps & { basePath: `/${string}` }) {
 	const { req } = initPageResult
 	const { user } = req
@@ -21,7 +21,9 @@ export async function DedupeMergeView({
 
 	const ctx = getContext(req.payload)
 	if (!user || !(await ctx.options.access.review({ req }))) {
-		redirect(authRedirectUrl({ config: req.payload.config, params, searchParams: sp, user }))
+		return server.redirect(
+			authRedirectUrl({ config: req.payload.config, params, searchParams: sp, user })
+		)
 	}
 
 	const param = (name: string) => [sp[name]].flat()[0]
@@ -38,7 +40,7 @@ export async function DedupeMergeView({
 		new Set(docs).size !== docs.length ||
 		(survivor !== undefined && !docs.includes(survivor))
 	) {
-		redirect(formatAdminURL({ adminRoute, path: `${basePath}?missingPair=1` }))
+		return server.redirect(formatAdminURL({ adminRoute, path: `${basePath}?missingPair=1` }))
 	}
 	// As the admin does for a document that does not exist, is in the trash or the reader may not
 	// read: back to the list of its collection, which names it.
@@ -59,7 +61,7 @@ export async function DedupeMergeView({
 	const missing = docs.find((_, index) => !found[index])
 	if (missing) {
 		const query = new URLSearchParams({ collection, notFound: missing })
-		redirect(formatAdminURL({ adminRoute, path: `${basePath}?${query}` }))
+		return server.redirect(formatAdminURL({ adminRoute, path: `${basePath}?${query}` }))
 	}
 
 	// Drawn here, so a section may be a server component, as any admin component may; what it
@@ -83,20 +85,19 @@ export async function DedupeMergeView({
 			permissions={initPageResult.permissions}
 			searchParams={searchParams}
 			user={user}
+			viewActions={viewActions}
 			visibleEntities={initPageResult.visibleEntities}
 			req={req}
 		>
-			<Gutter>
-				{/* A new group in the address is a new screen, not new props for the one on it. */}
-				<MergeClient
-					collection={collection}
-					key={`${collection}:${docs.join(',')}`}
-					docs={docs as string[]}
-					queuePath={formatAdminURL({ adminRoute, path: basePath })}
-					sections={sections}
-					survivor={survivor ?? (docs[0] as string)}
-				/>
-			</Gutter>
+			{/* A new group in the address is a new screen, not new props for the one on it. */}
+			<MergeClient
+				collection={collection}
+				key={`${collection}:${docs.join(',')}`}
+				docs={docs as string[]}
+				queuePath={formatAdminURL({ adminRoute, path: basePath })}
+				sections={sections}
+				survivor={survivor ?? (docs[0] as string)}
+			/>
 		</DefaultTemplate>
 	)
 }

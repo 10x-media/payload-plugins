@@ -1,4 +1,10 @@
-import { type FieldAccess, type FlattenedField, getFieldByPath, type PayloadRequest } from 'payload'
+import {
+	type FieldAccess,
+	type FlattenedField,
+	getFieldByPath,
+	type PayloadRequest,
+	type SanitizedCollectionConfig,
+} from 'payload'
 
 import type { CollectionContext } from '../plugin/context'
 import { fullLabel } from '../schema/deriveSpec'
@@ -45,16 +51,23 @@ const guarded = (fields: FlattenedField[], operation: 'read' | 'update') =>
 const allowed = async (
 	checks: Check[],
 	operation: 'read' | 'update',
-	args: { req: PayloadRequest; doc: LoadedDoc | undefined; data?: Row }
+	args: {
+		req: PayloadRequest
+		collection: SanitizedCollectionConfig
+		doc: LoadedDoc | undefined
+		data?: Row
+	}
 ): Promise<boolean> => {
-	const { req, doc } = args
+	const { req, collection, doc } = args
 	const data = args.data ?? doc
 	for (const { field, siblingData } of checks) {
 		const check =
 			'access' in field ? (field.access?.[operation] as FieldAccess | undefined) : undefined
 		if (!check) continue
 		try {
-			if (!(await check({ req, id: doc?.id, doc, data, siblingData: siblingData as Row })))
+			if (
+				!(await check({ req, collection, id: doc?.id, doc, data, siblingData: siblingData as Row }))
+			)
 				return false
 		} catch {
 			return false
@@ -67,7 +80,8 @@ const allowed = async (
 export const fieldReadable = (
 	req: PayloadRequest,
 	{ col, path, doc }: { col: CollectionContext; path: string; doc: LoadedDoc }
-): Promise<boolean> => allowed(checksAlong(col, path, doc), 'read', { req, doc })
+): Promise<boolean> =>
+	allowed(checksAlong(col, path, doc), 'read', { req, collection: col.config, doc })
 
 /** `value` of a field inside a row, one locale's value at a time when it holds one per locale. */
 const eachLocale = (field: FlattenedField, value: unknown, insideLocale: boolean): unknown[] =>
@@ -80,7 +94,12 @@ const eachLocale = (field: FlattenedField, value: unknown, insideLocale: boolean
 const changeableWithin = async (
 	field: FlattenedField,
 	value: unknown,
-	args: { req: PayloadRequest; doc: LoadedDoc | undefined; insideLocale: boolean }
+	args: {
+		req: PayloadRequest
+		collection: SanitizedCollectionConfig
+		doc: LoadedDoc | undefined
+		insideLocale: boolean
+	}
 ): Promise<boolean> => {
 	for (const { fields, row } of partsWithin(field, value, args.req.payload.config.blocks)) {
 		for (const sub of fields) {
@@ -138,21 +157,27 @@ export const mergeableSpec = async (args: {
 			const readable = await Promise.all(
 				docs.map(
 					async (doc) =>
-						!reads || (await allowed(checksAlong(col, spec.path, doc), 'read', { req, doc }))
+						!reads ||
+						(await allowed(checksAlong(col, spec.path, doc), 'read', {
+							req,
+							collection: col.config,
+							doc,
+						}))
 				)
 			)
 			const seen = (out: ReviewedFieldSpec): ReviewedFieldSpec =>
 				readable[0] ? out : { ...out, hidden: true, unread: true }
 			const locked = seen({ ...spec, policy: 'survivor', locked: true })
 			const kept = seen({ ...spec, policy: 'survivor', sealed: true })
-			if (!(await allowed(along, 'update', { req, doc: survivor }))) return locked
+			if (!(await allowed(along, 'update', { req, collection: col.config, doc: survivor })))
+				return locked
 			if (!field) return seen(spec)
 			const within = fieldsWithin(field, known)
 			const each = (doc: LoadedDoc) => {
 				const value = readPath(doc, spec.path)
 				return spec.localized && isPlainObject(value) ? Object.values(value) : [value]
 			}
-			const inner = { req, insideLocale: spec.localized }
+			const inner = { req, collection: col.config, insideLocale: spec.localized }
 			if (guarded(within, 'update')) {
 				for (const doc of docs) {
 					for (const one of each(doc)) {
@@ -182,7 +207,12 @@ export const mergeableSpec = async (args: {
 const readableWithin = async (
 	field: FlattenedField,
 	value: unknown,
-	args: { req: PayloadRequest; doc: LoadedDoc | undefined; insideLocale: boolean }
+	args: {
+		req: PayloadRequest
+		collection: SanitizedCollectionConfig
+		doc: LoadedDoc | undefined
+		insideLocale: boolean
+	}
 ): Promise<unknown> => {
 	const readable = async (fields: FlattenedField[], row: Row) => {
 		const kept = { ...row }
@@ -239,9 +269,11 @@ export const withoutUnreadable = async <T extends MergeDecision>(args: {
 			const shown = async (id: string, value: unknown) => {
 				const doc = docs[id]
 				const along = checksAlong(col, decision.path, doc)
-				if (!(await allowed(along, 'read', { req, doc }))) return undefined
+				if (!(await allowed(along, 'read', { req, collection: col.config, doc }))) return undefined
 				const insideLocale = Boolean(decision.locale)
-				return field && within ? readableWithin(field, value, { req, doc, insideLocale }) : value
+				return field && within
+					? readableWithin(field, value, { req, collection: col.config, doc, insideLocale })
+					: value
 			}
 			const values = await Promise.all(
 				decision.values.map(async (entry) => ({
@@ -288,7 +320,14 @@ export const writeRefusal = async (args: {
 		for (const field of fields) {
 			if (!(field.name in sibling)) continue
 			const at = path ? `${path}.${field.name}` : field.name
-			if (!(await allowed([{ field, siblingData: sibling }], 'update', { req, doc, data }))) {
+			if (
+				!(await allowed([{ field, siblingData: sibling }], 'update', {
+					req,
+					collection: col.config,
+					doc,
+					data,
+				}))
+			) {
 				return at
 			}
 			for (const part of partsWithin(field, sibling[field.name], known)) {
@@ -326,11 +365,12 @@ export const releaseRefusal = async (args: {
 			const localized = col.specByPath.get(path)?.localized === true
 			const value = readPath(doc, path)
 			const values = localized && isPlainObject(value) ? Object.values(value) : [value]
-			let changeable = await allowed(along, 'update', { req, doc })
+			let changeable = await allowed(along, 'update', { req, collection: col.config, doc })
 			for (const one of field && changeable ? values : []) {
 				if (
 					!(await changeableWithin(field as FlattenedField, one, {
 						req,
+						collection: col.config,
 						doc,
 						insideLocale: localized,
 					}))

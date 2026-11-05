@@ -118,6 +118,7 @@ export const typesenseAdapter = ({ url, apiKey }: Connection): DedupeAdapter => 
 	const checkLater = async (req: PayloadRequest, collection: string, id: string) => {
 		if (!(await req.transactionID)) return
 		await req.payload.jobs.queue({
+			overrideAccess: true,
 			task: CHECK_TASK as never,
 			input: { collection, id } as never,
 			queue: 'dedupe',
@@ -146,8 +147,14 @@ export const typesenseAdapter = ({ url, apiKey }: Connection): DedupeAdapter => 
 								overrideAccess: true,
 								disableErrors: true,
 							})
-							// As the plugin indexes: a document in the trash or taken off publication is out.
-							if (doc && doc._status !== 'draft') await upsert(req, collection, doc)
+							// As the plugin indexes: a document in the trash or taken off publication in every
+							// locale is out. Read in every locale, `_status` holds one status per locale.
+							const status = doc?._status as Record<string, string> | string | undefined
+							const published =
+								status && typeof status === 'object'
+									? Object.values(status).some((value) => value !== 'draft')
+									: status !== 'draft'
+							if (doc && published) await upsert(req, collection, doc)
 							else await drop(req, collection, id)
 							return { output: {} }
 						},

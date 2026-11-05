@@ -69,11 +69,13 @@ describeForDb('dedupe merge sections', {}, (db) => {
 		})
 	const club = async (name: string) =>
 		(await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: COMPANIES,
 			data: { name } as never,
 		})) as Doc
 	const membership = async (customer: Doc, at: Doc) =>
 		(await fixture.booted.payload.create({
+			overrideAccess: true,
 			collection: MEMBERSHIPS,
 			data: {
 				title: `${customer.email} in ${at.name}`,
@@ -84,6 +86,7 @@ describeForDb('dedupe merge sections', {}, (db) => {
 	const membershipsOf = async (customer: Doc) =>
 		(
 			await fixture.booted.payload.find({
+				overrideAccess: true,
 				collection: MEMBERSHIPS,
 				where: { customer: { equals: customer.id } },
 				depth: 0,
@@ -106,6 +109,7 @@ describeForDb('dedupe merge sections', {}, (db) => {
 		})
 		expect(handed).toBeNull()
 		const still = (await fixture.booted.payload.findByID({
+			overrideAccess: true,
 			collection: CUSTOMERS,
 			id: gone.id,
 			depth: 0,

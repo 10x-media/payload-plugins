@@ -3,15 +3,20 @@
 import {
 	Banner,
 	Button,
+	Gutter,
 	Link,
+	NoListResults,
 	Table,
 	toast,
 	useConfig,
+	usePathname,
 	useTranslation as usePayloadTranslation,
+	useRouter,
 	useStepNav,
+	ViewDescription,
 } from '@payloadcms/ui'
+import { ListHeader } from '@payloadcms/ui/elements/ListHeader'
 import { formatDate } from '@payloadcms/ui/shared'
-import { usePathname, useRouter } from 'next/navigation'
 import type { Column } from 'payload'
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react'
 
@@ -24,15 +29,7 @@ import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { callApi, mergeUrl } from './api'
 import { ChoicePill } from './ChoicePill'
-import {
-	column,
-	ListHeader,
-	ListPages,
-	ListTabs,
-	NoListResults,
-	SearchBar,
-	searchPlaceholder,
-} from './native'
+import { column, ListControls, ListPages, ListTabs, searchPlaceholder } from './native'
 import { Signals } from './Signals'
 import { SHORT_DATE } from './Value'
 
@@ -256,11 +253,31 @@ export function QueueClient({
 		]
 	}, [data.docs, collection, collections, i18n, maxGroupSize, mergePath, payloadT, status, t])
 
+	const scanButton = canScan ? (
+		<Button
+			buttonStyle="primary"
+			disabled={busy || navigating || scanState !== null}
+			key="scan"
+			margin={false}
+			onClick={() => void scan()}
+			size="medium"
+		>
+			{t(
+				scanState === 'running'
+					? keys.scanRunning
+					: scanState === 'queued'
+						? keys.scanPending
+						: keys.runScan
+			)}
+		</Button>
+	) : null
+
 	return (
 		<div className={baseClass}>
 			<ListHeader
-				actions={
+				Actions={[
 					<ListTabs
+						key="tabs"
 						onChange={(next) => navigate({ status: next, page: 1 })}
 						tabs={PAIR_STATUSES.map((entry) => ({
 							count: data.counts[entry],
@@ -268,35 +285,20 @@ export function QueueClient({
 							value: entry,
 						}))}
 						value={status}
-					/>
+					/>,
+				]}
+				AfterListHeaderContent={
+					<div className={`${baseClass}__sub-header`}>
+						<ViewDescription description={t(STATUS[status].about)} />
+					</div>
 				}
-				description={t(STATUS[status].about)}
 				title={t(keys.queueTitle)}
-				titleActions={
-					canScan ? (
-						<Button
-							buttonStyle="pill"
-							disabled={busy || navigating || scanState !== null}
-							margin={false}
-							onClick={() => void scan()}
-							size="small"
-						>
-							{t(
-								scanState === 'running'
-									? keys.scanRunning
-									: scanState === 'queued'
-										? keys.scanPending
-										: keys.runScan
-							)}
-						</Button>
-					) : null
-				}
 			/>
 
-			<div className="list-controls">
-				<SearchBar
-					actions={
-						collections.length > 1 ? (
+			<ListControls
+				actions={
+					<>
+						{collections.length > 1 ? (
 							<ChoicePill
 								groupLabel={t(keys.collection)}
 								onChange={(value) => navigate({ collection: value, page: 1 })}
@@ -306,27 +308,27 @@ export function QueueClient({
 								]}
 								value={collection}
 							/>
-						) : null
-					}
-					label={placeholder}
-					onSearchChange={(next) => navigate({ search: next ?? '', page: 1 })}
-					search={search}
-				/>
-			</div>
+						) : null}
+						{scanButton}
+					</>
+				}
+				label={placeholder}
+				onSearchChange={(next) => navigate({ search: next ?? '', page: 1 })}
+				search={search}
+			/>
 
-			{notice ? <Banner type="error">{notice}</Banner> : null}
+			{notice ? (
+				<Gutter className={`${baseClass}__notice`}>
+					<Banner type="danger">{notice}</Banner>
+				</Gutter>
+			) : null}
 
 			{data.docs.length === 0 ? (
-				<NoListResults>
-					{search ? (
-						<>
-							<h3>{payloadT('general:noResultsFound')}</h3>
-							<p className={`${baseClass}__message`}>{payloadT('general:noResultsDescription')}</p>
-						</>
-					) : (
-						<p className={`${baseClass}__message`}>{t(keys.noPairs)}</p>
-					)}
-				</NoListResults>
+				<NoListResults
+					description={search ? payloadT('general:noResultsDescription') : t(keys.noPairs)}
+					title={search ? payloadT('general:noResultsFound') : undefined}
+					withMargin
+				/>
 			) : (
 				<div className={`${baseClass}__table`}>
 					<Table columns={columns} data={data.docs} />

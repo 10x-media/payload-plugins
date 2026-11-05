@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { type CollectionConfig, type CollectionSlug, createLocalReq } from 'payload'
+import { type CollectionConfig, type CollectionSlug, createPayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { KEYS_SLUG, PAIRS_SLUG } from '../../src/collections/slugs'
@@ -65,10 +65,12 @@ describeForDb('dedupe without localization', {}, (db) => {
 	it('indexes a document saved by someone who may not read a match field by all its fields', async () => {
 		const { payload } = booted
 		await payload.create({
+			overrideAccess: true,
 			collection: PEOPLE,
 			data: { name: 'Alpha Person', email: 'same@people.test' } as never,
 		})
 		const b = (await payload.create({
+			overrideAccess: true,
 			collection: PEOPLE,
 			data: { name: 'Beta Person', email: 'same@people.test' } as never,
 		})) as { id: number | string }
@@ -93,17 +95,21 @@ describeForDb('dedupe without localization', {}, (db) => {
 		const before = await state()
 		expect(before.pairs).toEqual(['open'])
 
-		const user = await payload.create({
-			collection: 'users' as CollectionSlug,
-			data: { email: 'limited@people.test', password: 'password' } as never,
-		})
+		const user = {
+			...(await payload.create({
+				collection: 'users' as CollectionSlug,
+				data: { email: 'limited@people.test', password: 'password' } as never,
+				overrideAccess: true,
+			})),
+			collection: 'users',
+		} as never
 		await payload.update({
 			collection: PEOPLE,
 			id: b.id,
 			data: { note: 'touched' } as never,
 			overrideAccess: false,
 			user,
-			req: await createLocalReq({ user: user as never }, payload),
+			req: await createPayloadRequest({ user: user as never, payload: payload }),
 		})
 		expect(await state()).toEqual(before)
 	})
@@ -112,17 +118,18 @@ describeForDb('dedupe without localization', {}, (db) => {
 		const { payload } = booted
 		const [a, b] = (await Promise.all(
 			['Vault', 'Vault'].map((name) =>
-				payload.create({ collection: VAULTS, data: { name } as never })
+				payload.create({ overrideAccess: true, collection: VAULTS, data: { name } as never })
 			)
 		)) as Array<{ id: number | string }>
 		const user = await payload.create({
+			overrideAccess: true,
 			collection: 'users' as CollectionSlug,
 			data: { email: 'vault@people.test', password: 'password' } as never,
 		})
 		// As the endpoints hand them over, read from a request body or a query string.
 		await expect(
 			applyMerge({
-				req: await createLocalReq({ user: user as never }, payload),
+				req: await createPayloadRequest({ user: user as never, payload: payload }),
 				ctx: getContext(payload),
 				col: getCollectionContext(payload, VAULTS),
 				survivorId: String(a?.id),

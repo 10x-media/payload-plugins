@@ -12,6 +12,7 @@ export const tenantLocale =
 		const tenant = tenantOf(req.payload, collection, survivor)
 		if (!tenant) return null
 		const office = await req.payload.findByID({
+			overrideAccess: true,
 			collection: 'tenants',
 			id: tenant,
 			depth: 0,
