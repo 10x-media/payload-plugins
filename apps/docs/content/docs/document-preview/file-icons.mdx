@@ -60,3 +60,7 @@ documentPreview({
 ```
 
 With icons off for every collection, the plugin adds neither the hook nor the endpoint. The info card keeps its icon either way: it inlines the SVG and needs no request.
+
+<Callout type="warn">
+Payload 4.0.0-beta.7 builds the file panel's **Open in new tab** and **Download** links from `thumbnailURL` when a document has one, so with file icons on they open and save the icon instead of a non-image file. This is Payload's own behavior, and it hits any `adminThumbnail` the same way; until Payload fixes it, use the copy-link button or open the file's URL, or set `fileIcons: false`.
+</Callout>

@@ -40,3 +40,7 @@ A [custom viewer](/document-preview/custom-viewers) for one of these types takes
 ## If the collection sets `filePreview` itself
 
 A collection whose `upload.admin.components.filePreview` is one component for every file keeps it, and the plugin adds nothing to its panel. A `filePreview` map keeps its own entries and gains the plugin's for the mime types it does not list. See [surfaces](/document-preview/surfaces#file-panel).
+
+## Download in the file panel
+
+On Payload 4.0.0-beta.7 the file panel's **Open in new tab** and **Download** use a document's `thumbnailURL` when it has one, so with [file icons](/document-preview/file-icons) on they lead to the icon rather than a non-image file. It is Payload's behavior, not the plugin's; see the file icons page for the workarounds.
