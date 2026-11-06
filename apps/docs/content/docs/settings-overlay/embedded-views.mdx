@@ -122,4 +122,4 @@ A view from another plugin cannot be asked to read the prop. Until its author ad
 
 **Symptoms:** the panel opens with a second sidebar inside it, or a second admin header above the content. The plugin cannot detect this and will not warn about it.
 
-Use a `link` item for such a view, which opens it as the page it was written to be, or ask its author to read `settingsOverlayEmbed`. Payload 4's own embed mode (`?embed=true`) does not help here: it hides only the nav header and the account menu, and the template still renders the nav.
+Use a `link` item for such a view, which opens it as the page it was written to be, or ask its author to read `settingsOverlayEmbed`.

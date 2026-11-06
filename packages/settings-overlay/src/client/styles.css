@@ -399,6 +399,16 @@
 }
 
 /*
+ * Payload drops the list header's top margin only inside its own `.drawer`, so in a pane it kept
+ * the page's, a band of empty space above the title. The pane header already clears the top; the
+ * title row only needs the same inset above it as below.
+ */
+.settings-overlay__pane-body .list-drawer__header {
+	margin-top: 0;
+	padding-top: var(--spacer-3);
+}
+
+/*
  * With `mergeListHeader` on, the list's title row is folded into the pane header: its title
  * repeats the pane title one line below it, and its Create button is re-rendered up there
  * instead. Only `__content` goes, so the collection's description and anything else in
@@ -424,6 +434,35 @@
 .settings-overlay__pane-body .list-drawer__header-close,
 .settings-overlay__pane-body .doc-drawer__header-close {
 	display: none;
+}
+
+/*
+ * Payload lays the list controls out for a page: search and buttons in one row that will not
+ * shrink, folded only under a 768px viewport. A pane is narrower than a page at any viewport, so
+ * the row ran past the pane's edge. Here it wraps: the search takes what the buttons leave, and
+ * the buttons move under it when they do not fit beside it.
+ */
+.settings-overlay__pane-body .list-controls__search-row {
+	flex-wrap: wrap;
+	row-gap: var(--spacer-2);
+}
+
+.settings-overlay__pane-body .list-controls__left {
+	flex: 1 1 12rem;
+	min-width: 0;
+}
+
+.settings-overlay__pane-body .list-controls__left > .search-input {
+	flex: 1;
+	min-width: 0;
+}
+
+.settings-overlay__pane-body .list-controls__spacer {
+	display: none;
+}
+
+.settings-overlay__pane-body .list-controls__actions {
+	flex-wrap: wrap;
 }
 
 /*

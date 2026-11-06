@@ -20,7 +20,10 @@ The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload .
 
 The Payload 3 line shipped `@10x-media/settings-overlay/embed`, a stand-in for `@payloadcms/next/templates` that you aliased in `next.config`, so a view written for a page drew no admin chrome inside the panel. Payload 4 has no Next-only templates package to stand in for, and the export is removed with its `next` and `@payloadcms/next` peers.
 
-A view of your own renders `DefaultTemplate` from `@payloadcms/ui/rsc` on its page and skips it when it receives `settingsOverlayEmbed`, as [Your own view](/settings-overlay/embedded-views#your-own-view) shows. A view from another plugin is best listed as a `link` item. Payload 4's own embed mode (`?embed=true`) is not a replacement: it hides the nav header and the account menu, and the template still draws the nav.
+**Embedding a view you cannot edit is not supported on Payload 4 for now.** If the panel shows a second sidebar or header after the upgrade, that view relied on the shim. Until a replacement lands:
+
+- a view of your own renders `DefaultTemplate` from `@payloadcms/ui/rsc` on its page and skips it when it receives `settingsOverlayEmbed`, as [Your own view](/settings-overlay/embedded-views#your-own-view) shows;
+- a view from another plugin is best listed as a `link` item, which opens it as a page.
 
 ## The panel no longer writes the URL
 
