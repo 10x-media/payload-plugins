@@ -1,6 +1,7 @@
 'use client'
 
 import type { DocumentPreviewViewerProps } from '@10x-media/document-preview/types'
+import { Button } from '@payloadcms/ui'
 import { useEffect, useRef, useState } from 'react'
 import {
 	Box3,
@@ -203,23 +204,26 @@ export const ModelScene = ({ filename, mimeType, url }: DocumentPreviewViewerPro
 				) : null}
 			</div>
 			<div className="document-preview-toolbar">
-				<button
+				<Button
 					aria-pressed={spinning}
-					className="document-preview-toolbar__button document-preview-toolbar__button--text"
+					buttonStyle="ghost"
 					disabled={status !== 'ready'}
+					margin={false}
 					onClick={() => setSpinning((value) => !value)}
-					type="button"
+					selected={spinning}
+					size="medium"
 				>
 					Auto-rotate
-				</button>
-				<button
-					className="document-preview-toolbar__button document-preview-toolbar__button--text"
+				</Button>
+				<Button
+					buttonStyle="ghost"
 					disabled={status !== 'ready'}
+					margin={false}
 					onClick={() => resetRef.current()}
-					type="button"
+					size="medium"
 				>
 					Reset view
-				</button>
+				</Button>
 			</div>
 		</div>
 	)

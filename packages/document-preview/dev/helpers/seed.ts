@@ -96,7 +96,8 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		overrideAccess: true,
 		pagination: false,
 	})
-	const idOf = (name: string) => media.docs.find((doc) => doc.filename === name)?.id
+	// By `alt`: an upload whose name is already taken in `dev/uploads` is stored as `name-1.ext`.
+	const idOf = (name: string) => media.docs.find((doc) => doc.alt === name)?.id
 	const ids = (names: string[]) =>
 		names.map(idOf).filter((id): id is NonNullable<typeof id> => id !== undefined)
 	await payload.create({
