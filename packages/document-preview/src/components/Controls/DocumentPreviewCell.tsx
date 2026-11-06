@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, useDrawerSlug, useModal } from '@payloadcms/ui'
+import { Button, EyeIcon, useDrawerSlug, useModal } from '@payloadcms/ui'
 import type { DefaultCellComponentProps } from 'payload'
 import { useState } from 'react'
 
@@ -8,13 +8,10 @@ import { toPreviewFile } from '../../shared/types'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { PreviewDrawer } from '../PreviewDrawer/PreviewDrawer'
-import { PreviewIcon } from './PreviewIcon'
-import './controls.css'
 
 /**
- * List view cell: the same subtle button as the edit view's, small, opening
- * the row's file in a drawer. The column is appended last, so it never sits
- * inside the row's link to the document.
+ * List view cell: a pill button opening the row's file in a drawer. The column
+ * is appended last, so it never sits inside the row's link to the document.
  *
  * The drawer mounts on the first click, not with the cell, so a page of rows
  * does not carry a hidden drawer per row. Opening the modal first and mounting
@@ -34,16 +31,15 @@ export const DocumentPreviewCell = ({ collectionSlug, rowData }: DefaultCellComp
 		<>
 			<Button
 				aria-label={t(keys.previewFile, { filename: file.filename })}
-				buttonStyle="subtle"
-				icon={<PreviewIcon />}
+				buttonStyle="pill"
+				icon={<EyeIcon active={false} size={16} />}
 				iconPosition="left"
-				iconStyle="none"
 				margin={false}
 				onClick={() => {
 					setRequested(true)
 					openModal(slug)
 				}}
-				size="small"
+				size="medium"
 			>
 				{t(keys.preview)}
 			</Button>

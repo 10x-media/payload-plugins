@@ -41,16 +41,17 @@ const MIME_BY_EXTENSION: Record<string, string> = {
  * to commit. Idempotent.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ collection: 'users', overrideAccess: true })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
+			overrideAccess: true,
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const mediaCount = await payload.count({ collection: 'media' })
+	const mediaCount = await payload.count({ collection: 'media', overrideAccess: true })
 	if (mediaCount.totalDocs > 0) {
 		return
 	}
@@ -73,11 +74,18 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				name,
 				size: data.byteLength,
 			},
+			overrideAccess: true,
 		})
 	}
 	payload.logger.info('Seeded dev media fixtures')
 
-	const media = await payload.find({ collection: 'media', depth: 0, limit: 100, pagination: false })
+	const media = await payload.find({
+		collection: 'media',
+		depth: 0,
+		limit: 100,
+		overrideAccess: true,
+		pagination: false,
+	})
 	const idOf = (name: string) => media.docs.find((doc) => doc.filename === name)?.id
 	const ids = (names: string[]) =>
 		names.map(idOf).filter((id): id is NonNullable<typeof id> => id !== undefined)
@@ -103,10 +111,12 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			cover: idOf('sample.pdf'),
 			title: 'Every file type',
 		},
+		overrideAccess: true,
 	})
 	await payload.create({
 		collection: 'posts',
 		data: { cover: idOf('sample.png'), title: 'Image cover' },
+		overrideAccess: true,
 	})
 	payload.logger.info('Seeded dev posts')
 }

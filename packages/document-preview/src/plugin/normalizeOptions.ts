@@ -2,15 +2,12 @@ import type { Config } from 'payload'
 
 import type {
 	DocumentPreviewPluginOptions,
-	PreviewDisplay,
 	ResolvedCollectionPreview,
 	ViewerOverrides,
 } from '../options'
 import { type CustomFileIcon, definitionSvg } from '../shared/fileIcons'
 import { isMimePattern } from '../shared/resolveViewer'
 import type { DocumentPreviewRegistry } from './registry'
-
-const DISPLAYS: ReadonlySet<PreviewDisplay> = new Set(['both', 'drawer', 'inline'])
 
 const checkViewers = (viewers: undefined | ViewerOverrides, where: string): ViewerOverrides => {
 	for (const pattern of Object.keys(viewers ?? {})) {
@@ -73,17 +70,11 @@ export const normalizeOptions = (
 			throw new Error(`[document-preview] collection "${slug}" is not an upload collection`)
 		}
 		const custom = value === true ? {} : value
-		const display = custom.display ?? 'drawer'
-		if (!DISPLAYS.has(display)) {
-			throw new Error(
-				`[document-preview] invalid display "${String(display)}" for "${slug}" (expected "drawer", "inline" or "both")`
-			)
-		}
 		collections[slug] = {
-			display,
 			fileIcons: custom.fileIcons ?? options.fileIcons !== false,
 			filesizeCell: custom.filesizeCell !== false,
 			listView: custom.listView === true,
+			nativePreviews: custom.nativePreviews ?? options.nativePreviews !== false,
 			viewers: checkViewers(custom.viewers, `collections.${slug}.viewers`),
 		}
 	}

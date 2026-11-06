@@ -1,8 +1,8 @@
-import type { CollectionConfig, Config, UIField } from 'payload'
+import type { CollectionConfig, Config, UIField, UploadConfig } from 'payload'
 import { describe, expect, it } from 'vitest'
 
 import { documentPreview } from './index'
-import { COLUMN_FIELD_NAME, INLINE_FIELD_NAME } from './plugin/injectCollections'
+import { COLUMN_FIELD_NAME } from './plugin/injectCollections'
 import { getRegistry } from './plugin/registry'
 import { keys } from './translations'
 
@@ -22,8 +22,10 @@ const run = (options: Parameters<typeof documentPreview>[0], config = fakeConfig
 const collection = (config: Config, slug = 'media') =>
 	config.collections?.find((candidate) => candidate.slug === slug) as CollectionConfig
 
-const controls = (config: Config) =>
-	collection(config).admin?.components?.edit?.beforeDocumentControls ?? []
+const FILE_PREVIEW = '@10x-media/document-preview/client#DocumentPreviewFilePreview'
+
+const filePreview = (config: Config) =>
+	(collection(config).upload as UploadConfig).admin?.components?.filePreview
 
 const fieldNames = (config: Config) =>
 	collection(config).fields.map((field) => ('name' in field ? field.name : undefined))
@@ -53,40 +55,60 @@ describe('documentPreview factory', () => {
 })
 
 describe('collection wiring', () => {
-	it('defaults to a drawer button, the filesize cell and file icons', () => {
+	it('defaults to the file panel preview, the filesize cell and file icons', () => {
 		const out = run({ collections: { media: true } })
-		expect(controls(out)).toEqual(['@10x-media/document-preview/client#DocumentPreviewButton'])
+		expect(collection(out).admin?.components?.edit?.beforeDocumentControls).toBeUndefined()
 		expect(fieldNames(out)).toEqual(['alt', 'filesize', 'thumbnailURL'])
+		expect(filePreview(out)).toMatchObject({
+			'application/octet-stream': FILE_PREVIEW,
+			'application/vnd.openxmlformats-officedocument.wordprocessingml.document': FILE_PREVIEW,
+			'text/*': FILE_PREVIEW,
+			'text/csv': FILE_PREVIEW,
+		})
 	})
 
-	it('keeps controls the host already declared', () => {
-		const out = run(
+	it('leaves the types Payload previews to Payload by default', () => {
+		const map = filePreview(run({ collections: { media: true } })) as Record<string, string>
+		for (const native of ['application/pdf', 'audio/*', 'image/png', 'video/*', '*']) {
+			expect(map[native]).toBeUndefined()
+		}
+	})
+
+	it('takes every file with nativePreviews off, per collection or globally', () => {
+		expect(filePreview(run({ collections: { media: { nativePreviews: false } } }))).toEqual({
+			'*': FILE_PREVIEW,
+		})
+		expect(filePreview(run({ collections: { media: true }, nativePreviews: false }))).toEqual({
+			'*': FILE_PREVIEW,
+		})
+	})
+
+	it('routes the patterns of host viewers to the plugin', () => {
+		const out = run({
+			collections: { media: { viewers: { 'image/tiff': '/viewers/Tiff#Tiff' } } },
+			viewers: { 'video/*': '/viewers/Bunny#Bunny' },
+		})
+		expect(filePreview(out)).toMatchObject({
+			'image/tiff': FILE_PREVIEW,
+			'video/*': FILE_PREVIEW,
+		})
+	})
+
+	it('keeps a host file preview: a single component as is, map entries over its own', () => {
+		const single = run(
+			{ collections: { media: true } },
+			fakeConfig([media({ upload: { admin: { components: { filePreview: '/host#All' } } } })])
+		)
+		expect(filePreview(single)).toBe('/host#All')
+		const mapped = run(
 			{ collections: { media: true } },
 			fakeConfig([
-				media({ admin: { components: { edit: { beforeDocumentControls: ['/host#Control'] } } } }),
+				media({
+					upload: { admin: { components: { filePreview: { 'text/csv': '/host#Csv' } } } },
+				}),
 			])
 		)
-		expect(controls(out)).toEqual([
-			'/host#Control',
-			'@10x-media/document-preview/client#DocumentPreviewButton',
-		])
-	})
-
-	it('puts the inline preview first, without a list column', () => {
-		const out = run({ collections: { media: { display: 'inline' } } })
-		expect(controls(out)).toEqual([])
-		expect(fieldNames(out)).toEqual([INLINE_FIELD_NAME, 'alt', 'filesize', 'thumbnailURL'])
-		const field = collection(out).fields[0] as UIField
-		expect(field.admin?.components?.Field).toBe(
-			'@10x-media/document-preview/client#DocumentPreviewInlineField'
-		)
-		expect(field.admin?.disableListColumn).toBe(true)
-	})
-
-	it('wires both surfaces for display "both"', () => {
-		const out = run({ collections: { media: { display: 'both' } } })
-		expect(controls(out)).toHaveLength(1)
-		expect(fieldNames(out)[0]).toBe(INLINE_FIELD_NAME)
+		expect(filePreview(mapped)).toMatchObject({ 'text/*': FILE_PREVIEW, 'text/csv': '/host#Csv' })
 	})
 
 	it('adds the list column last, and to explicit default columns', () => {
@@ -167,10 +189,10 @@ describe('viewer overrides', () => {
 			fileIcons: [],
 			collections: {
 				media: {
-					display: 'drawer',
 					fileIcons: true,
 					filesizeCell: true,
 					listView: false,
+					nativePreviews: true,
 					viewers: { 'video/*': '/viewers#Bunny' },
 				},
 			},
@@ -214,12 +236,6 @@ describe('validation', () => {
 		).toThrow(/not an upload collection/)
 	})
 
-	it('rejects an invalid display', () => {
-		expect(() => run({ collections: { media: { display: 'modal' as never } } })).toThrow(
-			/invalid display "modal"/
-		)
-	})
-
 	it('rejects malformed viewer keys', () => {
 		expect(() => run({ collections: {}, viewers: { '*': '/x#Y' } })).toThrow(
 			/invalid viewer key "\*" in viewers/
@@ -244,9 +260,9 @@ describe('validation', () => {
 	it('rejects a field name the preview needs', () => {
 		expect(() =>
 			run(
-				{ collections: { media: { display: 'inline' } } },
-				fakeConfig([media({ fields: [{ name: INLINE_FIELD_NAME, type: 'text' }] })])
+				{ collections: { media: { listView: true } } },
+				fakeConfig([media({ fields: [{ name: COLUMN_FIELD_NAME, type: 'text' }] })])
 			)
-		).toThrow(/already has a field named "documentPreview"/)
+		).toThrow(/already has a field named "documentPreviewColumn"/)
 	})
 })

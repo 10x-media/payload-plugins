@@ -1,0 +1,12 @@
+/* Payload centers its own preview in the panel's well; the plugin's fills it as
+   Payload's PDF frame does and scrolls inside its own viewer. Size containment
+   keeps a wide viewer (a spreadsheet grid, a page at 100%) from widening the
+   panel: the panel is a flex item sized by its content, and without it the
+   fields column beside it collapses. */
+.file-preview__image-wrap > .document-preview-panel {
+	align-self: stretch;
+	border-radius: var(--radius-small);
+	contain: size;
+	flex: 1 1 auto;
+	min-width: 0;
+}

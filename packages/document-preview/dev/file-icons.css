@@ -1,31 +1,31 @@
 .file-icons {
-	padding-bottom: calc(var(--base) * 3);
-	padding-top: calc(var(--base) * 2);
+	padding-bottom: var(--spacer-6);
+	padding-top: var(--spacer-5);
 }
 
 .file-icons__lead {
-	color: var(--theme-elevation-500);
-	margin-bottom: calc(var(--base) * 1.5);
+	color: var(--color-text-secondary);
+	margin-bottom: var(--spacer-5);
 }
 
 .file-icons__grid {
 	display: grid;
-	gap: var(--base);
+	gap: var(--spacer-4);
 	grid-template-columns: repeat(auto-fill, minmax(18rem, 1fr));
 }
 
 .file-icons__item {
-	background: var(--theme-elevation-50);
-	border: 1px solid var(--theme-elevation-100);
+	background: var(--color-bg-secondary);
+	border: 1px solid var(--color-border);
 	border-radius: var(--style-radius-m);
 	margin: 0;
-	padding: var(--base);
+	padding: var(--spacer-4);
 }
 
 .file-icons__sizes {
 	align-items: flex-end;
 	display: flex;
-	gap: calc(var(--base) / 2);
+	gap: var(--spacer-2);
 }
 
 .file-icons__sizes img,
@@ -42,7 +42,7 @@
 }
 
 .file-icons__item figcaption {
-	color: var(--theme-elevation-650);
+	color: var(--color-text-secondary);
 	font-family: var(--font-mono, monospace);
-	margin-top: calc(var(--base) / 2);
+	margin-top: var(--spacer-2);
 }

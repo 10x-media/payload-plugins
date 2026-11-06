@@ -91,7 +91,7 @@ const frame = (model: Object3D, camera: PerspectiveCamera, controls: OrbitContro
 
 /** The admin's surface colour, read off the page so the canvas matches the theme. */
 const themeBackground = (element: HTMLElement) =>
-	new Color(getComputedStyle(element).getPropertyValue('--theme-elevation-50').trim() || '#f3f3f3')
+	new Color(getComputedStyle(element).getPropertyValue('--color-bg-secondary').trim() || '#f3f3f3')
 
 const dispose = (root: Object3D) => {
 	root.traverse((child) => {

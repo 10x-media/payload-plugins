@@ -1,17 +1,66 @@
-import type { CollectionConfig, Config, Field } from 'payload'
+import type { CollectionConfig, Config, Field, PayloadComponent } from 'payload'
 
+import { BUILT_IN_VIEWERS, NATIVE_KINDS } from '../shared/builtInViewers'
 import { createFileIconSet, type FileIconSet } from '../shared/fileIcons'
+import { OPAQUE_MIMES } from '../shared/mime'
 import { keys } from '../translations/keys'
 import { apiRouteOf, withFileIconThumbnail } from './fileIcons'
 import type { DocumentPreviewRegistry } from './registry'
-
-/** Name of the ui field carrying the inline preview. */
-export const INLINE_FIELD_NAME = 'documentPreview'
 
 /** Name of the ui field carrying the list view preview cell. */
 export const COLUMN_FIELD_NAME = 'documentPreviewColumn'
 
 const CLIENT = '@10x-media/document-preview/client'
+
+const FILE_PREVIEW = `${CLIENT}#DocumentPreviewFilePreview`
+
+type FilePreviewConfig = PayloadComponent | Record<string, PayloadComponent>
+
+/**
+ * The mime patterns the file panel hands to the plugin. Payload picks a
+ * `filePreview` by the stored mime (exact, then `type/*`, then `*`) and
+ * otherwise shows its own preview, so with `nativePreviews` the map leaves out
+ * the kinds Payload already previews and covers the rest: every other built-in
+ * pattern, every host viewer (which wins whatever the type), and the opaque
+ * mimes, which the plugin resolves by extension. Without it, `*` takes every
+ * file.
+ */
+const filePreviewPatterns = (
+	preview: DocumentPreviewRegistry['collections'][string],
+	globalViewers: DocumentPreviewRegistry['viewers']
+): string[] => {
+	if (!preview.nativePreviews) {
+		return ['*']
+	}
+	const builtIn = Object.entries(BUILT_IN_VIEWERS)
+		.filter(([, kind]) => !NATIVE_KINDS.has(kind))
+		.map(([pattern]) => pattern)
+	return [
+		...new Set([
+			...builtIn,
+			...Object.keys(globalViewers),
+			...Object.keys(preview.viewers),
+			...[...OPAQUE_MIMES].filter(Boolean),
+		]),
+	]
+}
+
+/**
+ * The collection's `filePreview` with the plugin's preview added. A component
+ * the host set for every file is kept as is; a host map keeps its own entries
+ * and gains the plugin's for the patterns it leaves open.
+ */
+const withFilePreview = (
+	existing: FilePreviewConfig | undefined,
+	patterns: string[]
+): FilePreviewConfig => {
+	const isMap = existing !== undefined && typeof existing === 'object' && !('path' in existing)
+	if (existing !== undefined && !isMap) {
+		return existing
+	}
+	const ours = Object.fromEntries(patterns.map((pattern) => [pattern, FILE_PREVIEW]))
+	return { ...ours, ...(existing as Record<string, PayloadComponent> | undefined) }
+}
 
 /**
  * The formatted filesize cell. Payload deep-merges a collection field named like
@@ -70,34 +119,24 @@ const withPreview = (
 	preview: DocumentPreviewRegistry['collections'][string],
 	{
 		apiRoute,
+		globalViewers,
 		icons,
 		label,
-	}: { apiRoute: string; icons: FileIconSet; label: Record<string, string> }
+	}: {
+		apiRoute: string
+		globalViewers: DocumentPreviewRegistry['viewers']
+		icons: FileIconSet
+		label: Record<string, string>
+	}
 ): CollectionConfig => {
 	const admin = { ...collection.admin }
 	let fields: Field[] = collection.fields
-	if (preview.display !== 'inline') {
-		const edit = { ...admin.components?.edit }
-		edit.beforeDocumentControls = [
-			...(edit.beforeDocumentControls ?? []),
-			`${CLIENT}#DocumentPreviewButton`,
-		]
-		admin.components = { ...admin.components, edit }
-	}
-	if (preview.display !== 'drawer') {
-		assertFreeName(collection, INLINE_FIELD_NAME)
-		fields = [
-			{
-				name: INLINE_FIELD_NAME,
-				type: 'ui',
-				admin: {
-					components: { Field: `${CLIENT}#DocumentPreviewInlineField` },
-					disableListColumn: true,
-				},
-			},
-			...fields,
-		]
-	}
+	const upload = typeof collection.upload === 'object' ? collection.upload : {}
+	const uploadComponents = upload.admin?.components
+	const filePreview = withFilePreview(
+		uploadComponents?.filePreview,
+		filePreviewPatterns(preview, globalViewers)
+	)
 	if (preview.listView) {
 		assertFreeName(collection, COLUMN_FIELD_NAME)
 		fields = [
@@ -119,13 +158,22 @@ const withPreview = (
 	if (preview.fileIcons) {
 		fields = withFileIconThumbnail(fields, icons, apiRoute)
 	}
-	return { ...collection, admin, fields }
+	return {
+		...collection,
+		admin,
+		fields,
+		upload: {
+			...upload,
+			admin: { ...upload.admin, components: { ...uploadComponents, filePreview } },
+		},
+	}
 }
 
-/** Wire every enabled upload collection's edit view (and list view, when asked) to the preview. */
+/** Wire every enabled upload collection's file panel (and list view, when asked) to the preview. */
 export const injectCollections = (config: Config, registry: DocumentPreviewRegistry): void => {
 	const context = {
 		apiRoute: apiRouteOf(config),
+		globalViewers: registry.viewers,
 		icons: createFileIconSet(registry.fileIcons),
 		label: columnLabel(config),
 	}

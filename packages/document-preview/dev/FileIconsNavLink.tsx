@@ -1,8 +1,6 @@
 'use client'
 
-import { useConfig } from '@payloadcms/ui'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import { Link, useConfig, usePathname } from '@payloadcms/ui'
 
 /** Dev-only sidebar link to the file icon gallery, styled as a Payload nav link. */
 export const FileIconsNavLink = () => {
