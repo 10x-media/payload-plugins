@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/document-preview",
-	"version": "4.0.0-alpha.0",
+	"version": "4.0.0-alpha.1",
 	"description": "Read-only previews of upload documents in the Payload admin: images, video, audio, PDF, CSV, text and code, Markdown, Word, Excel and PowerPoint, lazy-loaded per format.",
 	"license": "MIT",
 	"repository": {

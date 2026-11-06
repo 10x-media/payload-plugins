@@ -1,5 +1,11 @@
 # @10x-media/dedupe
 
+## 4.0.0-alpha.1
+
+### Major Changes
+
+- Payload 4 support, on Next.js and TanStack Start. `next` and `@payloadcms/next` are no longer peers. On a drafts collection with localized fields, Payload 4 publishes each locale on its own, and the merge now keeps the primary's status per locale: a locale the primary is published in is published with the merged values, a locale it is a draft in is written as a draft and stays unpublished (checked only when the collection validates drafts), and the values the locales share are written in a published locale; a document counts as published while any locale is. Folder and tag fields are the project's own on Payload 4: the folder special case is gone, and a field that hides itself in the document form with `NullField` is shown on the merge screen as its value. Blocks named by slug from the config's `blocks` are compared and drawn like inline ones. Scan jobs always carry their concurrency key, since Payload 4 removes `jobs.enableConcurrencyControl`; the check on save is not keyed, so the checks of many saves in one collection run side by side. The plugin's internal reads, writes and `jobs.queue` calls pass `overrideAccess: true` where Payload 4 now applies access by default; the merge still writes as the reviewer. The pairs and keys collections opt out of Payload 4's default versions and authorship. The queue is built from Payload 4's list parts: its list header with the tabs, a list-controls band with the search, the collection filter and Scan now, and Payload's page controls pinned to the bottom. The merge screen uses Payload 4's tokens, banners and buttons, its column head has ghost icon buttons, its footer stays pinned to the bottom of the window as the list view's page controls do, differences carry the version view's word marks, and rich text differences use Payload 4's Lexical diff styles and relationship markup. Requires Payload `4.0.0-beta.7`. See Upgrading to Payload 4 in the docs.
+
 ## 0.1.0-beta.3
 
 ### Minor Changes
