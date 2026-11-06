@@ -1,7 +1,7 @@
-/** A panel beside content: the toggle for a page or slide rail. */
+/** A panel beside content: the toggle for a page or slide rail, drawn like Payload's 16px icons. */
 export const RailIcon = () => (
-	<svg aria-hidden="true" className="document-preview-icon" fill="none" viewBox="0 0 20 20">
-		<rect height="13" rx="1.5" stroke="currentColor" width="15" x="2.5" y="3.5" />
-		<path d="M7.5 3.5v13" stroke="currentColor" />
+	<svg aria-hidden="true" className="icon" fill="none" height="16" viewBox="0 0 16 16" width="16">
+		<rect height="10" rx="1" stroke="currentColor" width="12" x="2" y="3" />
+		<path d="M6 3v10" stroke="currentColor" />
 	</svg>
 )

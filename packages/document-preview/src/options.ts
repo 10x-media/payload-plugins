@@ -4,13 +4,6 @@ import type { FileIconTypes } from './shared/fileIcons'
 import type { TranslationsOption } from './translations'
 
 /**
- * Where an upload collection's edit view shows its preview: a `drawer` opened
- * from a button beside the document controls, an `inline` panel above the
- * fields, or `both`.
- */
-export type PreviewDisplay = 'both' | 'drawer' | 'inline'
-
-/**
  * Viewer components keyed by mime pattern, an exact mime (`video/mp4`) or a
  * type wildcard (`video/*`). Values are Payload component paths
  * (`'/components/BunnyPlayer#BunnyPlayer'`) to client components receiving
@@ -20,8 +13,6 @@ export type PreviewDisplay = 'both' | 'drawer' | 'inline'
 export type ViewerOverrides = { [mimePattern: string]: string }
 
 export type CollectionPreviewOptions = {
-	/** Defaults to `'drawer'`. */
-	display?: PreviewDisplay
 	/**
 	 * Give non-image files a file-type icon as their admin thumbnail (list
 	 * column, upload fields, edit view) instead of Payload's blank page. On by
@@ -35,8 +26,16 @@ export type CollectionPreviewOptions = {
 	 * default; a `Cell` the collection already sets on `filesize` is kept.
 	 */
 	filesizeCell?: boolean
-	/** Add a preview column to the list view. Off by default. */
+	/** Add a preview column to the list view, opening the file in a drawer. Off by default. */
 	listView?: boolean
+	/**
+	 * Leave images, video, audio and PDF to Payload's own previews in the edit
+	 * view's file panel. On by default; `false` shows the plugin's viewers for
+	 * them too (image zoom and pan, the too-large and failure cards, a link where
+	 * the browser has no PDF viewer). A host viewer for one of these types always
+	 * wins. The list drawer always uses the plugin's viewers.
+	 */
+	nativePreviews?: boolean
 	/** Viewers for this collection only; they win over the global `viewers`. */
 	viewers?: ViewerOverrides
 }
@@ -74,6 +73,8 @@ export type DocumentPreviewPluginOptions = {
 	 * ```
 	 */
 	fileIcons?: boolean | FileIconsOptions
+	/** Default for every collection's `nativePreviews`. */
+	nativePreviews?: boolean
 	/**
 	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
 	 * translation keys exported from `@10x-media/document-preview/i18n`. Values win
@@ -87,9 +88,9 @@ export type DocumentPreviewPluginOptions = {
 
 /** A collection's options with defaults applied. */
 export type ResolvedCollectionPreview = {
-	display: PreviewDisplay
 	fileIcons: boolean
 	filesizeCell: boolean
 	listView: boolean
+	nativePreviews: boolean
 	viewers: ViewerOverrides
 }

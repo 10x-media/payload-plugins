@@ -1,5 +1,5 @@
-import { DefaultTemplate } from '@payloadcms/next/templates'
 import { File, Gutter } from '@payloadcms/ui'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps } from 'payload'
 
 import { getRegistry } from '../src/plugin/registry'
@@ -19,6 +19,8 @@ export const FileIconsView = ({
 	params,
 	payload,
 	searchParams,
+	user,
+	viewActions,
 }: AdminViewServerProps) => {
 	const { permissions, req, visibleEntities } = initPageResult
 	const icons = createFileIconSet(getRegistry(payload.config)?.fileIcons)
@@ -31,7 +33,8 @@ export const FileIconsView = ({
 			permissions={permissions}
 			req={req}
 			searchParams={searchParams}
-			user={req.user ?? undefined}
+			user={user}
+			viewActions={viewActions}
 			visibleEntities={{
 				collections: visibleEntities?.collections,
 				globals: visibleEntities?.globals,

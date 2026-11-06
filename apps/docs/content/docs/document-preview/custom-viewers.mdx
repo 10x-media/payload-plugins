@@ -39,6 +39,8 @@ For a file's mime type (corrected by extension where browsers misreport it), the
 
 Each layer is searched in full before the next, so your `video/*` replaces the built-in player for every video, including `video/mp4`.
 
+A viewer of yours renders in the file panel and in the list drawer. It takes the file panel for its types even where [`nativePreviews`](/document-preview/surfaces#file-panel) leaves a type to Payload: a `video/*` viewer replaces Payload's player there too.
+
 ## The component
 
 A client component that receives the file and the whole document, and fills its container:

@@ -9,7 +9,7 @@ describeForDb('documentPreview cross-db', {}, (db) => {
 		booted = await bootPayload({
 			collections: [{ slug: 'media', fields: [], upload: true }],
 			db,
-			plugin: documentPreview({ collections: { media: { display: 'both', listView: true } } }),
+			plugin: documentPreview({ collections: { media: { listView: true } } }),
 		})
 	})
 
@@ -22,6 +22,7 @@ describeForDb('documentPreview cross-db', {}, (db) => {
 			collection: 'media',
 			data: {},
 			file: { data: Buffer.from('hello'), mimetype: 'text/plain', name: 'hello.txt', size: 5 },
+			overrideAccess: true,
 		})
 		expect(doc.filename).toMatch(/^hello(-\d+)?\.txt$/)
 	})

@@ -51,7 +51,11 @@ const EXTENSION_MIME: Record<string, string> = {
 const EXTENSION_WINS = new Set(['csv', 'tsv'])
 
 /** Mimes that say nothing about the content and are treated as missing. */
-const OPAQUE_MIMES = new Set(['', 'application/octet-stream', 'binary/octet-stream'])
+export const OPAQUE_MIMES: ReadonlySet<string> = new Set([
+	'',
+	'application/octet-stream',
+	'binary/octet-stream',
+])
 
 const extensionOf = (filename: null | string | undefined): string | undefined => {
 	if (!filename) {

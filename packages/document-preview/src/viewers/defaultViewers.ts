@@ -2,6 +2,7 @@
 
 import { lazy } from 'react'
 
+import { BUILT_IN_VIEWERS, type ViewerKind } from '../shared/builtInViewers'
 import type { ViewerMap } from '../shared/resolveViewer'
 import type { DocumentPreviewViewer } from '../shared/types'
 
@@ -18,38 +19,23 @@ const DocxViewer = lazy(() => import('./DocxViewer').then((m) => ({ default: m.D
 const XlsxViewer = lazy(() => import('./XlsxViewer').then((m) => ({ default: m.XlsxViewer })))
 const PptxViewer = lazy(() => import('./PptxViewer').then((m) => ({ default: m.PptxViewer })))
 
+const VIEWERS: Record<ViewerKind, DocumentPreviewViewer> = {
+	audio: AudioViewer,
+	csv: CsvViewer,
+	docx: DocxViewer,
+	image: ImageViewer,
+	markdown: MarkdownViewer,
+	pdf: PdfViewer,
+	pptx: PptxViewer,
+	text: TextViewer,
+	video: VideoViewer,
+	xlsx: XlsxViewer,
+}
+
 /**
  * Built-in viewers, the last layer of resolution. Each is its own chunk,
- * fetched the first time a file of its kind is opened. Images are listed by
- * exact mime because `image/*` would claim TIFF and HEIC, which browsers
- * cannot decode.
+ * fetched the first time a file of its kind is opened.
  */
-export const defaultViewers: ViewerMap<DocumentPreviewViewer> = {
-	'application/json': TextViewer,
-	'application/javascript': TextViewer,
-	'application/pdf': PdfViewer,
-	'application/sql': TextViewer,
-	'application/vnd.ms-excel': XlsxViewer,
-	'application/vnd.ms-excel.sheet.macroEnabled.12': XlsxViewer,
-	'application/vnd.ms-powerpoint': PptxViewer,
-	'application/vnd.openxmlformats-officedocument.presentationml.presentation': PptxViewer,
-	'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': XlsxViewer,
-	'application/vnd.openxmlformats-officedocument.wordprocessingml.document': DocxViewer,
-	'application/xml': TextViewer,
-	'application/yaml': TextViewer,
-	'audio/*': AudioViewer,
-	'image/avif': ImageViewer,
-	'image/bmp': ImageViewer,
-	'image/gif': ImageViewer,
-	'image/jpeg': ImageViewer,
-	'image/png': ImageViewer,
-	'image/svg+xml': ImageViewer,
-	'image/vnd.microsoft.icon': ImageViewer,
-	'image/webp': ImageViewer,
-	'image/x-icon': ImageViewer,
-	'text/*': TextViewer,
-	'text/csv': CsvViewer,
-	'text/markdown': MarkdownViewer,
-	'text/tab-separated-values': CsvViewer,
-	'video/*': VideoViewer,
-}
+export const defaultViewers: ViewerMap<DocumentPreviewViewer> = Object.fromEntries(
+	Object.entries(BUILT_IN_VIEWERS).map(([pattern, kind]) => [pattern, VIEWERS[kind]])
+)

@@ -22,7 +22,7 @@
 
 .model-viewer__status {
 	align-items: center;
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 	display: flex;
 	inset: 0;
 	justify-content: center;

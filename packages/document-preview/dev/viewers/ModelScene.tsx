@@ -1,6 +1,7 @@
 'use client'
 
 import type { DocumentPreviewViewerProps } from '@10x-media/document-preview/types'
+import { Button } from '@payloadcms/ui'
 import { useEffect, useRef, useState } from 'react'
 import {
 	Box3,
@@ -91,7 +92,7 @@ const frame = (model: Object3D, camera: PerspectiveCamera, controls: OrbitContro
 
 /** The admin's surface colour, read off the page so the canvas matches the theme. */
 const themeBackground = (element: HTMLElement) =>
-	new Color(getComputedStyle(element).getPropertyValue('--theme-elevation-50').trim() || '#f3f3f3')
+	new Color(getComputedStyle(element).getPropertyValue('--color-bg-secondary').trim() || '#f3f3f3')
 
 const dispose = (root: Object3D) => {
 	root.traverse((child) => {
@@ -203,23 +204,26 @@ export const ModelScene = ({ filename, mimeType, url }: DocumentPreviewViewerPro
 				) : null}
 			</div>
 			<div className="document-preview-toolbar">
-				<button
+				<Button
 					aria-pressed={spinning}
-					className="document-preview-toolbar__button document-preview-toolbar__button--text"
+					buttonStyle="ghost"
 					disabled={status !== 'ready'}
+					margin={false}
 					onClick={() => setSpinning((value) => !value)}
-					type="button"
+					selected={spinning}
+					size="medium"
 				>
 					Auto-rotate
-				</button>
-				<button
-					className="document-preview-toolbar__button document-preview-toolbar__button--text"
+				</Button>
+				<Button
+					buttonStyle="ghost"
 					disabled={status !== 'ready'}
+					margin={false}
 					onClick={() => resetRef.current()}
-					type="button"
+					size="medium"
 				>
 					Reset view
-				</button>
+				</Button>
 			</div>
 		</div>
 	)

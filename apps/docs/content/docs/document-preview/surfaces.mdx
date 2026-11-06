@@ -3,27 +3,23 @@ title: Surfaces
 description: Where previews appear in the admin, and how to put one anywhere else.
 ---
 
-Each enabled collection chooses its surfaces with `display` and `listView`. All of them show the saved file of the document they belong to, through the same viewers.
+Every enabled collection shows its preview in the edit view's file panel; `listView` adds a column that opens it in a drawer. Both show the saved file of the document they belong to, through the same viewers.
 
-## Drawer
+## File panel
 
-`display: 'drawer'`, the default. A **Preview** button sits beside **Save** in the edit view and opens the file in a drawer as wide as the window. The viewer only mounts while the drawer is open, so a document view that never opens it loads no viewer code.
+Payload 4 puts the file of an upload document in a panel beside the fields, with the file name, a copy-link, open and download toolbar above it and the size and mime type below it. The plugin renders its viewer inside that panel, through the collection's `upload.admin.components.filePreview`, so there is nothing to open: the document view shows the file. The viewer fills the panel and scrolls inside itself.
 
-Press <kbd>Esc</kbd> or the close button to return to the form.
+Payload previews images, video, audio and PDF in that panel on its own: an image thumbnail with its sizes, the browser's `<video>` and `<audio>` players, and the browser's PDF viewer. By default the plugin leaves those four to Payload and takes everything else: Word, Excel, PowerPoint, CSV and TSV, text and code, Markdown, and any type you give a [custom viewer](/document-preview/custom-viewers). A file with no viewer at all keeps Payload's thumbnail, which the plugin draws as its [file-type icon](/document-preview/file-icons).
 
-## Inline
+Set `nativePreviews: false`, on the plugin or on one collection, to use the plugin's viewers for images, video, audio and PDF too: image zoom and pan, the too-large and failure cards, and a link card on browsers without a PDF viewer. A custom viewer for one of these types takes the panel either way.
 
-`display: 'inline'` places the preview above the collection's fields, directly under Payload's upload area, at a fixed height with its own scrolling. `display: 'both'` shows the inline preview and keeps the drawer button for a larger view.
+If the collection already sets `filePreview` to a single component, the plugin leaves it alone. A `filePreview` map keeps its own entries and gains the plugin's for the mime types it does not list.
 
-<Screenshot src="/images/document-preview/inline.webp" width={720} alt="The edit view of demo.docx: the Preview button beside Save, the upload area with a DOC file icon, and the first page of the document rendered inline below it." />
-
-An inline preview starts inert: the mouse wheel scrolls the form, not the document. Hovering shows **Click to interact**; one click hands the wheel, zoom and keyboard to the viewer, and a click anywhere outside hands them back. Files without a viewer, which only show the info card, skip this.
-
-The inline preview is a UI field named `documentPreview`, placed first in the collection's fields. It stores nothing, and the plugin refuses to start if the collection already has a field of that name.
+The panel previews the saved file. A replacement you have picked but not saved yet is shown by Payload's own preview until you save.
 
 ## List view
 
-`listView: true` appends a **Preview** column to the list view, with the same button as the edit view. If the collection sets `admin.defaultColumns`, the column is added to them; otherwise pick it from **Columns**.
+`listView: true` appends a **Preview** column to the list view. Its button opens the row's file in a drawer as wide as the file panel, with the plugin's viewer for every type (the drawer has no Payload preview to defer to). Press <kbd>Esc</kbd> or the close button to return to the list. If the collection sets `admin.defaultColumns`, the column is added to them; otherwise pick it from **Columns**.
 
 <Screenshot src="/images/document-preview/media-list.webp" width={720} alt="The media list sorted by file name: file-type icons in the thumbnails, sizes such as 8MB and 22 bytes, and a Preview button on every row." />
 
@@ -35,7 +31,7 @@ Independently of `listView`, the plugin shows `filesize` as `1.2 MB` rather than
 
 ## In your own components
 
-`DocumentPreview` is the viewer the surfaces use, exported for custom views, fields and dashboards. It fills its container, so give the container a height.
+`DocumentPreview` is the viewer the panel and the drawer use, exported for custom views, fields and dashboards. It fills its container, so give the container a height.
 
 ```tsx title="components/AttachmentPreview.tsx"
 'use client'
@@ -53,10 +49,10 @@ export const AttachmentPreview = ({ doc }: { doc: Record<string, unknown> }) => 
 |---|---|
 | `doc` | The upload document. It needs `url` and `filename`; `mimeType` and `filesize` are used when present. Renders nothing without a file. |
 | `collection` | The upload collection's slug, so that collection's [viewer overrides](/document-preview/custom-viewers) apply. |
-| `interactOnClick` | Start inert until clicked, as the inline preview does. Use it when the preview sits inside a scrolling page. |
+| `interactOnClick` | Start inert until clicked: the mouse wheel scrolls the page around the preview until a click hands it to the viewer, and a click outside hands it back. Use it when the preview sits inside a scrolling page. |
 | `className` | Added to the preview's root. |
 
-For a drawer of your own, `PreviewDrawer` is the drawer the button opens. It takes a modal `slug` from Payload's `useDrawerSlug` and opens with `useModal().openModal(slug)`:
+For a drawer of your own, `PreviewDrawer` is the drawer the list column opens. It takes a modal `slug` from Payload's `useDrawerSlug` and opens with `useModal().openModal(slug)`:
 
 ```tsx
 'use client'
@@ -79,5 +75,5 @@ export const OpenContract = ({ doc }: { doc: Record<string, unknown> }) => {
 Both read the host's viewer overrides and file icons from a provider the plugin registers for the whole admin, so they work anywhere in it without passing the plugin's config along.
 
 <Callout type="info">
-Previews do not appear on upload fields of other collections. To look at an attachment from a document that references it, open the attachment's own document (the pencil on the upload field opens it in a drawer) and preview it there.
+Previews do not appear on upload fields of other collections. To look at an attachment from a document that references it, open the attachment's own document (the pencil on the upload field opens it in a drawer): its file panel shows the preview.
 </Callout>

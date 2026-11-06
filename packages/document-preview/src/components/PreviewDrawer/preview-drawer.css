@@ -1,11 +1,23 @@
-/* The drawer content scrolls by default; the preview fills the space under the
-   header instead and scrolls inside its own viewer. */
+/* A Payload 4 side drawer grows with its content and the modal container scrolls
+   the whole of it, so the drawer is held to the viewport and the preview fills
+   what the header leaves, scrolling inside its own viewer. As wide as the edit
+   view's file panel rather than Payload's narrower form drawer. */
+.document-preview-drawer.drawer {
+	height: 100%;
+}
+
+.document-preview-drawer .drawer__content {
+	width: clamp(600px, 60vw, 1080px);
+}
+
 .document-preview-drawer .drawer__content-children {
 	display: flex;
 	flex-direction: column;
+	overflow: hidden;
+	padding: 0 var(--gutter-h) var(--gutter-h);
 }
 
 .document-preview-drawer__preview {
-	height: calc(100dvh - var(--base) * 7);
-	margin-bottom: var(--base);
+	flex: 1 1 auto;
+	min-height: 0;
 }

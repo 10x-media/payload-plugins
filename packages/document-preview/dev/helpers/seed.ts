@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,7 +10,16 @@ import { loadRemoteFixtures } from './remoteFixtures'
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
 
-const seedFilesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../seed-files')
+/**
+ * The committed fixtures. Next keeps `import.meta.url` on this source file, but the TanStack Start
+ * build bundles it into `dev-tanstack/dist/server/assets`, where `../seed-files` does not exist;
+ * `srvx` runs from `dev-tanstack`, so the working directory finds them there.
+ */
+const seedFilesDir =
+	[
+		path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../seed-files'),
+		path.resolve(process.cwd(), '../dev/seed-files'),
+	].find((dir) => existsSync(dir)) ?? ''
 
 /** Mimes for the fixtures, set explicitly so the dev data does not depend on sniffing. */
 const MIME_BY_EXTENSION: Record<string, string> = {
@@ -41,16 +51,17 @@ const MIME_BY_EXTENSION: Record<string, string> = {
  * to commit. Idempotent.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ collection: 'users', overrideAccess: true })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
+			overrideAccess: true,
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const mediaCount = await payload.count({ collection: 'media' })
+	const mediaCount = await payload.count({ collection: 'media', overrideAccess: true })
 	if (mediaCount.totalDocs > 0) {
 		return
 	}
@@ -73,12 +84,20 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				name,
 				size: data.byteLength,
 			},
+			overrideAccess: true,
 		})
 	}
 	payload.logger.info('Seeded dev media fixtures')
 
-	const media = await payload.find({ collection: 'media', depth: 0, limit: 100, pagination: false })
-	const idOf = (name: string) => media.docs.find((doc) => doc.filename === name)?.id
+	const media = await payload.find({
+		collection: 'media',
+		depth: 0,
+		limit: 100,
+		overrideAccess: true,
+		pagination: false,
+	})
+	// By `alt`: an upload whose name is already taken in `dev/uploads` is stored as `name-1.ext`.
+	const idOf = (name: string) => media.docs.find((doc) => doc.alt === name)?.id
 	const ids = (names: string[]) =>
 		names.map(idOf).filter((id): id is NonNullable<typeof id> => id !== undefined)
 	await payload.create({
@@ -103,10 +122,12 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 			cover: idOf('sample.pdf'),
 			title: 'Every file type',
 		},
+		overrideAccess: true,
 	})
 	await payload.create({
 		collection: 'posts',
 		data: { cover: idOf('sample.png'), title: 'Image cover' },
+		overrideAccess: true,
 	})
 	payload.logger.info('Seeded dev posts')
 }

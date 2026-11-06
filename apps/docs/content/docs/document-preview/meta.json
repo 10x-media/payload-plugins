@@ -9,6 +9,7 @@
 		"file-icons",
 		"production",
 		"configuration",
-		"i18n"
+		"i18n",
+		"upgrading"
 	]
 }

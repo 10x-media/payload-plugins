@@ -1,11 +1,13 @@
 'use client'
 
+import { LineIcon, PlusIcon } from '@payloadcms/ui'
 import { type MouseEvent, type PointerEvent, useCallback, useEffect, useRef, useState } from 'react'
 
 import type { DocumentPreviewViewerProps } from '../shared/types'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { InfoCard } from './InfoCard'
+import { ToolbarButton } from './ToolbarButton'
 
 type View = { scale: number; x: number; y: number }
 
@@ -222,42 +224,23 @@ export const ImageViewer = ({ filename, filesize, mimeType, url }: DocumentPrevi
 				/>
 			</div>
 			<div className="document-preview-toolbar">
-				<button
-					aria-label={t(keys.zoomOut)}
-					className="document-preview-toolbar__button"
+				<ToolbarButton
+					icon={<LineIcon size={16} />}
+					label={t(keys.zoomOut)}
 					onClick={() => zoomTo((scale) => scale / STEP)}
-					title={t(keys.zoomOut)}
-					type="button"
-				>
-					−
-				</button>
+				/>
 				<span className="document-preview-toolbar__value">
 					{view ? `${Math.round(view.scale * 100)}%` : ''}
 				</span>
-				<button
-					aria-label={t(keys.zoomIn)}
-					className="document-preview-toolbar__button"
+				<ToolbarButton
+					icon={<PlusIcon size={16} />}
+					label={t(keys.zoomIn)}
 					onClick={() => zoomTo((scale) => scale * STEP)}
-					title={t(keys.zoomIn)}
-					type="button"
-				>
-					+
-				</button>
-				<button
-					aria-pressed={fitted}
-					className="document-preview-toolbar__button document-preview-toolbar__button--text"
-					onClick={fit}
-					type="button"
-				>
+				/>
+				<ToolbarButton onClick={fit} pressed={fitted}>
 					{t(keys.fitToView)}
-				</button>
-				<button
-					className="document-preview-toolbar__button document-preview-toolbar__button--text"
-					onClick={actualSize}
-					type="button"
-				>
-					{t(keys.actualSize)}
-				</button>
+				</ToolbarButton>
+				<ToolbarButton onClick={actualSize}>{t(keys.actualSize)}</ToolbarButton>
 			</div>
 		</div>
 	)

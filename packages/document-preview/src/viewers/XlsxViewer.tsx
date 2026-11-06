@@ -5,7 +5,7 @@ import {
 	useXlsxViewerController,
 	type XlsxViewerController,
 } from '@extend-ai/react-xlsx'
-import { useTheme } from '@payloadcms/ui'
+import { Button, LineIcon, PlusIcon, useTheme } from '@payloadcms/ui'
 import { useMemo } from 'react'
 
 import { OFFICE_MAX_BYTES } from '../shared/limits'
@@ -13,13 +13,14 @@ import type { DocumentPreviewViewerProps } from '../shared/types'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import { InfoCard } from './InfoCard'
+import { ToolbarButton } from './ToolbarButton'
 import { useFileContent } from './useFileContent'
 import { PreviewLoading, WithFileContent } from './ViewerStatus'
 
 type HeaderColors = { background: string; text: string }
 
 /**
- * The admin's elevation tokens as concrete colors. The grid paints its row and
+ * The admin's surface tokens as concrete colors. The grid paints its row and
  * column headers on a canvas, which cannot resolve `var(--...)`, so they are
  * read off the element carrying the current theme.
  */
@@ -31,8 +32,8 @@ const useHeaderColors = (): HeaderColors | undefined => {
 		}
 		const themed = document.querySelector(`[data-theme="${theme}"]`) ?? document.documentElement
 		const styles = getComputedStyle(themed)
-		const background = styles.getPropertyValue('--theme-elevation-50').trim()
-		const text = styles.getPropertyValue('--theme-elevation-500').trim()
+		const background = styles.getPropertyValue('--color-bg-secondary').trim()
+		const text = styles.getPropertyValue('--color-text-secondary').trim()
 		return background && text ? { background, text } : undefined
 	}, [theme])
 }
@@ -63,48 +64,42 @@ const SheetBar = ({ controller }: { controller: XlsxViewerController }) => {
 		<div className="document-preview-toolbar document-preview-xlsx__sheet-bar">
 			<div className="document-preview-xlsx__tabs" role="tablist">
 				{controller.tabs.map((tab, index) => (
-					<button
-						aria-selected={index === controller.activeTabIndex}
+					<Button
+						buttonStyle="ghost"
 						className="document-preview-xlsx__tab"
+						extraButtonProps={{
+							'aria-selected': index === controller.activeTabIndex,
+							role: 'tab',
+							title: tab.name,
+						}}
 						key={tab.id}
+						margin={false}
 						onClick={() => controller.setActiveTabIndex(index)}
-						role="tab"
-						title={tab.name}
-						type="button"
+						selected={index === controller.activeTabIndex}
+						size="medium"
 					>
 						{tab.name}
-					</button>
+					</Button>
 				))}
 			</div>
 			<div className="document-preview-xlsx__zoom">
-				<button
-					aria-label={t(keys.zoomOut)}
-					className="document-preview-toolbar__button"
+				<ToolbarButton
 					disabled={!controller.canZoomOut}
+					icon={<LineIcon size={16} />}
+					label={t(keys.zoomOut)}
 					onClick={controller.zoomOut}
-					title={t(keys.zoomOut)}
-					type="button"
-				>
-					−
-				</button>
-				<button
-					className="document-preview-toolbar__button document-preview-toolbar__value"
-					onClick={controller.resetZoom}
-					title={t(keys.actualSize)}
-					type="button"
-				>
-					{Math.round(controller.zoomScale)}%
-				</button>
-				<button
-					aria-label={t(keys.zoomIn)}
-					className="document-preview-toolbar__button"
+				/>
+				<ToolbarButton label={t(keys.actualSize)} onClick={controller.resetZoom}>
+					<span className="document-preview-toolbar__zoom">
+						{Math.round(controller.zoomScale)}%
+					</span>
+				</ToolbarButton>
+				<ToolbarButton
 					disabled={!controller.canZoomIn}
+					icon={<PlusIcon size={16} />}
+					label={t(keys.zoomIn)}
 					onClick={controller.zoomIn}
-					title={t(keys.zoomIn)}
-					type="button"
-				>
-					+
-				</button>
+				/>
 			</div>
 		</div>
 	)

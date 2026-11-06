@@ -7,6 +7,7 @@ import {
 	ReactPptxViewer,
 	type ViewerZoomLevel,
 } from '@extend-ai/react-pptx'
+import { ChevronIcon, LineIcon, PlusIcon } from '@payloadcms/ui'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 import { OFFICE_MAX_BYTES } from '../shared/limits'
@@ -16,6 +17,7 @@ import { useTranslation } from '../translations/useTranslation'
 import { InfoCard } from './InfoCard'
 import { PptxThumbnails } from './PptxThumbnails'
 import { RailIcon } from './RailIcon'
+import { ToolbarButton } from './ToolbarButton'
 import { useFileContent } from './useFileContent'
 import { PreviewLoading, WithFileContent } from './ViewerStatus'
 
@@ -127,87 +129,52 @@ const Presentation = ({
 			</div>
 			<div className="document-preview-toolbar document-preview-office__toolbar">
 				<div className="document-preview-office__position">
-					<button
-						aria-label={t(keys.slides)}
-						aria-pressed={showSlides}
-						className="document-preview-toolbar__button"
+					<ToolbarButton
+						icon={<RailIcon />}
+						label={t(keys.slides)}
 						onClick={() => setShowSlides((open) => !open)}
-						title={t(keys.slides)}
-						type="button"
-					>
-						<RailIcon />
-					</button>
-					<button
-						aria-label={t(keys.previousSlide)}
-						className="document-preview-toolbar__button"
+						pressed={showSlides}
+					/>
+					<ToolbarButton
 						disabled={activeSlide <= 0}
+						icon={<ChevronIcon direction="left" size={16} />}
+						label={t(keys.previousSlide)}
 						onClick={() => goToSlide(activeSlide - 1)}
-						title={t(keys.previousSlide)}
-						type="button"
-					>
-						‹
-					</button>
+					/>
 					<span className="document-preview-toolbar__value">
 						{slideCount > 0
 							? t(keys.slideOf, { current: activeSlide + 1, total: slideCount })
 							: null}
 					</span>
-					<button
-						aria-label={t(keys.nextSlide)}
-						className="document-preview-toolbar__button"
+					<ToolbarButton
 						disabled={activeSlide >= slideCount - 1}
+						icon={<ChevronIcon direction="right" size={16} />}
+						label={t(keys.nextSlide)}
 						onClick={() => goToSlide(activeSlide + 1)}
-						title={t(keys.nextSlide)}
-						type="button"
-					>
-						›
-					</button>
+					/>
 				</div>
 				<div className="document-preview-office__zoom">
-					<button
-						aria-label={t(keys.zoomOut)}
-						className="document-preview-toolbar__button"
+					<ToolbarButton
 						disabled={resolved <= MIN_ZOOM}
+						icon={<LineIcon size={16} />}
+						label={t(keys.zoomOut)}
 						onClick={() => setLevel(clampZoom(resolved / STEP))}
-						title={t(keys.zoomOut)}
-						type="button"
-					>
-						−
-					</button>
-					<button
-						className="document-preview-toolbar__button document-preview-toolbar__value"
-						onClick={() => setLevel(100)}
-						title={t(keys.actualSize)}
-						type="button"
-					>
-						{Math.round(resolved)}%
-					</button>
-					<button
-						aria-label={t(keys.zoomIn)}
-						className="document-preview-toolbar__button"
+					/>
+					<ToolbarButton label={t(keys.actualSize)} onClick={() => setLevel(100)}>
+						<span className="document-preview-toolbar__zoom">{Math.round(resolved)}%</span>
+					</ToolbarButton>
+					<ToolbarButton
 						disabled={resolved >= MAX_ZOOM}
+						icon={<PlusIcon size={16} />}
+						label={t(keys.zoomIn)}
 						onClick={() => setLevel(clampZoom(resolved * STEP))}
-						title={t(keys.zoomIn)}
-						type="button"
-					>
-						+
-					</button>
-					<button
-						aria-pressed={level === 'fit-width'}
-						className="document-preview-toolbar__button document-preview-toolbar__button--text"
-						onClick={() => setLevel('fit-width')}
-						type="button"
-					>
+					/>
+					<ToolbarButton onClick={() => setLevel('fit-width')} pressed={level === 'fit-width'}>
 						{t(keys.fitWidth)}
-					</button>
-					<button
-						aria-pressed={level === 'fit-page'}
-						className="document-preview-toolbar__button document-preview-toolbar__button--text"
-						onClick={() => setLevel('fit-page')}
-						type="button"
-					>
+					</ToolbarButton>
+					<ToolbarButton onClick={() => setLevel('fit-page')} pressed={level === 'fit-page'}>
 						{t(keys.fitSlide)}
-					</button>
+					</ToolbarButton>
 				</div>
 			</div>
 		</div>

@@ -35,16 +35,16 @@ const registerViewerDependencies = (config: Config, registry: DocumentPreviewReg
 }
 
 /**
- * Document Preview plugin for Payload v3: read-only previews of upload
- * documents (images, video, audio, PDF, CSV, text, DOCX, XLSX, PPTX) in the
- * admin, opened from a drawer, inline above the fields, or a list column. Every
- * viewer loads lazily on first open. Authored with `definePlugin` so sibling
- * plugins can detect it by slug.
+ * Document Preview plugin for Payload 4: read-only previews of upload documents
+ * (images, video, audio, PDF, CSV, text, DOCX, XLSX, PPTX) in the edit view's
+ * file panel and, opt-in, from a list column in a drawer. Every viewer loads
+ * lazily on first open. Authored with `definePlugin` so sibling plugins can
+ * detect it by slug.
  */
 export const documentPreview = definePlugin<DocumentPreviewPluginOptions>({
 	slug: '@10x-media/document-preview',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
-		if (options.disabled === true) {
+	plugin: ({ config, options }): Config => {
+		if (!options || options.disabled === true) {
 			return config
 		}
 		registerTranslations(config, options.translations)
@@ -73,6 +73,5 @@ export type {
 	DocumentPreviewPluginOptions,
 	DocumentPreviewPluginOptions as PluginOptions,
 	FileIconsOptions,
-	PreviewDisplay,
 	ViewerOverrides,
 } from './options'

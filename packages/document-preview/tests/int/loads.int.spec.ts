@@ -18,7 +18,7 @@ describeForDb('documentPreview loads', { dbs: ['mongo'] }, (db) => {
 			collections: [media],
 			db,
 			plugin: documentPreview({
-				collections: { media: { display: 'both', listView: true } },
+				collections: { media: { listView: true } },
 				viewers: { 'video/*': '/viewers#Player' },
 			}),
 		})
@@ -33,14 +33,22 @@ describeForDb('documentPreview loads', { dbs: ['mongo'] }, (db) => {
 			fileIcons: [],
 			collections: {
 				media: {
-					display: 'both',
 					fileIcons: true,
 					filesizeCell: true,
 					listView: true,
+					nativePreviews: true,
 					viewers: {},
 				},
 			},
 			viewers: { 'video/*': '/viewers#Player' },
+		})
+	})
+
+	it('keeps the file panel preview on the sanitized upload config', () => {
+		const upload = booted.payload.collections.media?.config.upload
+		expect(upload?.admin?.components?.filePreview).toMatchObject({
+			'text/csv': '@10x-media/document-preview/client#DocumentPreviewFilePreview',
+			'video/*': '@10x-media/document-preview/client#DocumentPreviewFilePreview',
 		})
 	})
 
@@ -54,11 +62,12 @@ describeForDb('documentPreview loads', { dbs: ['mongo'] }, (db) => {
 				name: 'notes.csv',
 				size: 8,
 			},
+			overrideAccess: true,
 		})
 		expect(doc.filename).toMatch(/^notes(-\d+)?\.csv$/)
 		expect(doc.mimeType).toBe('text/csv')
 		expect(typeof doc.url).toBe('string')
-		expect(doc).not.toHaveProperty('documentPreview')
+		expect(doc).not.toHaveProperty('documentPreviewColumn')
 		expect(doc.filesize).toBe(8)
 	})
 
@@ -67,6 +76,7 @@ describeForDb('documentPreview loads', { dbs: ['mongo'] }, (db) => {
 			collection: 'media',
 			data: {},
 			file: { data: Buffer.from('%PDF-1.4'), mimetype: 'application/pdf', name: 'a.pdf', size: 8 },
+			overrideAccess: true,
 		})
 		expect(pdf.thumbnailURL).toMatch(/^\/api\/document-preview\/file-icon\/pdf\?v=\w+$/)
 		const svg = await booted.payload.create({
@@ -78,6 +88,7 @@ describeForDb('documentPreview loads', { dbs: ['mongo'] }, (db) => {
 				name: 'a.svg',
 				size: 60,
 			},
+			overrideAccess: true,
 		})
 		expect(svg.thumbnailURL ?? null).toBeNull()
 	})

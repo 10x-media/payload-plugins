@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { mkdir, readFile, writeFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -19,7 +20,12 @@ const REMOTE_FIXTURES = [
 	'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/models/stl/binary/colored.stl',
 ]
 
-const cacheDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.seed-cache')
+/** Beside the source on Next; from the working directory in a TanStack Start build (see `seed.ts`). */
+const cacheDir = existsSync(
+	path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../helpers')
+)
+	? path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../.seed-cache')
+	: path.resolve(process.cwd(), '../dev/.seed-cache')
 
 const load = async (url: string): Promise<{ data: Buffer; name: string }> => {
 	const name = path.basename(new URL(url).pathname)
