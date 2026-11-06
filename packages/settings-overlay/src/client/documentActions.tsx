@@ -5,6 +5,7 @@ import {
 	Button,
 	CheckboxInput,
 	ConfirmationModal,
+	MoreIcon,
 	Popup,
 	PopupList,
 	Translation,
@@ -347,16 +348,21 @@ export const SettingsOverlayDocumentActions: React.FC = () => {
 			) : null}
 			{showCreate || canDuplicate || canDelete ? (
 				<Popup
-					button={
-						<div className="doc-controls__dots">
-							<div />
-							<div />
-							<div />
-						</div>
-					}
+					caret={false}
 					className="doc-controls__popup"
 					horizontalAlign="right"
-					size="large"
+					popupType="menu"
+					renderButton={({ active, ...buttonProps }) => (
+						<Button
+							{...buttonProps}
+							aria-label={`${t('general:moreOptions')}: ${t('general:document')}`}
+							buttonStyle="ghost"
+							className="doc-controls__popup-button"
+							icon={<MoreIcon />}
+							selected={active}
+							size="medium"
+						/>
+					)}
 					verticalAlign="bottom"
 				>
 					<PopupList.ButtonGroup>

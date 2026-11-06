@@ -1,5 +1,7 @@
 import { LLMInstructionsMenuItem as LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { WatchTenantCollection as WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
+import { SettingsFormModifiedReporter as SettingsFormModifiedReporter_1fb8679bfe5063cdde30d578d88dd0b3 } from '@10x-media/settings-overlay/client'
+import { SettingsOverlayDocumentActions as SettingsOverlayDocumentActions_1fb8679bfe5063cdde30d578d88dd0b3 } from '@10x-media/settings-overlay/client'
 import { TenantField as TenantField_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
 import { LLMInstructionsDescription as LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { LLMInstructionsCell as LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
@@ -10,6 +12,7 @@ import { OverlayLaunchers as OverlayLaunchers_43572418a698b10c2ea3682eebeac3e1 }
 import { TenantSelectionProvider as TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { SettingsOverlayServer as SettingsOverlayServer_28feb8b8fbe291f0ccca412236a9ab06 } from '@10x-media/settings-overlay/rsc'
 import { DevReportView as DevReportView_c24a94462276709871a96ff550bd4452 } from '../../../../dev/components/DevReportView'
+import { SettingsOverlayItemDispatcher as SettingsOverlayItemDispatcher_28feb8b8fbe291f0ccca412236a9ab06 } from '@10x-media/settings-overlay/rsc'
 import { WelcomeWidget as WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { CollectionCards as CollectionCards_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { CollectionQueryWidget as CollectionQueryWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
@@ -17,13 +20,23 @@ import { QueryPresetsWhereField as QueryPresetsWhereField_3817bf644402e67bfe6577
 import { CollectionQuerySortField as CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { ActivityWidget as ActivityWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { CollectionFilter as CollectionFilter_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
-import { SettingsFormModifiedReporter as SettingsFormModifiedReporter_1fb8679bfe5063cdde30d578d88dd0b3 } from '@10x-media/settings-overlay/client'
 import { SettingsOverlayButton as SettingsOverlayButton_1fb8679bfe5063cdde30d578d88dd0b3 } from '@10x-media/settings-overlay/client'
+import { GearIcon as GearIcon_b91e6e49555f836da067d089386c0422 } from '../../../../dev/components/icons'
+import { SettingsOverlayAppearance as SettingsOverlayAppearance_73b931a31e79d1efadf0428488bdb3fb } from '@10x-media/settings-overlay/items'
+import { DevNotes as DevNotes_98cf264105f371bef869b1e619ddef37 } from '../../../../dev/components/DevNotes'
+import { DevStats as DevStats_19123d78607b4e120df51ce8e702d38d } from '../../../../dev/components/DevStats'
+import { StudioEmpty as StudioEmpty_60ba93de2e4d6ae70512d2f0cf9d30f7 } from '../../../../dev/components/studio/StudioEmpty'
+import { StudioHeader as StudioHeader_18b6db0d000861f3f1fac738de036ba2 } from '../../../../dev/components/studio/StudioHeader'
+import { StudioRailGroup as StudioRailGroup_22bd92f7511e05e687561f7b0dc75515 } from '../../../../dev/components/studio/StudioRailGroup'
+import { StudioRailItem as StudioRailItem_47cef5bf0952b83e5360805a1b28d30d } from '../../../../dev/components/studio/StudioRailItem'
+import { StudioSearch as StudioSearch_dd19464f51ceb101bf2f38139201a953 } from '../../../../dev/components/studio/StudioSearch'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
   "@payloadcms/ui#LLMInstructionsMenuItem": LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/plugin-multi-tenant/client#WatchTenantCollection": WatchTenantCollection_1d0591e3cf4f332c83a86da13a0de59a,
+  "@10x-media/settings-overlay/client#SettingsFormModifiedReporter": SettingsFormModifiedReporter_1fb8679bfe5063cdde30d578d88dd0b3,
+  "@10x-media/settings-overlay/client#SettingsOverlayDocumentActions": SettingsOverlayDocumentActions_1fb8679bfe5063cdde30d578d88dd0b3,
   "@payloadcms/plugin-multi-tenant/client#TenantField": TenantField_1d0591e3cf4f332c83a86da13a0de59a,
   "@payloadcms/ui#LLMInstructionsDescription": LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui/rsc#LLMInstructionsCell": LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a,
@@ -34,6 +47,7 @@ export const importMap = {
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelectionProvider": TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62,
   "@10x-media/settings-overlay/rsc#SettingsOverlayServer": SettingsOverlayServer_28feb8b8fbe291f0ccca412236a9ab06,
   "./components/DevReportView#DevReportView": DevReportView_c24a94462276709871a96ff550bd4452,
+  "@10x-media/settings-overlay/rsc#SettingsOverlayItemDispatcher": SettingsOverlayItemDispatcher_28feb8b8fbe291f0ccca412236a9ab06,
   "@payloadcms/ui/rsc#WelcomeWidget": WelcomeWidget_ab83ff7e88da8d3530831f296ec4756a,
   "@payloadcms/ui/rsc#CollectionCards": CollectionCards_ab83ff7e88da8d3530831f296ec4756a,
   "@payloadcms/ui/rsc#CollectionQueryWidget": CollectionQueryWidget_ab83ff7e88da8d3530831f296ec4756a,
@@ -41,6 +55,14 @@ export const importMap = {
   "@payloadcms/ui#CollectionQuerySortField": CollectionQuerySortField_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui/rsc#ActivityWidget": ActivityWidget_ab83ff7e88da8d3530831f296ec4756a,
   "@payloadcms/ui#CollectionFilter": CollectionFilter_3817bf644402e67bfe6577f60ef982de,
-  "@10x-media/settings-overlay/client#SettingsFormModifiedReporter": SettingsFormModifiedReporter_1fb8679bfe5063cdde30d578d88dd0b3,
-  "@10x-media/settings-overlay/client#SettingsOverlayButton": SettingsOverlayButton_1fb8679bfe5063cdde30d578d88dd0b3
+  "@10x-media/settings-overlay/client#SettingsOverlayButton": SettingsOverlayButton_1fb8679bfe5063cdde30d578d88dd0b3,
+  "./components/icons#GearIcon": GearIcon_b91e6e49555f836da067d089386c0422,
+  "@10x-media/settings-overlay/items#SettingsOverlayAppearance": SettingsOverlayAppearance_73b931a31e79d1efadf0428488bdb3fb,
+  "./components/DevNotes#DevNotes": DevNotes_98cf264105f371bef869b1e619ddef37,
+  "./components/DevStats#DevStats": DevStats_19123d78607b4e120df51ce8e702d38d,
+  "./components/studio/StudioEmpty#StudioEmpty": StudioEmpty_60ba93de2e4d6ae70512d2f0cf9d30f7,
+  "./components/studio/StudioHeader#StudioHeader": StudioHeader_18b6db0d000861f3f1fac738de036ba2,
+  "./components/studio/StudioRailGroup#StudioRailGroup": StudioRailGroup_22bd92f7511e05e687561f7b0dc75515,
+  "./components/studio/StudioRailItem#StudioRailItem": StudioRailItem_47cef5bf0952b83e5360805a1b28d30d,
+  "./components/studio/StudioSearch#StudioSearch": StudioSearch_dd19464f51ceb101bf2f38139201a953
 }

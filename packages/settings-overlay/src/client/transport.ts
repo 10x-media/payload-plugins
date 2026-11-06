@@ -28,8 +28,9 @@ const explainMissingFunction = (error: unknown, name: string): never => {
 	if (message.includes('Unknown Server Function')) {
 		throw new Error(
 			`[settings-overlay] the "${name}" server function is not registered. Either spread ` +
-				'`settingsOverlayServerFunctions` into `handleServerFunctions` in ' +
-				"app/(payload)/layout.tsx, or drop `lazyTransport: 'server-function'` from the " +
+				'`settingsOverlayServerFunctions` into `handleServerFunctions` (Next.js: ' +
+				'app/(payload)/layout.tsx; TanStack Start: src/app/_payload/server.functions.ts), or ' +
+				"drop `lazyTransport: 'server-function'` from the " +
 				'plugin options to go back to the widget transport, which needs no wiring.'
 		)
 	}

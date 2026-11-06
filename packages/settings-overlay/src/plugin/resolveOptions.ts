@@ -8,7 +8,6 @@ import type {
 export type ResolvedOverlay = {
 	addressable: boolean
 	hideEntities: boolean
-	history: NonNullable<SettingsOverlayConfig['history']>
 	layout: NonNullable<SettingsOverlayConfig['layout']>
 	mergeListHeader: boolean
 	searchable: boolean
@@ -34,7 +33,6 @@ export const resolveOptions = (options: SettingsOverlayPluginOptions): ResolvedO
 			addressable: overlay.addressable ?? defaults.addressable ?? true,
 			components: { ...defaults.components, ...overlay.components },
 			hideEntities: overlay.hideEntities ?? defaults.hideEntities ?? false,
-			history: overlay.history ?? defaults.history ?? 'push',
 			layout: overlay.layout ?? defaults.layout ?? 'compact',
 			mergeListHeader: overlay.mergeListHeader ?? defaults.mergeListHeader ?? true,
 			searchable: overlay.searchable ?? defaults.searchable ?? false,

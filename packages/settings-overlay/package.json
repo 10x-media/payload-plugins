@@ -25,7 +25,9 @@
 		"node": ">=24.22.1"
 	},
 	"type": "module",
-	"sideEffects": false,
+	"sideEffects": [
+		"*.css"
+	],
 	"exports": {
 		".": {
 			"development": "./src/index.ts",
@@ -56,11 +58,6 @@
 			"development": "./src/exports/items.ts",
 			"types": "./src/exports/items.ts",
 			"default": "./dist/exports/items.js"
-		},
-		"./embed": {
-			"development": "./src/exports/embed.ts",
-			"types": "./src/exports/embed.ts",
-			"default": "./dist/exports/embed.js"
 		}
 	},
 	"files": [
@@ -95,11 +92,9 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/next": "^4.0.0-beta.6",
 		"@payloadcms/plugin-multi-tenant": "^4.0.0-beta.6",
 		"@payloadcms/translations": "^4.0.0-beta.6",
 		"@payloadcms/ui": "^4.0.0-beta.6",
-		"next": "^16.4.0",
 		"payload": "^4.0.0-beta.6",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
@@ -111,7 +106,6 @@
 		"@10x-media/vitest-config": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
-		"@payloadcms/next": "catalog:",
 		"@payloadcms/plugin-multi-tenant": "catalog:",
 		"@payloadcms/translations": "catalog:",
 		"@payloadcms/ui": "catalog:",
@@ -119,7 +113,6 @@
 		"@types/node": "catalog:",
 		"@types/react": "catalog:",
 		"@types/react-dom": "catalog:",
-		"next": "catalog:",
 		"payload": "catalog:",
 		"playwright": "catalog:",
 		"react": "catalog:",
@@ -160,22 +153,11 @@
 				"types": "./dist/exports/items.d.ts",
 				"import": "./dist/exports/items.js",
 				"default": "./dist/exports/items.js"
-			},
-			"./embed": {
-				"types": "./dist/exports/embed.d.ts",
-				"import": "./dist/exports/embed.js",
-				"default": "./dist/exports/embed.js"
 			}
 		}
 	},
 	"peerDependenciesMeta": {
-		"@payloadcms/next": {
-			"optional": true
-		},
 		"@payloadcms/plugin-multi-tenant": {
-			"optional": true
-		},
-		"next": {
 			"optional": true
 		}
 	},

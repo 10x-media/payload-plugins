@@ -1,6 +1,6 @@
 'use client'
 
-import { AnimateHeight, ChevronIcon, SearchIcon, usePreferences } from '@payloadcms/ui'
+import { AnimateHeight, ChevronIcon, SearchInput, usePreferences } from '@payloadcms/ui'
 import React, { use, useState } from 'react'
 
 import { PREFERENCE_KEY } from '../plugin/constants'
@@ -136,6 +136,7 @@ const DefaultGroup: React.FC<{ group: ManifestGroup; overlayId: string }> = ({
 				<ChevronIcon
 					className={`${base}__rail-group-indicator`}
 					direction={open ? 'up' : undefined}
+					size={16}
 				/>
 			</button>
 			<AnimateHeight duration={animate ? 200 : 0} height={open ? 'auto' : 0}>
@@ -146,10 +147,8 @@ const DefaultGroup: React.FC<{ group: ManifestGroup; overlayId: string }> = ({
 }
 
 /**
- * The rail's filter box.
- *
- * `type="search"` so the browser offers its own clear affordance and Escape empties the field,
- * both for free and both already familiar.
+ * The rail's filter box: Payload's own `SearchInput`, so it has the admin's field chrome and its
+ * clear button.
  */
 const DefaultSearch: React.FC = () => {
 	const { overlay, search, setSearch } = useSettingsPanel()
@@ -158,18 +157,15 @@ const DefaultSearch: React.FC = () => {
 
 	return (
 		<search className={`${base}__search`}>
-			<span className={`${base}__search-icon`}>
-				<SearchIcon />
-			</span>
-			<input
+			<SearchInput
 				aria-label={label}
 				className={`${base}__search-input`}
 				id={`${base}-search-${overlay.id}`}
-				onChange={(event) => {
-					setSearch(event.target.value)
+				onChange={setSearch}
+				onClear={() => {
+					setSearch('')
 				}}
 				placeholder={label}
-				type="search"
 				value={search}
 			/>
 		</search>

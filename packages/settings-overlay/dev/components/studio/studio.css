@@ -1,58 +1,64 @@
 /*
  * A consumer's own look for one panel. Nothing here is the plugin's: these class names exist
  * only in this app, and the plugin never sees them.
+ *
+ * Sized in its own unit rather than Payload's spacers, as a consumer theme would be.
  */
+:where(.settings-overlay--studio) {
+	--studio-unit: 20px;
+}
+
 .studio-group + .studio-group {
-	margin-top: calc(var(--base) * 0.9);
+	margin-top: calc(var(--studio-unit) * 0.9);
 }
 
 .studio-group__label {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) * 0.35);
-	margin: 0 0 calc(var(--base) * 0.3);
-	padding-inline-start: calc(var(--base) * 0.15);
-	color: var(--theme-elevation-450);
-	font-size: calc(var(--base) * 0.55);
+	gap: calc(var(--studio-unit) * 0.35);
+	margin: 0 0 calc(var(--studio-unit) * 0.3);
+	padding-inline-start: calc(var(--studio-unit) * 0.15);
+	color: var(--color-text-tertiary);
+	font-size: calc(var(--studio-unit) * 0.55);
 	font-weight: 700;
 	letter-spacing: 0.08em;
 	text-transform: uppercase;
 }
 
 .studio-group__rule {
-	width: calc(var(--base) * 0.5);
+	width: calc(var(--studio-unit) * 0.5);
 	height: 2px;
 	border-radius: 2px;
-	background: var(--theme-elevation-300);
+	background: var(--color-text-tertiary);
 }
 
 .studio-row {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) * 0.45);
+	gap: calc(var(--studio-unit) * 0.45);
 	width: 100%;
-	padding: calc(var(--base) * 0.35) calc(var(--base) * 0.4);
+	padding: calc(var(--studio-unit) * 0.35) calc(var(--studio-unit) * 0.4);
 	border: 1px solid transparent;
-	border-radius: var(--style-radius-m);
+	border-radius: var(--radius-medium);
 	background: transparent;
-	color: var(--theme-elevation-750);
+	color: var(--color-text);
 	cursor: pointer;
 	font: inherit;
-	font-size: calc(var(--base) * 0.7);
+	font-size: calc(var(--studio-unit) * 0.7);
 	text-align: start;
 }
 
 .studio-row:hover {
-	border-color: var(--theme-elevation-150);
-	background: var(--theme-elevation-50);
-	color: var(--theme-elevation-1000);
+	border-color: var(--color-border);
+	background: var(--color-bg-secondary);
+	color: var(--color-text);
 }
 
 .studio-row--active,
 .studio-row--active:hover {
-	border-color: var(--theme-elevation-200);
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-1000);
+	border-color: var(--color-border);
+	background: var(--color-bg-tertiary);
+	color: var(--color-text);
 }
 
 .studio-row__mark {
@@ -60,16 +66,16 @@
 	flex-shrink: 0;
 	align-items: center;
 	justify-content: center;
-	width: calc(var(--base) * 1.3);
-	height: calc(var(--base) * 1.3);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-600);
+	width: calc(var(--studio-unit) * 1.3);
+	height: calc(var(--studio-unit) * 1.3);
+	border-radius: var(--radius-small);
+	background: var(--color-bg-tertiary);
+	color: var(--color-icon-secondary);
 }
 
 .studio-row--active .studio-row__mark {
-	background: var(--theme-elevation-800);
-	color: var(--theme-elevation-0);
+	background: var(--color-bg-inverse);
+	color: var(--color-icon-oninverse);
 }
 
 .studio-row__label {
@@ -82,64 +88,65 @@
 
 .studio-row__badge {
 	flex-shrink: 0;
-	padding: 0 calc(var(--base) * 0.3);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-elevation-150);
-	color: var(--theme-elevation-700);
-	font-size: calc(var(--base) * 0.55);
+	padding: 0 calc(var(--studio-unit) * 0.3);
+	border-radius: var(--radius-small);
+	background: var(--color-bg-tertiary);
+	color: var(--color-text-secondary);
+	font-size: calc(var(--studio-unit) * 0.55);
 }
 
 .studio-search {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) * 0.3);
-	padding: calc(var(--base) * 0.5) calc(var(--base) * 0.6) calc(var(--base) * 0.2);
+	gap: calc(var(--studio-unit) * 0.3);
+	padding: calc(var(--studio-unit) * 0.5) calc(var(--studio-unit) * 0.6)
+		calc(var(--studio-unit) * 0.2);
 }
 
 .studio-search__input {
 	width: 100%;
-	padding: calc(var(--base) * 0.3) calc(var(--base) * 0.4);
+	padding: calc(var(--studio-unit) * 0.3) calc(var(--studio-unit) * 0.4);
 	border: 0;
-	border-bottom: 1px solid var(--theme-elevation-150);
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
 	border-radius: 0;
 	background: transparent;
 	color: inherit;
 	font: inherit;
-	font-size: calc(var(--base) * 0.7);
+	font-size: calc(var(--studio-unit) * 0.7);
 }
 
 .studio-search__input:focus-visible {
-	border-bottom-color: var(--theme-elevation-800);
+	border-bottom-color: var(--color-border-strong);
 	outline: none;
 }
 
 .studio-search__count {
 	flex-shrink: 0;
-	color: var(--theme-elevation-450);
-	font-size: calc(var(--base) * 0.6);
+	color: var(--color-text-tertiary);
+	font-size: calc(var(--studio-unit) * 0.6);
 }
 
 .studio-header {
 	display: flex;
 	flex: none;
 	align-items: center;
-	gap: calc(var(--base) * 0.3);
+	gap: calc(var(--studio-unit) * 0.3);
 	box-sizing: border-box;
-	height: calc(var(--base) * 2.4);
-	padding: 0 calc(var(--base) * 0.5) 0 calc(var(--base) * 0.7);
-	border-bottom: 1px solid var(--theme-elevation-100);
+	height: calc(var(--studio-unit) * 2.4);
+	padding: 0 calc(var(--studio-unit) * 0.5) 0 calc(var(--studio-unit) * 0.7);
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
 }
 
 .studio-header__crumb,
 .studio-header__sep {
-	color: var(--theme-elevation-450);
-	font-size: calc(var(--base) * 0.65);
+	color: var(--color-text-tertiary);
+	font-size: calc(var(--studio-unit) * 0.65);
 }
 
 .studio-header__mark {
 	display: inline-flex;
 	align-items: center;
-	color: var(--theme-elevation-600);
+	color: var(--color-text-secondary);
 }
 
 .studio-header__title {
@@ -147,7 +154,7 @@
 	min-width: 0;
 	margin: 0;
 	overflow: hidden;
-	font-size: calc(var(--base) * 0.75);
+	font-size: calc(var(--studio-unit) * 0.75);
 	font-weight: 600;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -156,28 +163,28 @@
 .studio-header__back,
 .studio-header__close {
 	flex-shrink: 0;
-	padding: calc(var(--base) * 0.15) calc(var(--base) * 0.35);
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
+	padding: calc(var(--studio-unit) * 0.15) calc(var(--studio-unit) * 0.35);
+	border: var(--stroke-width-small) solid var(--color-border);
+	border-radius: var(--radius-small);
 	background: transparent;
-	color: var(--theme-elevation-600);
+	color: var(--color-text-secondary);
 	cursor: pointer;
 	font: inherit;
-	font-size: calc(var(--base) * 0.55);
+	font-size: calc(var(--studio-unit) * 0.55);
 	text-transform: uppercase;
 }
 
 .studio-header__back:hover,
 .studio-header__close:hover {
-	border-color: var(--theme-elevation-300);
-	color: var(--theme-elevation-1000);
+	border-color: var(--color-border-strong);
+	color: var(--color-text);
 }
 
 .studio-empty {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.2);
-	padding: var(--base);
+	gap: calc(var(--studio-unit) * 0.2);
+	padding: var(--studio-unit);
 }
 
 .studio-empty__title {
@@ -187,5 +194,5 @@
 
 .studio-empty__body {
 	margin: 0;
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }

@@ -2,8 +2,8 @@ import { expect, type Page, test } from '@playwright/test'
 
 /**
  * The cases a panel gets wrong quietly: what a stale link does, what Escape does over unsaved
- * edits, whether the back button walks the panel and nothing else, whether a hosted list still
- * filters into the URL. None of them shows up in a unit test, and all of them are what somebody
+ * edits, whether the panel stays out of the back button, whether closing a linked panel lets go
+ * of the link. None of them shows up in a unit test, and all of them are what somebody
  * hits on their second day.
  */
 
@@ -50,7 +50,7 @@ test.describe('opening and addressing', () => {
 		await page.goto('/admin')
 		await page.getByRole('button', { name: 'Open system settings' }).click()
 		await expect(panel(page)).toBeVisible()
-		await expect(page).toHaveURL(/settings=system/)
+		await expect(page).not.toHaveURL(/settings=/)
 	})
 
 	test('a deep link opens the named row', async ({ page }) => {
@@ -65,82 +65,39 @@ test.describe('opening and addressing', () => {
 		await expect(page.locator('.settings-overlay__pane-body')).toBeVisible()
 	})
 
-	test('back closes the panel in one step', async ({ page }) => {
-		await page.goto('/admin')
-		await page.getByRole('button', { name: 'Open system settings' }).click()
-		await expect(panel(page)).toBeVisible()
-		await page.goBack()
-		await expect(panel(page)).toBeHidden()
-	})
-
-	test('back after closing reopens the panel, with no dead press on the way', async ({ page }) => {
+	test('the panel adds nothing to history: back leaves the page in one step', async ({ page }) => {
 		await page.goto('/admin')
 		await page.goto('/admin/collections/tags')
 		await page.getByRole('button', { name: 'Open system settings' }).click()
 		await expect(panel(page)).toBeVisible()
-		await page.locator('.settings-overlay__pane-header button[aria-label="Close"]').click()
-		await expect(page).not.toHaveURL(/settings=/)
-		await page.goBack()
-		await expect(panel(page)).toBeVisible()
-		await page.goBack()
-		await expect(panel(page)).toBeHidden()
-		await expect(page).toHaveURL(tagsList)
-		await page.goBack()
-		await expect(page).toHaveURL(/\/admin$/)
-	})
-
-	test('back walks every step taken inside the panel', async ({ page }) => {
-		await page.goto('/admin')
-		await page.getByRole('button', { name: 'Open system settings' }).click()
-		await expect(page).toHaveURL(/settings=system%2Fappearance/)
 		await row(page, 'Tags').click()
 		await openFirstRow(page)
-		await expect(page).toHaveURL(/settings=system%2Ftags%2F|settings=system\/tags\//)
-		await page.goBack()
-		await expect(page).toHaveURL(/settings=system(%2F|\/)tags($|&)/)
-		await page.goBack()
-		await expect(page).toHaveURL(/settings=system%2Fappearance/)
-		await page.goBack()
-		await expect(panel(page)).toBeHidden()
-		await expect(page).toHaveURL(/\/admin$/)
-	})
-
-	test("history: 'replace' leaves the back button to the page", async ({ page }) => {
-		await page.goto('/admin')
-		await page.goto('/admin/collections/tags')
-		await page.getByRole('button', { name: 'Open workspace (wide, searchable)' }).click()
-		await row(page, 'Notes').click()
-		await expect(page).toHaveURL(/settings=workspace%2Fnotes/)
-		await page.locator('.settings-overlay__pane-header button[aria-label="Close"]').click()
 		await expect(page).toHaveURL(tagsList)
+		await expect(page).not.toHaveURL(/settings=/)
 		await page.goBack()
 		await expect(page).toHaveURL(/\/admin$/)
+		await expect(panel(page)).toBeHidden()
 	})
 
-	test('returning to an address that names the panel opens it and keeps it open', async ({
-		page,
-	}) => {
-		await page.goto('/admin/collections/tags')
-		await page.getByRole('button', { name: 'Open workspace (wide, searchable)' }).click()
-		await expect(page).toHaveURL(/settings=workspace/)
-		await page.goBack()
-		await page.goForward()
+	test('closing a panel a link opened takes the link out of the address', async ({ page }) => {
+		await page.goto('/admin?settings=system/branding')
 		await expect(panel(page)).toBeVisible()
-		// Payload closes all modals on a route change; that is not Escape, so the address stays.
+		await page.locator('.settings-overlay__pane-header button[aria-label="Close"]').click()
+		await expect(panel(page)).toBeHidden()
+		await expect(page).not.toHaveURL(/settings=/)
+		await page.reload()
+		await expect(page.locator('.nav')).toBeVisible()
+		await expect(panel(page)).toBeHidden()
+	})
+
+	test('a link on the page opens the panel it names, and it stays open', async ({ page }) => {
+		await page.goto('/admin')
+		await page.locator('a[href="?settings=system/branding"]').click()
+		await expect(panel(page)).toBeVisible()
+		await expect(page.locator('.settings-overlay__pane-title')).toHaveText(/branding/i)
+		// Payload closes all modals on a route change; the panel must not be one of them.
 		await page.waitForTimeout(500)
 		await expect(panel(page)).toBeVisible()
-		await expect(page).toHaveURL(/settings=workspace/)
-	})
-
-	test('a filtered list survives a reload', async ({ page }) => {
-		await page.goto('/admin?settings=system/tags')
-		await expect(panel(page)).toBeVisible()
-		const search = panel(page).locator('input[type="search"], .search-filter input').first()
-		await search.fill('Engineering')
-		await expect(page).toHaveURL(/settingsQuery=/)
-		await page.reload()
-		await expect(panel(page)).toBeVisible()
-		await expect(page).toHaveURL(/settingsQuery=/)
 	})
 })
 
@@ -154,7 +111,7 @@ test.describe('the rail', () => {
 
 	test('search narrows the rail without closing the open pane', async ({ page }) => {
 		await page.goto('/admin?settings=workspace/notes')
-		const search = rail(page).locator('.settings-overlay__search-input')
+		const search = rail(page).locator('.settings-overlay__search input')
 		await search.fill('scratch')
 		await expect(row(page, 'Notes')).toBeVisible()
 		await expect(page.locator('.settings-overlay__pane-body')).toContainText('Eager component')
@@ -162,14 +119,14 @@ test.describe('the rail', () => {
 
 	test('search matches a keyword the label does not contain', async ({ page }) => {
 		await page.goto('/admin?settings=workspace')
-		await rail(page).locator('.settings-overlay__search-input').fill('keyboard')
+		await rail(page).locator('.settings-overlay__search input').fill('keyboard')
 		await expect(row(page, 'Shortcuts')).toBeVisible()
 		await expect(row(page, 'Dashboard')).toHaveCount(0)
 	})
 
 	test('search keeps only the rows that match, across groups', async ({ page }) => {
 		await page.goto('/admin?settings=workspace')
-		await rail(page).locator('.settings-overlay__search-input').fill('overview')
+		await rail(page).locator('.settings-overlay__search input').fill('overview')
 		await expect(row(page, 'Dashboard')).toBeVisible()
 		await expect(row(page, 'Documentation')).toBeVisible()
 		await expect(row(page, 'Exports')).toHaveCount(0)
@@ -184,7 +141,7 @@ test.describe('the rail', () => {
 		await rail(page).locator('.settings-overlay__rail-group-toggle', { hasText: 'Help' }).click()
 		await expect(row(page, 'Shortcuts')).toBeHidden()
 
-		await rail(page).locator('.settings-overlay__search-input').fill('keyboard')
+		await rail(page).locator('.settings-overlay__search input').fill('keyboard')
 		await expect(row(page, 'Shortcuts')).toBeVisible()
 	})
 
@@ -200,7 +157,7 @@ test.describe('the rail', () => {
 
 	test('search finds nothing and says so', async ({ page }) => {
 		await page.goto('/admin?settings=workspace')
-		await rail(page).locator('.settings-overlay__search-input').fill('zzz')
+		await rail(page).locator('.settings-overlay__search input').fill('zzz')
 		await expect(rail(page).locator('.settings-overlay__rail-empty')).toBeVisible()
 	})
 
@@ -234,10 +191,12 @@ test.describe('panes', () => {
 
 	test('a collection opens its list, then a document, then goes back', async ({ page }) => {
 		await page.goto('/admin?settings=system/tags')
+		const back = page.locator('.settings-overlay__pane-header button[aria-label="Back"]')
 		await openFirstRow(page)
-		await expect(page).toHaveURL(/settings=system%2Ftags%2F|settings=system\/tags\//)
-		await page.locator('.settings-overlay__pane-header button[aria-label="Back"]').click()
-		await expect(page).toHaveURL(/settings=system(%2F|\/)tags($|&)/)
+		await expect(back).toBeVisible()
+		await back.click()
+		await expect(back).toBeHidden()
+		await expect(page.locator('.settings-overlay__pane-body tbody tr').first()).toBeVisible()
 	})
 
 	test('a tenant global opens its document straight away, with no back chevron', async ({
@@ -251,13 +210,17 @@ test.describe('panes', () => {
 	})
 })
 
+/** The plugin's own prompt; the dashboard has a "Discard changes?" dialog of its own. */
+const discardPrompt = (page: Page) =>
+	page.locator('.payload__modal-item--slug-settings-overlay__discard').getByText('Discard changes?')
+
 test.describe('unsaved edits', () => {
 	test('Escape over a modified document asks before discarding', async ({ page }) => {
 		await page.goto('/admin?settings=system/branding')
 		const field = page.locator('.settings-overlay__pane-body input[type="text"]').first()
 		await field.fill('changed in the panel')
 		await page.keyboard.press('Escape')
-		await expect(page.getByText('Discard changes?')).toBeVisible()
+		await expect(discardPrompt(page)).toBeVisible()
 		await expect(panel(page)).toBeVisible()
 	})
 
@@ -266,7 +229,7 @@ test.describe('unsaved edits', () => {
 		const field = page.locator('.settings-overlay__pane-body input[type="text"]').first()
 		await field.fill('changed in the panel')
 		await row(page, 'Tags').click()
-		await expect(page.getByText('Discard changes?')).toBeVisible()
+		await expect(discardPrompt(page)).toBeVisible()
 	})
 })
 
@@ -288,10 +251,10 @@ test.describe('the whole admin', () => {
 		await page.goto('/admin')
 		await page.getByRole('button', { name: 'Open system settings' }).click()
 		await expect(page.locator('.settings-overlay--system')).toBeVisible()
-		// The open panel's backdrop covers the nav, so no pointer reaches the other launcher.
-		// Dispatching its click still makes the same `useSettingsOverlay()` call a component
-		// inside the panel would.
-		await page.getByRole('button', { name: /Open workspace/ }).dispatchEvent('click')
+		// The open panel is a modal dialog, so the nav behind it is inert: no pointer reaches the
+		// other launcher, and it is out of the accessibility tree. Dispatching its click still makes
+		// the same `useSettingsOverlay()` call a component inside the panel would.
+		await page.locator('button', { hasText: 'Open workspace' }).dispatchEvent('click')
 		await expect(page.locator('.settings-overlay--workspace')).toBeVisible()
 		await expect(page.locator('.settings-overlay--system')).toBeHidden()
 	})

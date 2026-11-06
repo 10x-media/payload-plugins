@@ -93,23 +93,6 @@ describe('settingsOverlay factory', () => {
 		expect(b?.mergeListHeader).toBe(true)
 	})
 
-	it('pushes history by default, and takes replace from defaults or the overlay', () => {
-		expect(
-			registryOf(run({ overlays: [{ id: 'a', items: [], label: 'A' }] })).overlays[0]?.history
-		).toBe('push')
-
-		const replaced = run({
-			defaults: { history: 'replace' },
-			overlays: [
-				{ id: 'a', items: [], label: 'A' },
-				{ history: 'push', id: 'b', items: [], label: 'B' },
-			],
-		})
-		const [a, b] = registryOf(replaced).overlays
-		expect(a?.history).toBe('replace')
-		expect(b?.history).toBe('push')
-	})
-
 	it('hides listed entities when asked, and always adds the plugin document controls', () => {
 		const out = run({
 			overlays: [
@@ -136,7 +119,7 @@ describe('settingsOverlay factory', () => {
 		expect(sites?.admin?.hidden).toBeUndefined()
 		expect(branding?.admin?.hidden).toBe(true)
 		// A global has no delete, duplicate or restore, so it takes the reporter alone.
-		expect(branding?.admin?.components?.elements?.beforeDocumentControls).toEqual([REPORTER_PATH])
+		expect(branding?.admin?.components?.edit?.beforeDocumentControls).toEqual([REPORTER_PATH])
 	})
 
 	it('leaves entities visible by default, because the panel is not a replacement view', () => {

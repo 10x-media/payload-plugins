@@ -1,6 +1,7 @@
 'use client'
 
 import { useSettingsOverlayEmbed } from '@10x-media/settings-overlay/client'
+import { Button } from '@payloadcms/ui'
 import type React from 'react'
 
 /**
@@ -15,13 +16,13 @@ export const DevNotes: React.FC = () => {
 	return (
 		<div style={{ display: 'grid', gap: 16, padding: 20 }}>
 			<h4 style={{ margin: 0 }}>Eager component</h4>
-			<p style={{ margin: 0, color: 'var(--theme-elevation-600)' }}>
+			<p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
 				Rendered on the server with the rest of the page, so opening this row costs no request.
 			</p>
 			<pre
 				style={{
-					background: 'var(--theme-elevation-50)',
-					borderRadius: 4,
+					background: 'var(--color-bg-secondary)',
+					borderRadius: 'var(--radius-medium)',
 					margin: 0,
 					overflowX: 'auto',
 					padding: 12,
@@ -41,17 +42,18 @@ export const DevNotes: React.FC = () => {
 					2
 				)}
 			</pre>
-			<div>
-				<button
+			<div style={{ display: 'flex', gap: 'var(--spacer-2)' }}>
+				<Button
+					buttonStyle="secondary"
+					margin={false}
 					onClick={() => embed?.setTarget({ item: 'tags' })}
-					style={{ marginRight: 8 }}
-					type="button"
+					size="medium"
 				>
 					Go to Tags
-				</button>
-				<button onClick={() => embed?.close()} type="button">
+				</Button>
+				<Button buttonStyle="secondary" margin={false} onClick={() => embed?.close()} size="medium">
 					Close the panel
-				</button>
+				</Button>
 			</div>
 		</div>
 	)

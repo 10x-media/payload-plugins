@@ -10,9 +10,10 @@ import { type LazyItemRequest, renderLazyItem } from './renderLazyItem'
  * `render-widget` server function.
  *
  * What is being worked around: a panel has to render a server component after a click, without a
- * navigation, and the only transport for that is a Next server action. Payload funnels every one
- * of its own through a single action declared in the host's generated `app/(payload)/layout.tsx`
- * and dispatches by name (`handleServerFunctions`), with no config-level way to add a name.
+ * navigation, and the only transport for that is a server function. Payload funnels every one of
+ * its own through a single handler declared in a file it generates for the host
+ * (`app/(payload)/layout.tsx`, `src/app/_payload/server.functions.ts` on TanStack Start) and
+ * dispatches by name (`handleServerFunctions`), with no config-level way to add a name.
  * Requiring every consumer to edit a file Payload marks "DO NOT MODIFY" is a worse tax than this,
  * so that route is offered as `lazyTransport: 'server-function'` instead of imposed.
  *

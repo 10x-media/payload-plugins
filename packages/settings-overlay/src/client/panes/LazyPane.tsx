@@ -1,12 +1,11 @@
 'use client'
 
-import { toast, useServerFunctions } from '@payloadcms/ui'
+import { toast, useSearchParams, useServerFunctions } from '@payloadcms/ui'
 import { useQuery } from '@tanstack/react-query'
-import { useSearchParams } from 'next/navigation'
 import type React from 'react'
-import { useEffect, useMemo } from 'react'
+import { Suspense, useEffect, useMemo } from 'react'
 
-import { QUERY_PARAM, SEARCH_PARAM } from '../../plugin/constants'
+import { SEARCH_PARAM } from '../../plugin/constants'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { useSettingsOverlay } from '../context'
@@ -31,7 +30,7 @@ export const LazyPane: React.FC<{ itemSlug: string; overlayId: string }> = ({
 	const searchParams = useMemo(() => {
 		const out: Record<string, string> = {}
 		urlParams.forEach((value, key) => {
-			if (key !== SEARCH_PARAM && key !== QUERY_PARAM) {
+			if (key !== SEARCH_PARAM) {
 				out[key] = value
 			}
 		})
@@ -58,5 +57,8 @@ export const LazyPane: React.FC<{ itemSlug: string; overlayId: string }> = ({
 	if (error || data === null) {
 		return <p className="settings-overlay__empty">{t(keys.loadFailed)}</p>
 	}
-	return <>{data}</>
+	// A server-rendered tree can suspend as it mounts: on TanStack Start its client references and
+	// lazy chunks resolve after the response does. Without a boundary of its own the nearest one is
+	// the app's, which hides the whole admin for that moment, so the pane keeps its skeleton up.
+	return <Suspense fallback={<ItemSkeleton />}>{data}</Suspense>
 }

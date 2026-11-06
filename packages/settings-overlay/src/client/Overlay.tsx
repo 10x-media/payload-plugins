@@ -2,11 +2,11 @@
 
 import {
 	BulkUploadProvider,
+	Button,
 	ChevronIcon,
 	EditDepthProvider,
 	EntityVisibilityProvider,
 	Modal,
-	Pill,
 	useAuth,
 	useConfig,
 	useModal,
@@ -111,8 +111,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 	}, [items, settings.target.item])
 
 	// A panel opened without an item resolves to the rail's first entry. Write that back as the
-	// real target so the URL names it and the form-modified reporter can recognise its own
-	// document. Replaces rather than pushes, so back still closes the panel in one step.
+	// real target so the form-modified reporter can recognise its own document.
 	const { setTarget } = settings
 	const targetItem = settings.target.item
 	const activeSlug = activeItem?.slug
@@ -120,7 +119,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 		if (!isOpen || targetItem !== undefined || !activeSlug) {
 			return
 		}
-		setTarget({ item: activeSlug }, { replace: true })
+		setTarget({ item: activeSlug })
 	}, [activeSlug, isOpen, setTarget, targetItem])
 
 	const select = useCallback(
@@ -181,9 +180,8 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 	 *
 	 * Only Escape is the reader asking to close, and it must not lose unsaved edits silently: reopen
 	 * and ask. Anything else is not a request at all. Payload's `CloseModalOnRouteChange` closes
-	 * every modal whenever the pathname changes, which includes the back button returning to an
-	 * address that names this panel; closing here would then strip that address a moment after it
-	 * opened. The plugin's state stays the source of truth, and the sync effect above reopens it.
+	 * every modal whenever the pathname changes, which includes following a link to an address
+	 * that names this panel; closing here would then strip that link a moment after it opened. The plugin's state stays the source of truth, and the sync effect above reopens it.
 	 */
 	useEffect(() => {
 		if (wasOpen.current && !facelessOpen && isOpen && escapePressed.current) {
@@ -319,7 +317,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 			/>
 			<div className={`${base}__panel`} ref={panelRef} role="document" tabIndex={-1}>
 				<EntityVisibilityProvider visibleEntities={NO_VISIBLE_ENTITIES}>
-					<BulkUploadProvider drawerSlugPrefix={slug}>
+					<BulkUploadProvider modalSlugPrefix={slug}>
 						<EditDepthProvider>
 							<SettingsPanelContext value={panelState}>
 								<SettingsOverlayEmbedContext value={embed}>
@@ -332,14 +330,15 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 												{slots?.Header ?? (
 													<header className={`${base}__pane-header`}>
 														{canGoBack ? (
-															<button
+															<Button
 																aria-label={t(keys.back)}
-																className={`${base}__icon-button`}
+																buttonStyle="ghost"
+																className={`${base}__back`}
+																icon={<ChevronIcon className={`${base}__back-icon`} />}
+																margin={false}
 																onClick={goBack}
-																type="button"
-															>
-																<ChevronIcon className={`${base}__back-icon`} />
-															</button>
+																size="medium"
+															/>
 														) : null}
 														<h3 className={`${base}__pane-title`} id={titleId}>
 															{activeItem?.label ?? manifest.label}
@@ -355,14 +354,15 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 																}}
 															/>
 														) : null}
-														<button
+														<Button
 															aria-label={t(keys.close)}
-															className={`${base}__icon-button ${base}__close`}
+															buttonStyle="ghost"
+															className={`${base}__close`}
+															icon={<XIcon />}
+															margin={false}
 															onClick={requestClose}
-															type="button"
-														>
-															<XIcon />
-														</button>
+															size="medium"
+														/>
 													</header>
 												)}
 												<div className={`${base}__pane-body`}>
@@ -389,11 +389,11 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 /**
  * The list's own Create button, lifted into the pane header when `mergeListHeader` is on.
  *
- * Payload's markup and translation rather than a lookalike: the same `Pill` at the same size
- * under the same `list-header__create-new-button` class, labelled with its own
- * `general:createNew`, so a host styling that class styles this too and the label is translated
- * everywhere Payload is. Only the toggler differs, because the pane switches to the create form
- * in place instead of opening a nested drawer.
+ * Payload's markup and translation rather than a lookalike: the same secondary `Button` under the
+ * same `list-header__create-new-button` class, labelled with its own `general:createNew`, so a
+ * host styling that class styles this too and the label is translated everywhere Payload is. Only
+ * the click differs, because the pane switches to the create form in place instead of opening a
+ * nested drawer.
  */
 const CreateNewButton: React.FC<{ collectionSlug: string; onCreate: () => void }> = ({
 	collectionSlug,
@@ -407,13 +407,15 @@ const CreateNewButton: React.FC<{ collectionSlug: string; onCreate: () => void }
 	}
 
 	return (
-		<button
-			className={`list-header__create-new-button doc-drawer__toggler ${base}__create`}
+		<Button
+			buttonStyle="secondary"
+			className={`list-header__create-new-button ${base}__create`}
+			margin={false}
 			onClick={onCreate}
-			type="button"
+			size="medium"
 		>
-			<Pill size="small">{t('general:createNew')}</Pill>
-		</button>
+			{t('general:createNew')}
+		</Button>
 	)
 }
 
@@ -459,10 +461,9 @@ const Pane: React.FC<{
 				entity="collection"
 				id={settings.target.id}
 				key={`doc-${activeItem.slug}-${settings.target.id}`}
-				// Only called when the document cannot be shown, so the list corrects the address in
-				// place. Pushed, the back button would return to the broken address and bounce again.
+				// Only called when the document cannot be shown: the pane falls back to its list.
 				onBack={() => {
-					settings.setTarget({ item: activeItem.slug }, { replace: true })
+					settings.setTarget({ item: activeItem.slug })
 				}}
 				onCreated={(id) => {
 					settings.setTarget({ id, item: activeItem.slug })
