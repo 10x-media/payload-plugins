@@ -196,13 +196,13 @@ export default defineVideo({
 		await drawerShot(s, 'model-3d')
 		await closeDrawer(s)
 
-		// Inline above the fields, the Preview button beside Save.
+		// The edit view: the document in Payload's file panel beside the fields.
 		await s.goto(`/admin/collections/media/${ids.docx}`)
-		await s.page.locator('.document-preview-inline [data-docx-page-wrapper]').first().waitFor({
+		await s.page.locator('.document-preview-panel [data-docx-page-wrapper]').first().waitFor({
 			timeout: 60_000,
 		})
 		await s.wait(2000)
-		await top(s, 'inline', 900)
+		await top(s, 'panel', 900)
 
 		// Upload fields elsewhere: file-type thumbnails instead of a blank page.
 		await s.goto(`/admin/collections/posts/${ids.post}`)
