@@ -96,16 +96,15 @@ export const Navigation: React.FC = () => {
 					{primary && (
 						<Button
 							buttonStyle="primary"
-							className={working ? `${BASE_CLASS}__primary--working` : undefined}
-							disabled={working || primary.disabled}
+							disabled={primary.disabled}
 							extraButtonProps={{ 'aria-busy': working }}
+							loading={working}
 							margin={false}
 							onClick={() => void run(primary)}
 							size="medium"
 							type="button"
 						>
-							<span className={`${BASE_CLASS}__primary-label`}>{primary.label}</span>
-							{working && <span aria-hidden className={`${BASE_CLASS}__spinner`} />}
+							{primary.label}
 						</Button>
 					)}
 				</div>

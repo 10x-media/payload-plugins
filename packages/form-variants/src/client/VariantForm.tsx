@@ -2,6 +2,7 @@
 
 import {
 	DocumentLocked,
+	DocumentStaleData,
 	DocumentTakeOver,
 	Form,
 	type FormProps,
@@ -19,7 +20,9 @@ import {
 	useEditDepth,
 	useLocale,
 	useRouteCache,
+	useRouter,
 	useRouteTransition,
+	useSearchParams,
 	useServerFunctions,
 	useUploadEdits,
 } from '@payloadcms/ui'
@@ -27,8 +30,7 @@ import { abortAndIgnore, handleAbortRef } from '@payloadcms/ui/utilities/abortAn
 import { handleBackToDashboard } from '@payloadcms/ui/utilities/handleBackToDashboard'
 import { handleGoBack } from '@payloadcms/ui/utilities/handleGoBack'
 import { handleTakeOver } from '@payloadcms/ui/utilities/handleTakeOver'
-import { useRouter, useSearchParams } from 'next/navigation'
-import type { ClientCollectionConfig, ClientUser, FormState, JsonObject } from 'payload'
+import type { ClientCollectionConfig, FormState, JsonObject, User } from 'payload'
 import { formatAdminURL, hasAutosaveEnabled } from 'payload/shared'
 import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -41,7 +43,7 @@ import { VariantSwitcher } from './chrome/VariantSwitcher'
 import { useFormVariants } from './context'
 import { evaluate } from './evaluate'
 import { FormStateBridge } from './handoff'
-import { DrawerHeader, StaleDataModal } from './internals'
+import { DrawerHeader } from './internals'
 import { Runner } from './Runner'
 import { resolveSlot } from './slots'
 import type { ClientVariant, VariantProviderProps } from './types'
@@ -107,7 +109,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 	const depth = useEditDepth()
 	const router = useRouter()
 	const params = useSearchParams()
-	const { code: localeCode } = useLocale()
+	const localeCode = useLocale()?.code
 	const { reportUpdate } = useDocumentEvents()
 	const { resetUploadEdits } = useUploadEdits()
 	const { getFormState } = useServerFunctions()
@@ -144,7 +146,18 @@ export const VariantForm: React.FC<Props> = (props) => {
 	const saveCounterRef = useRef(0)
 	const isSavingRef = useRef(false)
 	const lockExpiryTime = lastUpdateTime + lockDurationInMilliseconds
-	const isLockExpired = Date.now() > lockExpiryTime
+	// Render cannot read the clock, so the lock's expiry is state, flipped by a timer the moment
+	// it passes, which is what hides the locked-document modal. As on the native form.
+	const [isLockExpired, setIsLockExpired] = useState(() => Date.now() > lockExpiryTime)
+
+	useEffect(() => {
+		const msUntilExpiry = lockExpiryTime - Date.now()
+		setIsLockExpired(msUntilExpiry < 0)
+		if (msUntilExpiry >= 0 && msUntilExpiry <= 2_147_483_647) {
+			const timeout = setTimeout(() => setIsLockExpired(true), msUntilExpiry)
+			return () => clearTimeout(timeout)
+		}
+	}, [lockExpiryTime])
 	// Unlike the native view this form never autosaves, so leaving always risks unsaved values.
 	const preventLeaveWithoutSaving = !isReadOnlyForIncomingUser && !disableLeaveWithoutSaving
 	const schemaPathSegments = useMemo(() => [collectionSlug ?? ''], [collectionSlug])
@@ -157,7 +170,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 	wizardStateRef.current = wizardState
 
 	const handleDocumentLocking = useCallback(
-		(lockedState: { lastEditedAt?: string; user?: ClientUser | number | string } | undefined) => {
+		(lockedState: { lastEditedAt?: string; user?: User | number | string } | undefined) => {
 			setDocumentIsLocked?.(true)
 			const previousOwnerID =
 				typeof documentLockState.current?.user === 'object'
@@ -180,7 +193,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 						isLocked: true,
 						user: lockedState.user,
 					}
-					setCurrentEditor?.(lockedState.user as ClientUser)
+					setCurrentEditor?.(lockedState.user as User)
 				}
 				if (lockedState.lastEditedAt) {
 					setLastUpdateTime(new Date(lockedState.lastEditedAt).getTime())
@@ -212,7 +225,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 				try {
 					await unlockDocument(id, collectionSlug)
 					setDocumentIsLocked?.(false)
-					setCurrentEditor?.(null as unknown as ClientUser)
+					setCurrentEditor?.(null as unknown as User)
 				} catch (err) {
 					console.error('Failed to unlock before leave', err)
 				}
@@ -303,10 +316,12 @@ export const VariantForm: React.FC<Props> = (props) => {
 				void onSaveFromContext({
 					...(json as object),
 					context,
-					doc: document as { id: number | string },
 					operation: saveOperation,
-					result: document ?? {},
-				} as Parameters<typeof onSaveFromContext>[0])
+					updatedAt:
+						saveOperation === 'update'
+							? new Date().toISOString()
+							: (document?.updatedAt ?? new Date().toISOString()),
+				} as unknown as Parameters<typeof onSaveFromContext>[0])
 			}
 
 			const isPageCreate = !isEditing && depth < 2 && redirectAfterCreate !== false
@@ -452,6 +467,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 				!hasCheckedForStaleDataRef.current &&
 				Boolean(originalUpdatedAtRef.current) &&
 				operation === 'update' &&
+				!isTrashed &&
 				!autosaveEnabled
 			if (checkForStaleData) {
 				hasCheckedForStaleDataRef.current = true
@@ -466,6 +482,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 				formState: prevFormState,
 				operation,
 				originalUpdatedAt: checkForStaleData ? originalUpdatedAtRef.current : undefined,
+				readOnly: isTrashed || isReadOnlyForIncomingUser,
 				renderAllFields: false,
 				returnLockStatus: isLockingEnabled,
 				schemaPath: schemaPathSegments.join('.'),
@@ -501,6 +518,8 @@ export const VariantForm: React.FC<Props> = (props) => {
 			handleDocumentLocking,
 			id,
 			isLockingEnabled,
+			isReadOnlyForIncomingUser,
+			isTrashed,
 			operation,
 			schemaPathSegments,
 		]
@@ -547,7 +566,12 @@ export const VariantForm: React.FC<Props> = (props) => {
 		!isLockExpired
 
 	const readOnly = isReadOnlyForIncomingUser || !hasSavePermission || isTrashed === true
-	const isFolderCollection = Boolean(config.folders && collectionSlug === config.folders?.slug)
+	// A folder collection's documents have no page of their own to link the title to.
+	const isFolderCollection = Boolean(
+		collectionConfig?.hierarchy &&
+			typeof collectionConfig.hierarchy === 'object' &&
+			collectionConfig.hierarchy.allowHasMany === false
+	)
 
 	/**
 	 * Payload's own edit view passes `undefined` here, against the prop's declared `string`, and
@@ -580,15 +604,42 @@ export const VariantForm: React.FC<Props> = (props) => {
 			updateDocumentEditor: updateDocumentEditor as Parameters<
 				typeof handleTakeOver
 			>[0]['updateDocumentEditor'],
-			user: user as ClientUser,
+			user: user as User,
 		})
 	}
 
-	const header = (
-		<Header>
+	const controls = (
+		<>
 			{documentSlots.BeforeDocumentControls}
 			{switcher}
 			{variant.save === 'always' && !readOnly && <SaveControls />}
+		</>
+	)
+	const lockedBy =
+		isReadOnlyForIncomingUser && currentEditor && typeof currentEditor === 'object'
+			? (currentEditor as User)
+			: undefined
+
+	// In a drawer the controls move into the drawer's own header bar, where Payload puts them.
+	const header = isInDrawer ? (
+		<DrawerHeader
+			actions={
+				<div className="doc-controls doc-controls--drawerHeaderActions">
+					<div className="doc-controls__controls-wrapper">
+						<div className="doc-controls__controls">{controls}</div>
+					</div>
+				</div>
+			}
+			AfterHeader={documentSlots.Description}
+			BeforeDocumentMeta={documentSlots.BeforeDocumentMeta}
+			drawerSlug={drawerSlug}
+			readOnlyForIncomingUser={isReadOnlyForIncomingUser}
+			renderTitleAsLink={!isFolderCollection}
+			user={lockedBy}
+		/>
+	) : (
+		<Header BeforeDocumentMeta={documentSlots.BeforeDocumentMeta} lockedBy={lockedBy}>
+			{controls}
 		</Header>
 	)
 
@@ -638,13 +689,6 @@ export const VariantForm: React.FC<Props> = (props) => {
 					onSuccess={onSave}
 				>
 					<FormStateBridge />
-					{isInDrawer && (
-						<DrawerHeader
-							AfterHeader={documentSlots.Description}
-							drawerSlug={drawerSlug}
-							showDocumentID={!isFolderCollection}
-						/>
-					)}
 					{isLockingEnabled && shouldShowDocumentLockedModal && (
 						<DocumentLocked
 							handleGoBack={() =>
@@ -676,10 +720,14 @@ export const VariantForm: React.FC<Props> = (props) => {
 						/>
 					)}
 					{showStaleDataModal && (
-						<StaleDataModal isActive={showStaleDataModal} onReload={handleStaleDataReload} />
+						<DocumentStaleData isActive={showStaleDataModal} onReload={handleStaleDataReload} />
 					)}
 					{preventLeaveWithoutSaving && (
-						<LeaveWithoutSaving onConfirm={handleLeaveConfirm} onPrevent={handlePrevent} />
+						<LeaveWithoutSaving
+							modalSlug={drawerSlug ? `leave-without-saving-${drawerSlug}` : undefined}
+							onConfirm={handleLeaveConfirm}
+							onPrevent={handlePrevent}
+						/>
 					)}
 					{!isInDrawer && (
 						<SetDocumentStepNav

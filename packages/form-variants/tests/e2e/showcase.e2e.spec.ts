@@ -93,7 +93,7 @@ test.describe('openings showcase', () => {
 		await expect(field(page, 'title')).toHaveValue('Senior Backend Engineer')
 
 		// `navigation: 'free'`: the last section opens from the first, and it hides its own header.
-		await page.getByRole('button', { name: 'Internal' }).click()
+		await page.getByRole('tab', { name: 'Internal' }).click()
 		await expect(field(page, 'internalNotes')).toBeVisible()
 		await expect(page.locator('.form-variants__step-header')).toHaveCount(0)
 
@@ -107,7 +107,7 @@ test.describe('openings showcase', () => {
 
 		// All four variants are on the switcher for an admin.
 		await page.locator('.form-variants__switcher-trigger').click()
-		await expect(page.locator('.form-variants__switcher-option')).toHaveCount(4)
+		await expect(page.locator('.form-variants__switcher-option:visible')).toHaveCount(4)
 	})
 
 	test('ends the wizard on the consumer outcome after a publish', async ({ page }) => {

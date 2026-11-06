@@ -90,9 +90,18 @@ describeForDb('formVariants evaluate endpoint', { dbs: ['mongo'] }, (db) => {
 			plugin: formVariants({}),
 			configOverrides: { admin: { user: 'users' } },
 		})
-		await booted.payload.create({ collection: 'users', data: { ...ADMIN, role: 'admin' } })
-		await booted.payload.create({ collection: 'users', data: { ...EDITOR, role: 'editor' } })
+		await booted.payload.create({
+			overrideAccess: true,
+			collection: 'users',
+			data: { ...ADMIN, role: 'admin' },
+		})
+		await booted.payload.create({
+			overrideAccess: true,
+			collection: 'users',
+			data: { ...EDITOR, role: 'editor' },
+		})
 		const created = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'people',
 			data: { firstName: 'Grace', lastName: 'Hopper' },
 		})

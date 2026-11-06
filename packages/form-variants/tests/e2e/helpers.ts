@@ -3,12 +3,12 @@ import { expect, type Page } from '@playwright/test'
 export const ADMIN = 'dev@10xmedia.de'
 export const EDITOR = 'editor@10xmedia.de'
 
+/** Logs in over REST on the page's own request context, so the cookie lands in the browser. */
 export const login = async (page: Page, email: string): Promise<void> => {
-	await page.goto('/admin/login')
-	await page.getByLabel(/email/i).fill(email)
-	await page.getByLabel(/password/i).fill('password')
-	await page.getByRole('button', { name: /login/i }).click()
-	await page.waitForURL(/\/admin(?!\/login)/)
+	const response = await page.request.post('/api/users/login', {
+		data: { email, password: 'password' },
+	})
+	expect(response.ok()).toBe(true)
 }
 
 /** The step the wizard is standing on, by its tab in the progress rail. */
@@ -46,5 +46,9 @@ export const walkToDuplicateCheck = async (
 /** Switches variants through the switcher, which is also what stores the choice. */
 export const switchVariant = async (page: Page, label: string): Promise<void> => {
 	await page.locator('.form-variants__switcher-trigger').click()
-	await page.getByRole('button', { name: label, exact: true }).click()
+	// Popup list items are not buttons, and closed popups stay mounted: match the visible one.
+	await page
+		.locator('.form-variants__switcher-option:visible')
+		.getByText(label, { exact: true })
+		.click()
 }

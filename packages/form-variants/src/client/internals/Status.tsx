@@ -36,13 +36,11 @@ export const Status: React.FC = () => {
 		state = 'published'
 	}
 
-	const label = t('version:status')
 	const value = t(LABELS[state])
 
 	return (
-		<div className={BASE_CLASS} title={`${label}: ${value}`}>
+		<div className={BASE_CLASS} title={`${t('version:status')}: ${value}`}>
 			<div className={`${BASE_CLASS}__value-wrap`}>
-				<span className={`${BASE_CLASS}__label`}>{label}:&nbsp;</span>
 				<span className={`${BASE_CLASS}__value`}>{value}</span>
 			</div>
 		</div>

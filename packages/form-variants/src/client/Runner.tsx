@@ -158,7 +158,7 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 		useForm()
 	const { getFormState } = useServerFunctions()
 	const { setPreference } = usePreferences()
-	const { code: locale } = useLocale()
+	const locale = useLocale()?.code
 	const editDepth = useEditDepth()
 	const modified = useFormModified()
 
@@ -477,7 +477,7 @@ export const Runner: React.FC<RunnerProps> = (props) => {
 				skipValidation: true,
 			})
 			if (state) {
-				dispatchFields({ type: 'REPLACE_STATE', sanitize: true, state })
+				dispatchFields({ type: 'REPLACE_STATE', state })
 				setModified(true)
 			}
 		},

@@ -22,8 +22,10 @@ export const Outcome: React.FC = () => {
 	const { message, title } = outcome
 	return (
 		<section className={`${BASE_CLASS}__outcome`}>
-			<h2>{typeof title === 'string' ? title : t(keys.done)}</h2>
-			{typeof message === 'string' && <p>{message}</p>}
+			<h2 className={`${BASE_CLASS}__outcome-title`}>
+				{typeof title === 'string' ? title : t(keys.done)}
+			</h2>
+			{typeof message === 'string' && <p className={`${BASE_CLASS}__outcome-message`}>{message}</p>}
 		</section>
 	)
 }

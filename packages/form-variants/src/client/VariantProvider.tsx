@@ -6,6 +6,7 @@ import {
 	useDocumentDrawerContext,
 	useEditDepth,
 	usePreferences,
+	useRouter,
 } from '@payloadcms/ui'
 import type React from 'react'
 import { useCallback, useMemo, useRef, useState } from 'react'
@@ -48,6 +49,7 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 	const { drawerSlug } = useDocumentDrawerContext()
 	const depth = useEditDepth()
 	const { setPreference } = usePreferences()
+	const router = useRouter()
 
 	const inDrawer = Boolean(drawerSlug) || depth > 1
 	const surface = inDrawer ? 'drawer' : 'page'
@@ -115,10 +117,10 @@ export const VariantProvider: React.FC<VariantProviderProps> = (props) => {
 			setOutcome(null)
 			setStepKey(rememberedStep(key))
 			if (!inDrawer) {
-				replaceParam(VARIANT_PARAM, key)
+				replaceParam(router, VARIANT_PARAM, key)
 			}
 		},
-		[active, available, collectionSlug, inDrawer, rememberedStep, setPreference]
+		[active, available, collectionSlug, inDrawer, rememberedStep, router, setPreference]
 	)
 
 	const handoffValue = useMemo(() => ({ handoff, register, release }), [handoff, register, release])

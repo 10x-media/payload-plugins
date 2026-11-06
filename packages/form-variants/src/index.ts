@@ -59,7 +59,7 @@ export const defineFormVariants = <TSlug extends CollectionSlug>(
  */
 export const formVariants = definePlugin<FormVariantsPluginOptions>({
 	slug: '@10x-media/form-variants',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config, options = {} }): Config => {
 		if (options.disabled === true) {
 			return config
 		}

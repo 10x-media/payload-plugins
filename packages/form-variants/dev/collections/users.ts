@@ -1,8 +1,8 @@
-import type { Access, CollectionConfig, TypedUser } from 'payload'
+import type { Access, CollectionConfig, User } from 'payload'
 
-export type DevUser = TypedUser & { role?: 'admin' | 'editor' }
+export type DevUser = User & { role?: 'admin' | 'editor' }
 
-export const isAdmin = (user: null | TypedUser | undefined): boolean =>
+export const isAdmin = (user: null | User | undefined): boolean =>
 	(user as DevUser | null | undefined)?.role === 'admin'
 
 export const adminOnly: Access = ({ req }) => isAdmin(req.user)

@@ -1,6 +1,6 @@
 'use client'
 
-import { ChevronIcon, Popup, PopupList } from '@payloadcms/ui'
+import { Button, ChevronIcon, Popup, PopupList } from '@payloadcms/ui'
 import type React from 'react'
 
 import { BASE_CLASS } from '../../plugin/constants'
@@ -25,15 +25,9 @@ export const VariantSwitcher: React.FC = () => {
 	return (
 		<div className={`${BASE_CLASS}__switcher`}>
 			<Popup
-				button={
-					<>
-						<span className={`${BASE_CLASS}__switcher-label`}>{t(keys.switcherLabel)}:</span>
-						<span className={`${BASE_CLASS}__switcher-current`}>{active.label}</span>
-						<ChevronIcon className={`${BASE_CLASS}__switcher-chevron`} />
-					</>
-				}
-				buttonClassName={`${BASE_CLASS}__switcher-trigger`}
+				caret={false}
 				horizontalAlign="right"
+				popupType="menu"
 				render={({ close }) => (
 					<PopupList.ButtonGroup>
 						{available.map((variant) => (
@@ -53,7 +47,22 @@ export const VariantSwitcher: React.FC = () => {
 						))}
 					</PopupList.ButtonGroup>
 				)}
-				size="large"
+				renderButton={({ active: open, onKeyDown, ...buttonProps }) => (
+					<Button
+						{...buttonProps}
+						buttonStyle="secondary"
+						className={`${BASE_CLASS}__switcher-trigger`}
+						extraButtonProps={{ onKeyDown }}
+						icon={<ChevronIcon direction={open ? 'up' : 'down'} size={16} />}
+						iconPosition="right"
+						margin={false}
+						selected={open}
+						size="medium"
+					>
+						<span className={`${BASE_CLASS}__switcher-label`}>{t(keys.switcherLabel)}:</span>{' '}
+						<span className={`${BASE_CLASS}__switcher-current`}>{active.label}</span>
+					</Button>
+				)}
 				verticalAlign="bottom"
 			/>
 		</div>

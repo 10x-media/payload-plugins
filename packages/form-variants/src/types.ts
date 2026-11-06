@@ -7,7 +7,7 @@ import type {
 	PayloadComponent,
 	PayloadRequest,
 	StaticLabel,
-	TypedUser,
+	User,
 } from 'payload'
 
 /** A label as Payload's own config writes them. */
@@ -24,7 +24,7 @@ export type FormVariantsContext = {
 	inDrawer: boolean
 	operation: 'create' | 'update'
 	req: PayloadRequest
-	user: TypedUser | null
+	user: null | User
 }
 
 /** Wizard state: a JSON object the steps share. Written by the browser, so never proof of anything. */

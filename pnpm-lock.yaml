@@ -1566,6 +1566,9 @@ importers:
       '@10x-media/dedupe':
         specifier: workspace:*
         version: link:..
+      '@10x-media/form-variants':
+        specifier: workspace:*
+        version: link:../../form-variants
       '@payloadcms/db-mongodb':
         specifier: 'catalog:'
         version: 4.0.0-beta.7(payload@4.0.0-beta.7(graphql@16.14.0)(typescript@5.9.3))(socks@2.8.10)
@@ -1624,6 +1627,9 @@ importers:
       '@10x-media/dedupe':
         specifier: workspace:*
         version: link:..
+      '@10x-media/form-variants':
+        specifier: workspace:*
+        version: link:../../form-variants
       '@payloadcms/db-mongodb':
         specifier: 'catalog:'
         version: 4.0.0-beta.7(payload@4.0.0-beta.7(graphql@16.14.0)(typescript@5.9.3))(socks@2.8.10)
@@ -2737,9 +2743,6 @@ importers:
       '@types/react-dom':
         specifier: 'catalog:'
         version: 19.2.3(@types/react@19.2.15)
-      next:
-        specifier: 'catalog:'
-        version: 16.4.4(@playwright/test@1.60.0)(@types/node@24.19.2)(babel-plugin-macros@3.1.0)(react-dom@19.2.6(react@19.2.6))(react@19.2.6)(sass@1.77.4)
       payload:
         specifier: 'catalog:'
         version: 4.0.0-beta.7(graphql@16.14.0)(typescript@5.9.3)
@@ -2855,6 +2858,9 @@ importers:
       react-dom:
         specifier: 'catalog:'
         version: 19.2.6(react@19.2.6)
+      srvx:
+        specifier: 'catalog:'
+        version: 1.0.8
       vite:
         specifier: 'catalog:'
         version: 8.3.5(@types/node@24.19.2)(esbuild@0.28.0)(jiti@2.7.0)(sass@1.77.4)(tsx@4.23.15)(yaml@2.9.0)

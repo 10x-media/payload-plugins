@@ -88,7 +88,8 @@ test.describe('editor', () => {
 		await expect(drawer.locator('.form-variants__progress-item--current')).toContainText(
 			'Who is this?'
 		)
-		await expect(drawer.locator('#field-firstName')).toBeVisible()
+		// A field in a drawer carries the edit depth in its id.
+		await expect(drawer.locator('#field-firstName-2')).toBeVisible()
 		// A drawer has no URL of its own, so neither parameter may appear.
 		await expect(page).not.toHaveURL(/variant=|step=/)
 		// The editor has one form here as on the page.
@@ -143,7 +144,7 @@ test.describe('admin', () => {
 		await expect(currentStep(page)).toContainText('Identity')
 
 		// `navigation: 'free'` opens a section that was never visited, skipping the one between.
-		await page.getByRole('button', { name: 'Work' }).click()
+		await page.getByRole('tab', { name: 'Work' }).click()
 		await expect(currentStep(page)).toContainText('Work')
 		await expect(page.locator('#field-employer')).toBeVisible()
 
