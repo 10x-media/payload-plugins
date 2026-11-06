@@ -3,18 +3,20 @@
 # @10x-media/settings-overlay
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/settings-overlay` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/settings-overlay` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/settings-overlay).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/settings-overlay@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/settings-overlay) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
-Files any Payload collection, global, registered admin view or component behind a floating panel, and makes that panel addressable by URL. `?settings=system/tags/abc` opens the panel on that document; copy the link, send it, it reopens the same thing.
+Files any Payload collection, global, registered admin view or component behind a floating panel, and lets a link open it. `?settings=system/tags/abc` opens the panel on that document, from a bookmark, an email or a `<Link>`.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/settings-overlay?style=flat-square)](https://www.npmjs.com/package/@10x-media/settings-overlay)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 ## Features
 
 - **Anything goes in the panel**: collections (list and edit), globals, registered admin views, your own components, and plain links.
-- **Deep links**: `?settings=<overlay>/<item>[/<id>]` survives a reload, a share, and the back button.
+- **Deep links**: `?settings=<overlay>/<item>[/<id>]` opens a panel from a bookmark, an email or a `<Link>`, and the panel itself never touches history.
 - **One way in, when you want it**: `hideEntities` takes a listed collection or global out of the nav and off its own route. Off by default, because Payload's drawer mode omits the trash tab, bulk actions and the document tabs.
 - **Open it from anywhere**: `useSettingsOverlay()` and `<SettingsOverlayButton>` work in a field, a list action or a dashboard card.
 - **Access is decided on the server**: the rail each reader sees is computed for them. Items they cannot open never reach the browser.
@@ -26,7 +28,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Quick start
 
 ```bash
-pnpm add @10x-media/settings-overlay@beta
+pnpm add @10x-media/settings-overlay@alpha
 ```
 
 ```ts

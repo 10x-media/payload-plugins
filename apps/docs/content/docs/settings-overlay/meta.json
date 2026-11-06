@@ -8,6 +8,7 @@
 		"customization",
 		"embedded-views",
 		"configuration",
-		"i18n"
+		"i18n",
+		"upgrading"
 	]
 }

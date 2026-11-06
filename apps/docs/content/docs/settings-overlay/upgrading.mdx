@@ -1,0 +1,37 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x.
+---
+
+`@10x-media/settings-overlay` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin runs on Next.js and TanStack Start.
+
+## Checklist
+
+1. Upgrade `@10x-media/settings-overlay` with Payload: its peers are `payload`, `@payloadcms/ui` and `@payloadcms/translations` at `^4.0.0-beta.6`. `next` and `@payloadcms/next` are no longer peers.
+2. Remove the `@10x-media/settings-overlay/embed` alias from `next.config` and any import of it (see [The embed shim is gone](#the-embed-shim-is-gone)).
+3. Remove `history` from every overlay and from `defaults` (see [The panel no longer writes the URL](#the-panel-no-longer-writes-the-url)).
+4. Drop the `replace` option from `setTarget` calls, and any use of `QUERY_PARAM` or `settingsQuery`.
+5. On `lazyTransport: 'server-function'`, wire the server functions for your framework (see [How a lazy item reaches the server](/settings-overlay/embedded-views#how-a-lazy-item-reaches-the-server)).
+6. Regenerate the import map (`pnpm payload generate:importmap`). The plugin adds no database fields, so there is nothing to migrate.
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## The embed shim is gone
+
+The Payload 3 line shipped `@10x-media/settings-overlay/embed`, a stand-in for `@payloadcms/next/templates` that you aliased in `next.config`, so a view written for a page drew no admin chrome inside the panel. Payload 4 has no Next-only templates package to stand in for, and the export is removed with its `next` and `@payloadcms/next` peers.
+
+A view of your own renders `DefaultTemplate` from `@payloadcms/ui/rsc` on its page and skips it when it receives `settingsOverlayEmbed`, as [Your own view](/settings-overlay/embedded-views#your-own-view) shows. A view from another plugin is best listed as a `link` item. Payload 4's own embed mode (`?embed=true`) is not a replacement: it hides the nav header and the account menu, and the template still draws the nav.
+
+## The panel no longer writes the URL
+
+On the Payload 3 line the panel kept its state in the address: every row, document and close was a history entry (or none, with `history: 'replace'`), and a filtered list carried its query in `?settingsQuery=`. On Payload 4 the URL is read only:
+
+- `?settings=<overlay>/<item>[/<id>]` still opens a panel, when the admin loads and whenever a navigation brings a new value, so existing bookmarks and links keep working.
+- Nothing is written while the panel is in use. The back button leaves the page, as it does over Payload's drawers, and a list's filters stay in the panel's memory.
+- Closing a panel that a link opened takes `settings` out of the address, so a reload does not reopen it.
+
+Removed with it: the overlay's `history` option and the `OverlayHistory` type, `QUERY_PARAM`, the `settingsQuery` parameter, and `setTarget`'s `{ replace }` option. `SEARCH_PARAM` is still exported. To share what is open, build the link from `useSettingsOverlay().target` in a button of your own.
+
+## Look
+
+The panel takes Payload 4's dialog look: its radius, elevation and backdrop, ghost icon buttons for Close and Back, and Payload's own `SearchInput` for the rail search. Rail rows match Payload 4's nav rows. A slot you replaced keeps working, but restyle it against Payload 4's tokens.

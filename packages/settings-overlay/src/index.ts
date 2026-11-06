@@ -16,7 +16,7 @@ declare module 'payload' {
 
 /**
  * Files collections, globals, registered admin views, components and links behind floating
- * panels, and makes each panel addressable by URL.
+ * panels, each one open-able from a link.
  *
  * Composable on purpose: only the entities you list are touched. A listed collection or
  * global gets an invisible form-modified reporter so the panel can confirm before discarding
@@ -56,7 +56,7 @@ export const settingsOverlay = definePlugin<SettingsOverlayPluginOptions>({
 	},
 })
 
-export { QUERY_PARAM, SEARCH_PARAM } from './plugin/constants'
+export { SEARCH_PARAM } from './plugin/constants'
 export { getOverlay, getRegistry, type SettingsOverlayRegistry } from './plugin/registry'
 export * from './types'
 export type { SettingsOverlayPluginOptions as PluginOptions }

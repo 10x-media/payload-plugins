@@ -8,9 +8,10 @@ import { type LazyItemRequest, renderLazyItem } from './renderLazyItem'
  * The opt-in transport, for `lazyTransport: 'server-function'`.
  *
  * Payload has no config-level way to register a server function: extras reach
- * `handleServerFunctions` only through its own argument, which lives in the host's generated
- * `app/(payload)/layout.tsx`. This is therefore the one contract-backed route, and the price is
- * that the consumer wires it themselves:
+ * `handleServerFunctions` only through its own argument, which lives in a file Payload generates
+ * for the host (`app/(payload)/layout.tsx` on Next.js, `src/app/_payload/server.functions.ts` on
+ * TanStack Start). This is therefore the one contract-backed route, and the price is that the
+ * consumer wires it themselves, here on Next.js:
  *
  * ```ts title="app/(payload)/layout.tsx"
  * import { settingsOverlayServerFunctions } from '@10x-media/settings-overlay/rsc'

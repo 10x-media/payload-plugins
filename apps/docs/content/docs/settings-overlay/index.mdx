@@ -1,9 +1,9 @@
 ---
 title: Settings Overlay
-description: Files any Payload collection, global, admin view or component behind a deep-linkable floating panel.
+description: Files any Payload collection, global, admin view or component behind a floating panel a link can open.
 ---
 
-`@10x-media/settings-overlay` puts a collection, a global, a registered admin view or a component of your own behind a floating panel, and makes that panel addressable by URL. `?settings=system/tags/abc` opens the panel on that document. Copy the link, send it, it reopens the same thing.
+`@10x-media/settings-overlay` puts a collection, a global, a registered admin view or a component of your own behind a floating panel, and lets a link open it. `?settings=system/tags/abc` opens the panel on that document, from a bookmark, an email or a `<Link>`.
 
 ![A settings panel over the dashboard: a rail of rows on the left under a System heading, with Content and Appearance as collapsible groups and a count badge on Tags, and the Appearance row open on the right showing the language and admin theme controls](/images/settings-overlay/overview.png)
 
@@ -65,6 +65,7 @@ A `component` may be a server or a client component. The plugin renders it the w
 - [Items](/settings-overlay/items): the five types and what each one is for.
 - [Access](/settings-overlay/access): who sees which row, and why none of it reaches the browser.
 - [Customization](/settings-overlay/customization): slots, hooks and the props each replacement gets.
-- [Embedded views](/settings-overlay/embedded-views): putting a registered admin view in the panel, and the one case that needs a bundler alias.
+- [Embedded views](/settings-overlay/embedded-views): putting a registered admin view in the panel, and how a lazy item reaches the server.
 - [Configuration](/settings-overlay/configuration): every option, in one place.
 - [i18n](/settings-overlay/i18n): the bundled locales and how to override a string.
+- [Upgrading to Payload 4](/settings-overlay/upgrading): what changed from the 0.x line.

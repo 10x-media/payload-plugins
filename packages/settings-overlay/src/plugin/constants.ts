@@ -1,11 +1,8 @@
 /** Where the plugin parks its full config. `custom` is in Payload's server-only properties. */
 export const REGISTRY_KEY = '@10x-media/settings-overlay'
 
-/** Which overlay is open and what it points at: `<overlay>/<item>[/<id>]`. */
+/** The link parameter that opens a panel: `?settings=<overlay>/<item>[/<id>]`. */
 export const SEARCH_PARAM = 'settings'
-
-/** The open list's query, as JSON, beside `settings`. Namespaced so the page never reads it. */
-export const QUERY_PARAM = 'settingsQuery'
 
 /**
  * Slug of the widget the plugin registers to reach `render-widget`. Namespaced with the

@@ -1,6 +1,7 @@
 'use client'
 
 import { useSettingsOverlayEmbed } from '@10x-media/settings-overlay/client'
+import { Button } from '@payloadcms/ui'
 import type React from 'react'
 
 /**
@@ -41,17 +42,18 @@ export const DevNotes: React.FC = () => {
 					2
 				)}
 			</pre>
-			<div>
-				<button
+			<div style={{ display: 'flex', gap: 'var(--spacer-2)' }}>
+				<Button
+					buttonStyle="secondary"
+					margin={false}
 					onClick={() => embed?.setTarget({ item: 'tags' })}
-					style={{ marginRight: 8 }}
-					type="button"
+					size="medium"
 				>
 					Go to Tags
-				</button>
-				<button onClick={() => embed?.close()} type="button">
+				</Button>
+				<Button buttonStyle="secondary" margin={false} onClick={() => embed?.close()} size="medium">
 					Close the panel
-				</button>
+				</Button>
 			</div>
 		</div>
 	)

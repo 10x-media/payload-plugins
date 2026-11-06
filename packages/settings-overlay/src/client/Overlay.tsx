@@ -111,8 +111,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 	}, [items, settings.target.item])
 
 	// A panel opened without an item resolves to the rail's first entry. Write that back as the
-	// real target so the URL names it and the form-modified reporter can recognise its own
-	// document. Replaces rather than pushes, so back still closes the panel in one step.
+	// real target so the form-modified reporter can recognise its own document.
 	const { setTarget } = settings
 	const targetItem = settings.target.item
 	const activeSlug = activeItem?.slug
@@ -120,7 +119,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 		if (!isOpen || targetItem !== undefined || !activeSlug) {
 			return
 		}
-		setTarget({ item: activeSlug }, { replace: true })
+		setTarget({ item: activeSlug })
 	}, [activeSlug, isOpen, setTarget, targetItem])
 
 	const select = useCallback(
@@ -181,9 +180,8 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 	 *
 	 * Only Escape is the reader asking to close, and it must not lose unsaved edits silently: reopen
 	 * and ask. Anything else is not a request at all. Payload's `CloseModalOnRouteChange` closes
-	 * every modal whenever the pathname changes, which includes the back button returning to an
-	 * address that names this panel; closing here would then strip that address a moment after it
-	 * opened. The plugin's state stays the source of truth, and the sync effect above reopens it.
+	 * every modal whenever the pathname changes, which includes following a link to an address
+	 * that names this panel; closing here would then strip that link a moment after it opened. The plugin's state stays the source of truth, and the sync effect above reopens it.
 	 */
 	useEffect(() => {
 		if (wasOpen.current && !facelessOpen && isOpen && escapePressed.current) {
@@ -463,10 +461,9 @@ const Pane: React.FC<{
 				entity="collection"
 				id={settings.target.id}
 				key={`doc-${activeItem.slug}-${settings.target.id}`}
-				// Only called when the document cannot be shown, so the list corrects the address in
-				// place. Pushed, the back button would return to the broken address and bounce again.
+				// Only called when the document cannot be shown: the pane falls back to its list.
 				onBack={() => {
-					settings.setTarget({ item: activeItem.slug }, { replace: true })
+					settings.setTarget({ item: activeItem.slug })
 				}}
 				onCreated={(id) => {
 					settings.setTarget({ id, item: activeItem.slug })

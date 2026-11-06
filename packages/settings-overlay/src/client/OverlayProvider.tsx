@@ -9,30 +9,20 @@ import {
 	useSearchParams,
 } from '@payloadcms/ui'
 import { QueryClientProvider } from '@tanstack/react-query'
-import type { ListQuery } from 'payload'
 import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
-import { DISCARD_SLUG, panelSlugFor, QUERY_PARAM, SEARCH_PARAM } from '../plugin/constants'
+import { DISCARD_SLUG, panelSlugFor, SEARCH_PARAM } from '../plugin/constants'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { ClientOverlay, Manifest } from '../types'
 import { InternalBadgeProvider } from './badges'
 import { SettingsOverlayContext, type SettingsOverlayContextValue } from './context'
 import { SettingsPanel } from './Overlay'
-import { pushStateWithoutLoad } from './pushState'
+import { CLOSED, parseParam, type State, sameState } from './panelState'
 import { createOverlayQueryClient } from './queries'
 import { readerKey } from './readerKey'
 import type { OverlaySlots } from './slots'
-import {
-	CLOSED,
-	formatParam,
-	formatQueryParam,
-	parseParam,
-	type State,
-	sameState,
-	sameUrlState,
-} from './urlState'
 
 export type SettingsOverlayClientProps = {
 	children?: React.ReactNode
@@ -51,14 +41,12 @@ export type SettingsOverlayClientProps = {
 /**
  * Owns which overlay is open and what it points at, and mounts each panel once.
  *
- * The URL carries `?settings=<overlay>/<item>[/<id>]`, written with the History API rather than
- * the router so opening a panel does not refetch the page underneath. A replace goes through the
- * router adapter's `replaceState` and a push through `pushStateWithoutLoad`, which both keep
- * TanStack Router from loading the route again, and popstate carries the address back into the
- * state, so the back button moves the panel exactly as far as the URL moved.
- *
- * Whether a navigation is an entry of its own is the overlay's `history` option. The panel never
- * travels through the history itself: the browser does, and the panel follows the URL it lands on.
+ * The panel's state lives here and nowhere else. A link can open it: the page's URL is read for
+ * `?settings=<overlay>/<item>[/<id>]` when the admin loads and whenever a navigation brings a new
+ * value, so `/admin?settings=system/tags` works from a bookmark, an email or a `<Link>`. Nothing
+ * is ever written back while the panel is in use, so it adds no history entries and the back
+ * button leaves the page, as it does over Payload's own drawers. Closing a panel that a link
+ * opened takes the parameter out of the address, so a reload does not bring it back.
  */
 export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 	children,
@@ -83,70 +71,19 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 		[overlays]
 	)
 
-	const [state, setState] = useState<State>(() => {
-		const fromUrl = parseParam(searchParams.get(SEARCH_PARAM), searchParams.get(QUERY_PARAM))
-		return fromUrl.overlayId && addressable.has(fromUrl.overlayId) ? fromUrl : CLOSED
-	})
-	const [formModified, setFormModified] = useState(false)
-
-	// Read by `setTarget`, which must write the URL outside the state updater: React may run an
-	// updater twice, and `history.replaceState` is not a pure computation.
-	const stateRef = useRef(state)
-	stateRef.current = state
-	const pendingAction = useRef<null | (() => void)>(null)
-
-	const historyModes = useMemo(
-		() => new Map(overlays.map((overlay) => [overlay.id, overlay.history])),
-		[overlays]
-	)
-
-	/**
-	 * Writes the panel's state into the URL.
-	 *
-	 * `'push'` is a navigation: a new entry, when the overlay it belongs to runs with
-	 * `history: 'push'`. `'replace'` corrects the address without moving the reader: the list's
-	 * query, the first row written back into a panel opened without one, a document that could not
-	 * be shown giving way to its list.
-	 *
-	 * An address identical to the current one is never pushed, whatever the caller asked for. A
-	 * second entry for the same URL is a back press that appears to do nothing.
-	 */
-	const writeUrl = useCallback(
-		(next: State, mode: 'push' | 'replace', overlayId: null | string = next.overlayId) => {
-			if (typeof window === 'undefined') {
-				return
-			}
-			const params = new URLSearchParams(window.location.search)
-			const value = next.overlayId && addressable.has(next.overlayId) ? formatParam(next) : null
-			if (value) {
-				params.set(SEARCH_PARAM, value)
-			} else {
-				params.delete(SEARCH_PARAM)
-			}
-			const listQuery = value ? formatQueryParam(next.target.query as ListQuery | undefined) : null
-			if (listQuery) {
-				params.set(QUERY_PARAM, listQuery)
-			} else {
-				params.delete(QUERY_PARAM)
-			}
-			const query = params.toString()
-			const url = `${pathname}${query ? `?${query}` : ''}${window.location.hash}`
-			const moved = query !== new URLSearchParams(window.location.search).toString()
-			if (
-				mode === 'push' &&
-				moved &&
-				overlayId !== null &&
-				historyModes.get(overlayId) === 'push'
-			) {
-				pushStateWithoutLoad(url)
-			} else if (router.replaceState) {
-				router.replaceState(url)
-			} else {
-				window.history.replaceState(null, '', url)
-			}
+	/** The state a `settings` value names, or `CLOSED` for no value or a panel links cannot open. */
+	const fromLink = useCallback(
+		(value: null | string): State => {
+			const linked = parseParam(value)
+			return linked.overlayId && addressable.has(linked.overlayId) ? linked : CLOSED
 		},
-		[addressable, historyModes, pathname, router]
+		[addressable]
 	)
+
+	const link = searchParams.get(SEARCH_PARAM)
+	const [state, setState] = useState<State>(() => fromLink(link))
+	const [formModified, setFormModified] = useState(false)
+	const pendingAction = useRef<null | (() => void)>(null)
 
 	// Signing in and out are client navigations, which leave the root layout, and with it the
 	// server half of this provider, as it was rendered for the previous reader. Refresh once per
@@ -165,76 +102,48 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 		router.refresh()
 	}, [currentReader, reader, router])
 
-	// Back and forward: the browser restores a URL and the panel follows it, including to closed.
-	// Read straight from `window.location` so the decision is made before Next has re-rendered
-	// with the restored search params.
+	// A navigation that brings a new `settings` value is a link to a panel: follow it. The value
+	// the page loaded with is already the initial state, and the same value seen again (a list
+	// behind the panel rewriting its own query) is not a new link.
+	const followedLink = useRef(link)
 	useEffect(() => {
-		const onPopState = () => {
-			const params = new URLSearchParams(window.location.search)
-			const fromUrl = parseParam(params.get(SEARCH_PARAM), params.get(QUERY_PARAM))
-			setState((current) => (sameUrlState(current, fromUrl) ? current : fromUrl))
-		}
-		window.addEventListener('popstate', onPopState)
-		return () => {
-			window.removeEventListener('popstate', onPopState)
-		}
-	}, [])
-
-	// Every other URL change. A `settings` value that differs from the state is a link or a
-	// navigation naming a panel: follow it. A URL with no `settings` while a panel is open is
-	// somebody else's navigation, typically an embedded view paging with `router.push('?page=2')`,
-	// which rewrites the whole query string: the panel stays open and puts its parameters back
-	// beside theirs. Closing is only ever decided by `close()` or popstate.
-	//
-	// The router's search params only say *when* the URL changed. What it says is read from
-	// `window.location`: TanStack Router never sees the panel's own History API writes, so its
-	// params can still name the panel's previous target, and following them would undo the write.
-	const searchKey = searchParams.toString()
-	// biome-ignore lint/correctness/useExhaustiveDependencies: `searchKey` is the change this waits for, not a value it reads.
-	useEffect(() => {
-		const params = new URLSearchParams(window.location.search)
-		const fromUrl = parseParam(params.get(SEARCH_PARAM), params.get(QUERY_PARAM))
-		const current = stateRef.current
-		if (fromUrl.overlayId) {
-			if (addressable.has(fromUrl.overlayId) && !sameUrlState(current, fromUrl)) {
-				setState(fromUrl)
-			}
+		if (link === followedLink.current) {
 			return
 		}
-		if (current.overlayId) {
-			writeUrl(current, 'replace')
-		}
-	}, [addressable, searchKey, writeUrl])
-
-	const open = useCallback<SettingsOverlayContextValue['open']>(
-		(overlayId, target = {}) => {
-			const next: State = { overlayId, target }
+		followedLink.current = link
+		const linked = fromLink(link)
+		if (linked.overlayId) {
 			setFormModified(false)
-			setState(next)
-			writeUrl(next, 'push')
-		},
-		[writeUrl]
-	)
+			setState(linked)
+		}
+	}, [fromLink, link])
+
+	const open = useCallback<SettingsOverlayContextValue['open']>((overlayId, target = {}) => {
+		setFormModified(false)
+		setState({ overlayId, target })
+	}, [])
 
 	/**
-	 * Closing is a navigation like any other. Under `history: 'push'` it is an entry of its own, so
-	 * the back button reopens the panel where the reader left it, as it would return them to a page
-	 * they had left.
+	 * Closes the panel. When the address still names a panel, the link that opened it, the
+	 * parameter goes too, through the router so that TanStack Router's own view of the URL stays
+	 * true; otherwise a reload would open the panel again.
 	 */
 	const close = useCallback(() => {
-		const closing = stateRef.current.overlayId
 		setFormModified(false)
 		setState(CLOSED)
-		writeUrl(CLOSED, 'push', closing)
-	}, [writeUrl])
+		const params = new URLSearchParams(window.location.search)
+		if (!params.has(SEARCH_PARAM)) {
+			return
+		}
+		params.delete(SEARCH_PARAM)
+		const query = params.toString()
+		followedLink.current = null
+		void router.replace(`${pathname}${query ? `?${query}` : ''}${window.location.hash}`, {
+			scroll: false,
+		})
+	}, [pathname, router])
 
-	/**
-	 * Leaves the panel for a page, which is what selecting a `link` row does.
-	 *
-	 * A push in either history mode, because the destination is a page. For an addressable overlay
-	 * the entry being left keeps the panel's address, so the back button returns the reader to the
-	 * panel exactly as they left it; a panel kept out of the URL has no address to return to.
-	 */
+	/** Leaves the panel for a page, which is what selecting a `link` row does. */
 	const navigate = useCallback<SettingsOverlayContextValue['navigate']>(
 		(url) => {
 			setFormModified(false)
@@ -244,52 +153,34 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 		[router]
 	)
 
-	const setTarget = useCallback<SettingsOverlayContextValue['setTarget']>(
-		(target, options) => {
-			const current = stateRef.current
-			if (!current.overlayId) {
-				return
-			}
-			const next: State = { overlayId: current.overlayId, target }
-			setFormModified(false)
-			setState(next)
-			writeUrl(next, options?.replace ? 'replace' : 'push')
-		},
-		[writeUrl]
-	)
+	const setTarget = useCallback<SettingsOverlayContextValue['setTarget']>((target) => {
+		setFormModified(false)
+		setState((current) => (current.overlayId ? { overlayId: current.overlayId, target } : current))
+	}, [])
 
 	/**
 	 * The list's own query, kept beside the target. Only meaningful while a list is shown, so a
-	 * target with a document id drops it. A filter change replaces rather than pushes, as Payload's
-	 * own list does on a page, so the back button steps past a reader's filtering rather than
-	 * through every keystroke of it.
+	 * target with a document id ignores it.
 	 */
-	const setListQuery = useCallback<SettingsOverlayContextValue['setListQuery']>(
-		(query) => {
-			const current = stateRef.current
+	const setListQuery = useCallback<SettingsOverlayContextValue['setListQuery']>((query) => {
+		// Payload's filter builder edits its condition objects in place and then hands the same
+		// objects over. Held by reference, the stored query would already contain the change by the
+		// time it arrives, and the "nothing changed" check below would swallow every edit after the
+		// first. A deep copy is ours alone, and keeps an unfinished condition exactly as the builder
+		// left it.
+		const copy = query ? structuredClone(query) : undefined
+		setState((current) => {
 			if (!current.overlayId || current.target.id) {
-				return
+				return current
 			}
 			const { query: _previous, ...rest } = current.target
-			// Payload's filter builder edits its condition objects in place and then hands the same
-			// objects over. Held by reference, the stored query would already contain the change by
-			// the time it arrives, and the "nothing changed" check below would swallow every edit
-			// after the first. A deep copy is ours alone; `undefined` values survive it, which JSON
-			// would not, and an unfinished condition must stay in memory exactly as the builder
-			// left it.
-			const copy = query ? structuredClone(query) : undefined
 			const next: State = {
 				overlayId: current.overlayId,
 				target: { ...rest, ...(copy ? { query: copy } : {}) },
 			}
-			if (sameState(current, next)) {
-				return
-			}
-			setState(next)
-			writeUrl(next, 'replace')
-		},
-		[writeUrl]
-	)
+			return sameState(current, next) ? current : next
+		})
+	}, [])
 
 	const guard = useCallback<SettingsOverlayContextValue['guard']>(
 		(action) => {
@@ -305,13 +196,13 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 
 	const toggle = useCallback<SettingsOverlayContextValue['toggle']>(
 		(overlayId, target) => {
-			if (stateRef.current.overlayId === overlayId) {
+			if (state.overlayId === overlayId) {
 				guard(close)
 				return
 			}
 			open(overlayId, target)
 		},
-		[close, guard, open]
+		[close, guard, open, state.overlayId]
 	)
 
 	const value = useMemo<SettingsOverlayContextValue>(

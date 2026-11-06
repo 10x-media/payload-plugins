@@ -6,7 +6,7 @@ description: Install the plugin, open the panel from your own button, and deep-l
 ## Install
 
 ```bash
-pnpm add @10x-media/settings-overlay@beta
+pnpm add @10x-media/settings-overlay@alpha
 ```
 
 ```ts title="payload.config.ts"
@@ -82,7 +82,7 @@ import { SettingsOverlayButton } from '@10x-media/settings-overlay/client'
 
 ## Link to it
 
-Every overlay is addressable by default:
+Every overlay can be opened from a link by default:
 
 ```
 ?settings=system                 the panel, on its first row
@@ -91,15 +91,13 @@ Every overlay is addressable by default:
 ?settings=system/tags/new        the create form
 ```
 
-A filtered list carries its query in a second parameter, `?settingsQuery=`, so the page underneath keeps its own `where[...]` parameters untouched.
+The parameter is read when the admin loads and whenever a navigation brings a new value, so it works from a bookmark, an email or a `<Link>`. The panel never writes it: switching rows, opening a document or filtering a list adds no history entries, and the back button leaves the page, the way it does over one of Payload's drawers. Closing a panel that a link opened takes the parameter out of the address, so a reload does not bring it back.
 
-The panel writes the URL with the History API rather than the router, so it does not refetch the page under it.
-
-By default every navigation in the panel is a history entry, as it would be between pages: opening it, switching rows, opening a document, returning to its list, and closing it again. The back button walks all of that in reverse, so pressing it after a close reopens the panel where you left it. A list's filters, search, sort and paging replace the current entry instead, as Payload's own list does on a page. Set `history: 'replace'` on an overlay and it adds no entries at all: the URL still names the panel, so a link keeps working, but the back button leaves the page, the way it does over one of Payload's drawers.
+To hand somebody a link to what is open right now, build it yourself from `useSettingsOverlay().target` in a button of your own.
 
 A stale link lands on something the reader can open rather than on an error: an item that no longer exists falls back to the first row, and a document that no longer exists to its list.
 
-Set `addressable: false` on an overlay to keep it out of the URL entirely.
+Set `addressable: false` on an overlay to ignore links to it.
 
 ## Try the rest
 

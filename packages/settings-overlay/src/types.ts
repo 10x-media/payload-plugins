@@ -16,12 +16,6 @@ export type LocalizedLabel = Record<string, string> | string
 export type OverlayLayout = 'compact' | 'wide'
 
 /**
- * Whether a navigation inside the panel is a history entry of its own. See
- * `SettingsOverlayConfig.history`.
- */
-export type OverlayHistory = 'push' | 'replace'
-
-/**
  * Server-side door on a whole overlay. Takes the request rather than a narrower set of
  * arguments so one project-level predicate can gate this panel and whatever else you gate.
  * Throwing denies (fail-closed) and logs.
@@ -169,27 +163,12 @@ export type SettingsOverlayComponents = {
 
 export type SettingsOverlayConfig = {
 	access?: OverlayAccess
-	/** Whether the panel is reachable by URL. @default true */
-	addressable?: boolean
 	/**
-	 * How the panel uses the browser's history.
-	 *
-	 * `'push'` makes every navigation an entry, as pages are: opening the panel, switching rows,
-	 * opening a document, returning to its list, and closing the panel again. The back button walks
-	 * all of it in reverse, so pressing it after a close reopens the panel where the reader left it.
-	 * The list's own filters, search, sort and paging replace instead, which is what Payload's list
-	 * does on a page, so the back button does not replay every keystroke.
-	 *
-	 * `'replace'` never adds an entry. The URL still names the panel, so a link to it can be sent and
-	 * survives a reload, but the back button leaves the page, the way it does over one of Payload's
-	 * own drawers.
-	 *
-	 * Has no effect when `addressable` is `false`. The history can only hold what the URL holds, and
-	 * a panel kept out of the URL is invisible to the back button either way.
-	 *
-	 * @default 'push'
+	 * Whether a link can open the panel: `?settings=<overlay>/<item>[/<id>]` on any admin URL, read
+	 * when the page loads and whenever a navigation brings a new value. The panel never writes the
+	 * URL itself, so it adds no history entries either way. @default true
 	 */
-	history?: OverlayHistory
+	addressable?: boolean
 	/** Extra class beside `settings-overlay` and `settings-overlay--<id>`. */
 	className?: string
 	components?: SettingsOverlayComponents
@@ -243,13 +222,7 @@ export type SettingsOverlayPluginOptions = {
 	/** Applied to every overlay; each overlay may override them. */
 	defaults?: Pick<
 		SettingsOverlayConfig,
-		| 'addressable'
-		| 'components'
-		| 'hideEntities'
-		| 'history'
-		| 'layout'
-		| 'mergeListHeader'
-		| 'searchable'
+		'addressable' | 'components' | 'hideEntities' | 'layout' | 'mergeListHeader' | 'searchable'
 	>
 	/**
 	 * Disable the plugin entirely (incoming config returned untouched).
@@ -266,7 +239,8 @@ export type SettingsOverlayPluginOptions = {
 	 *
 	 * `'server-function'` registers no widget. In exchange you spread
 	 * `settingsOverlayServerFunctions` into `handleServerFunctions` in your
-	 * `app/(payload)/layout.tsx`. Payload has no config-level way to register a server function,
+	 * `app/(payload)/layout.tsx` (TanStack Start: `src/app/_payload/server.functions.ts`). Payload
+	 * has no config-level way to register a server function,
 	 * so this is the only contract-backed route, and the only one that costs an edit.
 	 *
 	 * Neither applies when no overlay holds a lazy item.
@@ -340,7 +314,6 @@ export type Manifest = {
 export type ClientOverlay = {
 	addressable: boolean
 	className?: string
-	history: OverlayHistory
 	id: string
 	label: LocalizedLabel
 	layout: OverlayLayout
