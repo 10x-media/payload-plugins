@@ -1,0 +1,42 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x.
+---
+
+`@10x-media/document-preview` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin runs on Next.js and TanStack Start.
+
+## Checklist
+
+1. Upgrade `@10x-media/document-preview` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.7`.
+2. Remove `display` from every collection's options (see [The preview moved into the file panel](#the-preview-moved-into-the-file-panel)).
+3. Regenerate the import map (`pnpm payload generate:importmap`). The plugin adds no database fields, so there is nothing to migrate.
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## The preview moved into the file panel
+
+Payload 4 shows the file of an upload document in a panel beside the fields, and lets a collection render its own preview there (`upload.admin.components.filePreview`). The plugin's viewers now live in that panel, so a document view shows its file without a click. That replaces both edit view surfaces of the Payload 3 line:
+
+- the **Preview** button beside **Save** and its drawer (`display: 'drawer'`, the old default);
+- the inline preview above the fields (`display: 'inline'`), with its `documentPreview` UI field.
+
+`display` is gone; TypeScript flags it, and at runtime it is ignored. `display: 'both'` and `'inline'` installs have no field to migrate: the inline preview was a UI field and stored nothing. A collection field of your own named `documentPreview` is no longer a config error.
+
+`listView` is unchanged: the list column still opens the file in a drawer, now as wide as the file panel. `PreviewDrawer` and `DocumentPreview` are still exported for your own components; `DocumentPreviewButton` and `DocumentPreviewInlineField` are not.
+
+## Images, video, audio and PDF stay with Payload
+
+Payload 4 previews images (a thumbnail with its sizes), video, audio and PDF in the file panel itself. The plugin leaves those four to Payload by default and takes every other type. To keep the plugin's viewers for them (image zoom and pan, the too-large and failure cards, a link card on browsers without a PDF viewer), set `nativePreviews: false` on the plugin or on a collection:
+
+```ts title="payload.config.ts"
+documentPreview({
+  collections: { media: true },
+  nativePreviews: false,
+})
+```
+
+A [custom viewer](/document-preview/custom-viewers) for one of these types takes the panel either way. The list drawer always uses the plugin's viewers.
+
+## If the collection sets `filePreview` itself
+
+A collection whose `upload.admin.components.filePreview` is one component for every file keeps it, and the plugin adds nothing to its panel. A `filePreview` map keeps its own entries and gains the plugin's for the mime types it does not list. See [surfaces](/document-preview/surfaces#file-panel).
