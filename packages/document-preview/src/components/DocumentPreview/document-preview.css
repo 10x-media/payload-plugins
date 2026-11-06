@@ -231,6 +231,14 @@
 	min-height: 0;
 }
 
+/* The preview frame already draws the border; drop the field chrome of Payload's code editor. */
+.document-preview-code .code-editor {
+	background: transparent;
+	border: 0;
+	border-radius: 0;
+	padding: 0;
+}
+
 /* Prose typography after admin-wiki's guide article: a reading size above
    Payload's 13px form scale, headings in em off it, a capped measure. */
 .document-preview-markdown {
