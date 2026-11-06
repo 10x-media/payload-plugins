@@ -44,7 +44,37 @@
 		"@10x-media/webhooks": "4.0.0-alpha.0",
 		"@10x-media/webhooks-dev": "0.0.1-beta.6",
 		"@10x-media/plugin-template": "0.0.0",
-		"@10x-media/payload-test-harness": "0.0.0"
+		"@10x-media/payload-test-harness": "0.0.0",
+		"@10x-media/admin-wiki-dev-tanstack": "0.0.0",
+		"@10x-media/analytics-dev-tanstack": "0.0.0",
+		"@10x-media/audit-logs-dev-tanstack": "0.0.0",
+		"@10x-media/automations-dev-tanstack": "0.0.0",
+		"@10x-media/content-lock-dev-tanstack": "0.0.0",
+		"@10x-media/conversations-dev-tanstack": "0.0.0",
+		"@10x-media/dedupe-dev-tanstack": "0.0.0",
+		"@10x-media/document-preview-dev-tanstack": "0.0.0",
+		"@10x-media/dual-session-dev-tanstack": "0.0.0",
+		"@10x-media/fields-dev-tanstack": "0.0.0",
+		"@10x-media/folder-picker-dev-tanstack": "0.0.0",
+		"@10x-media/form-builder-dev-tanstack": "0.0.0",
+		"@10x-media/form-variants-dev-tanstack": "0.0.0",
+		"@10x-media/impersonation-dev-tanstack": "0.0.0",
+		"@10x-media/jobs-dev-tanstack": "0.0.0",
+		"@10x-media/settings-overlay-dev-tanstack": "0.0.0",
+		"@10x-media/undo-redo-dev-tanstack": "0.0.0",
+		"@10x-media/webhooks-dev-tanstack": "0.0.0"
 	},
-	"changesets": []
+	"changesets": [
+		"admin-wiki-payload-4",
+		"audit-logs-payload-4",
+		"content-lock-payload-4",
+		"dedupe-payload-4",
+		"document-preview-payload-4",
+		"dual-session-payload-4",
+		"fields-payload-4",
+		"impersonation-payload-4",
+		"jobs-payload-4",
+		"settings-overlay-payload-4",
+		"undo-redo-payload-4"
+	]
 }

@@ -1,5 +1,12 @@
 # @10x-media/undo-redo-dev
 
+## 0.0.1-alpha.4
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/undo-redo@4.0.0-alpha.1
+
 ## 0.0.1-beta.3
 
 ### Patch Changes
