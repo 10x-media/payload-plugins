@@ -6,19 +6,20 @@ import { describe, expect, it } from 'vitest'
  * the assumption stops holding, so the reason to change the code arrives as a red test rather
  * than as a memory.
  *
- * Both read the installed files rather than importing them: `@payloadcms/next` does not export
- * its own `package.json`, and importing `@payloadcms/ui` in Node pulls stylesheets a test runner
- * cannot load. The published surface is what these assertions are about anyway.
+ * They read the installed files rather than importing them: importing `@payloadcms/ui` in Node
+ * pulls stylesheets a test runner cannot load. The published surface is what these assertions are
+ * about anyway.
  */
 const readDist = (relative: string): Promise<string> =>
 	readFile(new URL(`../../node_modules/${relative}`, import.meta.url), 'utf8')
 
 describe('payload canaries', () => {
 	it('render-widget is still a built-in server function', async () => {
-		const source = await readDist('@payloadcms/next/dist/utilities/handleServerFunctions.js')
+		const source = await readDist('@payloadcms/ui/dist/utilities/serverFunctionRegistry.js')
 
-		// `client/transport.ts` and `server/widgetDispatcher.tsx` ride this name. If it goes, the
-		// lazy tier needs a new channel.
+		// `client/transport.ts` and `server/widgetDispatcher.tsx` ride this name. Every framework
+		// adapter dispatches from this one registry; if the name goes, the lazy tier needs a new
+		// channel.
 		expect(source).toContain("'render-widget'")
 		expect(source).toContain('renderWidgetHandler')
 	})

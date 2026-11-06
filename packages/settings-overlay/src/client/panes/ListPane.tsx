@@ -2,6 +2,7 @@
 
 import { getTranslation } from '@payloadcms/translations'
 import {
+	Button,
 	ListDrawerContextProvider,
 	toast,
 	useAuth,
@@ -12,7 +13,7 @@ import {
 import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ListQuery } from 'payload'
 import type React from 'react'
-import { useCallback, useEffect, useMemo } from 'react'
+import { Suspense, useCallback, useDeferredValue, useEffect, useMemo } from 'react'
 
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
@@ -52,6 +53,12 @@ export const ListPane: React.FC<{
 		placeholderData: keepPreviousData,
 	})
 
+	// The list is a server-rendered tree, and on TanStack Start a fresh one suspends as it mounts
+	// (see `DocumentPane`). The first one shows the skeleton below; every later one is deferred, so
+	// the list in view stays until the next is ready rather than giving way to a fallback, which
+	// would also drop focus from its search box between two keystrokes.
+	const list = useDeferredValue(data)
+
 	useEffect(() => {
 		if (error) {
 			toast.error(error instanceof Error ? error.message : t(keys.loadFailed))
@@ -78,20 +85,27 @@ export const ListPane: React.FC<{
 	const CreateButton = useMemo(
 		() =>
 			function SettingsOverlayCreateButton({
+				buttonStyle,
 				children,
 				className,
 			}: {
+				buttonStyle?: React.ComponentProps<typeof Button>['buttonStyle']
 				children?: React.ReactNode
 				className?: string
 			}) {
-				// `doc-drawer__toggler` is the class Payload's own toggler carries: it strips the
-				// browser's button chrome so only the pill inside shows, exactly as on a page.
+				// Payload's own toggler renders a `Button` when the list asks for a style (its header
+				// asks for `secondary`) and a bare button otherwise; this one follows it, with the
+				// same `doc-drawer__toggler` class, and switches the pane instead of opening a drawer.
+				const togglerClass = [className, 'doc-drawer__toggler'].filter(Boolean).join(' ')
+				if (buttonStyle) {
+					return (
+						<Button buttonStyle={buttonStyle} className={togglerClass} onClick={onCreate}>
+							{children}
+						</Button>
+					)
+				}
 				return (
-					<button
-						className={[className, 'doc-drawer__toggler'].filter(Boolean).join(' ')}
-						onClick={onCreate}
-						type="button"
-					>
+					<button className={togglerClass} onClick={onCreate} type="button">
 						{children}
 					</button>
 				)
@@ -123,7 +137,7 @@ export const ListPane: React.FC<{
 				value: collectionSlug as never,
 			}}
 		>
-			{data}
+			<Suspense fallback={<ListSkeleton />}>{list}</Suspense>
 		</ListDrawerContextProvider>
 	)
 }

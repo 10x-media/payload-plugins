@@ -35,7 +35,7 @@ export type SettingsOverlayServerProps = {
 export const SettingsOverlayServer = async (
 	props: SettingsOverlayServerProps
 ): Promise<React.ReactNode> => {
-	const { children, i18n, payload, permissions, user } = props
+	const { children, i18n, payload, permissions, server, user } = props
 
 	const registry = payload?.config ? getRegistry(payload.config) : undefined
 
@@ -61,7 +61,7 @@ export const SettingsOverlayServer = async (
 		)
 	}
 
-	const req = await buildProviderReq({ i18n, payload, user })
+	const req = await buildProviderReq({ i18n, payload, server, user })
 	const entities = lookupFromConfig(payload.config)
 	const groupPrefs = await getGroupPrefs(req)
 	// `getTranslation` widens to a JSX element for rich labels; a rail row is text, so the

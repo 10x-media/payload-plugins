@@ -26,7 +26,7 @@ declare module 'payload' {
  */
 export const settingsOverlay = definePlugin<SettingsOverlayPluginOptions>({
 	slug: '@10x-media/settings-overlay',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config, options }): Config => {
 		if (options.disabled === true) {
 			return config
 		}

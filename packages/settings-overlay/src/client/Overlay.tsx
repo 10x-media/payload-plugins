@@ -2,11 +2,11 @@
 
 import {
 	BulkUploadProvider,
+	Button,
 	ChevronIcon,
 	EditDepthProvider,
 	EntityVisibilityProvider,
 	Modal,
-	Pill,
 	useAuth,
 	useConfig,
 	useModal,
@@ -319,7 +319,7 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 			/>
 			<div className={`${base}__panel`} ref={panelRef} role="document" tabIndex={-1}>
 				<EntityVisibilityProvider visibleEntities={NO_VISIBLE_ENTITIES}>
-					<BulkUploadProvider drawerSlugPrefix={slug}>
+					<BulkUploadProvider modalSlugPrefix={slug}>
 						<EditDepthProvider>
 							<SettingsPanelContext value={panelState}>
 								<SettingsOverlayEmbedContext value={embed}>
@@ -332,14 +332,15 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 												{slots?.Header ?? (
 													<header className={`${base}__pane-header`}>
 														{canGoBack ? (
-															<button
+															<Button
 																aria-label={t(keys.back)}
-																className={`${base}__icon-button`}
+																buttonStyle="ghost"
+																className={`${base}__back`}
+																icon={<ChevronIcon className={`${base}__back-icon`} />}
+																margin={false}
 																onClick={goBack}
-																type="button"
-															>
-																<ChevronIcon className={`${base}__back-icon`} />
-															</button>
+																size="medium"
+															/>
 														) : null}
 														<h3 className={`${base}__pane-title`} id={titleId}>
 															{activeItem?.label ?? manifest.label}
@@ -355,14 +356,15 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 																}}
 															/>
 														) : null}
-														<button
+														<Button
 															aria-label={t(keys.close)}
-															className={`${base}__icon-button ${base}__close`}
+															buttonStyle="ghost"
+															className={`${base}__close`}
+															icon={<XIcon />}
+															margin={false}
 															onClick={requestClose}
-															type="button"
-														>
-															<XIcon />
-														</button>
+															size="medium"
+														/>
 													</header>
 												)}
 												<div className={`${base}__pane-body`}>
@@ -389,11 +391,11 @@ export const SettingsPanel: React.FC<{ overlay: ClientOverlay; slots?: OverlaySl
 /**
  * The list's own Create button, lifted into the pane header when `mergeListHeader` is on.
  *
- * Payload's markup and translation rather than a lookalike: the same `Pill` at the same size
- * under the same `list-header__create-new-button` class, labelled with its own
- * `general:createNew`, so a host styling that class styles this too and the label is translated
- * everywhere Payload is. Only the toggler differs, because the pane switches to the create form
- * in place instead of opening a nested drawer.
+ * Payload's markup and translation rather than a lookalike: the same secondary `Button` under the
+ * same `list-header__create-new-button` class, labelled with its own `general:createNew`, so a
+ * host styling that class styles this too and the label is translated everywhere Payload is. Only
+ * the click differs, because the pane switches to the create form in place instead of opening a
+ * nested drawer.
  */
 const CreateNewButton: React.FC<{ collectionSlug: string; onCreate: () => void }> = ({
 	collectionSlug,
@@ -407,13 +409,15 @@ const CreateNewButton: React.FC<{ collectionSlug: string; onCreate: () => void }
 	}
 
 	return (
-		<button
-			className={`list-header__create-new-button doc-drawer__toggler ${base}__create`}
+		<Button
+			buttonStyle="secondary"
+			className={`list-header__create-new-button ${base}__create`}
+			margin={false}
 			onClick={onCreate}
-			type="button"
+			size="medium"
 		>
-			<Pill size="small">{t('general:createNew')}</Pill>
-		</button>
+			{t('general:createNew')}
+		</Button>
 	)
 }
 

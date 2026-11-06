@@ -1,8 +1,14 @@
 'use client'
 
-import { ConfirmationModal, useAuth, useModal } from '@payloadcms/ui'
+import {
+	ConfirmationModal,
+	useAuth,
+	useModal,
+	usePathname,
+	useRouter,
+	useSearchParams,
+} from '@payloadcms/ui'
 import { QueryClientProvider } from '@tanstack/react-query'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
 import type { ListQuery } from 'payload'
 import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -14,6 +20,7 @@ import type { ClientOverlay, Manifest } from '../types'
 import { InternalBadgeProvider } from './badges'
 import { SettingsOverlayContext, type SettingsOverlayContextValue } from './context'
 import { SettingsPanel } from './Overlay'
+import { pushStateWithoutLoad } from './pushState'
 import { createOverlayQueryClient } from './queries'
 import { readerKey } from './readerKey'
 import type { OverlaySlots } from './slots'
@@ -45,8 +52,9 @@ export type SettingsOverlayClientProps = {
  * Owns which overlay is open and what it points at, and mounts each panel once.
  *
  * The URL carries `?settings=<overlay>/<item>[/<id>]`, written with the History API rather than
- * the router so opening a panel does not refetch the page underneath. Next reflects
- * pushState/replaceState into `useSearchParams`, and popstate carries the address back into the
+ * the router so opening a panel does not refetch the page underneath. A replace goes through the
+ * router adapter's `replaceState` and a push through `pushStateWithoutLoad`, which both keep
+ * TanStack Router from loading the route again, and popstate carries the address back into the
  * state, so the back button moves the panel exactly as far as the URL moved.
  *
  * Whether a navigation is an entry of its own is the overlay's `history` option. The panel never
@@ -130,12 +138,14 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 				overlayId !== null &&
 				historyModes.get(overlayId) === 'push'
 			) {
-				window.history.pushState(null, '', url)
+				pushStateWithoutLoad(url)
+			} else if (router.replaceState) {
+				router.replaceState(url)
 			} else {
 				window.history.replaceState(null, '', url)
 			}
 		},
-		[addressable, historyModes, pathname]
+		[addressable, historyModes, pathname, router]
 	)
 
 	// Signing in and out are client navigations, which leave the root layout, and with it the
@@ -175,8 +185,15 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 	// somebody else's navigation, typically an embedded view paging with `router.push('?page=2')`,
 	// which rewrites the whole query string: the panel stays open and puts its parameters back
 	// beside theirs. Closing is only ever decided by `close()` or popstate.
+	//
+	// The router's search params only say *when* the URL changed. What it says is read from
+	// `window.location`: TanStack Router never sees the panel's own History API writes, so its
+	// params can still name the panel's previous target, and following them would undo the write.
+	const searchKey = searchParams.toString()
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `searchKey` is the change this waits for, not a value it reads.
 	useEffect(() => {
-		const fromUrl = parseParam(searchParams.get(SEARCH_PARAM), searchParams.get(QUERY_PARAM))
+		const params = new URLSearchParams(window.location.search)
+		const fromUrl = parseParam(params.get(SEARCH_PARAM), params.get(QUERY_PARAM))
 		const current = stateRef.current
 		if (fromUrl.overlayId) {
 			if (addressable.has(fromUrl.overlayId) && !sameUrlState(current, fromUrl)) {
@@ -187,7 +204,7 @@ export const SettingsOverlayClient: React.FC<SettingsOverlayClientProps> = ({
 		if (current.overlayId) {
 			writeUrl(current, 'replace')
 		}
-	}, [addressable, searchParams, writeUrl])
+	}, [addressable, searchKey, writeUrl])
 
 	const open = useCallback<SettingsOverlayContextValue['open']>(
 		(overlayId, target = {}) => {

@@ -1,6 +1,6 @@
 import type { SettingsOverlayEmbedServer } from '@10x-media/settings-overlay/types'
-import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps } from 'payload'
 import type React from 'react'
 
@@ -25,20 +25,20 @@ export const DevReportView: React.FC<Props> = ({
 	settingsOverlayEmbed,
 }) => {
 	const body = (
-		<div style={{ display: 'grid', gap: 12 }}>
+		<div style={{ display: 'grid', gap: 'var(--spacer-2-5)' }}>
 			<h2 style={{ margin: 0 }}>Dev report</h2>
-			<p style={{ color: 'var(--theme-elevation-600)', margin: 0 }}>
+			<p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
 				{settingsOverlayEmbed
 					? `Rendering inside the "${settingsOverlayEmbed.overlayId}" panel, so the admin chrome is left out.`
 					: 'Rendering as a page, with the usual sidebar and header.'}
 			</p>
 			<pre
 				style={{
-					background: 'var(--theme-elevation-50)',
-					borderRadius: 4,
+					background: 'var(--color-bg-secondary)',
+					borderRadius: 'var(--radius-medium)',
 					margin: 0,
 					overflowX: 'auto',
-					padding: 12,
+					padding: 'var(--spacer-2-5)',
 				}}
 			>
 				{JSON.stringify({ searchParams, user: initPageResult?.req?.user?.email }, null, 2)}
@@ -47,7 +47,7 @@ export const DevReportView: React.FC<Props> = ({
 	)
 
 	if (settingsOverlayEmbed) {
-		return <div style={{ padding: 20 }}>{body}</div>
+		return <div style={{ padding: 'var(--spacer-4)' }}>{body}</div>
 	}
 
 	return (

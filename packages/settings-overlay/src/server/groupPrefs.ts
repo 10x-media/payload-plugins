@@ -27,6 +27,7 @@ export const getGroupPrefs = cache(
 			collection: 'payload-preferences',
 			depth: 0,
 			limit: 1,
+			overrideAccess: true,
 			pagination: false,
 			req,
 			where: {

@@ -13,27 +13,27 @@ export const DevStats = async (props: Partial<SettingsOverlayItemServerProps>) =
 	}
 
 	const [tags, posts, redirects] = await Promise.all([
-		req.payload.count({ collection: 'tags' }),
-		req.payload.count({ collection: 'posts' }),
-		req.payload.count({ collection: 'redirects' }),
+		req.payload.count({ collection: 'tags', req }),
+		req.payload.count({ collection: 'posts', req }),
+		req.payload.count({ collection: 'redirects', req }),
 	])
 
 	return (
 		<div style={{ display: 'grid', gap: 16, padding: 20 }}>
 			<h4 style={{ margin: 0 }}>Lazy server component</h4>
-			<p style={{ margin: 0, color: 'var(--theme-elevation-600)' }}>
+			<p style={{ margin: 0, color: 'var(--color-text-secondary)' }}>
 				Fetched on open through `render-widget`, with a real request. Counted at{' '}
 				{new Date().toLocaleTimeString()} for {req.user?.email ?? 'nobody'}.
 			</p>
-			<ul style={{ margin: 0, paddingInlineStart: 20 }}>
+			<ul style={{ margin: 0, listStyle: 'disc', paddingInlineStart: 20 }}>
 				<li>tags: {tags.totalDocs}</li>
 				<li>posts: {posts.totalDocs}</li>
 				<li>redirects: {redirects.totalDocs}</li>
 			</ul>
 			<pre
 				style={{
-					background: 'var(--theme-elevation-50)',
-					borderRadius: 4,
+					background: 'var(--color-bg-secondary)',
+					borderRadius: 'var(--radius-medium)',
 					margin: 0,
 					padding: 12,
 				}}

@@ -136,7 +136,7 @@ describe('settingsOverlay factory', () => {
 		expect(sites?.admin?.hidden).toBeUndefined()
 		expect(branding?.admin?.hidden).toBe(true)
 		// A global has no delete, duplicate or restore, so it takes the reporter alone.
-		expect(branding?.admin?.components?.elements?.beforeDocumentControls).toEqual([REPORTER_PATH])
+		expect(branding?.admin?.components?.edit?.beforeDocumentControls).toEqual([REPORTER_PATH])
 	})
 
 	it('leaves entities visible by default, because the panel is not a replacement view', () => {

@@ -3,12 +3,13 @@
 import { toast, useDocumentEvents, useServerFunctions } from '@payloadcms/ui'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type React from 'react'
-import { useEffect, useRef } from 'react'
+import { Suspense, useEffect, useRef } from 'react'
 
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
 import { documentQuery, overlayKeys } from '../queries'
 import { DocumentSkeleton } from '../skeletons'
+import { usePageStepNav } from '../stepNav'
 
 /**
  * Payload's edit view, hosted in the pane, for a collection document, the create form
@@ -34,6 +35,7 @@ export const DocumentPane: React.FC<{
 	const { mostRecentUpdate } = useDocumentEvents()
 	const queryClient = useQueryClient()
 	const { t } = useTranslation()
+	usePageStepNav()
 
 	// The provider keeps the last document event around, so identity against what this pane saw
 	// at mount is the only reliable "this happened here" test. Timestamps are not.
@@ -86,5 +88,8 @@ export const DocumentPane: React.FC<{
 	if (error || data === null) {
 		return <p className="settings-overlay__empty">{t(keys.loadFailed)}</p>
 	}
-	return <>{data}</>
+	// A server-rendered tree can suspend as it mounts: on TanStack Start its client references and
+	// lazy chunks resolve after the response does. Without a boundary of its own the nearest one is
+	// the app's, which hides the whole admin for that moment, so the pane keeps its skeleton up.
+	return <Suspense fallback={<DocumentSkeleton />}>{data}</Suspense>
 }

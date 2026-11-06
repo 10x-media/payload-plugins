@@ -4,9 +4,9 @@ import { useSettingsOverlay } from '@10x-media/settings-overlay/client'
 import type React from 'react'
 
 const buttonStyle: React.CSSProperties = {
-	background: 'var(--theme-elevation-50)',
-	border: '1px solid var(--theme-elevation-150)',
-	borderRadius: 4,
+	background: 'var(--color-bg-secondary)',
+	border: 'var(--stroke-width-small) solid var(--color-border)',
+	borderRadius: 'var(--radius-medium)',
 	color: 'inherit',
 	cursor: 'pointer',
 	font: 'inherit',
@@ -26,7 +26,7 @@ export const OverlayLaunchers: React.FC = () => {
 	const settings = useSettingsOverlay()
 
 	return (
-		<div style={{ display: 'grid', gap: 6, padding: '0 var(--base) var(--base)' }}>
+		<div style={{ display: 'grid', gap: 6, padding: '0 var(--spacer-3) var(--spacer-3)' }}>
 			<button onClick={() => settings.toggle('system')} style={buttonStyle} type="button">
 				Open system settings
 			</button>

@@ -154,7 +154,7 @@ test.describe('the rail', () => {
 
 	test('search narrows the rail without closing the open pane', async ({ page }) => {
 		await page.goto('/admin?settings=workspace/notes')
-		const search = rail(page).locator('.settings-overlay__search-input')
+		const search = rail(page).locator('.settings-overlay__search input')
 		await search.fill('scratch')
 		await expect(row(page, 'Notes')).toBeVisible()
 		await expect(page.locator('.settings-overlay__pane-body')).toContainText('Eager component')
@@ -162,14 +162,14 @@ test.describe('the rail', () => {
 
 	test('search matches a keyword the label does not contain', async ({ page }) => {
 		await page.goto('/admin?settings=workspace')
-		await rail(page).locator('.settings-overlay__search-input').fill('keyboard')
+		await rail(page).locator('.settings-overlay__search input').fill('keyboard')
 		await expect(row(page, 'Shortcuts')).toBeVisible()
 		await expect(row(page, 'Dashboard')).toHaveCount(0)
 	})
 
 	test('search keeps only the rows that match, across groups', async ({ page }) => {
 		await page.goto('/admin?settings=workspace')
-		await rail(page).locator('.settings-overlay__search-input').fill('overview')
+		await rail(page).locator('.settings-overlay__search input').fill('overview')
 		await expect(row(page, 'Dashboard')).toBeVisible()
 		await expect(row(page, 'Documentation')).toBeVisible()
 		await expect(row(page, 'Exports')).toHaveCount(0)
@@ -184,7 +184,7 @@ test.describe('the rail', () => {
 		await rail(page).locator('.settings-overlay__rail-group-toggle', { hasText: 'Help' }).click()
 		await expect(row(page, 'Shortcuts')).toBeHidden()
 
-		await rail(page).locator('.settings-overlay__search-input').fill('keyboard')
+		await rail(page).locator('.settings-overlay__search input').fill('keyboard')
 		await expect(row(page, 'Shortcuts')).toBeVisible()
 	})
 
@@ -200,7 +200,7 @@ test.describe('the rail', () => {
 
 	test('search finds nothing and says so', async ({ page }) => {
 		await page.goto('/admin?settings=workspace')
-		await rail(page).locator('.settings-overlay__search-input').fill('zzz')
+		await rail(page).locator('.settings-overlay__search input').fill('zzz')
 		await expect(rail(page).locator('.settings-overlay__rail-empty')).toBeVisible()
 	})
 

@@ -31,7 +31,7 @@ const withPanelComponents = (collection: CollectionConfig, hide: boolean): Colle
 
 /** A global has no delete, duplicate or restore, so it takes the reporter alone. */
 const withReporterGlobal = (global: GlobalConfig, hide: boolean): GlobalConfig => {
-	const existing = global.admin?.components?.elements?.beforeDocumentControls ?? []
+	const existing = global.admin?.components?.edit?.beforeDocumentControls ?? []
 	return {
 		...global,
 		admin: {
@@ -39,8 +39,8 @@ const withReporterGlobal = (global: GlobalConfig, hide: boolean): GlobalConfig =
 			...(hide ? { hidden: true } : {}),
 			components: {
 				...global.admin?.components,
-				elements: {
-					...global.admin?.components?.elements,
+				edit: {
+					...global.admin?.components?.edit,
 					beforeDocumentControls: [...existing, REPORTER_PATH],
 				},
 			},
