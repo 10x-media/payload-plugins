@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { readdir, readFile } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -9,7 +10,16 @@ import { loadRemoteFixtures } from './remoteFixtures'
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
 
-const seedFilesDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../seed-files')
+/**
+ * The committed fixtures. Next keeps `import.meta.url` on this source file, but the TanStack Start
+ * build bundles it into `dev-tanstack/dist/server/assets`, where `../seed-files` does not exist;
+ * `srvx` runs from `dev-tanstack`, so the working directory finds them there.
+ */
+const seedFilesDir =
+	[
+		path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../seed-files'),
+		path.resolve(process.cwd(), '../dev/seed-files'),
+	].find((dir) => existsSync(dir)) ?? ''
 
 /** Mimes for the fixtures, set explicitly so the dev data does not depend on sniffing. */
 const MIME_BY_EXTENSION: Record<string, string> = {

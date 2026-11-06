@@ -7,9 +7,17 @@ const dirname = path.dirname(fileURLToPath(import.meta.url))
 
 const mongoPort = process.env.MONGO_E2E_PORT ?? '37017'
 const pgPort = process.env.PG_E2E_PORT ?? '35432'
-const nextPort = process.env.E2E_NEXT_PORT ?? '3100'
+/** The app's port. The name predates the TanStack Start leg, which uses it as well. */
+const appPort = process.env.E2E_NEXT_PORT ?? '3100'
 
-const baseURL = `http://localhost:${nextPort}`
+/**
+ * `E2E_FRAMEWORK=tanstack` runs the suite on the TanStack Start dev app's production build, served
+ * by `srvx`; anything else on the Next dev app's, served by `next start`. `scripts/e2e.sh` builds
+ * whichever one it is.
+ */
+const tanstack = process.env.E2E_FRAMEWORK === 'tanstack'
+
+const baseURL = `http://localhost:${appPort}`
 
 export default defineConfig({
 	testDir: './tests/e2e',
@@ -26,17 +34,22 @@ export default defineConfig({
 	},
 	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 	webServer: {
-		command: 'pnpm --filter @10x-media/document-preview-dev start',
+		command: tanstack
+			? 'pnpm --filter @10x-media/document-preview-dev-tanstack start'
+			: 'pnpm --filter @10x-media/document-preview-dev start',
 		cwd: path.resolve(dirname, '..', '..'),
 		url: `${baseURL}/admin`,
 		reuseExistingServer: !process.env.CI,
 		timeout: 120_000,
 		env: {
-			PORT: nextPort,
+			PORT: appPort,
 			DEV_DB: process.env.DEV_DB ?? 'mongo',
 			DATABASE_URI_MONGO: `mongodb://localhost:${mongoPort}/document-preview_e2e?replicaSet=rs0&directConnection=true`,
 			DATABASE_URI_POSTGRES: `postgres://e2e:e2e@localhost:${pgPort}/document-preview_e2e`,
-			PAYLOAD_SECRET: 'e2e-secret',
+			// At least 16 bytes: a plugin that stores anything through `encryptedField` derives its
+			// key from this, and `@10x-media/fields` refuses to derive one from less, which fails
+			// Payload's init and leaves every e2e test running against an empty admin.
+			PAYLOAD_SECRET: 'e2e-secret-material-32-bytes-minimum!!',
 		},
 	},
 })

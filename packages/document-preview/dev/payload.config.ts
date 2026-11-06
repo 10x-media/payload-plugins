@@ -59,9 +59,11 @@ export default buildConfig({
 	collections: [users, media, posts],
 	plugins: [
 		documentPreview({
-			collections: { media: { display: 'both', listView: true } },
+			collections: { media: { listView: true } },
 			// A host viewer and a host icon, the two ways the plugin extends, both for 3D models.
 			fileIcons: { types: { 'model/*': { color: '#0EA5E9', label: '3D' } } },
+			// `DEV_NATIVE_PREVIEWS=0` shows the plugin's viewers for images, video, audio and PDF too.
+			nativePreviews: process.env.DEV_NATIVE_PREVIEWS !== '0',
 			viewers: { 'model/*': '/viewers/ModelViewer#ModelViewer' },
 		}),
 	],
