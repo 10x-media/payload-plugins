@@ -12,6 +12,7 @@
 	},
 	"dependencies": {
 		"@10x-media/dedupe": "workspace:*",
+		"@10x-media/form-variants": "workspace:*",
 		"@10x-media/audit-logs": "workspace:*",
 		"@payloadcms/db-mongodb": "catalog:",
 		"@payloadcms/db-postgres": "catalog:",
