@@ -9,12 +9,16 @@ const PAGE = new URL(
 	import.meta.url
 )
 
-/** An install that mounts every endpoint the plugin has: native, a binding, the exclusion link, flags. */
+/**
+ * An install that mounts every endpoint the plugin has: native, a binding, the exclusion link, flags,
+ * provider documents.
+ */
 const everyEndpoint = async (): Promise<Config> =>
 	(await analytics({
 		adapters: [native()],
 		capture: { gate: 'off', exclusion: true },
 		collections: { pages: { pathField: 'slug' } },
+		providers: { collection: true },
 	})({ collections: [] } as unknown as Config)) as Config
 
 describe('the endpoints reference', () => {

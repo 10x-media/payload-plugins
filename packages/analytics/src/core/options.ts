@@ -287,6 +287,11 @@ export type ProvidersCollectionOptions = {
 	 * enabled and scope. Default: the collection's own read access.
 	 */
 	sourceAccess?: Access
+	/**
+	 * The collection each document's last connection result is kept in, which reads and the Test
+	 * connection button write: `slug` defaults to `analytics-provider-status`.
+	 */
+	status?: AnalyticsCollectionOptions
 }
 
 export type ProvidersOptions = {
@@ -907,6 +912,7 @@ export interface ResolvedOptions {
 			/** The types the install serves, `types` applied; filled whether the collection is on or not. */
 			types: readonly ProviderId[]
 			sourceAccess?: Access
+			status: ResolvedCollectionOption
 		}
 		resolve?: ProvidersResolve
 		/** `providers.hosts`, for the collection's documents and the rows `resolve` reads alike. */

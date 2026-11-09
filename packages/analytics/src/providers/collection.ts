@@ -29,6 +29,7 @@ import { validatePosthogHost, validatePosthogRegion, validateProviderHost } from
 import { retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
 import { stampScope } from './stampScope'
+import { removeProviderStatus } from './status'
 
 export const PROVIDERS_SLUG = 'analytics-providers'
 
@@ -150,6 +151,8 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	staticLabel?: StaticLabelFor
 	/** Mount the list's note on the platform fallback, for an install with a `fallback` policy. */
 	listNotice?: boolean
+	/** The provider status collection, whose row of a deleted document goes with it. */
+	statusSlug?: string
 }
 
 const plainSecret: BuildSecretField = (source) => [source]
@@ -652,7 +655,10 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 				},
 			],
 			afterDelete: [
-				async ({ doc, req }) => {
+				async ({ doc, id, req }) => {
+					if (args.statusSlug) {
+						await removeProviderStatus(req, args.statusSlug, String(id))
+					}
 					await args.onChange({ scope: docScope(doc, args.scopeField) }, req)
 					return doc
 				},

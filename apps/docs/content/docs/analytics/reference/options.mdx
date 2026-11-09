@@ -170,6 +170,9 @@ Bindings, keyed by collection slug: how a document's [display fields](/analytics
 | `providers.collection.defaultAccess` | `FieldAccess \| { create?, update? }` | `connectionAccess`, else its default | Who may set or change a document's **Default for this site** checkbox on a scoped install; a denied value is dropped ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)). |
 | `providers.collection.defaultAccess.create`, `providers.collection.defaultAccess.update` | `FieldAccess` | as above | One operation each. |
 | `providers.collection.sourceAccess` | `Access` | the collection's read access | Which of a scope's documents a reader reads analytics through ([Who reads through a document](/analytics/providers#who-reads-through-a-document)). |
+| `providers.collection.status` | `{ slug?, overrides? }` | | The collection each document's last connection result is kept in ([Checking a connection](/analytics/providers#checking-a-connection)). |
+| `providers.collection.status.slug` | `string` | `'analytics-provider-status'` | Its slug. |
+| `providers.collection.status.overrides` | `(collection) => CollectionConfig` | none | Reshapes it, within what the plugin reads and writes. |
 | `providers.resolve` | `({ payload, req?, scope, fetch, hosts, sdks }) => AnalyticsAdapter[]` | none | Replaces the collection: a scope's adapters from a store of your own ([Keeping the settings somewhere else](/analytics/providers#keeping-the-settings-somewhere-else)). |
 | `providers.hosts` | `{ allow?, allowPrivateNetwork? }` | | Where provider documents may connect ([Where a document may connect](/analytics/providers#where-a-document-may-connect)). |
 | `providers.hosts.allow` | `string[]` | `[]`: each vendor's own cloud only | Further origins a document's host may name; `https://*.example.com` covers every subdomain. |
@@ -282,7 +285,7 @@ analytics({
 })
 ```
 
-A switched-off install registers the same collections with the same fields and indexes (providers, goals, sync, cache, the native engine's three when `native()` is listed, and `analytics-state` for sync or warming) and the same task names in Payload's jobs, so a development push or a generated migration drops nothing, and every row is still there when the plugin comes back. An adapter's own collections are kept by its `registerSchema`, which every built-in adapter has; a [custom adapter](/analytics/reference/adapter-contract#writing-your-own-adapter) that adds collections in `register` without one loses them while the plugin is off, and a push or a migration then drops them.
+A switched-off install registers the same collections with the same fields and indexes (providers and their status, goals, sync, cache, the native engine's three when `native()` is listed, and `analytics-state` for sync or warming) and the same task names in Payload's jobs, so a development push or a generated migration drops nothing, and every row is still there when the plugin comes back. An adapter's own collections are kept by its `registerSchema`, which every built-in adapter has; a [custom adapter](/analytics/reference/adapter-contract#writing-your-own-adapter) that adds collections in `register` without one loses them while the plugin is off, and a push or a migration then drops them.
 
 Nothing that runs is registered: no endpoint, view or widget. Each task does nothing, and its schedule, kept so Payload keeps the `payload-jobs-stats` global it adds for scheduled tasks, has a hook that never queues a run. What belongs to the collections stays as it is: the providers and goals collections keep their access and their hooks, so editors still manage them in the admin. Payload's job controls stay [restricted to the admin collection](/analytics/native#who-may-run-jobs) as when the plugin runs, which is the one `onInit` a switched-off install adds, and only when it keeps a task. Translations are registered only for the labels of the collections the admin lists. The options are checked as when the plugin runs, except that `adapters` may be empty, which keeps no adapter's collections. The [collection checks](#renaming-the-plugins-collections) run too, and only their warnings go unsaid; their second pass over the assembled config runs only while the plugin is on.
 
@@ -298,9 +301,10 @@ Every collection the plugin registers takes a `slug` and an `overrides` function
 | [Read cache](/analytics/cache#the-analytics-cache-collection) | `analytics-cache` | every install without `cache.store` | `cache.collection` |
 | [Synced daily metrics](/analytics/sync) | `analytics-daily` | `sync` | `sync.collection`, which also takes `hidden` |
 | [Provider settings](/analytics/providers#provider-documents) | `analytics-providers` | `providers.collection` | `providers.collection`, which also takes `fields`, `access` and more |
+| [Connection status](/analytics/providers#checking-a-connection) of each provider document | `analytics-provider-status` | `providers.collection` | `providers.collection.status` |
 | [Goals](/analytics/goals#5-let-editors-manage-goals) | `analytics-goals` | `goals.collection` | `goals.collection`, which also takes `fields`, `access` and more |
 
-The default slugs are exported for code that queries these collections: `CACHE_SLUG`, `GOALS_SLUG`, `PROVIDERS_SLUG`, `STATE_SLUG` and `SYNC_SLUG` from `@10x-media/analytics`, and `HITS_SLUG` and `AGGREGATES_SLUG` from `@10x-media/analytics/adapters/native`. On an install that renames a collection, use the slug it set.
+The default slugs are exported for code that queries these collections: `CACHE_SLUG`, `GOALS_SLUG`, `PROVIDER_STATUS_SLUG`, `PROVIDERS_SLUG`, `STATE_SLUG` and `SYNC_SLUG` from `@10x-media/analytics`, and `HITS_SLUG` and `AGGREGATES_SLUG` from `@10x-media/analytics/adapters/native`. On an install that renames a collection, use the slug it set.
 
 ```ts
 analytics({

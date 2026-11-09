@@ -100,6 +100,11 @@ interface ProviderRegistry {
 	changed(scopes: Iterable<string | null>): void
 	/** Retires the scope's cached reads on every instance: `refreshProviders()`. */
 	refresh(scope: string | null): Promise<void>
+	/**
+	 * A fresh adapter of one stored document, disabled ones included, for its Test connection
+	 * button: null when there is no such document or it builds none. Only on the providers collection.
+	 */
+	documentAdapter?(id: string): Promise<AnalyticsAdapter | null>
 	close(): Promise<void>
 }
 
@@ -291,17 +296,25 @@ const collectionRegistry = (
 			...options.withoutConsent,
 		})
 
+	/** A stored document with its secrets decrypted in a copy. */
+	const decrypted = async (
+		raw: Record<string, unknown>,
+		decrypt: DecryptFieldValue
+	): Promise<Record<string, unknown>> => {
+		const doc = structuredClone(raw)
+		for (const { path, value } of storedSecrets(doc)) {
+			const plain = await decrypt(payload, { collection: slug, path, value })
+			setAtPath(doc, path, typeof plain === 'string' ? plain : '')
+		}
+		return doc
+	}
+
 	const adapterOf = async (
 		raw: Record<string, unknown>,
 		decrypt: DecryptFieldValue
 	): Promise<Built> => {
 		try {
-			const doc = structuredClone(raw)
-			for (const { path, value } of storedSecrets(doc)) {
-				const plain = await decrypt(payload, { collection: slug, path, value })
-				setAtPath(doc, path, typeof plain === 'string' ? plain : '')
-			}
-			const adapter = fromDocument(doc)
+			const adapter = fromDocument(await decrypted(raw, decrypt))
 			// The first GA4 document is the earliest this install shows it reads GA4 at all.
 			if (raw.provider === 'ga4' && !options.sdks.ga4 && !warnedGa4 && isProductionBuild()) {
 				warnedGa4 = true
@@ -464,6 +477,25 @@ const collectionRegistry = (
 		},
 		changed: (scopes) => probe.expedite(scopes),
 		refresh: async (scope) => probe.expedite([scope]),
+		documentAdapter: async (id) => {
+			if (!isCollectionSlug(payload, slug)) {
+				return null
+			}
+			const { decryptFieldValue, withRawEncrypted } = await loadEncrypted()
+			// Never the caller's, as in buildDocuments.
+			const req = await createLocalReq({}, payload)
+			const raw: unknown = await withRawEncrypted(req, () =>
+				payload.findByID({
+					collection: slug,
+					id: idOf(id),
+					depth: 0,
+					overrideAccess: true,
+					disableErrors: true,
+					req,
+				})
+			)
+			return isRecord(raw) ? fromDocument(await decrypted(raw, decryptFieldValue)) : null
+		},
 		close: () => pool.close(),
 	}
 }

@@ -28,8 +28,14 @@ import { stateLease, stateStoreOf } from '../maintenance/lease'
 import { trackServerEvent } from '../native/ingest/serverTrack'
 import { NATIVE_ADAPTER_ID } from '../native/nativeAdapter'
 import { createGuardedFetch } from '../net/guardedFetch'
+import { documentIdOf } from '../providers/factory'
 import { configTokenBackend } from '../providers/refresh'
 import { createProviderRegistry, type ProviderPlan } from '../providers/registry'
+import {
+	connectionOutcomeOf,
+	type ProviderStatusStore,
+	providerStatusStore,
+} from '../providers/status'
 import { emptyTrackerConfig, type TrackerConfigSource } from '../site/getTrackerConfig'
 import { createCacheSweeper, SWEEP_LEASE, SWEEP_LEASE_MS } from '../surfacing/cacheSweep'
 import { collectionCacheStore } from '../surfacing/collectionCacheStore'
@@ -119,10 +125,19 @@ const goalsResolverFor = (
  * Native reads stay out of the global cap, so a slow vendor never queues them; on a scoped install
  * every config adapter serves all scopes, so one scope holds at most half of its lane.
  */
-const lanesFor = (payload: Payload, resolved: ResolvedOptions, plan: ProviderPlan) => {
+const lanesFor = (
+	payload: Payload,
+	resolved: ResolvedOptions,
+	{ plan, status }: { plan: ProviderPlan; status: ProviderStatusStore | undefined }
+) => {
 	const { concurrency } = resolved.cache
 	const configAdapters = new Set(resolved.adapters)
+	const configIds = new Set(resolved.adapters.map((adapter) => adapter.id))
 	const poolMax = postgresPoolMax(payload)
+	const statusWarning = throttled((message: string) => payload.logger?.warn(message), {
+		now: monotonicMs,
+		intervalMs: CACHE_WARN_EVERY_MS,
+	})
 	return createLanes({
 		global: concurrency.global,
 		perSource: concurrency.perSource,
@@ -136,6 +151,22 @@ const lanesFor = (payload: Payload, resolved: ResolvedOptions, plan: ProviderPla
 			payload.logger?.warn(
 				`analytics: a request to the "${adapter.id}" source ignored its abort signal and was still out ${ABANDON_AFTER_MS / 1000} seconds after its read gave up, so its slot was given back and it counts as a timeout. An adapter must pass ctx.signal (or the signal ctx.upstream hands it) to every request it sends; this is said once per source.`
 			),
+		...(status
+			? {
+					onOutcome: (adapter, outcome, health) => {
+						const docId = configIds.has(adapter.id) ? undefined : documentIdOf(adapter.id)
+						const told = connectionOutcomeOf(outcome, health)
+						if (docId === undefined || told === undefined) {
+							return
+						}
+						status.record(docId, told, { throttle: true }).catch((err: unknown) => {
+							statusWarning(
+								`analytics: the connection status of provider document "${docId}" could not be saved, reads go on without it: ${String(err)}`
+							)
+						})
+					},
+				}
+			: {}),
 	})
 }
 
@@ -278,6 +309,8 @@ export const createRuntimeFactory = (
 						})
 					: undefined
 			const epoch = createEpochStore(payload)
+			const providerStatus =
+				plan.kind === 'collection' ? providerStatusStore(payload, providers.status.slug) : undefined
 			const now = currentTime
 			const warn = (message: string) => payload.logger?.warn(message)
 			const registry = createProviderRegistry({
@@ -353,7 +386,7 @@ export const createRuntimeFactory = (
 				payload,
 				store,
 				memo,
-				lanes: lanesFor(payload, resolved, plan),
+				lanes: lanesFor(payload, resolved, { plan, status: providerStatus }),
 				coldReadsPerScope: resolved.cache.concurrency.perScope,
 				ttl: resolved.cache.ttl,
 				timeoutMs: resolved.cache.timeoutMs,
@@ -390,6 +423,8 @@ export const createRuntimeFactory = (
 				listGoals: goals.listReadable,
 				listGoalsAcross: goals.listAcross,
 				...(providerConnections ? { providerFetch: providerConnections.fetch } : {}),
+				...(providerStatus ? { providerStatus } : {}),
+				...(registry.documentAdapter ? { providerAdapter: registry.documentAdapter } : {}),
 				// Refreshes and sweeps still running write to the database, which closes after this.
 				close: async () => {
 					await Promise.all([engine.close(), sweeper.idle(), syncWatch?.idle()])
