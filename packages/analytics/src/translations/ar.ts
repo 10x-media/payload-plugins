@@ -158,7 +158,6 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerConnectionLastError]: 'آخر فشل',
 	[keys.providerConnectionPaused]: 'القراءة متوقفة حتى {{date}}',
 	[keys.providerConnectionResumes]: 'تُستأنف القراءة',
-	[keys.providerConnectionHttpStatus]: 'HTTP {{status}}',
 	[keys.providerConnectionSaveFirst]: 'احفظ المستند لاختباره.',
 	[keys.providerConnectionUnsaved]: 'احفظ تغييراتك لاختبارها.',
 	[keys.providerConnectionRefusedHelp]: 'تحقق من المفتاح والمعرّفات والمضيف.',
