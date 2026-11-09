@@ -8,9 +8,18 @@ import type { ChatServerSlotProps } from '@10x-media/conversations/rsc'
 export const StatusChange = ({ message, req }: ChatServerSlotProps) => {
 	const data = (message?.data ?? {}) as { from?: string; to?: string }
 	return (
-		<div style={{ color: 'var(--theme-elevation-700)', fontSize: '1rem' }}>
+		<div
+			style={{
+				color: 'var(--color-text)',
+				fontSize: 'var(--text-body-large-font-size)',
+				lineHeight: 'var(--text-body-large-line-height)',
+			}}
+		>
 			Status changed from <strong>{data.from}</strong> to <strong>{data.to}</strong>
-			<span style={{ opacity: 0.6 }}> · rendered on the server for {req.user?.email}</span>
+			<span style={{ color: 'var(--color-text-secondary)' }}>
+				{' '}
+				· rendered on the server for {req.user?.email}
+			</span>
 		</div>
 	)
 }
