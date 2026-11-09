@@ -7,16 +7,25 @@ const PASSWORD = 'password'
 /** One paragraph as Lexical writes it, so a seeded rich text field opens with something in it. */
 const paragraphs = (...texts: string[]) => ({
 	root: {
-		type: 'root',
+		type: 'root' as const,
 		children: texts.map((text) => ({
-			type: 'paragraph',
+			type: 'paragraph' as const,
 			children: [
-				{ type: 'text', detail: 0, format: 0, mode: 'normal', style: '', text, version: 1 },
+				{
+					type: 'text' as const,
+					detail: 0,
+					format: 0,
+					mode: 'normal' as const,
+					style: '',
+					text,
+					version: 1,
+				},
 			],
 			direction: 'ltr' as const,
 			format: '' as const,
 			indent: 0,
 			textFormat: 0,
+			textStyle: '',
 			version: 1,
 		})),
 		direction: 'ltr' as const,
@@ -32,13 +41,15 @@ const paragraphs = (...texts: string[]) => ({
  * to edit and a secret the editor cannot open. Each collection is seeded only while empty.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ overrideAccess: true, collection: 'users' })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: ADMIN_EMAIL, password: PASSWORD, role: 'admin' },
 		})
 		await payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: EDITOR_EMAIL, password: PASSWORD, role: 'editor' },
 		})
@@ -46,14 +57,23 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		payload.logger.info(`Seeded dev editor: ${EDITOR_EMAIL} / ${PASSWORD}`)
 	}
 
-	const companyCount = await payload.count({ collection: 'companies' })
+	const companyCount = await payload.count({ overrideAccess: true, collection: 'companies' })
 	if (companyCount.totalDocs === 0) {
-		const acme = await payload.create({ collection: 'companies', data: { name: 'Acme' } })
-		await payload.create({ collection: 'companies', data: { name: 'Globex' } })
+		const acme = await payload.create({
+			overrideAccess: true,
+			collection: 'companies',
+			data: { name: 'Acme' },
+		})
+		await payload.create({
+			overrideAccess: true,
+			collection: 'companies',
+			data: { name: 'Globex' },
+		})
 
-		const peopleCount = await payload.count({ collection: 'people' })
+		const peopleCount = await payload.count({ overrideAccess: true, collection: 'people' })
 		if (peopleCount.totalDocs === 0) {
 			await payload.create({
+				overrideAccess: true,
 				collection: 'people',
 				data: {
 					dateOfBirth: '1984-03-12',
@@ -66,6 +86,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 				},
 			})
 			await payload.create({
+				overrideAccess: true,
 				collection: 'people',
 				data: {
 					dateOfBirth: '1990-07-01',
@@ -78,15 +99,17 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		}
 	}
 
-	const openingCount = await payload.count({ collection: 'openings' })
+	const openingCount = await payload.count({ overrideAccess: true, collection: 'openings' })
 	if (openingCount.totalDocs === 0) {
 		const acme = await payload.find({
+			overrideAccess: true,
 			collection: 'companies',
 			depth: 0,
 			limit: 1,
 			where: { name: { equals: 'Acme' } },
 		})
 		const ada = await payload.find({
+			overrideAccess: true,
 			collection: 'people',
 			depth: 0,
 			limit: 1,
@@ -96,6 +119,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		const hiringManager = ada.docs[0]?.id
 
 		await payload.create({
+			overrideAccess: true,
 			collection: 'openings',
 			data: {
 				_status: 'published',
@@ -141,6 +165,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 
 		await payload.create({
+			overrideAccess: true,
 			collection: 'openings',
 			data: {
 				_status: 'published',
@@ -175,6 +200,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 
 		await payload.create({
+			overrideAccess: true,
 			collection: 'openings',
 			data: {
 				_status: 'draft',
@@ -193,9 +219,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 	}
 
-	const eventCount = await payload.count({ collection: 'events' })
+	const eventCount = await payload.count({ overrideAccess: true, collection: 'events' })
 	if (eventCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'events',
 			data: {
 				format: 'in-person',
@@ -210,9 +237,10 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 		})
 	}
 
-	const secretCount = await payload.count({ collection: 'secrets' })
+	const secretCount = await payload.count({ overrideAccess: true, collection: 'secrets' })
 	if (secretCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'secrets',
 			data: { label: 'Staging API key', value: 'sk_test_123' },
 		})

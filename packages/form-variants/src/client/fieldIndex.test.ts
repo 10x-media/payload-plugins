@@ -30,7 +30,7 @@ const fields = [
 
 describe('buildFieldIndex', () => {
 	const index = buildFieldIndex(fields, 'people', {
-		address: { create: true, fields: { city: true }, read: true, update: true },
+		address: { create: true, fields: { city: true }, read: true, update: true, validate: true },
 		title: true,
 	})
 

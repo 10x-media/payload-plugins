@@ -1,11 +1,11 @@
 /**
- * Writes one query parameter with the History API rather than the router, so the page is
- * not refetched and unsaved values survive. Next reflects `replaceState` into
- * `useSearchParams`. A `null` value removes the parameter.
+ * The current URL with one query parameter set, or removed for `null`. The caller writes it
+ * through the router adapter's `replaceState`, which updates the address without refetching the
+ * page, so unsaved values survive.
  */
-export const replaceParam = (name: string, value: null | string): void => {
+export const withParam = (name: string, value: null | string): null | string => {
 	if (typeof window === 'undefined') {
-		return
+		return null
 	}
 	const url = new URL(window.location.href)
 	if (value === null) {
@@ -13,5 +13,26 @@ export const replaceParam = (name: string, value: null | string): void => {
 	} else {
 		url.searchParams.set(name, value)
 	}
-	window.history.replaceState(window.history.state, '', url.toString())
+	return `${url.pathname}${url.search}${url.hash}`
+}
+
+/**
+ * Writes one query parameter without a navigation. TanStack Start reloads the route on a plain
+ * `history.replaceState` and would remount the form, so the router adapter's own `replaceState`
+ * goes first; the History API is the fallback for an adapter that has none.
+ */
+export const replaceParam = (
+	router: { replaceState?: (url: string) => void },
+	name: string,
+	value: null | string
+): void => {
+	const url = withParam(name, value)
+	if (url === null) {
+		return
+	}
+	if (router.replaceState) {
+		router.replaceState(url)
+	} else {
+		window.history.replaceState(window.history.state, '', url)
+	}
 }

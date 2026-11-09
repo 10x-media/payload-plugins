@@ -3,13 +3,15 @@
 # @10x-media/form-variants
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/form-variants` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/form-variants` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/form-variants).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/form-variants@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/form-variants) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
 Alternative edit forms for a Payload collection. A variant is a sequence of steps drawn over Payload's own form state, rendered with Payload's own fields, saved by Payload's own save. The native form is one of the variants, so accounts with access can switch back and forth.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/form-variants?style=flat-square)](https://www.npmjs.com/package/@10x-media/form-variants)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 > [!WARNING]
 > **Beta.** This plugin replaces a collection's edit view, which is the largest surface Payload has: every field type, custom field components, drafts, localization, uploads, drawers, and every combination of those. It is covered by unit, integration and end-to-end tests on both Mongo and Postgres, but no suite reaches every combination. Expect gaps, and expect some of Payload's own edit-view features to be missing on a variant. [Open an issue](https://github.com/10x-media/payload-plugins/issues) for anything that renders wrong, saves wrong or is not supported.
@@ -28,7 +30,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Quick start
 
 ```bash
-pnpm add @10x-media/form-variants@beta
+pnpm add @10x-media/form-variants@alpha
 ```
 
 ```ts

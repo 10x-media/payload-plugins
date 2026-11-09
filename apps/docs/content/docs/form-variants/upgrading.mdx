@@ -1,0 +1,35 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x.
+---
+
+`@10x-media/form-variants` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin's options and variant definitions are unchanged, and it runs on Next.js and TanStack Start. This page covers what changes around them.
+
+## Checklist
+
+1. Upgrade `@10x-media/form-variants` with Payload: its peers are `payload`, `@payloadcms/ui` and `@payloadcms/translations` at `^4.0.0-beta.7`. `next` is no longer a peer.
+2. Pass `overrideAccess: true` where a `gate`, `afterSave` or other code of yours reads or writes documents through the Local API without a user (see [Local API access](#local-api-access)).
+3. Restyle any CSS of your own that targets the progress rail or the switcher trigger (see [Look](#look)).
+4. Regenerate the import map (`pnpm payload generate:importmap`). The plugin adds no database fields, so there is nothing to migrate.
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## Local API access
+
+Payload 4's Local API applies access control by default. The plugin's own reads (the stored variant choice) pass `overrideAccess: true`, but a callback of yours that calls `payload.find` or `payload.create` and relied on the old default now runs as no one and gets `Forbidden`. Pass `req` to run as the requesting user, or `overrideAccess: true` where the call is meant to bypass access. Callbacks receive `user` typed as Payload's `User` (Payload 3's `TypedUser`).
+
+## Look
+
+The variant's chrome takes Payload 4's look, built from Payload's own components on Payload 4's tokens:
+
+- **Top bar.** The page bar uses Payload 4's document controls markup: "Creating new" or the status and the last update on the left, the controls on the right. In a drawer, the switcher and the save controls sit in the drawer's header bar, beside its back button, as Payload's own drawer puts them.
+- **Progress.** The rail is Payload's tabs (`TabsList` and `TabButton`, `role="tab"`). The `form-variants__progress-tab` and `form-variants__progress-item--<state>` classes now sit on the same element, the tab button, rather than on an `li` and the button inside it, so a selector like `.form-variants__progress-item--current .form-variants__progress-tab` needs to become `.form-variants__progress-tab.form-variants__progress-item--current`. A step with errors shows Payload's error pill.
+- **Switcher.** The trigger is Payload's secondary `Button` (`form-variants__switcher-trigger`), and the options are Payload's popup list buttons (`form-variants__switcher-option`).
+- **Navigation.** The primary button uses `Button`'s own `loading` state instead of a spinner of its own.
+- **Custom properties.** `--form-variants-rail` and `--form-variants-current` are gone, because the tabs draw the rail. `--form-variants-muted`, `--form-variants-done`, `--form-variants-column`, `--form-variants-field-gap` and `--form-variants-row-gap` remain, with defaults from Payload 4's tokens (`--color-text-secondary`, `--color-border-strong`, `--spacing-field`, the spacers).
+
+A slot you replaced keeps working, but restyle it against Payload 4's tokens. The package declares its CSS as side effects, so a bundler keeps the stylesheet when it tree-shakes the import.
+
+## Stale data
+
+When someone else saves the document while it is open, the variant shows Payload's own `DocumentStaleData` notice instead of the plugin's own modal.

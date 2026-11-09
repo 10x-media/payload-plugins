@@ -38,6 +38,9 @@ export const getStoredPreferences = async (
 		collection: 'payload-preferences',
 		depth: 0,
 		limit: 2,
+		// The account's own rows, filtered by user below. Payload's own preference reads bypass
+		// access the same way, and the Local API no longer does it by default.
+		overrideAccess: true,
 		pagination: false,
 		req,
 		where: {

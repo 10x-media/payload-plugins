@@ -60,7 +60,6 @@ export const FormStateBridge: React.FC = () => {
 		dispatchFields({
 			type: 'REPLACE_STATE',
 			optimize: false,
-			sanitize: true,
 			state: context.handoff.state,
 		})
 		setModified(context.handoff.modified)

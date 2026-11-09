@@ -6,6 +6,7 @@ import { DevPrefill as DevPrefill_a0093709d9c3511525e93cefc69657e2 } from '../..
 import { MergeSelectedMenuItem as MergeSelectedMenuItem_1a48da5a6176fc2ea2e37c62a09adb5d } from '@10x-media/dedupe/client'
 import { NearDuplicateListButton as NearDuplicateListButton_a0093709d9c3511525e93cefc69657e2 } from '../../../components/NearDuplicate'
 import { NearDuplicateButton as NearDuplicateButton_a0093709d9c3511525e93cefc69657e2 } from '../../../components/NearDuplicate'
+import { VariantEditView as VariantEditView_654fa555539f4d3a2be3fc3df376f0d3 } from '@10x-media/form-variants/rsc'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { LexicalDiffComponent as LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -56,6 +57,7 @@ import { CollectionFilter as CollectionFilter_3817bf644402e67bfe6577f60ef982de }
 import { UploadDropzoneWidget as UploadDropzoneWidget_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { UploadDropzoneCollectionsField as UploadDropzoneCollectionsField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { MembershipsSection as MembershipsSection_373a85c26942b02e9287ea02011c0269 } from '../../../components/MembershipsSection'
+import { DuplicateCheckStep as DuplicateCheckStep_f00521c9797d130da1438d242599c957 } from '../../../components/DuplicateCheckStep'
 
 /** @type import('payload').ImportMap */
 export const importMap = {
@@ -67,6 +69,7 @@ export const importMap = {
   "@10x-media/dedupe/client#MergeSelectedMenuItem": MergeSelectedMenuItem_1a48da5a6176fc2ea2e37c62a09adb5d,
   "/components/NearDuplicate#NearDuplicateListButton": NearDuplicateListButton_a0093709d9c3511525e93cefc69657e2,
   "/components/NearDuplicate#NearDuplicateButton": NearDuplicateButton_a0093709d9c3511525e93cefc69657e2,
+  "@10x-media/form-variants/rsc#VariantEditView": VariantEditView_654fa555539f4d3a2be3fc3df376f0d3,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -116,5 +119,6 @@ export const importMap = {
   "@payloadcms/ui#CollectionFilter": CollectionFilter_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui/rsc#UploadDropzoneWidget": UploadDropzoneWidget_ab83ff7e88da8d3530831f296ec4756a,
   "@payloadcms/ui#UploadDropzoneCollectionsField": UploadDropzoneCollectionsField_3817bf644402e67bfe6577f60ef982de,
-  "/components/MembershipsSection#MembershipsSection": MembershipsSection_373a85c26942b02e9287ea02011c0269
+  "/components/MembershipsSection#MembershipsSection": MembershipsSection_373a85c26942b02e9287ea02011c0269,
+  "/components/DuplicateCheckStep#DuplicateCheckStep": DuplicateCheckStep_f00521c9797d130da1438d242599c957
 }

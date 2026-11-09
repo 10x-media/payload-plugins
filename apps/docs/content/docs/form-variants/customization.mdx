@@ -82,13 +82,15 @@ The variant's top bar, with the document status and the save controls, always re
 
 ## Styling
 
-Every class is stable and prefixed `form-variants__`. Defaults are declared with zero specificity, so a host rule wins regardless of stylesheet order, and every colour and metric is a Payload theme variable:
+Every class is stable and prefixed `form-variants__`. Defaults are declared with zero specificity, so a host rule wins regardless of stylesheet order, and every colour and metric is a Payload 4 token:
 
 ```css
 .form-variants {
-  --form-variants-border: var(--theme-elevation-150);
+  --form-variants-muted: var(--color-text-secondary);
 }
 ```
+
+The top bar reuses Payload's `doc-controls` classes and the progress rail is Payload's own tabs, so both follow the admin theme.
 
 ## Translations
 

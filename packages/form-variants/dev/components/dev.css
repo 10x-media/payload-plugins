@@ -1,12 +1,12 @@
 /* Styles for the dev app's own example components, on Payload's tokens. */
 .dev-muted {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .dev-stack {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.75);
+	gap: var(--spacer-2-5);
 }
 
 .dev-stack > p {
@@ -19,33 +19,33 @@
 	margin: 0;
 	padding: 0;
 	list-style: none;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m);
+	border: var(--stroke-width-small, 1px) solid var(--color-border);
+	border-radius: var(--radius-medium);
 }
 
 .dev-list > li {
 	display: flex;
 	justify-content: space-between;
-	gap: var(--base);
-	padding: calc(var(--base) * 0.5) calc(var(--base) * 0.75);
+	gap: var(--spacer-3);
+	padding: var(--spacer-2) var(--spacer-2-5);
 }
 
 .dev-list > li + li {
-	border-top: 1px solid var(--theme-elevation-150);
+	border-top: var(--stroke-width-small, 1px) solid var(--color-border);
 }
 
 .dev-hint {
-	padding: calc(var(--base) * 0.6) calc(var(--base) * 0.75);
-	border-left: 2px solid var(--theme-elevation-400);
-	background: var(--theme-elevation-50);
-	color: var(--theme-elevation-800);
+	padding: var(--spacer-2-5) var(--spacer-2-5);
+	border-left: 2px solid var(--color-border-strong);
+	background: var(--color-bg-secondary);
+	color: var(--color-text);
 }
 
 .dev-outcome {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.5);
-	max-width: calc(var(--base) * 30);
+	gap: var(--spacer-2);
+	max-width: 38rem;
 }
 
 .dev-outcome h2,
@@ -53,11 +53,19 @@
 	margin: 0;
 }
 
+/* Payload 4 gives a bare heading no type style. */
+.dev-outcome h2 {
+	font-size: var(--text-heading-large-font-size);
+	font-weight: var(--text-heading-large-font-weight);
+	line-height: var(--text-heading-large-line-height);
+	letter-spacing: var(--text-heading-large-letter-spacing);
+}
+
 .dev-outcome__actions {
 	display: flex;
 	flex-wrap: wrap;
-	gap: calc(var(--base) * 0.5);
-	margin-top: calc(var(--base) * 0.5);
+	gap: var(--spacer-2);
+	margin-top: var(--spacer-2);
 }
 
 .dev-outcome__actions .btn {
@@ -68,14 +76,14 @@
 .dev-counter {
 	display: flex;
 	flex-direction: column;
-	gap: calc(var(--base) * 0.4);
+	gap: var(--spacer-2);
 }
 
 .dev-counter__line {
 	display: flex;
 	align-items: baseline;
 	justify-content: space-between;
-	gap: var(--base);
+	gap: var(--spacer-3);
 }
 
 .dev-counter__count,
@@ -88,12 +96,12 @@
 }
 
 .dev-counter__label {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .dev-counter__bar {
 	display: flex;
-	gap: calc(var(--base) * 0.25);
+	gap: var(--spacer-1);
 	margin: 0;
 	padding: 0;
 	list-style: none;
@@ -103,11 +111,11 @@
 	flex: 1;
 	height: 3px;
 	border-radius: 2px;
-	background: var(--theme-elevation-150);
+	background: var(--color-bg-tertiary);
 }
 
 .dev-counter__segment--done {
-	background: var(--theme-elevation-800);
+	background: var(--color-bg-inverse);
 }
 
 /* The review card of the component step that closes the publishing wizard. */
@@ -115,23 +123,23 @@
 	display: flex;
 	flex-direction: column;
 	margin: 0;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m);
+	border: var(--stroke-width-small, 1px) solid var(--color-border);
+	border-radius: var(--radius-medium);
 }
 
 .dev-review__row {
 	display: flex;
-	gap: var(--base);
-	padding: calc(var(--base) * 0.5) calc(var(--base) * 0.75);
+	gap: var(--spacer-3);
+	padding: var(--spacer-2) var(--spacer-2-5);
 }
 
 .dev-review__row + .dev-review__row {
-	border-top: 1px solid var(--theme-elevation-150);
+	border-top: var(--stroke-width-small, 1px) solid var(--color-border);
 }
 
 .dev-review dt {
-	flex: 0 0 calc(var(--base) * 5);
-	color: var(--theme-elevation-500);
+	flex: 0 0 6rem;
+	color: var(--color-text-secondary);
 }
 
 .dev-review dd {
@@ -142,6 +150,6 @@
 .dev-confirm {
 	display: flex;
 	align-items: center;
-	gap: calc(var(--base) * 0.5);
+	gap: var(--spacer-2);
 	cursor: pointer;
 }

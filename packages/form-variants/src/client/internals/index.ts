@@ -11,5 +11,4 @@
  * (`@payloadcms/ui/shared`, `@payloadcms/ui/utilities/*`) carry no context and stay fine.
  */
 export { DrawerHeader } from './DrawerHeader'
-export { StaleDataModal } from './StaleDataModal'
 export { Status } from './Status'
