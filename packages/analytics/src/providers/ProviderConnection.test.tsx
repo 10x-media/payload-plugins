@@ -12,6 +12,9 @@ const doc = vi.hoisted(() => ({
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
 vi.mock('@payloadcms/ui', () => ({
+	Banner: ({ children, type }: { children?: ReactNode; type?: string }) => (
+		<div data-banner={type}>{children}</div>
+	),
 	Button: ({
 		children,
 		disabled,
@@ -111,14 +114,19 @@ describe('ProviderConnection', () => {
 		})
 		expect(fetchMock.mock.calls[1]?.[1]?.method).toBe('POST')
 		expect(screen.getByText(keys.providerConnectionRefused).dataset.pill).toBe('error')
-		expect(screen.getByText('posthog: HTTP 403 Invalid personal API key.')).toBeDefined()
-		expect(
-			screen.getByText(`${keys.providerConnectionLastError} <2026-11-09T10:00:00.000Z>`)
-		).toBeDefined()
-		expect(
-			screen.getByText(`${keys.providerConnectionPaused} <2999-01-01T00:00:00.000Z>`)
-		).toBeDefined()
-		expect(screen.getByText(keys.providerConnectionRefusedHelp)).toBeDefined()
+		const banner = screen.getByText(keys.providerConnectionRefusedHelp).closest('[data-banner]')
+		expect(banner?.getAttribute('data-banner')).toBe('error')
+		// The vendor's words as a reader reads them: its name, the message, then the status.
+		expect(banner?.textContent).toContain(
+			`${keys.providerNamePosthog}: Invalid personal API key. (${keys.providerConnectionHttpStatus} 403)`
+		)
+		const facts = [...document.querySelectorAll('.analytics-provider-connection__facts li')].map(
+			(li) => li.textContent
+		)
+		expect(facts).toEqual([
+			`${keys.providerConnectionLastError}:\u00a0<2026-11-09T10:00:00.000Z>`,
+			`${keys.providerConnectionResumes}:\u00a0<2999-01-01T00:00:00.000Z>`,
+		])
 		expect(toasts.error).toHaveBeenCalledWith(keys.providerConnectionFailed)
 	})
 
@@ -141,7 +149,12 @@ describe('ProviderConnection', () => {
 		answers({ status: { lastErrorAt: '2026-11-09T10:00:00.000Z', errorKind: 'unavailable' } })
 		await renderPanel()
 		expect(screen.getByText(keys.providerConnectionUnreachable).dataset.pill).toBe('warning')
-		expect(screen.getByText(keys.providerConnectionUnreachableHelp)).toBeDefined()
+		expect(
+			screen
+				.getByText(keys.providerConnectionUnreachableHelp)
+				.closest('[data-banner]')
+				?.getAttribute('data-banner')
+		).toBe('default')
 	})
 
 	it('toasts a working check', async () => {

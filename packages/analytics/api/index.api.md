@@ -1391,6 +1391,8 @@ export const keys: {
     readonly providerConnectionLastSuccess: "analytics:providerConnectionLastSuccess";
     readonly providerConnectionLastError: "analytics:providerConnectionLastError";
     readonly providerConnectionPaused: "analytics:providerConnectionPaused";
+    readonly providerConnectionResumes: "analytics:providerConnectionResumes";
+    readonly providerConnectionHttpStatus: "analytics:providerConnectionHttpStatus";
     readonly providerConnectionSaveFirst: "analytics:providerConnectionSaveFirst";
     readonly providerConnectionUnsaved: "analytics:providerConnectionUnsaved";
     readonly providerConnectionRefusedHelp: "analytics:providerConnectionRefusedHelp";
