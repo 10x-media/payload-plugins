@@ -8,6 +8,7 @@ import {
 	parseHostPattern,
 	resolveHostPolicy,
 	validatePosthogHost,
+	validatePosthogRegion,
 	validateProviderHost,
 } from './hosts'
 
@@ -251,5 +252,44 @@ describe('validatePosthogHost', () => {
 	] as const)('%s', (_name, { host, region }, expected) => {
 		const args = { req: { t: (key: string) => key }, siblingData: { region } } as never
 		expect(validate(host, args)).toBe(expected)
+	})
+})
+
+describe('validatePosthogRegion', () => {
+	const options = [
+		{ label: 'US', value: 'us' },
+		{ label: 'EU', value: 'eu' },
+	]
+
+	it.each([
+		[
+			'no Region with a blank Host',
+			{ region: undefined, host: '' },
+			'analytics:providerErrorPosthogRegionRequired',
+		],
+		[
+			'no Region with a Host of only spaces',
+			{ region: null, host: '   ' },
+			'analytics:providerErrorPosthogRegionRequired',
+		],
+		[
+			'no Region and no Host at all',
+			{ region: '', host: undefined },
+			'analytics:providerErrorPosthogRegionRequired',
+		],
+		['Region EU with a blank Host', { region: 'eu', host: '' }, true],
+		[
+			'no Region with a cloud Host, which decides it',
+			{ region: undefined, host: 'https://eu.posthog.com' },
+			true,
+		],
+		[
+			'no Region with a self-hosted Host',
+			{ region: undefined, host: 'https://ph.example.com' },
+			true,
+		],
+	] as const)('%s', async (_name, { region, host }, expected) => {
+		const args = { req: { t: (key: string) => key }, siblingData: { host }, options } as never
+		expect(await validatePosthogRegion(region, args)).toBe(expected)
 	})
 })
