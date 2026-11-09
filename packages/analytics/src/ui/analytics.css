@@ -1087,20 +1087,13 @@
 	}
 
 	/*
-	 * The provider form's Connection panel, in the sidebar: spaced like Payload's auth-field
-	 * controls, its facts styled like the document controls' "Last Modified: <value>".
+	 * The provider form's Connection panel, in the sidebar: laid out like Payload's auth-field
+	 * controls, its status and dates styled like the document controls' "Status: <value>".
 	 */
 	.analytics-provider-connection__body {
 		display: flex;
 		flex-direction: column;
-		gap: calc(var(--base) * 0.5);
-	}
-
-	.analytics-provider-connection__row {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: calc(var(--base) * 0.5);
+		gap: var(--base);
 	}
 
 	/* Its margin would stack on the column's gap. */
@@ -1128,16 +1121,18 @@
 		list-style: none;
 	}
 
+	.analytics-provider-connection__facts li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
 	.analytics-provider-connection__fact-label {
 		color: var(--analytics-text-muted);
 	}
 
 	.analytics-provider-connection__fact-value {
 		font-weight: 600;
-	}
-
-	.analytics-provider-connection .field-description {
-		margin-block-start: 0;
 	}
 
 	/* The breakdown's tabs, with the filter a row click set beside them. */
