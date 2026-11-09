@@ -50,8 +50,11 @@ describe('SourceConnectionNote', () => {
 		fetchMock.mockImplementation(() => Promise.resolve(Response.json(body)))
 		await renderNote('posthog:6650f1c2a9e4b3d2c1a09f87')
 		expect(String(fetchMock.mock.calls[0]?.[0])).toBe(`${ENDPOINT}?id=6650f1c2a9e4b3d2c1a09f87`)
+		// Named and with the status after the words, as the provider form's Connection panel says it.
 		expect(
-			screen.getByText(`${keys.viewErrorVendorSaid} posthog: HTTP 403 Invalid personal API key.`)
+			screen.getByText(
+				`${keys.providerNamePosthog}: Invalid personal API key. (${keys.providerConnectionHttpStatus} 403)`
+			)
 		).toBeDefined()
 		expect(screen.getByText(new RegExp(`^${keys.providerConnectionPaused} .*2999`))).toBeDefined()
 	})

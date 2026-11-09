@@ -43,6 +43,19 @@ describe('SectionError', () => {
 		expect(onRetry).toHaveBeenCalled()
 	})
 
+	it('says more about the failure inside its banner, after the message', () => {
+		render(
+			<SectionError
+				error={{ code: 'source_misconfigured', hostRefused: false }}
+				note={<span>PostHog: Invalid personal API key.</span>}
+				onRetry={() => {}}
+			/>
+		)
+		expect(screen.getByRole('alert').textContent).toBe(
+			`${keys.viewErrorMisconfigured}PostHog: Invalid personal API key.`
+		)
+	})
+
 	it('offers no retry for a denied read', () => {
 		render(<SectionError error={{ code: 'forbidden' }} onRetry={() => {}} />)
 		expect(screen.getByText(keys.viewErrorForbidden)).toBeDefined()

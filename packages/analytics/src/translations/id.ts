@@ -169,7 +169,6 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerConnectionUnreachableHelp]: 'Layanan tidak menjawab. Coba lagi nanti.',
 	[keys.providerConnectionChecked]: 'Koneksi berfungsi',
 	[keys.providerConnectionFailed]: 'Koneksi gagal',
-	[keys.viewErrorVendorSaid]: 'Jawaban layanan: {{detail}}',
 	[keys.providerFieldIsDefault]: 'Bawaan untuk situs ini',
 	[keys.providerFieldIsDefaultHelp]:
 		'Analitik dibuka dengan alat ini kecuali pembaca memilih yang lain. Hanya satu alat per situs yang bisa menjadi bawaan.',

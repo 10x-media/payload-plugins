@@ -170,7 +170,6 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionUnreachableHelp]: 'Сервис не ответил. Попробуйте позже.',
 	[keys.providerConnectionChecked]: 'Подключение работает',
 	[keys.providerConnectionFailed]: 'Подключение не удалось',
-	[keys.viewErrorVendorSaid]: 'Ответ сервиса: {{detail}}',
 	[keys.providerFieldIsDefault]: 'По умолчанию для этого сайта',
 	[keys.providerFieldIsDefaultHelp]:
 		'Аналитика открывается в этом инструменте, если читатель не выберет другой. По умолчанию на сайте может быть только один инструмент.',

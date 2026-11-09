@@ -169,7 +169,6 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerConnectionUnreachableHelp]: 'El servicio no respondió. Inténtalo más tarde.',
 	[keys.providerConnectionChecked]: 'La conexión funciona',
 	[keys.providerConnectionFailed]: 'La conexión falló',
-	[keys.viewErrorVendorSaid]: 'El servicio respondió: {{detail}}',
 	[keys.providerFieldIsDefault]: 'Predeterminado para este sitio',
 	[keys.providerFieldIsDefaultHelp]:
 		'Las estadísticas se abren con esta herramienta salvo que el lector elija otra. Solo una herramienta por sitio puede ser la predeterminada.',

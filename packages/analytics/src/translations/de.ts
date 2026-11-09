@@ -169,7 +169,6 @@ export const de: LocaleBundle<'one' | 'other'> = {
 		'Der Dienst hat nicht geantwortet. Versuchen Sie es später erneut.',
 	[keys.providerConnectionChecked]: 'Verbindung funktioniert',
 	[keys.providerConnectionFailed]: 'Verbindung fehlgeschlagen',
-	[keys.viewErrorVendorSaid]: 'Der Dienst antwortete: {{detail}}',
 	[keys.providerFieldIsDefault]: 'Standard für diese Website',
 	[keys.providerFieldIsDefaultHelp]:
 		'Die Statistiken öffnen mit diesem Tool, solange niemand ein anderes auswählt. Pro Website kann nur ein Tool der Standard sein.',
