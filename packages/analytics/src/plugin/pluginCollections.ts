@@ -5,6 +5,7 @@ import { STATE_SLUG } from '../native/collections/slugs'
 import { stateCollection } from '../native/collections/state'
 import type { BuildSecretField, ConnectionFieldAccess } from '../providers/collection'
 import { buildProvidersCollection } from '../providers/collection'
+import { providerStatusCollection } from '../providers/status'
 import { cacheCollection } from '../surfacing/cacheCollection'
 import { syncCollection } from '../sync/collection'
 import type { StaticLabelFor } from '../translations/staticLabel'
@@ -100,6 +101,7 @@ const providersCollectionOf = async (
 		types: providers.types,
 		staticLabel: context.staticLabel,
 		listNotice: [...resolved.sources.policies.values()].includes('fallback'),
+		statusSlug: providers.status.slug,
 	})
 	const checked = checkEditorCollection(built, {
 		role: 'providers',
@@ -145,9 +147,27 @@ const goalsCollectionOf = (
 	})
 }
 
+/** The provider status collection after `providers.collection.status.overrides`. */
+const statusCollectionOf = (
+	resolved: ResolvedOptions,
+	context: CollectionContext
+): CollectionConfig => {
+	const { slug, overrides } = resolved.providers.collection.status
+	return noticed(
+		shapeCollection(providerStatusCollection(slug), {
+			role: 'status',
+			option: 'providers.collection.status',
+			db: context.db,
+			...(overrides ? { overrides } : {}),
+		}),
+		context
+	)
+}
+
 /**
- * The providers and goals collections an install turned on, built exactly alike whether the plugin
- * runs or only keeps its schema (`disabled: true`), so neither drops a field or an index.
+ * The providers and goals collections an install turned on, the providers' status beside them,
+ * built exactly alike whether the plugin runs or only keeps its schema (`disabled: true`), so none
+ * drops a field or an index.
  */
 export const configCollections = async (
 	resolved: ResolvedOptions,
@@ -155,7 +175,10 @@ export const configCollections = async (
 	context: CollectionContext
 ): Promise<CollectionConfig[]> => [
 	...(resolved.providers.collection.enabled
-		? [await providersCollectionOf(resolved, callbacks, context)]
+		? [
+				await providersCollectionOf(resolved, callbacks, context),
+				statusCollectionOf(resolved, context),
+			]
 		: []),
 	...(resolved.goalsCollection.enabled ? [goalsCollectionOf(resolved, callbacks, context)] : []),
 ]

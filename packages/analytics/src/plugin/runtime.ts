@@ -32,6 +32,7 @@ import { isRecord } from '../core/values'
 import type { GoalsResolver, ResolvedGoal } from '../goals/resolver'
 import type { Goal } from '../goals/types'
 import type { TrustedPlatform } from '../net/platform'
+import type { ProviderStatusStore } from '../providers/status'
 import type { CacheStore } from '../surfacing/cacheStore'
 import type { CacheSweeper } from '../surfacing/cacheSweep'
 import type { Engine } from '../surfacing/engine'
@@ -121,6 +122,10 @@ export interface AnalyticsRuntime {
 	 * `providers.hosts.allowPrivateNetwork`.
 	 */
 	providerFetch?: FetchLike
+	/** Each provider document's last connection result, kept while the providers collection runs. */
+	providerStatus?: ProviderStatusStore
+	/** A fresh adapter of one stored provider document, for its Test connection button. */
+	providerAdapter?: (id: string) => Promise<AnalyticsAdapter | null>
 	/**
 	 * Releases what the runtime itself holds once it is retired: the adapters built from provider
 	 * documents, then the connections they reached their vendors through.

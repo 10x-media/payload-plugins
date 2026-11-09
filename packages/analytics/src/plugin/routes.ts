@@ -29,6 +29,11 @@ export interface RoutePaths {
 	goals: string
 	/** Authenticated POST retiring a scope's cached reads. */
 	refresh: string
+	/**
+	 * Authenticated GET of one provider document's connection status, POST checking it first;
+	 * mounted while `providers.collection` is on.
+	 */
+	providerStatus: string
 	/** Authenticated realtime read the live counters poll. */
 	live: string
 	/** Authenticated exclusion link for the selected scope; mounted while `capture.exclusion` is on. */
@@ -54,6 +59,7 @@ export const routePaths = (base: RouteBase): RoutePaths => ({
 	sources: `${base}/sources`,
 	goals: `${base}/goals`,
 	refresh: `${base}/refresh`,
+	providerStatus: `${base}/provider-status`,
 	live: `${base}/live`,
 	exclusion: `${base}/exclusion`,
 	ingest: `${base}/e`,

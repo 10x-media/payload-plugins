@@ -30,6 +30,7 @@ import {
 	configCollections,
 	syncCollectionOf,
 } from './plugin/pluginCollections'
+import { makeProviderStatusHandler } from './plugin/providerStatusEndpoint'
 import { makeQueryHandler } from './plugin/queryEndpoint'
 import { makeRealtimeHandler } from './plugin/realtimeEndpoint'
 import { makeRefreshHandler } from './plugin/refreshEndpoint'
@@ -239,6 +240,14 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			{ method: 'get', path: routes.query, handler: makeQueryHandler() },
 			{ method: 'post', path: routes.refresh, handler: makeRefreshHandler() }
 		)
+		if (resolved.providers.collection.enabled) {
+			const providerStatus = makeProviderStatusHandler()
+			addEndpoints(
+				config,
+				{ method: 'get', path: routes.providerStatus, handler: providerStatus },
+				{ method: 'post', path: routes.providerStatus, handler: providerStatus }
+			)
+		}
 		if (resolved.capture.exclusion) {
 			addEndpoints(config, {
 				method: 'get',
@@ -574,6 +583,7 @@ export type { HostPattern } from './providers/hosts'
 export { type ProviderHostPolicy, resolveHostPolicy } from './providers/hosts'
 export { type RefreshProvidersOptions, refreshProviders } from './providers/refresh'
 export { CONNECTION_PATHS, SECRET_PATHS } from './providers/secrets'
+export { PROVIDER_STATUS_SLUG } from './providers/status'
 export type { QueryError, QueryErrorCode } from './query/errors'
 export type {
 	ItemLabels,

@@ -10,6 +10,8 @@ import {
 import { memoryAdapter } from '../testing/memoryAdapter'
 import {
 	adapterFromProviderDoc,
+	documentAdapterId,
+	documentIdOf,
 	normalizePrivateKey,
 	type ProviderDoc,
 	type ProviderFactoryContext,
@@ -282,6 +284,22 @@ describe('adapterFromProviderDoc', () => {
 			plausible: { siteId: 's', apiKey: 'k', host: '' },
 		})
 		expect(adapter?.isConfigured()).toBe(true)
+	})
+})
+
+describe('documentIdOf', () => {
+	it('gives back the document id documentAdapterId put in, a Mongo ObjectId or a Postgres number', () => {
+		expect(documentIdOf(documentAdapterId('posthog', '6650f1c2a9e4b3d2c1a09f87'))).toBe(
+			'6650f1c2a9e4b3d2c1a09f87'
+		)
+		expect(documentIdOf(documentAdapterId('ga4', 5))).toBe('5')
+		expect(documentIdOf('umami:a:b')).toBe('a:b')
+	})
+
+	it('names no document for a config adapter’s id', () => {
+		for (const id of ['posthog', 'native', 'posthog:', ':5', 'custom:5', '']) {
+			expect(documentIdOf(id), id).toBeUndefined()
+		}
 	})
 })
 

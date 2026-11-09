@@ -13,6 +13,7 @@ const COLLECTION_ROLES = [
 	'cache',
 	'sync',
 	'providers',
+	'status',
 	'goals',
 ] as const
 
@@ -31,6 +32,7 @@ const KIND_OF: Readonly<Record<CollectionRole, CollectionKind>> = {
 	cache: 'machine',
 	sync: 'machine',
 	providers: 'editor',
+	status: 'machine',
 	goals: 'editor',
 }
 
