@@ -1,5 +1,5 @@
 import { type BootedPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq } from 'payload'
+import { createPayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { conversations, defineMessageType, postMessage, touchMessage } from '../../src/index'
@@ -76,7 +76,11 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 			type: 'component',
 		})
 
-		const person = await booted.payload.create({ collection: 'persons', data: { name: 'P' } })
+		const person = await booted.payload.create({
+			overrideAccess: true,
+			collection: 'persons',
+			data: { name: 'P' },
+		})
 		const key = `collection:persons:${person.id}`
 		await call(booted, 'POST /conversations/comments/messages', {
 			body: { channel: 'internal', key, text: 'comment' },
@@ -87,10 +91,12 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 			session: staff,
 		})
 		const comments = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'comments-messages',
 			where: { key: { equals: key } },
 		})
 		const tickets = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'tickets-messages',
 			where: { key: { equals: key } },
 		})
@@ -108,7 +114,11 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 
 	describe('cascade', () => {
 		it('deletes the conversation with its target by default, and not where disabled', async () => {
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'Gone' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'Gone' },
+			})
 			const key = `collection:persons:${person.id}`
 			for (const instance of ['comments', 'tickets']) {
 				await call(booted, `POST /conversations/${instance}/messages`, {
@@ -116,29 +126,50 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 					session: staff,
 				})
 			}
-			await booted.payload.delete({ collection: 'persons', id: person.id })
+			await booted.payload.delete({ overrideAccess: true, collection: 'persons', id: person.id })
 			const where = { key: { equals: key } }
 			expect(
-				(await booted.payload.count({ collection: 'comments-messages', where })).totalDocs
+				(
+					await booted.payload.count({
+						overrideAccess: true,
+						collection: 'comments-messages',
+						where,
+					})
+				).totalDocs
 			).toBe(0)
-			expect((await booted.payload.count({ collection: 'comments-reads', where })).totalDocs).toBe(
-				0
-			)
 			expect(
-				(await booted.payload.count({ collection: 'tickets-messages', where })).totalDocs
+				(await booted.payload.count({ overrideAccess: true, collection: 'comments-reads', where }))
+					.totalDocs
+			).toBe(0)
+			expect(
+				(
+					await booted.payload.count({
+						overrideAccess: true,
+						collection: 'tickets-messages',
+						where,
+					})
+				).totalDocs
 			).toBe(1)
 		})
 
 		it('hands the key to a custom cascade', async () => {
-			const media = await booted.payload.create({ collection: 'media', data: { title: 'm' } })
-			await booted.payload.delete({ collection: 'media', id: media.id })
+			const media = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'media',
+				data: { title: 'm' },
+			})
+			await booted.payload.delete({ overrideAccess: true, collection: 'media', id: media.id })
 			expect(cascaded).toContain(`collection:media:${media.id}`)
 		})
 	})
 
 	describe('deleted placeholders', () => {
 		it('keeps counting a deleted reply that still shows', async () => {
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'K' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'K' },
+			})
 			const key = `collection:persons:${person.id}`
 			const root = await call<{ message: ConversationMessage }>(
 				booted,
@@ -154,6 +185,7 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 				session: staff,
 			})
 			const stored = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'kept-messages',
 				id: root.json.message.id,
 			})) as unknown as ConversationMessage
@@ -163,10 +195,14 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 
 	describe('system authors', () => {
 		it('posts as a system author and projects its configured name', async () => {
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'S' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'S' },
+			})
 			const key = `collection:persons:${person.id}`
 			// No user on the request: an import job.
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			const note = await postMessage(req, {
 				author: { system: 'import' },
 				channel: 'internal',
@@ -208,9 +244,13 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 
 	describe('server helpers', () => {
 		it('posts any type from server code and validates its data', async () => {
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'T' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'T' },
+			})
 			const key = `collection:persons:${person.id}`
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			const message = await postMessage(req, {
 				author: staff.userKey,
 				channel: 'internal',
@@ -222,6 +262,7 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 			expect(message.type).toBe('ticket.status')
 			expect(message.authorKey).toBe(staff.userKey)
 			const cursor = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'comments-reads',
 				where: { and: [{ userKey: { equals: staff.userKey } }, { key: { equals: key } }] },
 			})
@@ -243,6 +284,7 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 			await new Promise((resolve) => setTimeout(resolve, 5))
 			await touchMessage(req, { id: message.id, instance: 'comments' })
 			const touched = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'comments-messages',
 				id: message.id,
 			})) as unknown as ConversationMessage
@@ -250,7 +292,11 @@ describeForDb('conversations instances', { dbs: ['mongo'] }, (db) => {
 		})
 
 		it('refuses a custom type from clients unless it is client-creatable', async () => {
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'C' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'C' },
+			})
 			const res = await call(booted, 'POST /conversations/comments/messages', {
 				body: {
 					channel: 'internal',

@@ -1,23 +1,23 @@
 .pg {
 	display: grid;
-	grid-template-columns: 13rem minmax(0, 1fr);
-	gap: calc(var(--base) * 1.5);
-	padding-block: var(--base);
+	grid-template-columns: 169px minmax(0, 1fr);
+	gap: 30px;
+	padding-block: 20px;
 }
 
 .pg-nav {
 	position: sticky;
-	top: calc(var(--app-header-height, 0px) + var(--base));
+	top: calc(var(--app-header-height, 0px) + 20px);
 	align-self: start;
 	display: flex;
 	flex-direction: column;
-	gap: var(--base);
+	gap: 20px;
 }
 
 .pg-nav__heading {
-	margin-bottom: 0.25rem;
-	color: var(--theme-elevation-500);
-	font-size: 0.85rem;
+	margin-bottom: 3px;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-small-font-size);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
@@ -25,19 +25,19 @@
 
 .pg-nav__link {
 	display: block;
-	padding: 0.35rem 0.6rem;
-	border-radius: var(--style-radius-s);
-	color: var(--theme-elevation-800);
+	padding: 5px 8px;
+	border-radius: var(--radius-medium);
+	color: var(--color-text);
 	text-decoration: none;
 }
 
 .pg-nav__link:hover {
-	background: var(--theme-elevation-50);
+	background: var(--color-bg-secondary);
 }
 
 .pg-nav__link--active {
-	background: var(--theme-elevation-100);
-	color: var(--theme-text);
+	background: var(--color-bg-hover);
+	color: var(--color-text);
 	font-weight: 600;
 }
 
@@ -45,7 +45,7 @@
 	min-width: 0;
 	display: flex;
 	flex-direction: column;
-	gap: var(--base);
+	gap: 20px;
 }
 
 .pg-toolbar {
@@ -54,88 +54,88 @@
 	z-index: 2;
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.5rem calc(var(--base) * 1.5);
-	padding: 0.6rem 0;
-	border-bottom: 1px solid var(--theme-elevation-100);
-	background: var(--theme-bg);
+	gap: 6px 30px;
+	padding: 8px 0;
+	border-bottom: 1px solid var(--color-border);
+	background: var(--color-bg);
 }
 
 .pg-toolbar__group {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 0.35rem;
+	gap: 5px;
 }
 
 .pg-toolbar__label {
-	margin-right: 0.25rem;
-	color: var(--theme-elevation-500);
-	font-size: 0.9rem;
+	margin-right: 3px;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 }
 
 .pg-chip,
 .pg-button {
-	padding: 0.25rem 0.65rem;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	background: var(--theme-elevation-0);
-	color: var(--theme-elevation-800);
+	padding: 3px 8px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg);
+	color: var(--color-text);
 	cursor: pointer;
 	font: inherit;
-	font-size: 0.9rem;
+	font-size: var(--text-body-medium-font-size);
 }
 
 .pg-chip:hover,
 .pg-button:hover {
-	border-color: var(--theme-elevation-300);
+	border-color: var(--color-border-control-strong);
 }
 
 .pg-chip--active {
-	border-color: var(--theme-elevation-800);
-	background: var(--theme-elevation-800);
-	color: var(--theme-elevation-0);
+	border-color: var(--color-border-strong);
+	background: var(--color-bg-inverse);
+	color: var(--color-text-oninverse);
 }
 
 .pg-check {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.3rem;
-	font-size: 0.9rem;
+	gap: 4px;
+	font-size: var(--text-body-medium-font-size);
 	cursor: pointer;
 }
 
 .pg-canvas__header {
-	margin-bottom: var(--base);
+	margin-bottom: 20px;
 }
 
 .pg-canvas__title {
-	margin: 0 0 0.25rem;
+	margin: 0 0 3px;
 }
 
 .pg-canvas__description {
-	max-width: 48rem;
+	max-width: 624px;
 	margin: 0;
-	color: var(--theme-elevation-600);
+	color: var(--color-text-secondary);
 }
 
 .pg-stack {
 	display: flex;
 	flex-direction: column;
-	gap: var(--base);
+	gap: 20px;
 }
 
 .pg-row {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 0.6rem;
+	gap: 8px;
 }
 
 .pg-split {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-start;
-	gap: var(--base);
+	gap: 20px;
 }
 
 .pg-grid {
@@ -144,117 +144,117 @@
 			auto-fill,
 			minmax(min(var(--pg-width, 100%), 100%), var(--pg-width, 1fr))
 		);
-	gap: calc(var(--base) * 1.25);
+	gap: 25px;
 }
 
 .pg-case {
 	display: flex;
 	flex-direction: column;
-	gap: 0.4rem;
+	gap: 5px;
 	min-width: 0;
 }
 
 .pg-case__label {
-	color: var(--theme-elevation-600);
-	font-size: 0.9rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	font-weight: 600;
 }
 
 .pg-case__note {
 	font-weight: 400;
-	color: var(--theme-elevation-450, var(--theme-elevation-500));
+	color: var(--color-text-secondary);
 }
 
 /* The drawer's box: its width from the toolbar, a fixed height so the feed scrolls. */
 .pg .pg-frame {
 	width: var(--pg-width, 100%);
 	max-width: 100%;
-	height: 36rem;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m);
+	height: 468px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
 	overflow: hidden;
 	box-shadow: 0 2px 12px rgb(0 0 0 / 0.06);
 }
 
 .pg .pg-frame--auto {
 	height: auto;
-	padding: 0.25rem 0;
-	background: var(--theme-elevation-50);
+	padding: 3px 0;
+	background: var(--color-bg-secondary);
 }
 
 .pg .pg-pad {
-	padding: 0 1rem 1rem;
+	padding: 0 13px 13px;
 }
 
 .pg-thread-header {
 	display: flex;
 	align-items: flex-start;
 	justify-content: space-between;
-	padding: 1rem 1rem 0.5rem;
+	padding: 13px 13px 6px;
 }
 
 .pg-empty {
-	padding: var(--base);
-	color: var(--theme-elevation-500);
+	padding: 20px;
+	color: var(--color-text-secondary);
 }
 
 .pg-doc-controls {
 	display: flex;
 	flex-wrap: wrap;
 	align-items: flex-start;
-	gap: calc(var(--base) * 1.5);
-	padding: var(--base);
-	border: 1px dashed var(--theme-elevation-150);
-	border-radius: var(--style-radius-m);
+	gap: 30px;
+	padding: 20px;
+	border: 1px dashed var(--color-border);
+	border-radius: var(--radius-medium);
 }
 
 .pg-inspects {
 	display: flex;
 	flex-wrap: wrap;
-	gap: var(--base);
+	gap: 20px;
 }
 
 .pg-inspect {
-	flex: 1 1 20rem;
+	flex: 1 1 260px;
 	min-width: 0;
-	border: 1px solid var(--theme-elevation-100);
-	border-radius: var(--style-radius-s);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
 }
 
 .pg-inspect summary {
-	padding: 0.4rem 0.6rem;
+	padding: 5px 8px;
 	cursor: pointer;
 	font-family: var(--font-mono, monospace);
-	font-size: 0.9rem;
+	font-size: var(--text-body-medium-font-size);
 }
 
 .pg-inspect pre {
-	max-height: 24rem;
+	max-height: 312px;
 	margin: 0;
-	padding: 0.6rem;
+	padding: 8px;
 	overflow: auto;
-	background: var(--theme-elevation-50);
-	font-size: 0.85rem;
+	background: var(--color-bg-secondary);
+	font-size: var(--text-body-small-font-size);
 }
 
 .pg-slot {
-	padding: 0.15rem 0.4rem;
-	border: 1px dashed var(--theme-success-500, #3a8);
-	border-radius: var(--style-radius-s);
-	color: var(--theme-success-750, #276);
-	font-size: 0.85rem;
+	padding: 2px 5px;
+	border: 1px dashed var(--color-text-brand);
+	border-radius: var(--radius-medium);
+	color: var(--color-text-brand);
+	font-size: var(--text-body-small-font-size);
 }
 
 .pg-note {
-	color: var(--theme-elevation-700);
+	color: var(--color-text-secondary);
 }
 
 .pg-feed-item {
-	margin: 0.25rem 1rem;
-	padding: 0.3rem 0.6rem;
-	border-left: 2px solid var(--theme-elevation-200);
-	color: var(--theme-elevation-600);
-	font-size: 0.9rem;
+	margin: 3px 13px;
+	padding: 4px 8px;
+	border-left: 2px solid var(--color-border);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 }
 
 @media (max-width: 900px) {
@@ -270,30 +270,30 @@
 /* A docs screenshot: the scene crops to it, so it carries its own background and fixed width. */
 .pg .pg-shot {
 	--pg-width: 100%;
-	padding: calc(var(--base) * 0.75);
-	background: var(--theme-bg);
+	padding: 15px;
+	background: var(--color-bg);
 }
 
 /* Room below a composer for its `/` or `@` menu, inside the cropped area. */
 .pg .pg-shot__menu-room {
-	margin-bottom: 17rem;
+	margin-bottom: 221px;
 }
 
 .pg-system-note {
 	display: flex;
-	gap: 0.462rem;
+	gap: 6px;
 	align-items: baseline;
-	color: var(--theme-elevation-600);
-	font-size: 0.923rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 }
 
 .pg-slot-marker {
-	padding: 0.2rem 0.5rem;
-	border: 1px dashed var(--theme-warning-500, #d9a100);
-	border-radius: var(--style-radius-s);
-	color: var(--theme-warning-750, #b58500);
+	padding: 3px 6px;
+	border: 1px dashed var(--color-border-warning);
+	border-radius: var(--radius-medium);
+	color: var(--color-text-warning);
 	font-family: var(--font-mono, monospace);
-	font-size: 0.8rem;
+	font-size: var(--text-body-small-font-size);
 }
 
 .pg-slot-marker__note {

@@ -18,7 +18,7 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
 	const { user } = await payload.auth({ headers: await headers() })
 	if (user?.collection !== 'customers') return <LoginForm />
 	const ticket = await payload
-		.findByID({ collection: 'tickets', depth: 0, disableErrors: true, id })
+		.findByID({ collection: 'tickets', depth: 0, disableErrors: true, id, overrideAccess: true })
 		.catch(() => null)
 	if (!ticket || String(ticket.customer) !== String(user.id)) notFound()
 	return (

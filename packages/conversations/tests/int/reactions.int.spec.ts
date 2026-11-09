@@ -53,6 +53,7 @@ for (const storage of ['collection', 'message'] as const)
 			staff = await signUp(booted, 'users', 'Staff One')
 			customer = await signUp(booted, 'customers', 'Customer')
 			const person = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'persons',
 				data: { name: 'Athlete', owner: String(customer.id) },
 			})
@@ -186,7 +187,11 @@ for (const storage of ['collection', 'message'] as const)
 		})
 
 		it.runIf(storage === 'collection')('removes a target’s reactions with the target', async () => {
-			const other = await booted.payload.create({ collection: 'persons', data: { name: 'Gone' } })
+			const other = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'Gone' },
+			})
 			const key = `collection:persons:${other.id}`
 			const sent = await call<{ message: Message }>(
 				booted,
@@ -197,8 +202,9 @@ for (const storage of ['collection', 'message'] as const)
 				}
 			)
 			await react(staff, { action: 'add', emoji: '👍', message: sent.json.message })
-			await booted.payload.delete({ collection: 'persons', id: other.id })
+			await booted.payload.delete({ overrideAccess: true, collection: 'persons', id: other.id })
 			const left = await booted.payload.count({
+				overrideAccess: true,
 				collection: 'comments-reactions' as never,
 				where: { key: { equals: key } },
 			})
@@ -222,7 +228,11 @@ for (const storage of ['collection', 'message'] as const)
 				)
 			)
 			staff = await signUp(booted, 'users', 'Staff')
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'P' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'P' },
+			})
 			personKey = `collection:persons:${person.id}`
 		}, 240_000)
 

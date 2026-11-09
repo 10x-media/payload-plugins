@@ -96,6 +96,7 @@ describe.skipIf(!withDocker)('realtime over Pusher (Soketi)', () => {
 		staff = await signUp(booted, 'users', 'Staff')
 		customer = await signUp(booted, 'customers', 'Customer')
 		const person = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'persons',
 			data: { name: 'Pushed', owner: String(customer.id) },
 		})

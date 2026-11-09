@@ -120,9 +120,9 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/richtext-lexical": "^4.0.0-beta.6",
-		"@payloadcms/ui": "^4.0.0-beta.6",
-		"payload": "^4.0.0-beta.6",
+		"@payloadcms/richtext-lexical": "^4.0.0-beta.7",
+		"@payloadcms/ui": "^4.0.0-beta.7",
+		"payload": "^4.0.0-beta.7",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},

@@ -1,8 +1,8 @@
 import {
 	type CollectionSlug,
-	createLocalReq,
+	createPayloadRequest,
 	type PayloadRequest,
-	type TypedUser,
+	type User,
 	type Where,
 } from 'payload'
 
@@ -64,10 +64,12 @@ export const requestAs = async (
 	req: PayloadRequest,
 	user: Record<string, unknown> & { collection: string }
 ): Promise<PayloadRequest> =>
-	createLocalReq(
-		{ context: req.context, locale: req.locale ?? undefined, user: user as unknown as TypedUser },
-		req.payload
-	)
+	createPayloadRequest({
+		context: req.context,
+		locale: req.locale ?? undefined,
+		payload: req.payload,
+		user: user as unknown as User,
+	})
 
 /**
  * The candidates who may be mentioned in `channel` of `key`: each passes the

@@ -76,7 +76,13 @@ export default async function TicketPage({ params }: { params: Promise<{ id: str
   const payload = await getPayload({ config })
   const { user } = await payload.auth({ headers: await headers() })
   if (user?.collection !== 'customers') redirect('/support/login')
-  const ticket = await payload.findByID({ collection: 'tickets', id, depth: 0, disableErrors: true })
+  const ticket = await payload.findByID({
+    collection: 'tickets',
+    id,
+    depth: 0,
+    disableErrors: true,
+    overrideAccess: true,
+  })
   if (!ticket || String(ticket.customer) !== String(user.id)) notFound()
   return (
     <main className="mx-auto max-w-2xl p-6">

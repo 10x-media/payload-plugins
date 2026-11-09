@@ -1,6 +1,6 @@
 'use client'
 
-import { MoreIcon, Popup, PopupList } from '@payloadcms/ui'
+import { Button, MoreIcon, Popup, PopupList } from '@payloadcms/ui'
 import { createContext, type ReactNode, useContext, useState } from 'react'
 
 import type { WindowMessage } from '../react/window'
@@ -21,7 +21,7 @@ const MessageMenuContext = createContext<MessageMenuContextValue | null>(null)
 export const useMessageMenu = (): MessageMenuContextValue | null => useContext(MessageMenuContext)
 
 /**
- * A message's "⋯" menu on Payload's own popup: an optional row of quick
+ * A message's "more" menu on Payload's own popup: an optional row of quick
  * actions (`messageQuickActions`, e.g. reactions), then Reply in thread,
  * Edit and Delete, then extension items (`messageActions`, the `actions`
  * prop). Renders nothing when the viewer has nothing to do with the message.
@@ -58,18 +58,24 @@ export const MessageMenu = ({
 	}
 	return (
 		<Popup
-			button={
-				<>
-					<MoreIcon />
-					<span className="conversations-sr-only">{t(keys.messageMenu)}</span>
-				</>
-			}
-			buttonClassName="conversations-message__menu-button"
-			buttonType="custom"
 			caret={false}
 			className={`conversations-message__menu${open ? ' conversations-message__menu--open' : ''}`}
 			horizontalAlign="right"
 			onToggleOpen={setOpen}
+			popupType="menu"
+			renderButton={({ active, onClick, onKeyDown, ...aria }) => (
+				<Button
+					aria-label={t(keys.messageMenu)}
+					buttonStyle="ghost"
+					className="conversations-message__menu-button"
+					extraButtonProps={{ ...aria, onKeyDown }}
+					icon={<MoreIcon />}
+					margin={false}
+					onClick={onClick}
+					selected={active}
+					size="medium"
+				/>
+			)}
 			render={({ close }) => (
 				<MessageMenuContext.Provider value={{ close, message }}>
 					{quick ? (

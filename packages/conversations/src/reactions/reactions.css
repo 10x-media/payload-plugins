@@ -2,30 +2,31 @@
 	display: flex;
 	flex-wrap: wrap;
 	align-items: center;
-	gap: 0.308rem;
-	margin-top: 0.385rem;
+	gap: var(--spacer-1);
+	margin-top: var(--spacer-1-5);
 }
 
 .conversations-reactions__pill,
 .conversations-reactions__add {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.308rem;
-	height: 1.846rem;
-	padding: 0 0.538rem;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: 999px;
-	background: var(--theme-elevation-50);
-	color: var(--theme-elevation-700);
+	gap: var(--spacer-1);
+	height: var(--spacer-4);
+	padding: 0 var(--spacer-2);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-full);
+	background: var(--color-bg-secondary);
+	color: var(--color-text);
 	cursor: pointer;
 	font: inherit;
-	font-size: 0.923rem;
+	font-size: var(--text-body-medium-font-size);
 	line-height: 1;
 }
 
-.conversations-reactions__pill:hover,
-.conversations-reactions__add:hover {
-	border-color: var(--theme-elevation-300);
+.conversations-reactions__pill:hover:not(:disabled),
+.conversations-reactions__add:hover,
+.conversations-reactions__add--open {
+	background: var(--color-bg-secondary-hover);
 }
 
 .conversations-reactions__pill:disabled {
@@ -33,30 +34,36 @@
 	opacity: 0.7;
 }
 
+/* Your own reaction: Payload's selected pair, as a pressed toggle. */
 .conversations-reactions__pill--mine {
-	border-color: color-mix(in srgb, var(--theme-success-500, #3e63dd) 60%, transparent);
-	background: color-mix(in srgb, var(--theme-success-500, #3e63dd) 14%, transparent);
-	color: var(--theme-text);
+	border-color: var(--color-border-selected);
+	background: var(--color-bg-selected);
+	color: var(--color-text-selected);
+}
+
+.conversations-reactions__pill--mine:hover:not(:disabled) {
+	background: var(--color-bg-selected-hover);
 }
 
 .conversations-reactions__emoji {
-	font-size: 1.077rem;
+	font-size: var(--text-body-large-font-size);
 }
 
 .conversations-reactions__count {
-	font-weight: 600;
+	font-weight: var(--text-body-medium-bold-font-weight);
 	font-variant-numeric: tabular-nums;
 }
 
 /* The add button only shows while the message is hovered, as the action row does. */
 .conversations-reactions__add {
-	padding: 0 0.462rem;
-	color: var(--theme-elevation-500);
+	padding: 0 var(--spacer-1-5);
+	color: var(--color-icon-secondary);
 	opacity: 0;
 }
 
 .conversations-message:hover .conversations-reactions__add,
-.conversations-reactions__add:focus-visible {
+.conversations-reactions__add:focus-visible,
+.conversations-reactions__add--open {
 	opacity: 1;
 }
 
@@ -70,27 +77,27 @@
 .conversations-reaction-row {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.154rem;
+	gap: 2px;
 }
 
 .conversations-reaction-row__emoji {
-	width: 2.308rem;
-	height: 2.308rem;
+	width: var(--spacer-5);
+	height: var(--spacer-5);
 	padding: 0;
 	border: 0;
-	border-radius: var(--style-radius-s, 4px);
+	border-radius: var(--radius-medium);
 	background: transparent;
 	cursor: pointer;
-	font-size: 1.385rem;
+	font-size: var(--text-body-xl-font-size);
 	line-height: 1;
 }
 
 .conversations-reaction-row__emoji:hover:not(:disabled) {
-	background: var(--theme-elevation-150);
+	background: var(--color-bg-transparent-hover);
 }
 
 .conversations-reaction-row__emoji--mine {
-	background: var(--theme-elevation-150);
+	background: var(--color-bg-transparent-pressed);
 }
 
 .conversations-reaction-row__emoji:disabled {

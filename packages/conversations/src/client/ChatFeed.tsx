@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@payloadcms/ui'
+import { Button, ChevronIcon } from '@payloadcms/ui'
 import { Fragment, type ReactNode } from 'react'
 
 import type { FeedDay, FeedItem } from '../react/feed'
@@ -59,10 +59,10 @@ const DefaultFeed = ({
 				{feed.hasOlder ? (
 					<div className="conversations-feed__older">
 						<Button
-							buttonStyle="subtle"
+							buttonStyle="pill"
 							margin={false}
 							onClick={() => void feed.loadOlder()}
-							size="small"
+							size="medium"
 						>
 							{t(keys.loadEarlier)}
 						</Button>
@@ -109,11 +109,11 @@ const DefaultFeed = ({
 				<div className="conversations-feed__jump">
 					<Button
 						buttonStyle="pill"
-						icon={['chevron']}
+						icon={<ChevronIcon direction="down" size={16} />}
 						iconPosition="right"
 						margin={false}
 						onClick={() => void feed.toBottom()}
-						size="small"
+						size="medium"
 					>
 						{feed.hasNewer ? t(keys.jumpToLatest) : t(keys.unseenCount, { count: feed.unseen })}
 					</Button>

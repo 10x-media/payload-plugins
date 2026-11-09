@@ -3,13 +3,15 @@
 # @10x-media/conversations
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/conversations` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/conversations` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/conversations).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/conversations@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/conversations) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
 Conversations for Payload: messages bound to any document, global or custom key, with channels that decide who reads what, one-level threads, mentions and per-user read state. Comments on documents, reactions and file attachments ship as extensions; support tickets, chat rooms and website chats are built from the same primitives.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/conversations?style=flat-square)](https://www.npmjs.com/package/@10x-media/conversations)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 ## Features
 
@@ -28,7 +30,7 @@ Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-pl
 ## Quick start
 
 ```bash
-pnpm add @10x-media/conversations@beta
+pnpm add @10x-media/conversations@alpha
 ```
 
 ```ts

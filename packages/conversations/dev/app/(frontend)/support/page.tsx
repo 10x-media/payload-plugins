@@ -16,6 +16,8 @@ export default async function SupportPage() {
 	const tickets = await payload.find({
 		collection: 'tickets',
 		depth: 0,
+		// Narrowed to the customer's own tickets by `where`.
+		overrideAccess: true,
 		sort: '-createdAt',
 		where: { customer: { equals: user.id } },
 	})

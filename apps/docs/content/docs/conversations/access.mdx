@@ -151,7 +151,7 @@ Both collections deny every operation over REST and GraphQL. Payload's collectio
 
 A project that stores what its access needs on the message itself, such as a `tenant` field added through `overrides.messages.fields`, may open REST through `overrides.messages.access`. That becomes the project's responsibility; the instance endpoints keep checking instance access regardless.
 
-The Local API is yours: `payload.find({ collection: 'comments-messages' })` from server code works as with any collection, and the collection hooks keep the invariants (channel and type checks, derived fields, counters, instance hooks).
+The Local API is yours: `payload.find({ collection: 'comments-messages', overrideAccess: true })` from server code works as with any collection (the collections' own access denies everyone, and Payload 4's Local API applies it unless `overrideAccess` says otherwise), and the collection hooks keep the invariants (channel and type checks, derived fields, counters, instance hooks).
 
 ## Plugin order
 

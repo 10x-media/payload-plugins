@@ -45,6 +45,12 @@ const users: CollectionConfig = {
 const customers: CollectionConfig = {
 	slug: 'customers',
 	auth: true,
+	// Payload's default access admits only `admin.user`; a customer reads their own account (`/me`).
+	access: {
+		read: ({ req }) =>
+			isStaff(req) ||
+			(req.user?.collection === 'customers' ? { id: { equals: req.user.id } } : false),
+	},
 	admin: { useAsTitle: 'name' },
 	fields: [
 		{ name: 'name', type: 'text' },

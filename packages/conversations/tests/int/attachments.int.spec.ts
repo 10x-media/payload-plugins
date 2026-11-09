@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
 import { type BootedPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq, handleEndpoints } from 'payload'
+import { createPayloadRequest, handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 
 import { type AttachmentView, attachments } from '../../src/exports/attachments'
@@ -70,6 +70,7 @@ for (const deleteWithMessage of [false, true])
 		const fileExists = async (id: number | string) =>
 			(
 				await booted.payload.find({
+					overrideAccess: true,
 					collection: COLLECTION as 'users',
 					where: { id: { equals: id } },
 				})
@@ -104,6 +105,7 @@ for (const deleteWithMessage of [false, true])
 			staff = await signUp(booted, 'users', 'Staff One')
 			customer = await signUp(booted, 'customers', 'Customer')
 			const person = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'persons',
 				data: { name: 'Athlete', owner: String(customer.id) },
 			})
@@ -198,7 +200,7 @@ for (const deleteWithMessage of [false, true])
 
 		it('attaches from server code without access checks', async () => {
 			const staffFile = await upload(staff, { name: 'import.txt' })
-			const message = await postMessage(await createLocalReq({}, booted.payload), {
+			const message = await postMessage(await createPayloadRequest({ payload: booted.payload }), {
 				author: staff.userKey,
 				channel: 'shared',
 				ext: { attachments: [staffFile.doc?.id] },
@@ -236,7 +238,7 @@ for (const deleteWithMessage of [false, true])
 			async () => {
 				const file = await upload(customer)
 				await send(customer, { ext: { attachments: [file.doc?.id] }, text: 'last words' })
-				await booted.payload.delete({ collection: 'persons', id: personId })
+				await booted.payload.delete({ overrideAccess: true, collection: 'persons', id: personId })
 				expect(await fileExists(file.doc?.id ?? '')).toBe(!deleteWithMessage)
 			}
 		)

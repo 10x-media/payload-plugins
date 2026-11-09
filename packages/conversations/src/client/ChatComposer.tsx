@@ -132,7 +132,12 @@ const DefaultComposer = ({
 			{failed ? (
 				<div className="conversations-composer__banner conversations-composer__banner--error">
 					<span>{t(keys.couldNotSend)}</span>
-					<Button buttonStyle="secondary" margin={false} onClick={() => void submit()} size="small">
+					<Button
+						buttonStyle="secondary"
+						margin={false}
+						onClick={() => void submit()}
+						size="medium"
+					>
 						{t(keys.retry)}
 					</Button>
 				</div>
@@ -171,7 +176,7 @@ const DefaultComposer = ({
 									: t(submitOn === 'enter' ? keys.enterToSend : keys.modEnterToSend)}
 							</span>
 							{onCancel ? (
-								<Button buttonStyle="secondary" margin={false} onClick={onCancel} size="small">
+								<Button buttonStyle="secondary" margin={false} onClick={onCancel} size="medium">
 									{t(keys.cancel)}
 								</Button>
 							) : null}
@@ -183,7 +188,7 @@ const DefaultComposer = ({
 								disabled={busy}
 								margin={false}
 								onClick={() => void submit()}
-								size="small"
+								size="medium"
 							>
 								{submitLabel ?? t(onSave ? keys.save : keys.send)}
 							</Button>

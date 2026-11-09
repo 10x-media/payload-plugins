@@ -130,7 +130,10 @@ test.describe('comments drawer', () => {
 
 		await openMenu(edited)
 		await page.locator('.popup__content').getByText('Delete', { exact: true }).click()
-		await page.locator('.confirmation-modal').getByRole('button', { name: 'Delete' }).click()
+		await page
+			.getByRole('dialog', { name: 'Delete message?' })
+			.getByRole('button', { name: 'Delete' })
+			.click()
 		await expect(
 			page.locator('.conversations-message', { hasText: `${text} (edited)` })
 		).toHaveCount(0)

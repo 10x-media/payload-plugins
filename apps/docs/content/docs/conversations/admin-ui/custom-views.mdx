@@ -80,15 +80,17 @@ admin: {
 The view is a server component that loads what the page needs (the rooms the user may see) and renders a client app inside Payload's `DefaultTemplate`, so the admin's nav and header stay:
 
 ```tsx title="chat/ChatView.tsx"
-import { DefaultTemplate } from '@payloadcms/next/templates'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps } from 'payload'
 
 import { ChatApp } from './ChatApp'
 
 export const ChatView = async ({ initPageResult, params, searchParams }: AdminViewServerProps) => {
-  const { payload, user } = initPageResult.req
+  const { req } = initPageResult
+  const { payload, user } = req
+  // Payload 4's Local API applies access control: `req` runs it as the viewer.
   const rooms = user
-    ? (await payload.find({ collection: 'rooms', depth: 0, limit: 100, sort: 'name' })).docs
+    ? (await payload.find({ collection: 'rooms', depth: 0, limit: 100, req, sort: 'name' })).docs
     : []
   return (
     <DefaultTemplate
@@ -97,6 +99,7 @@ export const ChatView = async ({ initPageResult, params, searchParams }: AdminVi
       params={params}
       payload={payload}
       permissions={initPageResult.permissions}
+      req={req}
       searchParams={searchParams}
       user={user ?? undefined}
       visibleEntities={initPageResult.visibleEntities}

@@ -1,0 +1,61 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x.
+---
+
+`@10x-media/conversations` 4.x is the Payload 4 line; the 0.x beta releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin's options, instances, channels, extensions and hooks are unchanged, and it runs on Next.js and TanStack Start. This page covers what changes around them.
+
+## Checklist
+
+1. Upgrade `@10x-media/conversations` with Payload: its peers are `payload`, `@payloadcms/ui` and `@payloadcms/richtext-lexical` at `^4.0.0-beta.7`.
+2. Pass `overrideAccess: true` (or `req`) where code of yours reads or writes through the Local API without a user, including the plugin's own collections (see [Local API access](#local-api-access)).
+3. If website accounts upload into an attachments collection of your own, or read their own account, give those collections access that admits them (see [Website accounts](#website-accounts)).
+4. With `serverComponents: 'server-function'` on TanStack Start, register the plugin's server functions there too (see [Slots](/conversations/admin-ui/slots#how-server-components-reach-the-admin)).
+5. Restyle any CSS of your own that targets the drawer header, the tabs or the message menu (see [Look](#look)).
+6. Regenerate the import map and types (`pnpm payload generate:importmap`, `pnpm payload generate:types`). The plugin's collections keep their Payload 3 schema, so they need no migration of their own (see [Collections](#collections)).
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## Local API access
+
+Payload 4's Local API applies access control by default. The plugin's own reads and writes (endpoints, hooks, `postMessage`, the extensions) pass `overrideAccess: true` or run as the requesting user, so nothing changes there. Code of yours that calls `payload.find` or `payload.create` and relied on the old default now runs as no one and gets `Forbidden`:
+
+- An `access` or `decorate` callback, or a hook of yours, that looks something up: pass `overrideAccess: true`, or `req` to run as the viewer.
+- Server code that reads the plugin's collections (`<instance>-messages`, `<instance>-reads`, `<instance>-reactions`) directly: their collection access denies everyone over REST, so pass `overrideAccess: true`.
+- A seed or job that posts messages: give it a request built with Payload's `createPayloadRequest` (Payload 3's `createLocalReq`).
+
+Callbacks receive `user` typed as Payload's `User` (Payload 3's `TypedUser`).
+
+## Website accounts
+
+Payload 4's default access admits only the admin's user collection (`admin.user`). A website account collection with no access of its own (customers in the [support chat recipe](/conversations/recipes/support-tickets)) can sign in but no longer reads its own record; open `read` for the account itself:
+
+```ts title="collections/customers.ts"
+access: {
+  read: ({ req }) =>
+    req.user?.collection === 'customers' ? { id: { equals: req.user.id } } : Boolean(req.user),
+},
+```
+
+The attachments extension's own collection keeps the Payload 3 behaviour: it now states it explicitly, so any signed-in user, a website account included, uploads and reads. An upload collection of your own passed as `collection` follows Payload 4's default, so website accounts need `create` and `read` opened there.
+
+## Collections
+
+Payload 4 turns on versions and core authorship (`createdBy`, `updatedBy`) by default. The plugin turns both off on its own collections (messages, reads, reactions, and the attachments extension's upload collection): messages track their own author and edit time, and read state and reactions are written per user on every view. Their schema is the same as on Payload 3. An attachments collection of your own takes Payload 4's defaults; set `versions: false` there if files are only added and removed.
+
+## Mentions
+
+The mention node declares its JSON schema, so the generated types include `SerializedConversationsMentionNode` in a message body's node union. Its legacy HTML converter is gone, as Payload 4's `createNode` takes none; render bodies through the [JSX converters](/conversations/rich-text) as before, or add an HTML converter for `conversationsMention` to your own `convertLexicalToHTML` call.
+
+## Look
+
+The admin UI takes Payload 4's look, built from Payload's own components on Payload 4's tokens (see [Styling](/conversations/admin-ui/styling)):
+
+- **Drawer.** The header is Payload's drawer header: the back button on the left (`drawer__header__close`), then the title (`drawer__header__title`, still `conversations-drawer__title`) and the subtitle. Threads open as a drawer stacked on it, offset like Payload's own.
+- **Tabs.** The channel tabs are Payload's tabs (`TabsList` and `TabButton`, `role="tab"`). `conversations-tabs__tab` and `conversations-tabs__tab--active` sit on the tab button, beside Payload's `tabs__tab-button` classes.
+- **Trigger.** The Comments button is Payload's secondary `Button` (`conversations-trigger`).
+- **Message menu.** The "⋯" button is Payload's ghost `Button` (`conversations-message__menu-button`); the menu is Payload's popup.
+- **Composer.** The editor box follows Payload's inputs (`--field-*`), its toolbar buttons, `/` and `@` menus and link field follow Payload's rich text editor.
+- **Text.** Message bodies use Payload 4's large body text, as its rich text field does. Payload 4's root size is 16px (Payload 3's 13px), so `rem` values of your own grow.
+
+The theme variables are Payload 4's (`--color-*`, `--spacer-*`, `--text-body-*`, `--radius-*`); Payload 3's `--base`, `--theme-*` and `--style-radius-*` no longer reach the plugin. `--conversations-avatar-hue` is unchanged. A component you replaced keeps working, but restyle it against Payload 4's tokens.

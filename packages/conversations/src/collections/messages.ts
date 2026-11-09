@@ -256,6 +256,8 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 
 	const override = instance.overrides.messages ?? {}
 	return {
+		// Written only through the plugin, which keeps its own author: no core authorship, no versions.
+		authorship: false,
 		access: {
 			create: closed,
 			delete: closed,
@@ -281,5 +283,6 @@ export const buildMessagesCollection = (instance: ConversationsInstance): Collec
 		],
 		slug,
 		timestamps: true,
+		versions: false,
 	}
 }

@@ -2,63 +2,63 @@
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 1.846rem;
-	height: 1.846rem;
+	width: var(--spacer-4);
+	height: var(--spacer-4);
 	padding: 0;
 	border: 0;
-	border-radius: var(--style-radius-s, 3px);
+	border-radius: var(--radius-medium);
 	background: none;
-	color: var(--theme-elevation-600);
+	color: var(--color-icon-secondary);
 	cursor: pointer;
 }
 
 .conversations-attach-button:hover {
-	background: var(--theme-elevation-100);
-	color: var(--theme-text);
+	background: var(--color-bg-transparent-hover);
+	color: var(--color-icon);
 }
 
 .conversations-attach-picked {
-	padding: 0 1.077rem 0.385rem;
+	padding: 0 var(--spacer-2-5) 5px;
 }
 
 .conversations-attach-picked__list {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.385rem;
+	gap: 5px;
 	margin: 0;
 	padding: 0;
 	list-style: none;
 }
 
 .conversations-attach-picked__error {
-	margin: 0.308rem 0 0;
-	color: var(--theme-error-500);
-	font-size: 0.846rem;
+	margin: var(--spacer-1) 0 0;
+	color: var(--color-text-danger);
+	font-size: var(--text-body-small-font-size);
 }
 
 .conversations-attach-chip {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.385rem;
-	max-width: 16rem;
-	height: 2.154rem;
-	padding: 0 0.308rem 0 0.231rem;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s, 3px);
-	background: var(--theme-elevation-50);
-	font-size: 0.846rem;
+	gap: 5px;
+	max-width: 208px;
+	height: 28px;
+	padding: 0 var(--spacer-1) 0 3px;
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg-secondary);
+	font-size: var(--text-body-small-font-size);
 }
 
 .conversations-attach-chip__thumb {
-	width: 1.692rem;
-	height: 1.692rem;
-	border-radius: 2px;
+	width: 22px;
+	height: 22px;
+	border-radius: var(--radius-small);
 	object-fit: cover;
 }
 
 .conversations-attach-chip__icon {
 	display: inline-flex;
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .conversations-attach-chip__name {
@@ -69,47 +69,47 @@
 }
 
 .conversations-attach-chip__size {
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 	white-space: nowrap;
 }
 
 .conversations-attach-chip__remove {
 	display: inline-flex;
-	padding: 0.154rem;
+	padding: 2px;
 	border: 0;
-	border-radius: 2px;
+	border-radius: var(--radius-small);
 	background: none;
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 	cursor: pointer;
 }
 
 .conversations-attach-chip__remove:hover {
-	background: var(--theme-elevation-150);
-	color: var(--theme-text);
+	background: var(--color-bg-transparent-hover);
+	color: var(--color-text);
 }
 
 .conversations-attachments {
 	display: flex;
 	flex-direction: column;
 	align-items: flex-start;
-	gap: 0.308rem;
-	margin-top: 0.385rem;
+	gap: var(--spacer-1);
+	margin-top: 5px;
 }
 
 .conversations-attachments__images {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.385rem;
+	gap: 5px;
 }
 
 .conversations-attachments__image {
 	overflow: hidden;
-	width: 7.692rem;
-	height: 7.692rem;
+	width: 100px;
+	height: 100px;
 	padding: 0;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s, 3px);
-	background: var(--theme-elevation-50);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg-secondary);
 	cursor: zoom-in;
 }
 
@@ -123,18 +123,18 @@
 .conversations-attachments__file {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.462rem;
+	gap: var(--spacer-1-5);
 	max-width: 100%;
-	padding: 0.308rem 0.462rem;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s, 3px);
-	background: var(--theme-elevation-50);
-	font-size: 0.923rem;
+	padding: var(--spacer-1) var(--spacer-1-5);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg-secondary);
+	font-size: var(--text-body-medium-font-size);
 }
 
 .conversations-attachments__icon {
 	display: inline-flex;
-	color: var(--theme-elevation-500);
+	color: var(--color-text-secondary);
 }
 
 .conversations-attachments__name {
@@ -143,10 +143,10 @@
 	padding: 0;
 	border: 0;
 	background: none;
-	color: var(--theme-text);
+	color: var(--color-text);
 	cursor: pointer;
 	font: inherit;
-	text-align: left;
+	text-align: start;
 	text-decoration: none;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -157,31 +157,31 @@
 }
 
 .conversations-attachments__size {
-	color: var(--theme-elevation-500);
-	font-size: 0.846rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-small-font-size);
 	white-space: nowrap;
 }
 
 .conversations-attachments__download {
 	display: inline-flex;
-	padding: 0.154rem;
-	border-radius: 2px;
-	color: var(--theme-elevation-600);
+	padding: 2px;
+	border-radius: var(--radius-small);
+	color: var(--color-icon-secondary);
 }
 
 .conversations-attachments__download:hover {
-	background: var(--theme-elevation-150);
-	color: var(--theme-text);
+	background: var(--color-bg-transparent-hover);
+	color: var(--color-text);
 }
 
 .conversations-attachments__upload {
 	margin: 0;
-	color: var(--theme-elevation-500);
-	font-size: 0.846rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-small-font-size);
 }
 
 .conversations-attachments__upload--failed {
-	color: var(--theme-error-500);
+	color: var(--color-text-danger);
 }
 
 .conversations-attach-viewer {
@@ -191,7 +191,7 @@
 	display: flex;
 	align-items: center;
 	justify-content: center;
-	padding: 3.5rem 4rem 2rem;
+	padding: 56px 64px 32px;
 	background: rgb(0 0 0 / 0.85);
 }
 
@@ -217,8 +217,8 @@
 	left: 0;
 	display: flex;
 	align-items: center;
-	gap: 0.615rem;
-	padding: 0.769rem 1.077rem;
+	gap: var(--spacer-2);
+	padding: 10px var(--spacer-2-5);
 	color: #fff;
 }
 
@@ -232,14 +232,14 @@
 
 .conversations-attach-viewer__count {
 	opacity: 0.7;
-	font-size: 0.923rem;
+	font-size: var(--text-body-medium-font-size);
 }
 
 .conversations-attach-viewer__action {
 	display: inline-flex;
-	padding: 0.385rem;
+	padding: 5px;
 	border: 0;
-	border-radius: var(--style-radius-s, 3px);
+	border-radius: var(--radius-medium);
 	background: none;
 	color: #fff;
 	cursor: pointer;
@@ -256,7 +256,7 @@
 }
 
 .conversations-attach-viewer__frame {
-	width: min(60rem, 100%);
+	width: min(780px, 100%);
 	height: 100%;
 	border: 0;
 	background: #fff;
@@ -265,14 +265,14 @@
 .conversations-attach-viewer__step {
 	position: absolute;
 	top: 50%;
-	width: 2.5rem;
-	height: 2.5rem;
+	width: 40px;
+	height: 40px;
 	border: 0;
-	border-radius: 50%;
+	border-radius: var(--radius-full);
 	background: rgb(255 255 255 / 0.12);
 	color: #fff;
 	cursor: pointer;
-	font-size: 1.5rem;
+	font-size: 24px;
 	line-height: 1;
 	transform: translateY(-50%);
 }
@@ -282,9 +282,9 @@
 }
 
 .conversations-attach-viewer__step--prev {
-	left: 0.769rem;
+	left: 10px;
 }
 
 .conversations-attach-viewer__step--next {
-	right: 0.769rem;
+	right: 10px;
 }

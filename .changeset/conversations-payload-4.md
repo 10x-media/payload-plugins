@@ -1,0 +1,5 @@
+---
+'@10x-media/conversations': major
+---
+
+Payload 4 support, on Next.js and TanStack Start. The plugin's Local API calls pass `overrideAccess` or run as the requesting user, as Payload 4's Local API applies access by default. Its own collections (messages, reads, reactions, the attachments extension's uploads) turn off Payload 4's default versions and core authorship, so their schema is unchanged; the attachments collection states its signed-in `create` and `read` access, which was Payload 3's default. Globals get the comments button through `admin.components.edit.beforeDocumentControls`. The mention node declares its JSON schema, so generated types include `SerializedConversationsMentionNode`, and drops its legacy HTML converter. The admin UI takes Payload 4's look from Payload's own components on its tokens: Payload's drawer header, Payload's tabs for the channel tabs (`conversations-tabs__tab` now sits on the tab button), a secondary `Button` for the trigger, a ghost `Button` for the message menu, and a composer drawn like Payload's inputs and rich text editor. See Upgrading to Payload 4 in the docs.

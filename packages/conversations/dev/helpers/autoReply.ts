@@ -1,4 +1,4 @@
-import { type CollectionSlug, createLocalReq } from 'payload'
+import { type CollectionSlug, createPayloadRequest } from 'payload'
 
 import { postMessage } from '../../src/index'
 import type { ConversationsHooks } from '../../src/types'
@@ -68,13 +68,14 @@ export const autoReply =
 					void (async () => {
 						const author = (await payload
 							.findByID({
+								overrideAccess: true,
 								collection: message.authorKey.split(':')[0] as CollectionSlug,
 								depth: 0,
 								disableErrors: true,
 								id: message.authorKey.split(':').slice(1).join(':'),
 							})
 							.catch(() => null)) as null | { name?: string }
-						const local = await createLocalReq({ context: { [AUTO_REPLY]: true } }, payload)
+						const local = await createPayloadRequest({ context: { [AUTO_REPLY]: true }, payload })
 						await postMessage(local, {
 							author: userKey,
 							body: paragraph([
