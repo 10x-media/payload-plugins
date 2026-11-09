@@ -1,5 +1,6 @@
 import { isRecord } from '../core/values'
 import type { ReadFailureKind } from '../surfacing/classifyError'
+import { PROVIDER_IDS, type ProviderId } from './ids'
 
 /** One provider document's status row, its dates as ISO strings. */
 export interface ProviderStatus {
@@ -60,3 +61,23 @@ export const isProviderStatusResponse = (value: unknown): value is ProviderStatu
 	) &&
 	(value.checked === undefined ||
 		(isRecord(value.checked) && typeof value.checked.ok === 'boolean'))
+
+/** A stored vendor answer split as a reader reads it: who said it, what, and the HTTP status. */
+export interface VendorWords {
+	provider?: ProviderId
+	message: string
+	status?: string
+}
+
+/**
+ * `posthog: HTTP 403 Bad key`, as `fetchJson` words a refusal, into its parts; any other text is
+ * the message as it is.
+ */
+export const vendorWordsOf = (detail: string): VendorWords => {
+	const match = /^([a-z0-9]+): HTTP (\d{3})\s*([\s\S]*)$/.exec(detail)
+	const provider = PROVIDER_IDS.find((id) => id === match?.[1])
+	if (!match || !provider) {
+		return { message: detail.trim() }
+	}
+	return { provider, message: (match[3] ?? '').trim(), status: match[2] }
+}

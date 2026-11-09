@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
+import { vendorWordsOf } from './connectionState'
 import {
 	connectionOutcomeOf,
 	PROVIDER_STATUS_SLUG,
@@ -183,5 +184,27 @@ describe('providerStatusStore', () => {
 		const store = providerStatusStore(payload, PROVIDER_STATUS_SLUG, clock())
 		await store.record('5', { ok: false, kind: 'unavailable', detail: 'x'.repeat(5000) })
 		expect((await store.read('5'))?.errorDetail).toHaveLength(300)
+	})
+})
+
+describe('vendorWordsOf', () => {
+	it('splits a refusal fetchJson worded into the vendor, its message and the status', () => {
+		expect(vendorWordsOf('posthog: HTTP 403 Invalid personal API key.')).toEqual({
+			provider: 'posthog',
+			message: 'Invalid personal API key.',
+			status: '403',
+		})
+		expect(vendorWordsOf('umami: HTTP 502')).toEqual({
+			provider: 'umami',
+			message: '',
+			status: '502',
+		})
+	})
+
+	it('keeps any other text as the message, a provider it does not know included', () => {
+		expect(vendorWordsOf('  7 PERMISSION_DENIED: no access  ')).toEqual({
+			message: '7 PERMISSION_DENIED: no access',
+		})
+		expect(vendorWordsOf('custom: HTTP 403 nope')).toEqual({ message: 'custom: HTTP 403 nope' })
 	})
 })
