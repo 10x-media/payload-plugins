@@ -13,6 +13,7 @@ import {
 	type AnalyticsQuery,
 	type AnalyticsResult,
 	type AnalyticsRow,
+	type ConnectionCheckContext,
 	DIMENSION_KEYS,
 	type DimensionKey,
 	type FilterOperator,
@@ -26,6 +27,7 @@ import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
 import type { WithoutConsentLevel } from '../../tracker/config'
 import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { hostnameOf, withoutTrailingSlash } from '../http/baseUrl'
+import { fetchJson } from '../http/fetchJson'
 import { declaredFilters, everyOperatorOn, firstMapped, mappedKeys } from '../mapping'
 import { readTime } from '../readTime'
 import { dayIso } from '../series'
@@ -333,6 +335,14 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		capabilities,
 		capture: buildCapture(config, endpoints),
 		isConfigured: () => Boolean(config.websiteId && (config.apiKey || config.token)),
+		async checkConnection(ctx: ConnectionCheckContext): Promise<void> {
+			await fetchJson<unknown>(`${endpoints.api}/websites/${config.websiteId}`, {
+				headers: authHeaders(),
+				provider: 'umami',
+				signal: ctx.signal,
+				...(config.fetch ? { fetch: config.fetch } : {}),
+			})
+		},
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = readTime(ctx)
 			const headers = authHeaders()

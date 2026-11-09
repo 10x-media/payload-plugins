@@ -835,3 +835,46 @@ describe('umami host', () => {
 		expect(urls).toHaveLength(1)
 	})
 })
+
+describe('umami checkConnection', () => {
+	const ctx = () => ({ signal: AbortSignal.timeout(5_000), timeoutMs: 5_000 })
+
+	it('reads the website on Umami Cloud with the cloud key', async () => {
+		let auth: string | null = null
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w', ({ request }) => {
+				auth = request.headers.get('x-umami-api-key')
+				return HttpResponse.json({ id: 'w', name: 'Site' })
+			})
+		)
+		await umami({ websiteId: 'w', apiKey: 'k' }).checkConnection?.(ctx())
+		expect(auth).toBe('k')
+	})
+
+	it('reads the website on a self-hosted instance with its token', async () => {
+		let auth: string | null = null
+		server.use(
+			http.get('https://umami.example.com/api/websites/w', ({ request }) => {
+				auth = request.headers.get('authorization')
+				return HttpResponse.json({ id: 'w', name: 'Site' })
+			})
+		)
+		await umami({
+			websiteId: 'w',
+			token: 't',
+			host: 'https://umami.example.com',
+		}).checkConnection?.(ctx())
+		expect(auth).toBe('Bearer t')
+	})
+
+	it('throws what Umami refused with', async () => {
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w', () =>
+				HttpResponse.json({ error: 'Unauthorized' }, { status: 401 })
+			)
+		)
+		await expect(
+			umami({ websiteId: 'w', apiKey: 'bad' }).checkConnection?.(ctx())
+		).rejects.toMatchObject({ name: 'ProviderHttpError', status: 401 })
+	})
+})

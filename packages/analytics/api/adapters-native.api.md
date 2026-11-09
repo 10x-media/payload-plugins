@@ -78,6 +78,7 @@ export interface AnalyticsAdapter {
     // (undocumented)
     readonly capabilities: AnalyticsCapabilities;
     readonly capture?: CaptureSupport;
+    checkConnection?(ctx: ConnectionCheckContext): Promise<void>;
     close?(payload: Payload): void | Promise<void>;
     // (undocumented)
     readonly id: string;
@@ -278,6 +279,13 @@ export type CardinalityCaps = Readonly<Record<CapKey, number | null>>;
 
 // @public
 export type CollectionOverrides = (collection: CollectionConfig) => CollectionConfig;
+
+// @public
+export interface ConnectionCheckContext {
+    payload?: Payload;
+    signal: AbortSignal;
+    timeoutMs: number;
+}
 
 // @public
 export type ConsentPhase = 'pending' | 'refused';

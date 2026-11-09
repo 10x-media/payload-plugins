@@ -13,6 +13,7 @@ import {
 	type AnalyticsQuery,
 	type AnalyticsResult,
 	type AnalyticsRow,
+	type ConnectionCheckContext,
 	DIMENSION_KEYS,
 	type DimensionKey,
 	type FilterOperator,
@@ -430,6 +431,21 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 			Boolean(
 				config.propertyId && config.credentials?.client_email && config.credentials?.private_key
 			),
+		// The smallest report GA4 serves: one metric, one day, one row, a few quota tokens.
+		async checkConnection(ctx: ConnectionCheckContext): Promise<void> {
+			const client = await getClient(ctx.payload)
+			const call = client.runReport(
+				{
+					property: `properties/${config.propertyId}`,
+					dateRanges: [{ startDate: 'today', endDate: 'today' }],
+					metrics: [{ name: 'activeUsers' }],
+					limit: 1,
+				},
+				{ timeout: ctx.timeoutMs, retry: null }
+			)
+			cancelWhenAborted(call, ctx.signal)
+			await call
+		},
 		register(_config, context) {
 			pluginSdk = context?.sdks?.ga4
 		},

@@ -464,6 +464,16 @@ export interface AdapterLabelArgs {
 	scope: string | null
 }
 
+/** What a connection check runs with. */
+export interface ConnectionCheckContext {
+	/** Ends the check: aborted once {@link ConnectionCheckContext.timeoutMs} has passed. */
+	signal: AbortSignal
+	/** The time the check may take, for an SDK that wants a deadline rather than a signal. */
+	timeoutMs: number
+	/** The instance the check runs on, for an adapter that keeps a client per instance. */
+	payload?: Payload
+}
+
 export interface AnalyticsAdapter {
 	readonly id: string
 	/** The source's name wherever no reader is known (boot-time pickers, logs). */
@@ -484,6 +494,12 @@ export interface AnalyticsAdapter {
 	isConfigured(): boolean
 	query(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
 	realtime?(query: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult>
+	/**
+	 * One cheap read that proves the source's settings work, behind a provider document's Test
+	 * connection: it resolves when the vendor accepts them and throws what a read would when it does
+	 * not. It does not go through the source's lane, so a rested source is tried anyway.
+	 */
+	checkConnection?(ctx: ConnectionCheckContext): Promise<void>
 	register?(config: Config, context?: AdapterRegisterContext): void
 	/**
 	 * For `disabled: true`: adds exactly the schema `register` would (collections, fields, indexes,

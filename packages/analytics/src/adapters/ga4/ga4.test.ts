@@ -982,3 +982,26 @@ describe('ga4 reads through the engine', () => {
 		expect(cancel).toHaveBeenCalledTimes(1)
 	})
 })
+
+describe('ga4 checkConnection', () => {
+	const ctx = () => ({ signal: AbortSignal.timeout(5_000), timeoutMs: 5_000 })
+
+	it("runs the smallest report on the property, with the check's deadline and no SDK retry", async () => {
+		runReport.mockResolvedValue([{ rows: [], totals: [] }])
+		await ga4(config).checkConnection?.(ctx())
+		expect(runReport).toHaveBeenCalledWith(
+			{
+				property: 'properties/123456789',
+				dateRanges: [{ startDate: 'today', endDate: 'today' }],
+				metrics: [{ name: 'activeUsers' }],
+				limit: 1,
+			},
+			{ timeout: 5_000, retry: null }
+		)
+	})
+
+	it('throws what the Data API refused with', async () => {
+		runReport.mockRejectedValue(Object.assign(new Error('7 PERMISSION_DENIED'), { code: 7 }))
+		await expect(ga4(config).checkConnection?.(ctx())).rejects.toMatchObject({ code: 7 })
+	})
+})
