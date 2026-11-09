@@ -317,15 +317,16 @@ const FILTER_SQL: Record<FilterOperator, (expr: string, value: string) => string
 }
 
 interface SeriesBucket {
-	/** The HogQL function that buckets a timestamp. */
-	fn: string
+	/** HogQL that buckets `timestamp` in the reporting zone, given as a quoted literal. */
+	expr: (zone: string) => string
 	/** A bucket label read back as an ISO instant. */
 	isoOf: (label: string) => string | null
 }
 
 const SERIES_BUCKETS: Record<'day' | 'hour', SeriesBucket> = {
-	day: { fn: 'toStartOfDay', isoOf: dayIso },
-	hour: { fn: 'toStartOfHour', isoOf: hourIso },
+	day: { expr: (zone) => `toStartOfDay(timestamp, ${zone})`, isoOf: dayIso },
+	// HogQL's toStartOfHour takes one argument, unlike toStartOfDay, so the zone goes through toTimeZone.
+	hour: { expr: (zone) => `toStartOfHour(toTimeZone(timestamp, ${zone}))`, isoOf: hourIso },
 }
 
 /**
@@ -527,10 +528,10 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 					? q.granularity
 					: undefined
 			if (unit) {
-				const { fn, isoOf } = SERIES_BUCKETS[unit]
+				const { expr, isoOf } = SERIES_BUCKETS[unit]
 				// Without a timezone argument HogQL buckets in the project's zone, so the reporting zone
 				// (UTC included) is always passed; the window literals stay UTC instants, already aligned.
-				const bucket = `${fn}(timestamp, ${sqlString(q.timezone ?? DEFAULT_TIMEZONE)})`
+				const bucket = expr(sqlString(q.timezone ?? DEFAULT_TIMEZONE))
 				const [series, totals] = await Promise.all([
 					runSql(
 						`SELECT ${bucket} AS ${unit}, ${columns} ${from} GROUP BY ${unit} ORDER BY ${unit}`
