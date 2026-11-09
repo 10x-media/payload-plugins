@@ -171,7 +171,6 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerConnectionUnreachableHelp]: 'Le service n’a pas répondu. Réessayez plus tard.',
 	[keys.providerConnectionChecked]: 'La connexion fonctionne',
 	[keys.providerConnectionFailed]: 'La connexion a échoué',
-	[keys.viewErrorVendorSaid]: 'Le service a répondu : {{detail}}',
 	[keys.providerFieldIsDefault]: 'Par défaut pour ce site',
 	[keys.providerFieldIsDefaultHelp]:
 		'Les statistiques s’ouvrent sur cet outil, sauf si le lecteur en choisit un autre. Un seul outil par site peut être celui par défaut.',

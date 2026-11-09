@@ -166,7 +166,6 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionUnreachableHelp]: 'The service did not answer. Try again later.',
 	[keys.providerConnectionChecked]: 'Connection works',
 	[keys.providerConnectionFailed]: 'Connection failed',
-	[keys.viewErrorVendorSaid]: 'The service answered: {{detail}}',
 	[keys.providerFieldIsDefault]: 'Default for this site',
 	[keys.providerFieldIsDefaultHelp]:
 		'Analytics opens on this tool unless the reader picks another. Only one tool per site can be the default.',

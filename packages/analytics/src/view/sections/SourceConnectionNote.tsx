@@ -1,8 +1,12 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { isProviderStatusResponse, type ProviderStatus } from '../../providers/connectionState'
-import { documentIdOf } from '../../providers/ids'
+import {
+	isProviderStatusResponse,
+	type ProviderStatus,
+	vendorWordsOf,
+} from '../../providers/connectionState'
+import { documentIdOf, PROVIDER_NAMES } from '../../providers/ids'
 import { dateTimeFormat } from '../../translations/intl'
 import { keys } from '../../translations/keys'
 import { useTranslation } from '../../translations/useTranslation'
@@ -18,7 +22,7 @@ interface SourceConnectionNoteProps {
 
 /**
  * What the vendor said when it refused a provider document's source, and until when reads rest,
- * under the view's error. Shown only to a reader who may read the document; nothing for anyone
+ * inside the view's error banner. Shown only to a reader who may read the document; nothing for anyone
  * else, nor for a source no document gives.
  */
 export function SourceConnectionNote({ endpoint, sourceId, locale }: SourceConnectionNoteProps) {
@@ -43,19 +47,31 @@ export function SourceConnectionNote({ endpoint, sourceId, locale }: SourceConne
 		return () => controller.abort()
 	}, [url])
 
-	const detail = status?.errorDetail
+	const words = status?.errorDetail ? vendorWordsOf(status.errorDetail) : undefined
 	const pausedAt = status?.pausedUntil ? Date.parse(status.pausedUntil) : Number.NaN
 	const pausedUntil =
 		pausedAt > viewerNow().getTime()
 			? dateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(pausedAt)
 			: undefined
-	if (!detail && !pausedUntil) {
+	if (!words && !pausedUntil) {
 		return null
 	}
 	return (
-		<ul className="analytics-view__caption analytics-view__source-note">
-			{detail ? <li>{t(keys.viewErrorVendorSaid, { detail })}</li> : null}
-			{pausedUntil ? <li>{t(keys.providerConnectionPaused, { date: pausedUntil })}</li> : null}
-		</ul>
+		<>
+			{words ? (
+				<span className="analytics-view__source-note">
+					{words.provider ? `${t(PROVIDER_NAMES[words.provider])}: ` : null}
+					{words.message}
+					{words.status
+						? ` (${t(keys.providerConnectionHttpStatus, { status: words.status })})`
+						: null}
+				</span>
+			) : null}
+			{pausedUntil ? (
+				<span className="analytics-view__source-note">
+					{t(keys.providerConnectionPaused, { date: pausedUntil })}
+				</span>
+			) : null}
+		</>
 	)
 }

@@ -1073,11 +1073,10 @@
 		color: var(--analytics-text-muted);
 	}
 
-	/* What the vendor said under the view's error: often one long JSON word. */
+	/* What the vendor said, inside the view's error banner: often one long JSON word. */
 	.analytics-view__source-note {
-		margin: 0;
-		padding: 0;
-		list-style: none;
+		display: block;
+		margin-block-start: calc(var(--base) * 0.25);
 		overflow-wrap: anywhere;
 	}
 

@@ -161,7 +161,6 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerConnectionUnreachableHelp]: '服务没有响应。请稍后再试。',
 	[keys.providerConnectionChecked]: '连接正常',
 	[keys.providerConnectionFailed]: '连接失败',
-	[keys.viewErrorVendorSaid]: '服务返回：{{detail}}',
 	[keys.providerFieldIsDefault]: '设为本站默认',
 	[keys.providerFieldIsDefaultHelp]:
 		'除非读者另选，分析数据默认在此工具中打开。每个站点只能有一个默认工具。',
