@@ -4,8 +4,12 @@ import { createServerFn } from '@tanstack/react-start'
 
 import { DemoPoll } from '../../../dev/demo/DemoPoll'
 
-/** Server-only modules load inside the handler, which TanStack Start strips from the client bundle. */
-const load = createServerFn({ method: 'GET' }).handler(async () => {
+/**
+ * Server-only modules load inside the handler, which TanStack Start strips from the client bundle.
+ * `strict: { output: false }`: Payload types JSON fields as `unknown`, which Start's serializable
+ * check rejects; the documents are plain JSON read from the database.
+ */
+const load = createServerFn({ method: 'GET', strict: { output: false } }).handler(async () => {
 	const [{ getPayload }, { loadPollDemo }, { default: config }] = await Promise.all([
 		import('payload'),
 		import('../../../dev/demo/data'),

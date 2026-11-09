@@ -60,7 +60,7 @@ import { Form, toFormDocument } from '@10x-media/form-builder/react'
 import { createFileRoute } from '@tanstack/react-router'
 import { createServerFn } from '@tanstack/react-start'
 
-const loadContactForm = createServerFn({ method: 'GET' }).handler(async () => {
+const loadContactForm = createServerFn({ method: 'GET', strict: { output: false } }).handler(async () => {
   const { createPayloadRequest, getPayload } = await import('payload')
   const { default: config } = await import('@payload-config')
   const { resolveConsentStatements } = await import('@10x-media/form-builder/rsc')
@@ -87,7 +87,7 @@ export const Route = createFileRoute('/contact')({
 })
 ```
 
-The imports inside the handler keep Payload out of the client bundle. `createPayloadRequest` replaces Payload 3's `createLocalReq` wherever you build a `req` outside a route handler.
+The imports inside the handler keep Payload out of the client bundle. `strict: { output: false }` turns off Start's type-level serialization check on the result: Payload types a form's JSON fields (`flow`, conditions, calculations) as `unknown`, which the check rejects, though the document is plain JSON. `createPayloadRequest` replaces Payload 3's `createLocalReq` wherever you build a `req` outside a route handler.
 
 ## Look
 
