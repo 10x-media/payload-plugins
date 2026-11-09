@@ -1,6 +1,7 @@
 'use client'
 
 import {
+	Banner,
 	Button,
 	FieldDescription,
 	FieldLabel,
@@ -26,7 +27,9 @@ import {
 	connectionStateOf,
 	isProviderStatusResponse,
 	type ProviderStatus,
+	vendorWordsOf,
 } from './connectionState'
+import { PROVIDER_NAMES } from './ids'
 import '../ui/analytics.css'
 
 const PILL_STYLE = {
@@ -107,55 +110,76 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 	const state = status ? connectionStateOf(status) : undefined
 	const when = (iso: string | undefined) =>
 		iso ? formatDate({ date: iso, i18n, pattern: config.admin.dateFormat }) : undefined
-	const lastSuccess = when(status?.lastSuccessAt)
 	const failed = state === 'refused' || state === 'unreachable'
-	const lastError = failed ? when(status?.lastErrorAt) : undefined
 	const pausedUntil =
 		status?.pausedUntil && Date.parse(status.pausedUntil) > viewerNow().getTime()
 			? when(status.pausedUntil)
 			: undefined
+	const facts: Array<[TranslationKey, string | undefined]> = [
+		[keys.providerConnectionLastSuccess, when(status?.lastSuccessAt)],
+		[keys.providerConnectionLastError, failed ? when(status?.lastErrorAt) : undefined],
+		[keys.providerConnectionResumes, pausedUntil],
+	]
+	const shown = facts.filter((fact): fact is [TranslationKey, string] => fact[1] !== undefined)
+	const words = failed && status?.errorDetail ? vendorWordsOf(status.errorDetail) : undefined
+	const help = state ? HELP[state] : undefined
 	const blocked =
 		docId === undefined
 			? keys.providerConnectionSaveFirst
 			: modified
 				? keys.providerConnectionUnsaved
 				: undefined
-	const note = blocked ?? (state ? HELP[state] : undefined)
 
 	return (
 		<div className={`${fieldBaseClass} analytics-provider-connection`}>
 			<FieldLabel as="span" label={t(keys.providerConnectionLabel)} />
-			<div className="analytics-provider-connection__row" aria-live="polite">
-				{docId === undefined ? null : state ? (
-					<Pill pillStyle={PILL_STYLE[state]} size="small">
-						{t(PILL_LABEL[state])}
-					</Pill>
-				) : (
-					<ShimmerEffect height="calc(var(--base) * 1.2)" width="calc(var(--base) * 4)" />
-				)}
-				<Button
-					buttonStyle="secondary"
-					disabled={blocked !== undefined || checking || state === undefined}
-					margin={false}
-					onClick={check}
-					size="small"
-				>
-					{t(keys.providerConnectionTest)}
-				</Button>
+			<div className="analytics-provider-connection__body" aria-live="polite">
+				<div className="analytics-provider-connection__row">
+					{docId === undefined ? null : state ? (
+						<Pill pillStyle={PILL_STYLE[state]} size="small">
+							{t(PILL_LABEL[state])}
+						</Pill>
+					) : (
+						<ShimmerEffect height="calc(var(--base) * 1.2)" width="calc(var(--base) * 4)" />
+					)}
+					<Button
+						buttonStyle="secondary"
+						disabled={blocked !== undefined || checking || state === undefined}
+						margin={false}
+						onClick={check}
+						size="small"
+					>
+						{t(keys.providerConnectionTest)}
+					</Button>
+				</div>
+				{failed && help ? (
+					<Banner type={state === 'refused' ? 'error' : 'default'}>
+						<strong className="analytics-provider-connection__help">{t(help)}</strong>
+						{words ? (
+							<span className="analytics-provider-connection__words">
+								{words.provider ? `${t(PROVIDER_NAMES[words.provider])}: ` : null}
+								{words.message}
+								{words.status
+									? ` (${t(keys.providerConnectionHttpStatus, { status: words.status })})`
+									: null}
+							</span>
+						) : null}
+					</Banner>
+				) : null}
+				{shown.length > 0 ? (
+					<ul className="analytics-provider-connection__facts">
+						{shown.map(([label, value]) => (
+							<li key={label}>
+								<span className="analytics-provider-connection__fact-label">{`${t(label)}:\u00a0`}</span>
+								<span className="analytics-provider-connection__fact-value">{value}</span>
+							</li>
+						))}
+					</ul>
+				) : null}
+				{blocked ? (
+					<FieldDescription description={t(blocked)} marginPlacement="top" path={path} />
+				) : null}
 			</div>
-			{lastSuccess || lastError || pausedUntil ? (
-				<ul className="analytics-provider-connection__facts">
-					{lastSuccess ? (
-						<li>{t(keys.providerConnectionLastSuccess, { date: lastSuccess })}</li>
-					) : null}
-					{lastError ? <li>{t(keys.providerConnectionLastError, { date: lastError })}</li> : null}
-					{pausedUntil ? <li>{t(keys.providerConnectionPaused, { date: pausedUntil })}</li> : null}
-				</ul>
-			) : null}
-			{failed && status?.errorDetail ? (
-				<p className="analytics-provider-connection__detail">{status.errorDetail}</p>
-			) : null}
-			{note ? <FieldDescription description={t(note)} marginPlacement="top" path={path} /> : null}
 		</div>
 	)
 }

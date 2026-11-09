@@ -1,3 +1,5 @@
+import { keys, type TranslationKey } from '../translations/keys'
+
 export type ProviderId = 'native' | 'plausible' | 'umami' | 'ga4' | 'posthog'
 export const PROVIDER_IDS = [
 	'native',
@@ -6,6 +8,15 @@ export const PROVIDER_IDS = [
 	'ga4',
 	'posthog',
 ] as const satisfies readonly ProviderId[]
+
+/** Each provider type's name, as the Provider select and the Connection panel show it. */
+export const PROVIDER_NAMES: Readonly<Record<ProviderId, TranslationKey>> = {
+	native: keys.providerNameNative,
+	plausible: keys.providerNamePlausible,
+	umami: keys.providerNameUmami,
+	ga4: keys.providerNameGa4,
+	posthog: keys.providerNamePosthog,
+}
 
 /** The registry id of a provider document's adapter, which grants and stand-ins must match. */
 export const documentAdapterId = (provider: unknown, id: unknown): string =>

@@ -25,7 +25,7 @@ import { asTranslate, labelForKey } from '../translations/server'
 import { builtInStaticLabel, type StaticLabelFor } from '../translations/staticLabel'
 import { type ProviderAccessArgs, providerCreateAccess, providerRowAccess } from './access'
 import { validatePosthogHost, validatePosthogRegion, validateProviderHost } from './hosts'
-import { PROVIDER_IDS, type ProviderId } from './ids'
+import { PROVIDER_IDS, PROVIDER_NAMES, type ProviderId } from './ids'
 import { retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
 import { stampScope } from './stampScope'
@@ -290,14 +290,6 @@ const nameField = (): Field => ({
 	label: labelForKey(keys.providerFieldName),
 	admin: { description: labelForKey(keys.providerFieldNameHelp) },
 })
-
-const PROVIDER_NAMES: Record<ProviderId, TranslationKey> = {
-	native: keys.providerNameNative,
-	plausible: keys.providerNamePlausible,
-	umami: keys.providerNameUmami,
-	ga4: keys.providerNameGa4,
-	posthog: keys.providerNamePosthog,
-}
 
 /**
  * Names the refusal of a stored type the install no longer serves (native() removed, `types`
