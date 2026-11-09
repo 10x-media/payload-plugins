@@ -211,6 +211,21 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		expect(vendor.asked.filter((site) => site === 'twice.example')).toHaveLength(1)
 	})
 
+	it(`checks again at once after a save, whatever the debounce says, on ${db}`, async () => {
+		const doc = await createProvider('alpha', 'resaved.example')
+		await status('POST', 'alpha', doc.id)
+		await booted.payload.update({
+			collection: PROVIDERS_SLUG,
+			id: doc.id,
+			data: { plausible: { siteId: 'denied-resaved.example', apiKey: 'plausible-key' } },
+			user: userOf('alpha'),
+			overrideAccess: true,
+		})
+		const again = (await (await status('POST', 'alpha', doc.id)).json()) as ProviderStatusResponse
+		expect(again.checked).toMatchObject({ ok: false, kind: 'source_misconfigured' })
+		expect(vendor.asked).toContain('denied-resaved.example')
+	})
+
 	it(`deletes a document's status row with the document on ${db}`, async () => {
 		const doc = await createProvider('alpha', 'gone.example')
 		await status('POST', 'alpha', doc.id)
