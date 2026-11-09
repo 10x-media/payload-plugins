@@ -4,8 +4,17 @@ import { fileURLToPath } from 'node:url'
 import { mongooseAdapter } from '@payloadcms/db-mongodb'
 import { postgresAdapter } from '@payloadcms/db-postgres'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
-import { lexicalEditor } from '@payloadcms/richtext-lexical'
-import { buildConfig, type CollectionConfig, type Where } from 'payload'
+import {
+	BoldFeature,
+	FixedToolbarFeature,
+	ItalicFeature,
+	LinkFeature,
+	lexicalEditor,
+	OrderedListFeature,
+	ParagraphFeature,
+	UnorderedListFeature,
+} from '@payloadcms/richtext-lexical'
+import { buildConfig, type CollectionConfig, type CollectionSlug, type Where } from 'payload'
 import { attachments } from '../src/exports/attachments'
 import { comments } from '../src/exports/comments'
 import { reactions } from '../src/exports/reactions'
@@ -45,6 +54,12 @@ const users: CollectionConfig = {
 const customers: CollectionConfig = {
 	slug: 'customers',
 	auth: true,
+	// Payload's default access admits only `admin.user`; a customer reads their own account (`/me`).
+	access: {
+		read: ({ req }) =>
+			isStaff(req) ||
+			(req.user?.collection === 'customers' ? { id: { equals: req.user.id } } : false),
+	},
 	admin: { useAsTitle: 'name' },
 	fields: [
 		{ name: 'name', type: 'text' },
@@ -125,6 +140,40 @@ const projects: CollectionConfig = {
 	fields: [{ name: 'name', type: 'text', required: true }],
 }
 
+/**
+ * Payload's own rich text field with the composer's configuration (the instance editor's default
+ * features and admin flags, without the plugin's mention feature), to set the composer beside the
+ * native editor.
+ */
+const reference: CollectionConfig = {
+	slug: 'reference',
+	admin: { group: 'Reference', useAsTitle: 'title' },
+	fields: [
+		{ name: 'title', type: 'text' },
+		{
+			name: 'body',
+			type: 'richText',
+			editor: lexicalEditor({
+				admin: {
+					hideAddBlockButton: true,
+					hideDraggableBlockElement: true,
+					hideInsertParagraphAtEnd: true,
+					placeholder: 'Write a message...',
+				},
+				features: () => [
+					ParagraphFeature(),
+					BoldFeature(),
+					ItalicFeature(),
+					LinkFeature({ enabledCollections: [] as CollectionSlug[] }),
+					UnorderedListFeature(),
+					OrderedListFeature(),
+					FixedToolbarFeature(),
+				],
+			}),
+		},
+	],
+}
+
 const replaced = (name: string) => `/replaced/Replaced#Replaced${name}`
 
 const db =
@@ -147,7 +196,18 @@ export default buildConfig({
 	secret: process.env.PAYLOAD_SECRET ?? 'dev-secret-not-for-prod',
 	db,
 	editor: lexicalEditor(),
-	collections: [tenants, users, customers, persons, media, files, rooms, tickets, projects],
+	collections: [
+		tenants,
+		users,
+		customers,
+		persons,
+		media,
+		files,
+		rooms,
+		tickets,
+		projects,
+		reference,
+	],
 	plugins: [
 		// Persons belong to a tenant; staff to one or more (the dev admin to all of them).
 		multiTenantPlugin({

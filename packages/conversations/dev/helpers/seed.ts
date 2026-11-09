@@ -1,4 +1,4 @@
-import { createLocalReq, type Payload, type Where } from 'payload'
+import { createPayloadRequest, type Payload, type Where } from 'payload'
 
 import { postMessage } from '../../src/index'
 
@@ -25,13 +25,19 @@ const ensureUser = async (
 		tenants = [],
 	}: { collection: 'customers' | 'users'; email: string; name: string; tenants?: string[] }
 ) => {
-	const found = await payload.find({ collection, limit: 1, where: { email: { equals: email } } })
+	const found = await payload.find({
+		overrideAccess: true,
+		collection,
+		limit: 1,
+		where: { email: { equals: email } },
+	})
 	if (found.docs[0]) return found.docs[0]
 	const data =
 		collection === 'users'
 			? { tenants: tenants.map((tenant) => ({ tenant })) }
 			: { tenant: tenants[0] ?? null }
 	return payload.create({
+		overrideAccess: true,
 		collection,
 		data: { email, name, password: DEV_PASSWORD, ...data } as never,
 	})
@@ -39,11 +45,14 @@ const ensureUser = async (
 
 const ensureTenant = async (payload: Payload, name: string): Promise<string> => {
 	const found = await payload.find({
+		overrideAccess: true,
 		collection: 'tenants',
 		limit: 1,
 		where: { name: { equals: name } },
 	})
-	const doc = found.docs[0] ?? (await payload.create({ collection: 'tenants', data: { name } }))
+	const doc =
+		found.docs[0] ??
+		(await payload.create({ overrideAccess: true, collection: 'tenants', data: { name } }))
 	return String(doc.id)
 }
 
@@ -94,21 +103,27 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 	await seedProjects(payload, { anna: String(anna.id), me: String(me.id) })
 
-	if ((await payload.count({ collection: 'persons' })).totalDocs > 0) return
+	if ((await payload.count({ overrideAccess: true, collection: 'persons' })).totalDocs > 0) return
 	payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 
 	const athlete = await payload.create({
+		overrideAccess: true,
 		collection: 'persons',
 		data: { name: 'Jana Nováková', owner: customer.id, tenant: canoe } as never,
 	})
 	await payload.create({
+		overrideAccess: true,
 		collection: 'persons',
 		data: { name: 'Tomás Ruiz', tenant: rowing } as never,
 	})
-	await payload.create({ collection: 'media', data: { title: 'Passport scan' } })
+	await payload.create({
+		overrideAccess: true,
+		collection: 'media',
+		data: { title: 'Passport scan' },
+	})
 
 	const key = `collection:persons:${athlete.id}`
-	const req = await createLocalReq({}, payload)
+	const req = await createPayloadRequest({ payload })
 	const authors = [`users:${anna.id}`, `users:${me.id}`]
 	for (let index = 0; index < 120; index++) {
 		await postMessage(req, {
@@ -310,9 +325,9 @@ export const seedChat = async (
 	payload: Payload,
 	{ anna, marc, me }: { anna: string; marc: string; me: string }
 ): Promise<void> => {
-	if ((await payload.count({ collection: 'rooms' })).totalDocs > 0) return
+	if ((await payload.count({ overrideAccess: true, collection: 'rooms' })).totalDocs > 0) return
 	const authors = { anna: `users:${anna}`, marc: `users:${marc}`, me: `users:${me}` }
-	const req = await createLocalReq({}, payload)
+	const req = await createPayloadRequest({ payload })
 	const collection = 'chat-messages'
 	const at = (ago: number) => new Date(Date.now() - ago * 60_000).toISOString()
 	const backdate = (id: number | string, data: Record<string, unknown>) =>
@@ -320,6 +335,7 @@ export const seedChat = async (
 
 	for (const room of ROOMS) {
 		const doc = await payload.create({
+			overrideAccess: true,
 			collection: 'rooms',
 			data: { archived: room.archived ?? false, name: room.name, topic: room.topic },
 		})
@@ -381,13 +397,15 @@ export const seedTickets = async (
 	payload: Payload,
 	{ anna, customer, me }: { anna: string; customer: string; me: string }
 ): Promise<void> => {
-	if ((await payload.count({ collection: 'tickets' })).totalDocs > 0) return
-	const req = await createLocalReq({}, payload)
+	if ((await payload.count({ overrideAccess: true, collection: 'tickets' })).totalDocs > 0) return
+	const req = await createPayloadRequest({ payload })
 	const open = await payload.create({
+		overrideAccess: true,
 		collection: 'tickets',
 		data: { customer, status: 'open', subject: 'Medical form upload fails' },
 	})
 	const closed = await payload.create({
+		overrideAccess: true,
 		collection: 'tickets',
 		data: { customer, status: 'closed', subject: 'Invoice for March' },
 	})
@@ -410,9 +428,10 @@ export const seedProjects = async (
 	payload: Payload,
 	{ anna, me }: { anna: string; me: string }
 ): Promise<void> => {
-	if ((await payload.count({ collection: 'projects' })).totalDocs > 0) return
-	const req = await createLocalReq({}, payload)
+	if ((await payload.count({ overrideAccess: true, collection: 'projects' })).totalDocs > 0) return
+	const req = await createPayloadRequest({ payload })
 	const project = await payload.create({
+		overrideAccess: true,
 		collection: 'projects',
 		data: { name: 'Website relaunch' },
 	})

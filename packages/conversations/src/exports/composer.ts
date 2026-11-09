@@ -14,6 +14,11 @@ export {
 	listsFeature,
 	mentionFeature,
 } from '../composer/features'
+export {
+	type ComposerIcon,
+	type ComposerIcons,
+	defaultComposerIcons,
+} from '../composer/iconSet'
 export { toEditorJSON, toStoredJSON } from '../composer/json'
 export { englishComposerLabels } from '../composer/labels'
 export { OPEN_LINK_EDITOR_COMMAND } from '../composer/runtime'

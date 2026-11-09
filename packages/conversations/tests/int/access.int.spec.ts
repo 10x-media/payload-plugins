@@ -1,5 +1,5 @@
 import { type BootedPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq } from 'payload'
+import { createPayloadRequest } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { reactions } from '../../src/exports/reactions'
@@ -78,7 +78,7 @@ describeForDb('conversations access', {}, (db) => {
 		).json.entries
 
 	const person = async (name: string, owner?: string) =>
-		`collection:persons:${(await booted.payload.create({ collection: 'persons', data: { name, owner } })).id}`
+		`collection:persons:${(await booted.payload.create({ overrideAccess: true, collection: 'persons', data: { name, owner } })).id}`
 
 	beforeAll(async () => {
 		booted = await boot(
@@ -173,7 +173,12 @@ describeForDb('conversations access', {}, (db) => {
 				{ body: { channel: 'internal', key, text: 'before closing' }, session: staff }
 			)
 			const id = String(key.split(':').at(-1))
-			await booted.payload.update({ collection: 'persons', data: { name: 'Closed' }, id })
+			await booted.payload.update({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'Closed' },
+				id,
+			})
 
 			const [entry] = await subscribe(staff, { keys: [key] })
 			expect(entry?.channels).toEqual([
@@ -216,6 +221,7 @@ describeForDb('conversations access', {}, (db) => {
 			const frozen = await post('comments')
 			const open = await post('strict')
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'persons',
 				data: { name: 'Closed' },
 				id: String(key.split(':').at(-1)),
@@ -261,7 +267,7 @@ describeForDb('conversations access', {}, (db) => {
 
 		it('counts unread in one query and recounts pairs a busy one crowded out', async () => {
 			const [busy, quiet] = [await person('Busy'), await person('Quiet')]
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			// Two keys with two channels each: the shared query stops at 4 × the cap.
 			for (let index = 0; index < UNREAD_CAP * 4; index++) {
 				await postMessage(req, {

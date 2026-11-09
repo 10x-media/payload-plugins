@@ -1,6 +1,6 @@
 'use client'
 
-import { Drawer, useModal, XIcon } from '@payloadcms/ui'
+import { Button, ChevronIcon, Drawer, useModal } from '@payloadcms/ui'
 import type { ReactNode } from 'react'
 
 import { resolveLabel } from '../react/hooks'
@@ -47,22 +47,21 @@ const DrawerHeader = ({
 	title: ReactNode
 }) => {
 	const { t } = useTranslation()
-	// Payload's own drawer header markup and classes, plus a line under the title.
+	// Payload's own drawer header markup and classes (back chevron, title), plus a line under the title.
 	return (
 		<div className="drawer__header conversations-drawer__header">
+			<Button
+				aria-label={t(keys.close)}
+				buttonStyle="ghost"
+				className="drawer__header__close"
+				icon={<ChevronIcon direction="left" size={24} />}
+				onClick={onClose}
+			/>
 			<div className="conversations-drawer__heading">
 				<h2 className="drawer__header__title conversations-drawer__title">{title}</h2>
 				{subtitle ? <div className="conversations-drawer__subtitle">{subtitle}</div> : null}
 				{children}
 			</div>
-			<button
-				aria-label={t(keys.close)}
-				className="drawer__header__close"
-				onClick={onClose}
-				type="button"
-			>
-				<XIcon />
-			</button>
 		</div>
 	)
 }

@@ -19,6 +19,8 @@ export const buildReadsCollection = (
 	]
 	const override = instance.overrides.reads ?? {}
 	return {
+		// Cursors the plugin writes for each user: no core authorship, no versions.
+		authorship: false,
 		access: {
 			create: closed,
 			delete: closed,
@@ -31,5 +33,6 @@ export const buildReadsCollection = (
 		hooks: override.hooks,
 		indexes: [{ fields: ['userKey', 'key', 'channel', 'thread'], unique: true }],
 		slug,
+		versions: false,
 	}
 }

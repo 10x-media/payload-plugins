@@ -65,10 +65,15 @@ describeForDb('conversations core', {}, (db) => {
 		customer = await signUp(booted, 'customers', 'Customer')
 		stranger = await signUp(booted, 'customers', 'Stranger')
 		const person = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'persons',
 			data: { name: 'Athlete', owner: String(customer.id) },
 		})
-		const other = await booted.payload.create({ collection: 'persons', data: { name: 'Other' } })
+		const other = await booted.payload.create({
+			overrideAccess: true,
+			collection: 'persons',
+			data: { name: 'Other' },
+		})
 		personKey = `collection:persons:${person.id}`
 		otherKey = `collection:persons:${other.id}`
 	}, 240_000)
@@ -261,6 +266,7 @@ describeForDb('conversations core', {}, (db) => {
 			// A reply takes the root's channel whatever the client said.
 			expect(replies.every((reply) => reply.json.message.channel === 'internal')).toBe(true)
 			const stored = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'comments-messages',
 				id: rootId,
 			})) as unknown as ConversationMessage
@@ -335,7 +341,7 @@ describeForDb('conversations core', {}, (db) => {
 
 		it('adds the comments button to the global', () => {
 			const settings = booted.payload.config.globals.find((global) => global.slug === 'settings')
-			expect(settings?.admin?.components?.elements?.beforeDocumentControls).toEqual([
+			expect(settings?.admin?.components?.edit?.beforeDocumentControls).toEqual([
 				{
 					clientProps: { instance: 'comments' },
 					path: '@10x-media/conversations/client#ChatTrigger',
@@ -368,7 +374,11 @@ describeForDb('conversations core', {}, (db) => {
 	describe('feed', () => {
 		let key: string
 		beforeAll(async () => {
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'Feed' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'Feed' },
+			})
 			key = `collection:persons:${person.id}`
 			// Written directly with one shared timestamp, so keyset ties are real.
 			const at = new Date('2026-01-01T10:00:00.000Z').toISOString()
@@ -436,7 +446,11 @@ describeForDb('conversations core', {}, (db) => {
 
 	describe('read state', () => {
 		it('counts unread, excludes own messages, and raises monotonically', async () => {
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'Reads' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'Reads' },
+			})
 			const key = `collection:persons:${person.id}`
 			await send(staff, { channel: 'internal', key, text: 'one' })
 			const second = await send(staff, { channel: 'internal', key, text: 'two' })
@@ -467,6 +481,7 @@ describeForDb('conversations core', {}, (db) => {
 			})
 			expect(await unread(staff2)).toEqual({ internal: 0, shared: 0 })
 			const rows = await booted.payload.find({
+				overrideAccess: true,
 				collection: 'comments-reads',
 				where: { and: [{ userKey: { equals: staff2.userKey } }, { key: { equals: key } }] },
 			})
@@ -477,6 +492,7 @@ describeForDb('conversations core', {}, (db) => {
 	describe('read state per channel', () => {
 		it('keeps another channel unread when the viewer posts in one', async () => {
 			const person = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'persons',
 				data: { name: 'Channels' },
 			})
@@ -494,7 +510,11 @@ describeForDb('conversations core', {}, (db) => {
 
 	describe('deleting', () => {
 		it('wipes content, keeps a root with replies as a placeholder, removes the rest', async () => {
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'Del' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'Del' },
+			})
 			const key = `collection:persons:${person.id}`
 			const lonely = await send(staff, { channel: 'internal', key, text: 'lonely' })
 			const root = await send(staff, { channel: 'internal', key, text: 'root' })
@@ -507,6 +527,7 @@ describeForDb('conversations core', {}, (db) => {
 				expect(res.status).toBe(200)
 			}
 			const stored = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'comments-messages',
 				id: root.json.message.id,
 			})) as unknown as ConversationMessage
@@ -524,11 +545,13 @@ describeForDb('conversations core', {}, (db) => {
 			const id = sent.json.message.id
 			await call(booted, `DELETE /conversations/comments/messages/${id}`, { session: staff })
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'comments-messages',
 				data: { body: bodyOf(textNode('back')) },
 				id,
 			})
 			const stored = (await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'comments-messages',
 				id,
 			})) as unknown as ConversationMessage
@@ -537,7 +560,11 @@ describeForDb('conversations core', {}, (db) => {
 		})
 
 		it('keeps a deleted root that still has replies', async () => {
-			const person = await booted.payload.create({ collection: 'persons', data: { name: 'Del2' } })
+			const person = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'persons',
+				data: { name: 'Del2' },
+			})
 			const key = `collection:persons:${person.id}`
 			const root = await send(staff, { channel: 'internal', key, text: 'root' })
 			await send(staff, { key, parent: String(root.json.message.id), text: 'r' })
@@ -554,6 +581,7 @@ describeForDb('conversations core', {}, (db) => {
 	describe('authors', () => {
 		it('projects authors across auth collections and marks deleted users', async () => {
 			const person = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'persons',
 				data: { name: 'Auth', owner: String(customer.id) },
 			})
@@ -561,7 +589,7 @@ describeForDb('conversations core', {}, (db) => {
 			const gone = await signUp(booted, 'users', 'Gone')
 			await send(customer, { channel: 'shared', key, text: 'from a customer' })
 			await send(gone, { channel: 'shared', key, text: 'from someone leaving' })
-			await booted.payload.delete({ collection: 'users', id: gone.id })
+			await booted.payload.delete({ overrideAccess: true, collection: 'users', id: gone.id })
 			const feed = await list(staff, { channel: 'shared', key })
 			expect(feed.json.authors[customer.userKey]).toEqual({ avatar: null, name: 'Customer' })
 			expect(feed.json.authors[gone.userKey]).toEqual({ deleted: true, name: 'Deleted user' })

@@ -1,6 +1,6 @@
 'use client'
 
-import { Button } from '@payloadcms/ui'
+import { TabButton, TabsList } from '@payloadcms/ui'
 
 import { GlobeIcon, LockIcon } from '../composer/icons'
 import { type ChannelView, resolveLabel } from '../react/hooks'
@@ -20,33 +20,26 @@ const DefaultChannelTabs = ({ active, channels, onChange, reads = true }: ChatCh
 	const { i18n } = useTranslation()
 	if (channels.length < 2) return null
 	return (
-		<div className="conversations-tabs" role="tablist">
+		<TabsList className="conversations-tabs">
 			{channels.map((channel) => (
-				// Payload's own tab button, as its list view tabs: the active one is disabled.
-				<Button
-					buttonStyle="tab"
-					className={`conversations-tabs__tab${channel.slug === active ? ' conversations-tabs__tab--active' : ''}`}
-					disabled={channel.slug === active}
-					// Who reads it, from the channel's cue: a lock inside, a globe for outside.
-					icon={
-						channel.cue ? channel.cue.tone === 'warning' ? <GlobeIcon /> : <LockIcon /> : undefined
-					}
-					iconPosition="left"
-					extraButtonProps={{ 'aria-selected': channel.slug === active, role: 'tab' }}
+				<TabButton
+					className="conversations-tabs__tab"
+					isActive={channel.slug === active}
 					key={channel.slug}
-					margin={false}
+					modifierClassName="conversations-tabs__tab"
 					onClick={() => onChange(channel.slug)}
-					size="medium"
 				>
+					{/* Who reads it, from the channel's cue: a lock inside, a globe for outside. */}
+					{channel.cue ? channel.cue.tone === 'warning' ? <GlobeIcon /> : <LockIcon /> : null}
 					{resolveLabel(channel.label, i18n.language)}
 					{reads && channel.unread > 0 ? (
 						<span className="conversations-tabs__count">
 							{channel.unread > 99 ? '99+' : channel.unread}
 						</span>
 					) : null}
-				</Button>
+				</TabButton>
 			))}
-		</div>
+		</TabsList>
 	)
 }
 

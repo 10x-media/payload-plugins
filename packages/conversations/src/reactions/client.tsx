@@ -75,17 +75,23 @@ const AddReaction = ({ message }: { message: ConversationMessage }) => {
 	const { t } = useTranslation()
 	return (
 		<Popup
-			button={
-				<>
-					<SmileIcon />
-					<span className="conversations-sr-only">{t(keys.addReaction)}</span>
-				</>
-			}
-			buttonClassName="conversations-reactions__add"
-			buttonType="custom"
 			caret={false}
 			horizontalAlign="left"
-			render={({ close }) => <EmojiRow message={message} onPicked={close} />}
+			render={({ close }) => (
+				<div className="conversations-reactions__picker">
+					<EmojiRow message={message} onPicked={close} />
+				</div>
+			)}
+			renderButton={({ active, ...props }) => (
+				<button
+					{...props}
+					aria-label={t(keys.addReaction)}
+					className={`conversations-reactions__add${active ? ' conversations-reactions__add--open' : ''}`}
+					type="button"
+				>
+					<SmileIcon />
+				</button>
+			)}
 			size="fit-content"
 			verticalAlign="top"
 		/>

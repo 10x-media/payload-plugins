@@ -65,6 +65,8 @@ const slugOf = (instance: ConversationsInstance) => `${instance.slug}-reactions`
 
 /** One row per user, emoji and message; the unique index is what makes adding atomic. */
 const reactionsCollection = (instance: ConversationsInstance): CollectionConfig => ({
+	// Written only through the plugin, which keeps the user key itself: no core authorship, no versions.
+	authorship: false,
 	access: { create: closed, delete: closed, read: closed, update: closed },
 	admin: { group: ADMIN_GROUP, hidden: true },
 	fields: [
@@ -75,6 +77,7 @@ const reactionsCollection = (instance: ConversationsInstance): CollectionConfig 
 	],
 	indexes: [{ fields: ['message', 'userKey', 'emoji'], unique: true }],
 	slug: slugOf(instance),
+	versions: false,
 })
 
 /** Mongo's duplicate key (11000) or Postgres' unique violation (23505), however it is wrapped. */

@@ -9,8 +9,7 @@ import {
 	useUnread,
 	type WindowMessage,
 } from '@10x-media/conversations/react'
-import { useConfig } from '@payloadcms/ui'
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { useConfig, usePathname, useRouter, useSearchParams } from '@payloadcms/ui'
 import { useState } from 'react'
 
 import './chat.css'

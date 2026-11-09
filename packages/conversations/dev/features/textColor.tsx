@@ -88,7 +88,7 @@ const Palette = ({ close, editor }: ComposerToolbarItemProps) => (
 			style={{
 				background: 'none',
 				border: 0,
-				color: 'var(--theme-elevation-600)',
+				color: 'var(--color-text-secondary)',
 				cursor: 'pointer',
 				fontSize: 12,
 			}}

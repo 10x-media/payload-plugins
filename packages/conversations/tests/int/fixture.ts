@@ -90,6 +90,7 @@ export const signUp = async (
 ): Promise<Session> => {
 	const email = `${name.toLowerCase().replace(/\W/g, '')}-${Math.random().toString(36).slice(2)}@test.dev`
 	const doc = await booted.payload.create({
+		overrideAccess: true,
 		collection,
 		data: { email, name, password: 'password' },
 	})

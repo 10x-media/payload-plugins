@@ -151,13 +151,23 @@ export const AttachmentsPicker = ({ channel, conversationKey, instance }: ChatSl
 		</ChatScope>
 	) : null
 
+/**
+ * Where the viewer renders: inside the modal the message sits in (a drawer),
+ * else `body`. While a modal is open Payload makes everything outside it inert,
+ * a viewer appended to `body` included, which then takes no clicks or focus.
+ */
+const viewerHost = (from: HTMLElement | null): HTMLElement =>
+	from?.closest<HTMLElement>('dialog, [role="dialog"]') ?? document.body
+
 /** Images and PDFs of one message, full size, one at a time. */
 const Viewer = ({
 	files,
+	host,
 	onClose,
 	start,
 }: {
 	files: AttachmentView[]
+	host: HTMLElement
 	onClose: () => void
 	start: number
 }) => {
@@ -170,12 +180,16 @@ const Viewer = ({
 	)
 	useEffect(() => {
 		const onKey = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') onClose()
+			if (event.key === 'Escape') {
+				// Before the modal's own Escape, which would close the drawer under the viewer.
+				event.stopPropagation()
+				onClose()
+			}
 			if (event.key === 'ArrowRight') step(1)
 			if (event.key === 'ArrowLeft') step(-1)
 		}
-		document.addEventListener('keydown', onKey)
-		return () => document.removeEventListener('keydown', onKey)
+		document.addEventListener('keydown', onKey, true)
+		return () => document.removeEventListener('keydown', onKey, true)
 	}, [onClose, step])
 	if (!file?.url) return null
 	return createPortal(
@@ -246,7 +260,7 @@ const Viewer = ({
 				</>
 			) : null}
 		</div>,
-		document.body
+		host
 	)
 }
 
@@ -254,13 +268,14 @@ const Files = ({ message }: { message: ConversationMessage }) => {
 	const { t } = useTranslation()
 	const { files, uploads } = useAttachments(message)
 	const [open, setOpen] = useState<null | number>(null)
+	const list = useRef<HTMLDivElement>(null)
 	if (files.length === 0 && uploads.length === 0) return null
 	const inViewer = files.filter(viewable)
 	const images = files.filter(isImage)
 	const others = files.filter((file) => !isImage(file))
 	const show = (file: AttachmentView) => setOpen(inViewer.indexOf(file))
 	return (
-		<div className="conversations-attachments">
+		<div className="conversations-attachments" ref={list}>
 			{images.length > 0 ? (
 				<div className="conversations-attachments__images">
 					{images.map((file) => (
@@ -325,7 +340,12 @@ const Files = ({ message }: { message: ConversationMessage }) => {
 				</p>
 			))}
 			{open !== null && open >= 0 ? (
-				<Viewer files={inViewer} onClose={() => setOpen(null)} start={open} />
+				<Viewer
+					files={inViewer}
+					host={viewerHost(list.current)}
+					onClose={() => setOpen(null)}
+					start={open}
+				/>
 			) : null}
 		</div>
 	)

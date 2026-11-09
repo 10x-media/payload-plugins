@@ -49,7 +49,11 @@ describe.skipIf(!withDocker)('realtime over SSE with the Redis bus', () => {
 			)
 		)
 		staff = await signUp(booted, 'users', 'Staff')
-		const person = await booted.payload.create({ collection: 'persons', data: { name: 'Redis' } })
+		const person = await booted.payload.create({
+			overrideAccess: true,
+			collection: 'persons',
+			data: { name: 'Redis' },
+		})
 		personKey = `collection:persons:${person.id}`
 	}, 240_000)
 

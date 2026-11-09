@@ -36,12 +36,20 @@ import { ListPlugin } from '@payloadcms/richtext-lexical/lexical/react/LexicalLi
 import { $findMatchingParent } from '@payloadcms/richtext-lexical/lexical/utils'
 
 import { MentionNode } from '../editor/mention/MentionNode'
-import { AtIcon, BoldIcon, BulletListIcon, ItalicIcon, LinkIcon, NumberedListIcon } from './icons'
+import { composerIcon } from './iconSet'
 import { isAllowedUrl, normalizeUrl } from './links'
 import { LINK_ATTRIBUTES, LinkEditor } from './plugins/LinkEditor'
 import { MentionTypeahead } from './plugins/MentionTypeahead'
 import { OPEN_LINK_EDITOR_COMMAND } from './runtime'
 import type { ComposerFeature, ComposerItemState, ComposerLabels } from './types'
+
+// Roles, not icons: the composer a feature renders in picks the icon (`icons`).
+const BoldIcon = composerIcon('bold')
+const ItalicIcon = composerIcon('italic')
+const LinkIcon = composerIcon('link')
+const AtIcon = composerIcon('mention')
+const BulletListIcon = composerIcon('bulletList')
+const NumberedListIcon = composerIcon('numberedList')
 
 const hasFormat =
 	(format: 'bold' | 'italic') =>

@@ -67,10 +67,10 @@ export const comments = (options: CommentsOptions): ConversationsExtension => ({
 									...global.admin,
 									components: {
 										...global.admin?.components,
-										elements: {
-											...global.admin?.components?.elements,
+										edit: {
+											...global.admin?.components?.edit,
 											beforeDocumentControls: [
-												...(global.admin?.components?.elements?.beforeDocumentControls ?? []),
+												...(global.admin?.components?.edit?.beforeDocumentControls ?? []),
 												trigger(instance.slug),
 											],
 										},

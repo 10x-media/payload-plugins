@@ -1,6 +1,6 @@
 import { collectionKey } from '@10x-media/conversations'
-import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter } from '@payloadcms/ui'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps } from 'payload'
 
 import { Playground } from './Playground'
@@ -15,12 +15,13 @@ export const PlaygroundView = async ({
 	params,
 	searchParams,
 }: AdminViewServerProps) => {
-	const { payload, user } = initPageResult.req
+	const { req } = initPageResult
+	const { payload, user } = req
 	const live: LiveTarget[] = []
 	if (user) {
 		const [persons, media] = await Promise.all([
-			payload.find({ collection: 'persons', depth: 0, limit: 5, sort: 'createdAt' }),
-			payload.find({ collection: 'media', depth: 0, limit: 1, sort: 'createdAt' }),
+			payload.find({ collection: 'persons', depth: 0, limit: 5, req, sort: 'createdAt' }),
+			payload.find({ collection: 'media', depth: 0, limit: 1, req, sort: 'createdAt' }),
 		])
 		for (const doc of persons.docs) {
 			live.push({ key: collectionKey('persons', doc.id), label: `Person · ${String(doc.name)}` })
@@ -36,6 +37,7 @@ export const PlaygroundView = async ({
 			params={params}
 			payload={payload}
 			permissions={initPageResult.permissions}
+			req={req}
 			searchParams={searchParams}
 			user={user ?? undefined}
 			visibleEntities={initPageResult.visibleEntities}

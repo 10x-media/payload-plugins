@@ -7,27 +7,28 @@ The admin components use Payload's own building blocks (`Button`, `Drawer`, `Pop
 
 ## Where the CSS comes from
 
-The components import their own stylesheets (`conversations.css`, and `composer.css` for the editor), so Next bundles them with the admin. There is nothing to import. Your own admin CSS (for example through `admin.components` or a custom SCSS file in your Payload app) can override any rule.
+The components import their own stylesheets (`conversations.css`, and `composer.css` for the editor), so the admin's bundler (Next.js or Vite) picks them up. There is nothing to import. Your own admin CSS (for example through `admin.components` or a custom SCSS file in your Payload app) can override any rule.
 
 ## Theme variables
 
-Colours, spacing and radii come from Payload's variables:
+Colours, spacing, type and radii come from Payload 4's design tokens:
 
 | Variable | Used for |
 |---|---|
-| `--base` | Spacing throughout |
-| `--theme-elevation-*` | Text shades, borders, hover and placeholder backgrounds |
-| `--theme-text`, `--theme-input-bg`, `--font-body` | Message text, the editor |
-| `--theme-warning-*` | Cues of `warning` channels, the composer border under such a cue |
-| `--theme-error-*` | The send-failed banner, the unread dot |
-| `--theme-success-*` | Links in message bodies, the thread summary |
-| `--style-radius-s`, `--style-radius-m` | Corners |
+| `--spacer-*`, `--gutter-h` | Spacing throughout, the drawer's side gutter |
+| `--color-text*`, `--color-icon*`, `--color-border`, `--color-bg*` | Text shades, icons, borders, hover and selected backgrounds |
+| `--text-body-*` | Message text (`--text-body-large-*`, as Payload's rich text field), names, times and hints |
+| `--field-*` | The editor box, as Payload's own inputs |
+| `--color-*-warning*` | Cues of `warning` channels, the composer border under such a cue |
+| `--color-*-danger*` | The send-failed banner, the unread dot |
+| `--color-text-brand` | Links in message bodies, the thread summary |
+| `--radius-*`, `--elevation-*` | Corners, the shadows of menus and the link field |
 
 Change a variable on a class to restyle one part without touching the rest of the admin:
 
 ```css
 .conversations-drawer {
-  --theme-elevation-100: #f4f1ea;
+  --color-bg-secondary: #f4f1ea;
 }
 ```
 
@@ -55,10 +56,10 @@ The feed's divider also carries `data-feed-divider` and each message `data-messa
 ```css title="custom.scss"
 /* Tighter feed with a quieter day separator. */
 .conversations-message:not(.conversations-message--compact) {
-  padding-top: calc(var(--base) * 0.25);
+  padding-top: var(--spacer-1);
 }
 .conversations-feed__day {
-  color: var(--theme-elevation-400);
+  color: var(--color-text-tertiary);
   font-size: 11px;
 }
 ```
@@ -97,4 +98,4 @@ The line above the editor (`conversations-composer__banner`) shows the channel's
 
 ### Class names on the composer itself
 
-The underlying `Composer` from `@10x-media/conversations/composer` names about 35 parts (`COMPOSER_CLASSES`) and takes `classNames` and `unstyled`, which is how the website skin restyles it with Tailwind. `ChatComposer` does not forward those props: in the admin, style the `conversations-editor*` classes with CSS. The skinning API is described in [Headless](/conversations/website/headless).
+The underlying `Composer` from `@10x-media/conversations/composer` names about 40 parts (`COMPOSER_CLASSES`) and takes `classNames` and `unstyled`, which is how the website skin restyles it with Tailwind. `ChatComposer` does not forward those props: in the admin, style the `conversations-editor*` classes with CSS. It passes the composer Payload's own rich text icons (`icons`), so its toolbar, `/` menu and link tooltip match a native rich text field. The skinning API is described in [Headless](/conversations/website/headless).

@@ -13,10 +13,11 @@ export const SystemNote = ({ authors, message }: ChatSlotProps) => {
 		<div
 			style={{
 				alignItems: 'baseline',
-				color: 'var(--theme-elevation-600)',
+				color: 'var(--color-text-secondary)',
 				display: 'flex',
-				fontSize: '0.923rem',
-				gap: '0.462rem',
+				fontSize: 'var(--text-body-medium-font-size)',
+				gap: 'var(--spacer-1-5)',
+				lineHeight: 'var(--text-body-medium-line-height)',
 			}}
 		>
 			<span aria-hidden="true">ⓘ</span>

@@ -12,7 +12,7 @@ import './playground.css'
 const WIDTHS = [
 	{ label: '400', value: '400px' },
 	{ label: '560', value: '560px' },
-	{ label: 'Drawer 640', value: '49.231rem' },
+	{ label: 'Drawer 640', value: '640px' },
 	{ label: 'Full', value: '100%' },
 ]
 

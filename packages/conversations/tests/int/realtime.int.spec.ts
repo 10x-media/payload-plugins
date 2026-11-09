@@ -38,6 +38,7 @@ describeForDb('realtime over SSE', {}, (db) => {
 		staff = await signUp(booted, 'users', 'Staff')
 		customer = await signUp(booted, 'customers', 'Customer')
 		const person = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'persons',
 			data: { name: 'Live', owner: String(customer.id) },
 		})
@@ -70,6 +71,7 @@ describeForDb('realtime over SSE', {}, (db) => {
 		it('hears another process through the database bus, within its channels', async () => {
 			// A fresh key, so nothing the earlier tests wrote can answer for it.
 			const person = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'persons',
 				data: { name: 'Elsewhere', owner: String(customer.id) },
 			})
@@ -138,7 +140,11 @@ describeForDb('realtime over SSE with the Payload KV bus', {}, (db) => {
 	})
 
 	it('queries only once the KV flag moved', async () => {
-		const person = await booted.payload.create({ collection: 'persons', data: { name: 'KV' } })
+		const person = await booted.payload.create({
+			overrideAccess: true,
+			collection: 'persons',
+			data: { name: 'KV' },
+		})
 		const key = `collection:persons:${person.id}`
 		const token = (
 			await call<{ entries: Array<{ token: string }> }>(

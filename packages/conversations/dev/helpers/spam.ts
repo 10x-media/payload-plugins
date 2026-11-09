@@ -1,4 +1,4 @@
-import { createLocalReq } from 'payload'
+import { createPayloadRequest } from 'payload'
 
 import { postMessage } from '../../src/index'
 import type { ConversationsHooks } from '../../src/types'
@@ -51,7 +51,7 @@ export const spam =
 					.map((doc) => `users:${doc.id}`)
 					.filter((key) => key !== message.authorKey)
 				if (authors.length === 0) return
-				const local = await createLocalReq({ context: { [SPAM]: true } }, payload)
+				const local = await createPayloadRequest({ context: { [SPAM]: true }, payload })
 				for (let index = 0; index < count; index++) {
 					await postMessage(local, {
 						author: authors[index % authors.length],

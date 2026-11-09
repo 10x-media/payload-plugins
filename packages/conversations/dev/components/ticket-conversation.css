@@ -2,17 +2,17 @@
 .conversations-inline {
 	display: flex;
 	flex-direction: column;
-	height: min(70vh, 40rem);
+	height: min(70vh, 520px);
 	min-height: 0;
-	margin-bottom: var(--spacing-field, var(--base));
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m);
-	padding: 0 calc(var(--base) * 0.75) calc(var(--base) * 0.5);
+	margin-bottom: var(--spacing-field, 20px);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	padding: 0 var(--spacer-3) var(--spacer-2);
 	overflow: hidden;
 }
 
 .ticket-conversation__empty {
 	height: auto;
-	padding: var(--base);
-	color: var(--theme-elevation-500);
+	padding: 20px;
+	color: var(--color-text-secondary);
 }

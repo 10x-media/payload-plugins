@@ -28,7 +28,7 @@ declare module 'payload' {
  */
 export const conversations = definePlugin<ConversationsPluginOptions>({
 	slug: '@10x-media/conversations',
-	plugin: ({ config: incoming, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config: incoming, options }): Config => {
 		if (options.disabled === true) {
 			return incoming
 		}

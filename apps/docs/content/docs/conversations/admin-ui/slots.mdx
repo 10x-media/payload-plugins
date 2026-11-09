@@ -116,7 +116,7 @@ That widget appears in the dashboard's "Add widget" drawer, which readers see on
 
 #### `serverComponents: 'server-function'`
 
-No widget is registered for the instance. In exchange you wire the plugin's own function yourself:
+No widget is registered for the instance. In exchange you wire the plugin's own function into the admin's server-function handler yourself. On Next.js that is the root layout:
 
 ```ts title="app/(payload)/layout.tsx"
 import config from '@payload-config'
@@ -137,13 +137,32 @@ const serverFunction: ServerFunctionClient = async (args) => {
 }
 ```
 
+On TanStack Start it is the server function file next to the import map:
+
+```ts title="src/app/_payload/server.functions.ts"
+import { conversationsServerFunctions } from '@10x-media/conversations/rsc'
+
+const runPayloadServerFn = createServerFn({ method: 'POST' })
+  .validator((args: ServerFunctionClientArgs): ServerFunctionClientArgs => args)
+  .handler(async ({ data }) => {
+    const { handleServerFunctions } = await import('@payloadcms/tanstack-start/server')
+    return handleServerFunctions({
+      args: data.args,
+      config: await getConfig(),
+      importMap: await getImportMap(),
+      name: data.name,
+      serverFunctions: conversationsServerFunctions,
+    })
+  })
+```
+
 ```ts title="payload.config.ts"
 conversations({ slug: 'comments', serverComponents: 'server-function', /* ... */ })
 ```
 
 With another plugin that registers functions the same way, spread both: `serverFunctions: { ...conversationsServerFunctions, ...settingsOverlayServerFunctions }`.
 
-Payload generates that layout file and marks it "DO NOT MODIFY", so this one is opt in. Forget the wiring and the browser console says so in as many words, naming both the fix and the way back.
+Payload generates that file and marks it "DO NOT MODIFY", so this one is opt in. Forget the wiring and the browser console says so in as many words, naming both the fix and the way back.
 
 #### Choosing
 

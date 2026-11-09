@@ -1,66 +1,66 @@
-/* Conversations admin UI. Built on Payload's theme variables, so light and dark follow the admin. */
+/* Conversations admin UI. Built on Payload's tokens, so light and dark follow the admin. */
 
 /* The slot dispatcher widget added to a dashboard by hand: not for display, and says so. */
 .conversations-widget-notice {
 	margin: 0;
-	padding: var(--base);
-	border: 1px solid var(--theme-error-250);
-	border-radius: var(--style-radius-m);
-	background: var(--theme-error-50);
-	color: var(--theme-error-750);
+	padding: var(--spacer-3);
+	border: 1px solid var(--color-border-danger);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg-danger-tertiary);
+	color: var(--color-text-danger);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
 }
 
-/* Payload's subtle button; only room for the unread dot on its corner. */
+/* Payload's button; only room for the count and the unread dot on its corner. */
 .conversations-trigger {
 	position: relative;
-	--btn-icon-size: calc(var(--base) * 0.85);
-}
-
-.conversations-trigger .btn__icon svg {
-	width: calc(var(--base) * 0.85);
-	height: calc(var(--base) * 0.85);
 }
 
 .conversations-trigger__count {
-	min-width: 1.538rem;
-	margin-left: calc(var(--base) * 0.3);
-	padding: 0 0.369rem;
-	border-radius: 999px;
-	background: var(--theme-elevation-200);
-	font-size: 0.846rem;
+	min-width: 16px;
+	margin-inline-start: var(--spacer-1);
+	padding: 0 var(--spacer-1);
+	border-radius: var(--radius-full);
+	background: var(--color-bg-tertiary);
+	color: var(--color-text);
+	font-size: var(--text-body-small-bold-font-size);
+	font-weight: var(--text-body-small-bold-font-weight);
+	line-height: 16px;
 	text-align: center;
 }
 
 .conversations-trigger__dot {
 	position: absolute;
-	top: -3px;
-	right: -3px;
+	top: -2px;
+	inset-inline-end: -2px;
 	width: 8px;
 	height: 8px;
-	border-radius: 50%;
-	background: var(--theme-error-500, #e5484d);
-}
-
-.conversations-drawer-shell .drawer__content {
-	max-width: min(49.231rem, 100vw);
-}
-
-.conversations-drawer-shell .drawer__content-children {
-	height: 100%;
-	overflow: hidden;
+	border: 1px solid var(--color-bg);
+	border-radius: var(--radius-full);
+	background: var(--color-bg-danger);
 }
 
 /*
- * Inside Payload's drawer (its gutter, background and header markup): only
- * the layout a chat needs, a column whose feed scrolls between the header
- * and the composer.
+ * Payload's drawer grows with its content and the modal container scrolls it
+ * whole; bounded to the viewport, the feed between header and composer is
+ * the one that scrolls.
  */
+.conversations-drawer-shell.drawer {
+	height: 100%;
+}
+
+.conversations-drawer-shell .drawer__content-children {
+	overflow: hidden;
+}
+
+/* Payload's drawer header on top, full bleed; the chat below on the drawer's gutter. */
 .conversations-drawer {
 	display: flex;
+	flex: 1;
 	flex-direction: column;
-	height: 100%;
 	min-height: 0;
-	padding-bottom: var(--base);
+	padding-bottom: var(--spacer-3);
 }
 
 .conversations-drawer__header {
@@ -68,48 +68,65 @@
 	align-items: flex-start;
 }
 
+.conversations-drawer__header .drawer__header__close {
+	flex: none;
+}
+
 .conversations-drawer__heading {
-	flex-grow: 1;
+	display: flex;
+	flex: 1;
+	flex-direction: column;
+	gap: var(--spacer-1);
 	min-width: 0;
+	/* Centres the first line on the 24px close button. */
+	padding-top: var(--spacer-1);
+}
+
+/* Payload's title grows along the header's row; in this column it keeps its line. */
+.conversations-drawer__heading > .drawer__header__title {
+	flex: none;
 }
 
 .conversations-drawer__subtitle {
-	margin-top: calc(var(--base) / 4);
-	color: var(--theme-elevation-500);
+	overflow: hidden;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
+	text-overflow: ellipsis;
+	white-space: nowrap;
 }
 
+/* Payload's tabs; the margin under them is the feed's own padding. */
 .conversations-tabs {
-	display: flex;
-	gap: calc(var(--base) * 0.25);
-	padding-bottom: 1.077rem;
-	border-bottom: 1px solid var(--theme-elevation-100);
+	flex: none;
+	margin-top: var(--spacer-3);
 }
 
-/* Payload's tab buttons, as channels: a quiet fill when idle, the tab style's own when active. */
-.conversations-tabs__tab {
-	--btn-icon-size: calc(var(--base) * 0.85);
+.conversations-tabs .tabs__tabs-wrap {
+	margin-bottom: 0;
 }
 
-.conversations-tabs__tab .btn__icon svg {
-	width: calc(var(--base) * 0.85);
-	height: calc(var(--base) * 0.85);
+.conversations-tabs__tab svg {
+	flex: none;
+	width: 16px;
+	height: 16px;
+	color: var(--color-icon-secondary);
 }
 
-.conversations-tabs__tab.btn--style-tab:not(.btn--disabled) {
-	--bg-color: var(--theme-elevation-50);
-	--hover-bg: var(--theme-elevation-100);
-	--color: var(--theme-elevation-650, var(--theme-elevation-600));
-}
-
-.conversations-tabs__tab.btn--style-tab.btn--disabled {
-	--bg-color: var(--theme-elevation-150);
+.conversations-tabs__tab.tabs__tab-button--active svg {
+	color: var(--color-icon);
 }
 
 .conversations-tabs__count {
-	margin-left: calc(var(--base) * 0.3);
-	color: var(--theme-elevation-600);
-	font-size: 0.923rem;
-	font-weight: 500;
+	min-width: 16px;
+	padding: 0 var(--spacer-1);
+	border-radius: var(--radius-full);
+	background: var(--color-bg-tertiary);
+	color: var(--color-text);
+	font-size: var(--text-body-small-bold-font-size);
+	font-weight: var(--text-body-small-bold-font-weight);
+	line-height: 16px;
+	text-align: center;
 }
 
 .conversations-feed {
@@ -124,9 +141,9 @@
 	display: flex;
 	flex: 1;
 	flex-direction: column;
-	gap: 0.154rem;
+	gap: 2px;
 	min-height: 0;
-	padding: 1.231rem 0;
+	padding: var(--spacer-3) 0;
 	overflow-y: auto;
 	overscroll-behavior: contain;
 }
@@ -139,27 +156,28 @@
 .conversations-feed__older {
 	display: flex;
 	justify-content: center;
-	padding: 0.615rem 0;
+	padding: var(--spacer-2) 0;
 }
 
 .conversations-feed__empty {
 	margin: auto;
-	padding: 2.462rem 1.231rem;
-	color: var(--theme-elevation-600);
-	font-size: 1.077rem;
+	padding: var(--spacer-5) var(--spacer-3);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-large-font-size);
+	line-height: var(--text-body-large-line-height);
 	text-align: center;
 }
 
 .conversations-feed__skeleton {
 	flex: 1;
-	min-height: 9.846rem;
-	margin: 1.231rem 0;
-	border-radius: var(--style-radius-m, 4px);
+	min-height: 128px;
+	margin: var(--spacer-3) 0;
+	border-radius: var(--radius-medium);
 	background: linear-gradient(
 		90deg,
-		var(--theme-elevation-50),
-		var(--theme-elevation-100),
-		var(--theme-elevation-50)
+		var(--color-bg-secondary),
+		var(--color-bg-tertiary),
+		var(--color-bg-secondary)
 	);
 	background-size: 200% 100%;
 	animation: conversations-shimmer 1.4s ease-in-out infinite;
@@ -178,10 +196,11 @@
 .conversations-feed__divider {
 	display: flex;
 	align-items: center;
-	gap: 0.923rem;
-	margin: 0.923rem 0 0.308rem;
-	color: var(--theme-elevation-600);
-	font-size: 0.923rem;
+	gap: var(--spacer-2-5);
+	margin: var(--spacer-2-5) 0 var(--spacer-1);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
 }
 
 .conversations-feed__day::before,
@@ -191,32 +210,46 @@
 	content: "";
 	flex: 1;
 	height: 1px;
-	background: var(--theme-elevation-100);
+	background: var(--color-border);
 }
 
 .conversations-feed__divider {
-	color: var(--theme-error-500, #e5484d);
-	font-weight: 600;
+	color: var(--color-text-danger);
+	font-weight: var(--text-body-medium-bold-font-weight);
 }
 
 .conversations-feed__divider::before,
 .conversations-feed__divider::after {
-	background: color-mix(in srgb, var(--theme-error-500, #e5484d) 45%, transparent);
+	background: var(--color-border-danger);
 }
 
 /* Room under the last message for the floating button, so nothing stays hidden behind it. */
 .conversations-feed--jump .conversations-feed__scroller {
-	padding-bottom: calc(var(--base) * 3);
+	padding-bottom: var(--spacer-6);
 }
 
 /* Payload's pill button, floating over the bottom of the feed. */
 .conversations-feed__jump {
 	position: absolute;
-	bottom: calc(var(--base) * 0.75);
+	bottom: var(--spacer-3);
 	left: 50%;
 	transform: translateX(-50%);
-	border-radius: 999px;
-	box-shadow: 0 2px 12px -2px rgb(0 0 0 / 0.25);
+}
+
+/*
+ * Payload's pill, lifted off the feed by a wide, soft shadow. Payload's own elevations draw
+ * hairlines at the edge in the dark theme, which read as a border on a button.
+ */
+.conversations-feed__jump .btn {
+	box-shadow:
+		0 8px 24px 0 rgb(0 0 0 / 0.14),
+		0 2px 8px 0 rgb(0 0 0 / 0.08);
+}
+
+[data-theme="dark"] .conversations-feed__jump .btn {
+	box-shadow:
+		0 8px 28px 0 rgb(0 0 0 / 0.45),
+		0 2px 10px 0 rgb(0 0 0 / 0.35);
 }
 
 .conversations-avatar {
@@ -224,27 +257,27 @@
 	flex: none;
 	align-items: center;
 	justify-content: center;
-	border-radius: 50%;
+	border-radius: var(--radius-full);
 	background: hsl(var(--conversations-avatar-hue, 0) 35% 28%);
 	color: hsl(var(--conversations-avatar-hue, 0) 70% 82%);
-	font-weight: 600;
+	font-weight: var(--text-body-medium-bold-font-weight);
 	object-fit: cover;
 }
 
 .conversations-message {
 	position: relative;
 	display: flex;
-	gap: 0.923rem;
-	padding: 0.615rem 0.615rem 0.462rem;
-	border-radius: var(--style-radius-m, 4px);
+	gap: var(--spacer-2-5);
+	padding: var(--spacer-2) var(--spacer-2) var(--spacer-1-5);
+	border-radius: var(--radius-medium);
 }
 
 .conversations-message--compact {
-	padding-top: 0.154rem;
+	padding-top: 2px;
 }
 
 .conversations-message:hover {
-	background: var(--theme-elevation-100);
+	background: var(--color-bg-hover);
 }
 
 .conversations-message__gutter {
@@ -260,25 +293,27 @@
 .conversations-message__header {
 	display: flex;
 	align-items: baseline;
-	gap: 0.615rem;
-	margin-bottom: 0.154rem;
+	gap: var(--spacer-2);
+	margin-bottom: 2px;
 }
 
 .conversations-message__author {
-	font-size: 1.077rem;
-	font-weight: 600;
+	font-size: var(--text-body-large-bold-font-size);
+	font-weight: var(--text-body-large-bold-font-weight);
+	line-height: var(--text-body-large-bold-line-height);
 }
 
 .conversations-message__time,
 .conversations-message__edited,
 .conversations-message__status {
-	color: var(--theme-elevation-600);
-	font-size: 0.923rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
 }
 
 .conversations-message__body {
-	font-size: 1.077rem;
-	line-height: 1.5;
+	font-size: var(--text-body-large-font-size);
+	line-height: var(--text-body-large-line-height);
 	overflow-wrap: anywhere;
 }
 
@@ -289,24 +324,34 @@
 .conversations-message__body p + p,
 .conversations-message__body ul,
 .conversations-message__body ol {
-	margin-top: 0.462rem;
+	margin-top: var(--spacer-1-5);
 }
 
+/* The admin's preflight drops list styles; a message keeps its bullets and numbers. */
 .conversations-message__body ul,
 .conversations-message__body ol {
 	margin-bottom: 0;
-	padding-left: 1.538rem;
+	padding-inline-start: var(--spacer-4);
+}
+
+.conversations-message__body ul {
+	list-style: disc;
+}
+
+.conversations-message__body ol {
+	list-style: decimal;
 }
 
 .conversations-message__body a {
-	color: var(--theme-success-500, #2d7ff9);
+	color: var(--color-text-brand);
 	text-decoration: underline;
 }
 
 .conversations-message__placeholder {
-	color: var(--theme-elevation-600);
-	font-size: 1.077rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-large-font-size);
 	font-style: italic;
+	line-height: var(--text-body-large-line-height);
 }
 
 .conversations-message--sending {
@@ -316,56 +361,60 @@
 .conversations-message__thread {
 	display: inline-flex;
 	align-items: center;
-	gap: 0.615rem;
-	margin-top: 0.462rem;
-	padding: 0.308rem 0.769rem;
-	border: 1px solid var(--theme-elevation-100);
-	border-radius: var(--style-radius-s, 4px);
-	background: var(--theme-elevation-50);
-	color: var(--theme-elevation-600);
-	font-size: 0.923rem;
+	gap: var(--spacer-2);
+	margin-top: var(--spacer-1-5);
+	padding: var(--spacer-1) var(--spacer-2-5);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg-secondary);
+	color: var(--color-text-secondary);
+	font: inherit;
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
 	cursor: pointer;
 }
 
 .conversations-message__thread:hover {
-	border-color: var(--theme-elevation-200);
+	background: var(--color-bg-secondary-hover);
 }
 
 .conversations-message__thread-count {
-	color: var(--theme-success-500, #2d7ff9);
-	font-weight: 500;
+	color: var(--color-text-brand);
+	font-weight: var(--text-body-medium-bold-font-weight);
 }
 
 .conversations-message__thread-new {
-	padding: 0 0.462rem;
-	border-radius: 999px;
-	background: var(--theme-error-500, #e5484d);
-	color: #fff;
-	font-size: 0.846rem;
-	font-weight: 600;
+	padding: 0 var(--spacer-1-5);
+	border-radius: var(--radius-full);
+	background: var(--color-bg-danger);
+	color: var(--color-text-ondanger);
+	font-size: var(--text-body-small-bold-font-size);
+	font-weight: var(--text-body-small-bold-font-weight);
+	line-height: 16px;
 }
 
 .conversations-message__side {
 	flex: none;
-	width: 1.846rem;
+	width: 24px;
 }
 
 /* A `layout: 'bare'` type: its component is the row; the time waits for hover beside the menu. */
 .conversations-message--bare {
-	padding-block: 0.308rem;
+	padding-block: var(--spacer-1);
 }
 
 .conversations-message--bare .conversations-message__side {
 	display: flex;
-	gap: 0.308rem;
+	gap: var(--spacer-1);
 	align-items: flex-start;
 	width: auto;
 }
 
 .conversations-message__bare-time {
-	padding-top: 0.154rem;
-	color: var(--theme-elevation-500);
-	font-size: 0.846rem;
+	padding-top: var(--spacer-1);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-small-font-size);
+	line-height: var(--text-body-small-line-height);
 	white-space: nowrap;
 	opacity: 0;
 	transition: opacity 0.1s ease;
@@ -376,7 +425,7 @@
 	opacity: 1;
 }
 
-/* The "⋯" button: on hover or focus, while its menu is open, and always where nothing hovers. */
+/* The "more" button: on hover or focus, while its menu is open, and always where nothing hovers. */
 .conversations-message__menu {
 	opacity: 0;
 	transition: opacity 0.1s ease;
@@ -394,35 +443,15 @@
 	}
 }
 
-.conversations-message__menu-button {
-	display: flex;
-	align-items: center;
-	justify-content: center;
-	width: 1.846rem;
-	height: 1.846rem;
-	border-radius: var(--style-radius-s, 4px);
-	color: var(--theme-elevation-600);
-}
-
-.conversations-message__menu-button:hover,
-.conversations-message__menu--open .conversations-message__menu-button {
-	background: var(--theme-elevation-150);
-	color: var(--theme-text);
-}
-
-.conversations-message__menu-button .icon {
-	width: 1.538rem;
-	height: 1.538rem;
-}
-
 /* A row of one-click actions above the menu's list, e.g. reactions. */
 .conversations-message-menu__quick {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.154rem;
-	margin-bottom: calc(var(--base) * 0.25);
-	padding-bottom: calc(var(--base) * 0.25);
-	border-bottom: 1px solid var(--theme-elevation-150);
+	gap: 2px;
+	margin-bottom: var(--spacer-1);
+	/* The inline padding of Payload's list below, so the hover boxes line up. */
+	padding: var(--spacer-1) var(--spacer-2) var(--spacer-1-5);
+	border-bottom: 1px solid var(--color-border-menu-separator);
 }
 
 /* A quick action may render nothing, e.g. reactions in a read-only channel. */
@@ -447,46 +476,65 @@
 }
 
 .conversations-thread__root {
-	padding: 0.308rem;
-	border: 1px solid var(--theme-elevation-100);
-	border-radius: var(--style-radius-m, 4px);
-	background: var(--theme-elevation-100);
+	margin-top: var(--spacer-3);
+	padding: var(--spacer-1);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg-secondary);
+}
+
+.conversations-thread__root .conversations-message:hover {
+	background: none;
 }
 
 .conversations-composer {
 	display: flex;
+	flex: none;
 	flex-direction: column;
-	gap: 0.615rem;
-	padding-top: 0.923rem;
-	border-top: 1px solid var(--theme-elevation-100);
+	gap: var(--spacer-2);
+	padding-top: var(--spacer-2-5);
+	border-top: 1px solid var(--color-border);
 }
 
 .conversations-composer__banner {
 	display: flex;
 	align-items: center;
-	gap: 0.615rem;
-	padding: 0.615rem 0.923rem;
-	border-radius: var(--style-radius-m, 4px);
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-700);
-	font-size: 1rem;
+	gap: var(--spacer-2);
+	padding: var(--spacer-2) var(--spacer-2-5);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg-secondary);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
 }
 
 .conversations-composer__banner--warning {
-	background: color-mix(in srgb, var(--theme-warning-500, #f5a623) 16%, transparent);
-	color: var(--theme-warning-600, var(--theme-warning-500, #f5a623));
+	border-color: var(--color-border-warning);
+	background: var(--color-bg-warning-tertiary);
+	color: var(--color-text);
 }
 
 .conversations-composer__banner--error {
 	justify-content: space-between;
-	background: color-mix(in srgb, var(--theme-error-500, #e5484d) 18%, transparent);
-	color: var(--theme-error-500, #e5484d);
+	border-color: var(--color-border-danger);
+	background: var(--color-bg-danger-tertiary);
+	color: var(--color-text-danger);
 }
 
 .conversations-composer__cue-icon {
 	display: inline-flex;
 	flex: none;
-	opacity: 0.85;
+	color: var(--color-icon-secondary);
+}
+
+.conversations-composer__cue-icon svg {
+	width: 16px;
+	height: 16px;
+}
+
+.conversations-composer__banner--warning .conversations-composer__cue-icon {
+	color: var(--color-icon-warning);
 }
 
 .conversations-composer__cue-label {
@@ -507,34 +555,68 @@
 }
 
 .conversations-composer__cue-action:hover {
-	color: var(--theme-text);
+	color: var(--color-text);
 }
 
 .conversations-composer--warning .conversations-editor {
-	border-color: color-mix(in srgb, var(--theme-warning-500, #f5a623) 55%, transparent);
+	border-color: var(--color-border-warning);
 }
 
 .conversations-composer--failed .conversations-editor {
-	border-color: color-mix(in srgb, var(--theme-error-500, #e5484d) 60%, transparent);
+	border-color: var(--color-border-danger);
 }
 
 .conversations-composer__disabled {
-	padding: 1.077rem 1.231rem;
-	border: 1px solid var(--theme-elevation-100);
-	border-radius: var(--style-radius-m, 4px);
-	color: var(--theme-elevation-600);
-	font-size: 1rem;
+	padding: var(--spacer-3);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
 }
 
 .conversations-composer__hint {
-	color: var(--theme-elevation-500);
-	font-size: 0.923rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
 	white-space: nowrap;
 }
 
 /* A narrow composer drops the hint before the buttons would wrap. */
-@container (max-width: 26rem) {
+@container (max-width: 340px) {
 	.conversations-composer__hint {
 		display: none;
 	}
+}
+
+/*
+ * Lines that structure the drawer run edge to edge, as the one under Payload's header: under the
+ * tabs, and over the composer. The feed scrolls edge to edge too, its scrollbar on the drawer's
+ * edge. Their content, and everything else, keeps the drawer's gutter; separators inside the feed
+ * (days, new messages) are content.
+ */
+.conversations-drawer
+> :not(
+	.drawer__header,
+	.conversations-tabs,
+	.conversations-feed,
+	.conversations-composer,
+	.conversations-thread
+),
+.conversations-drawer > .conversations-thread > .conversations-thread__root {
+	margin-inline: var(--gutter-h);
+}
+
+:is(.conversations-drawer, .conversations-drawer > .conversations-thread)
+	> .conversations-feed
+	> .conversations-feed__scroller,
+:is(.conversations-drawer, .conversations-drawer > .conversations-thread)
+	> .conversations-composer {
+	padding-inline: var(--gutter-h);
+}
+
+/* Payload draws the tabs' line on the list itself, so the gutter goes inside it. */
+.conversations-drawer > .conversations-tabs .tabs__tabs {
+	box-sizing: border-box;
+	padding-inline: var(--gutter-h);
 }

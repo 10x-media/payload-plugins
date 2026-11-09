@@ -1,4 +1,4 @@
-import type { LexicalEditorProps } from '@payloadcms/richtext-lexical'
+import type { LexicalEditorArgs } from '@payloadcms/richtext-lexical'
 import type {
 	CollectionConfig,
 	CollectionSlug,
@@ -18,7 +18,7 @@ export type { ParsedKey, TargetKind, UserRef } from './shared/keys'
 
 /** One feature of an instance editor, as `lexicalEditor({ features })` takes it. */
 export type ConversationsEditorFeature = Extract<
-	NonNullable<LexicalEditorProps['features']>,
+	NonNullable<LexicalEditorArgs['features']>,
 	readonly unknown[]
 >[number]
 

@@ -1,4 +1,4 @@
-import { DefaultTemplate } from '@payloadcms/next/templates'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps } from 'payload'
 
 import { ChatApp, type ChatRoom } from './ChatApp'
@@ -9,13 +9,15 @@ import { ChatApp, type ChatRoom } from './ChatApp'
  * composes itself; the plugin ships no such view.
  */
 export const ChatView = async ({ initPageResult, params, searchParams }: AdminViewServerProps) => {
-	const { payload, user } = initPageResult.req
+	const { req } = initPageResult
+	const { payload, user } = req
 	const rooms: ChatRoom[] = []
 	if (user) {
 		const result = await payload.find({
 			collection: 'rooms',
 			depth: 0,
 			limit: 100,
+			req,
 			sort: 'name',
 		})
 		for (const doc of result.docs) {
@@ -34,6 +36,7 @@ export const ChatView = async ({ initPageResult, params, searchParams }: AdminVi
 			params={params}
 			payload={payload}
 			permissions={initPageResult.permissions}
+			req={req}
 			searchParams={searchParams}
 			user={user ?? undefined}
 			visibleEntities={initPageResult.visibleEntities}

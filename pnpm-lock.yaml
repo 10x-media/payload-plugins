@@ -1460,6 +1460,9 @@ importers:
       shadcn:
         specifier: ^4.21.0
         version: 4.21.0(babel-plugin-macros@3.1.0)(typescript@5.9.3)
+      srvx:
+        specifier: 'catalog:'
+        version: 1.0.8
       tailwind-merge:
         specifier: ^3.3.1
         version: 3.6.0

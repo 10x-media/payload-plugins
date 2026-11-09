@@ -77,6 +77,8 @@ const DEFAULT_MAX_FILES = 10
 
 const closed = () => false
 
+const signedIn = ({ req }: { req: PayloadRequest }) => Boolean(req.user)
+
 const stringOr = (value: unknown): null | string => (typeof value === 'string' ? value : null)
 const numberOr = (value: unknown): null | number =>
 	typeof value === 'number' && Number.isFinite(value) ? value : null
@@ -132,9 +134,16 @@ export const attachments = (options: AttachmentsOptions = {}): ConversationsExte
 	const ownCollection = (instance: ConversationsInstance): CollectionConfig => {
 		const override = options.overrides ?? {}
 		return {
-			// Files are never changed or removed over REST unless the host opens it; the
-			// extension itself deletes with `overrideAccess` (`deleteWithMessage`).
-			access: { delete: closed, update: closed, ...override.access },
+			// Any signed-in user uploads and reads, website accounts included: Payload 4's default
+			// admits only `admin.user`. Files are never changed or removed over REST unless the
+			// host opens it; the extension itself deletes with `overrideAccess` (`deleteWithMessage`).
+			access: {
+				create: signedIn,
+				delete: closed,
+				read: signedIn,
+				update: closed,
+				...override.access,
+			},
 			admin: { group: ADMIN_GROUP, ...override.admin },
 			fields: override.fields ? override.fields({ defaultFields: [] }) : [],
 			hooks: {
@@ -143,6 +152,8 @@ export const attachments = (options: AttachmentsOptions = {}): ConversationsExte
 			},
 			slug: override.slug ?? `${instance.slug}-attachments`,
 			upload: override.upload ?? true,
+			// Files are added and removed, never edited: no version history.
+			versions: false,
 		}
 	}
 

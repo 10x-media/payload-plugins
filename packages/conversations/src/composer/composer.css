@@ -1,57 +1,61 @@
-/* The composer: one box holding the text, the toolbar and the send row. */
+/*
+ * The composer: one box holding the text, the toolbar and the send row. Its
+ * chrome follows Payload's own inputs (the `--field-*` tokens) and the pieces
+ * of its rich text editor (toolbar buttons, slash menu, link bubble).
+ */
 .conversations-editor {
 	container-type: inline-size;
 	display: flex;
 	flex-direction: column;
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-m, 4px);
-	background: var(--theme-input-bg, var(--theme-elevation-0));
-	transition: border-color 0.15s ease;
+	border: var(--stroke-width-small, 1px) solid var(--field-color-border);
+	border-radius: var(--field-border-radius);
+	background: var(--field-color-bg);
 }
 
 .conversations-editor:hover {
-	border-color: var(--theme-elevation-250, var(--theme-elevation-200));
+	border-color: var(--field-color-border-hover);
 }
 
 .conversations-editor:focus-within {
-	border-color: var(--theme-elevation-400);
+	border-color: var(--field-color-border-focus);
 }
 
 /* Files dragged over a composer that takes them (`onFiles`). */
 .conversations-editor[data-dragging] {
 	border-style: dashed;
-	border-color: var(--theme-success-500, var(--theme-elevation-500));
-	background: var(--theme-elevation-50);
+	border-color: var(--color-border-brand);
+	background: var(--color-bg-brand-tertiary);
 }
 
 .conversations-editor__input {
 	position: relative;
-	padding: 0.846rem 1.077rem 0.308rem;
+	padding: var(--spacer-2) var(--spacer-2-5) var(--spacer-1);
 	cursor: text;
 }
 
 .conversations-editor__content {
-	min-height: 3rem;
-	max-height: 14.769rem;
+	min-height: 40px;
+	max-height: 192px;
 	overflow-y: auto;
 	outline: none;
-	color: var(--theme-text);
-	font-family: var(--font-body);
-	font-size: 1.077rem;
-	line-height: 1.5;
+	color: var(--field-color-text, var(--color-text));
+	font-family: var(--text-body-large-font-family);
+	font-size: var(--text-body-large-font-size);
+	font-weight: var(--text-body-large-font-weight);
+	line-height: var(--text-body-large-line-height);
 	overflow-wrap: anywhere;
 }
 
 .conversations-editor__placeholder {
 	position: absolute;
-	top: 0.846rem;
-	left: 1.077rem;
-	right: 1.077rem;
+	top: var(--spacer-2);
+	left: var(--spacer-2-5);
+	right: var(--spacer-2-5);
 	overflow: hidden;
-	color: var(--theme-elevation-450, var(--theme-elevation-500));
-	font-family: var(--font-body);
-	font-size: 1.077rem;
-	line-height: 1.5;
+	color: var(--field-color-placeholder, var(--color-text-tertiary));
+	font-family: var(--text-body-large-font-family);
+	font-size: var(--text-body-large-font-size);
+	line-height: var(--text-body-large-line-height);
 	white-space: nowrap;
 	text-overflow: ellipsis;
 	pointer-events: none;
@@ -62,10 +66,19 @@
 	margin: 0;
 }
 
+/* The admin's preflight drops list styles; the editor keeps its bullets and numbers. */
 .conversations-editor__ul,
 .conversations-editor__ol {
 	margin: 0.25em 0;
-	padding-left: 1.5em;
+	padding-inline-start: 1.5em;
+}
+
+.conversations-editor__ul {
+	list-style: disc;
+}
+
+.conversations-editor__ol {
+	list-style: decimal;
 }
 
 .conversations-editor__listitem {
@@ -77,7 +90,7 @@
 }
 
 .conversations-editor__bold {
-	font-weight: 600;
+	font-weight: var(--text-body-large-bold-font-weight, 600);
 }
 
 .conversations-editor__italic {
@@ -87,7 +100,7 @@
 .conversations-editor__link {
 	color: inherit;
 	text-decoration: underline;
-	text-decoration-color: var(--theme-elevation-400);
+	text-decoration-color: var(--color-text-tertiary);
 	text-underline-offset: 2px;
 }
 
@@ -95,9 +108,9 @@
 	display: flex;
 	align-items: center;
 	justify-content: space-between;
-	gap: 0.769rem;
-	min-height: 2.769rem;
-	padding: 0.308rem 0.615rem 0.615rem 0.615rem;
+	gap: var(--spacer-2);
+	min-height: 40px;
+	padding: var(--spacer-1) var(--spacer-2) var(--spacer-2);
 	cursor: text;
 }
 
@@ -119,130 +132,134 @@
 	display: flex;
 	flex: none;
 	align-items: center;
-	padding-right: 0.154rem;
+	gap: 2px;
+	padding-inline-end: 2px;
 }
 
 .conversations-editor--toolbar-top > .conversations-editor__toolbar {
-	padding: 0.308rem 0.615rem;
-	border-bottom: 1px solid var(--theme-elevation-100);
+	padding: var(--spacer-1) var(--spacer-2);
+	border-bottom: 1px solid var(--color-border);
 }
 
+/* Payload's toolbar button: 24px, a transparent fill on hover, the selected fill while it applies. */
 .conversations-editor__tool {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
-	width: 2.154rem;
-	height: 2.154rem;
+	width: var(--spacer-4);
+	height: var(--spacer-4);
 	padding: 0;
 	border: 0;
-	border-radius: var(--style-radius-s, 3px);
-	background: transparent;
-	color: var(--theme-elevation-600);
+	border-radius: var(--radius-medium);
+	background: none;
+	color: var(--color-icon);
 	cursor: pointer;
 }
 
-.conversations-editor__tool:hover {
-	background: var(--theme-elevation-100);
-	color: var(--theme-text);
+.conversations-editor__tool:hover:not(:disabled):not(.conversations-editor__tool--active) {
+	background: var(--color-bg-transparent-hover);
+}
+
+.conversations-editor__tool:active:not(:disabled):not(.conversations-editor__tool--active) {
+	background: var(--color-bg-transparent-pressed);
 }
 
 .conversations-editor__tool--active {
-	background: var(--theme-elevation-150);
-	color: var(--theme-text);
+	background: var(--color-bg-selected);
+	color: var(--color-icon-selected);
+}
+
+.conversations-editor__tool--active:hover {
+	background: var(--color-bg-selected-hover);
 }
 
 /* Groups sit apart; a hairline only when the toolbar has its own row. */
 .conversations-editor__divider {
-	width: 0.308rem;
+	width: var(--spacer-1);
 }
 
 .conversations-editor--toolbar-top .conversations-editor__divider {
 	width: 1px;
-	height: 1.231rem;
-	margin: 0 0.308rem;
-	background: var(--theme-elevation-150);
+	height: var(--spacer-3);
+	margin: 0 var(--spacer-1);
+	background: var(--color-border);
 }
 
 .conversations-editor__tool--dropdown {
-	gap: 0.154rem;
+	gap: 2px;
 	width: auto;
-	padding: 0 0.385rem;
+	padding: 0 var(--spacer-1);
 }
 
 .conversations-editor__tool:disabled {
-	opacity: 0.4;
-	cursor: default;
+	opacity: 0.2;
+	cursor: not-allowed;
 }
 
 .conversations-editor__end {
 	flex: none;
 	display: flex;
 	align-items: center;
-	gap: 0.769rem;
-	margin-left: auto;
+	gap: var(--spacer-2);
+	margin-inline-start: auto;
 	cursor: default;
 }
 
 /*
- * Floating pieces, drawn after Payload's own editor so they sit in the admin
- * unnoticed: the `/` and `@` menus after its slash menu, the toolbar's
- * dropdowns after its popups, the link field after its link tooltip. Above
- * drawers and modals.
+ * Floating pieces, drawn like Payload's own editor so they sit in the admin
+ * unnoticed: the `/` and `@` menus as its slash menu, the toolbar's dropdowns
+ * as its toolbar dropdowns, the link field as its link bubble. Above drawers
+ * and modals.
  */
 .conversations-menu,
 .conversations-link-editor {
 	z-index: 10000;
-	border-radius: 4px;
-	background: var(--theme-input-bg);
-	color: var(--theme-elevation-800);
-	font-family: var(--font-body);
-	box-shadow:
-		0 1px 2px 1px rgb(0 0 0 / 0.05),
-		0 4px 8px rgb(0 0 0 / 0.1);
+	font-family: var(--text-body-medium-font-family);
+	font-size: var(--text-body-medium-font-size);
+	font-weight: var(--text-body-medium-font-weight);
+	line-height: var(--text-body-medium-line-height);
 }
 
 .conversations-menu {
 	display: flex;
 	flex-direction: column;
-	width: 15.385rem;
-	max-height: 23rem;
-	padding: 0.308rem 0;
+	width: 200px;
+	max-height: 300px;
+	padding: var(--spacer-2);
 	overflow-y: auto;
+	border-radius: var(--radius-large);
+	background: var(--color-bg-elevated);
+	color: var(--color-text);
+	box-shadow: var(--elevation-400-menu-panel);
 }
 
-/* The toolbar's dropdowns and "More": Payload's popup box. */
+/* The toolbar's dropdowns and "More". */
 .conversations-menu--dropdown {
 	width: auto;
-	min-width: 11.5rem;
-	padding: calc(var(--base) * 0.5);
-	box-shadow: 0 -2px 16px -2px rgb(0 0 0 / 0.2);
+	min-width: 160px;
+	box-shadow: var(--elevation-300-tooltip);
 }
 
 .conversations-menu__item {
 	display: flex;
+	flex: none;
 	align-items: center;
-	gap: 0.462rem;
+	gap: var(--spacer-1);
 	width: 100%;
-	height: 2.308rem;
-	padding: 0 0.923rem;
+	height: var(--spacer-4);
+	padding: 0 var(--spacer-1);
 	border: 0;
+	border-radius: var(--radius-medium);
 	background: none;
-	color: var(--theme-elevation-900);
+	color: var(--color-text);
 	cursor: pointer;
 	font: inherit;
-	font-size: 1rem;
-	text-align: left;
-}
-
-.conversations-menu--dropdown .conversations-menu__item {
-	height: auto;
-	padding: 0.385rem calc(var(--base) * 0.5);
-	border-radius: 4px;
+	text-align: start;
 }
 
 .conversations-menu__item--selected,
 .conversations-menu__item:hover:not(:disabled) {
-	background: var(--theme-elevation-100);
+	background: var(--color-bg-transparent-pressed);
 }
 
 .conversations-menu__icon {
@@ -250,8 +267,8 @@
 	flex: none;
 	align-items: center;
 	justify-content: center;
-	width: 1.538rem;
-	color: var(--theme-elevation-500);
+	width: var(--spacer-4);
+	color: var(--color-icon-secondary);
 }
 
 .conversations-menu__label {
@@ -261,68 +278,81 @@
 }
 
 .conversations-menu__group {
-	padding: 0.462rem 0.769rem 0.154rem;
-	color: var(--theme-elevation-600);
-	font-size: 0.769rem;
+	padding: 0 var(--spacer-1);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-small-font-size);
+	line-height: var(--spacer-4);
 }
 
 .conversations-menu__group:not(:first-child) {
-	margin-top: 0.308rem;
+	margin-top: var(--spacer-1);
 }
 
 .conversations-menu__item:disabled {
-	opacity: 0.4;
-	cursor: default;
+	opacity: 0.2;
+	cursor: not-allowed;
 }
 
 .conversations-menu__empty {
-	padding: 0.462rem 0.923rem;
-	color: var(--theme-elevation-500);
-	font-size: 1rem;
+	padding: var(--spacer-1);
+	color: var(--color-text-secondary);
 }
 
-/* The link tooltip: a slim bar, as Payload's own editor shows over a link. */
+/* The link bubble: a slim dark bar, as Payload's own editor shows over a link. */
 .conversations-link-editor {
-	padding: 0.308rem 0.308rem 0.308rem 0.923rem;
-	font-size: 1rem;
-	line-height: 1.538rem;
+	padding: 0 var(--spacer-2);
+	border-radius: var(--radius-large);
+	background: var(--color-bg-menu);
+	color: var(--color-text-onbrand);
+	box-shadow: var(--elevation-100-canvas);
 }
 
 .conversations-link-editor__row {
 	display: flex;
 	align-items: center;
-	gap: 0.154rem;
-	min-height: 2.154rem;
+	gap: var(--spacer-2);
+	height: var(--spacer-6);
+}
+
+.conversations-link-editor__icon {
+	display: flex;
+	flex: none;
+	color: var(--color-icon-onbrand-secondary);
+}
+
+.conversations-link-editor__actions {
+	display: flex;
+	flex: none;
+	gap: var(--spacer-1);
 }
 
 .conversations-link-editor__input {
-	width: 18rem;
+	width: 240px;
 	max-width: 60vw;
 	padding: 0;
 	border: 0;
 	background: transparent;
-	color: var(--theme-text);
+	color: var(--color-text-onbrand);
 	font: inherit;
 	outline: none;
 }
 
+.conversations-link-editor__input::placeholder {
+	color: var(--color-text-onbrand-secondary);
+}
+
 .conversations-link-editor__input[aria-invalid="true"] {
-	color: var(--theme-error-500);
+	text-decoration: underline wavy var(--color-icon-danger);
 }
 
 .conversations-link-editor__url {
 	min-width: 0;
-	max-width: 18rem;
-	margin-right: 0.615rem;
+	max-width: 240px;
 	overflow: hidden;
-	color: var(--theme-success-750);
+	color: var(--color-text-onbrand);
 	text-decoration: underline;
 	white-space: nowrap;
 	text-overflow: ellipsis;
-}
-
-.conversations-link-editor__url:hover {
-	color: var(--theme-success-850);
 }
 
 .conversations-link-editor__button {
@@ -330,23 +360,28 @@
 	flex: none;
 	align-items: center;
 	justify-content: center;
-	width: 2.308rem;
-	height: 2.308rem;
+	width: var(--spacer-4);
+	height: var(--spacer-4);
 	padding: 0;
 	border: 0;
-	border-radius: 4px;
+	border-radius: var(--radius-medium);
 	background: transparent;
-	color: var(--theme-elevation-600);
+	color: var(--color-icon-onbrand);
 	cursor: pointer;
 }
 
 .conversations-link-editor__button:hover {
-	background: var(--theme-elevation-100);
-	color: var(--theme-elevation-800);
+	background: var(--color-bg-transparent-hover);
 }
 
+.conversations-link-editor__button:focus-visible {
+	outline: var(--stroke-width-small, 1px) solid var(--color-border-brand-strong);
+}
+
+/* Under the field, lined up with its text. */
 .conversations-link-editor__error {
-	padding: 0 0 0.308rem;
-	color: var(--theme-error-500);
-	font-size: 0.923rem;
+	padding: 0 0 var(--spacer-2) calc(var(--spacer-4) + var(--spacer-2));
+	color: var(--color-text-onbrand-secondary);
+	font-size: var(--text-body-small-font-size);
+	line-height: var(--text-body-small-line-height);
 }

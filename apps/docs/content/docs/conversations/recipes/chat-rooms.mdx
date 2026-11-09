@@ -84,15 +84,16 @@ admin: {
 The server view loads the rooms the user may see and hands them to a client component inside Payload's `DefaultTemplate`:
 
 ```tsx title="chat/ChatView.tsx"
-import { DefaultTemplate } from '@payloadcms/next/templates'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps } from 'payload'
 
 import { ChatApp } from './ChatApp'
 
 export const ChatView = async ({ initPageResult, params, searchParams }: AdminViewServerProps) => {
-  const { payload, user } = initPageResult.req
+  const { req } = initPageResult
+  const { payload, user } = req
   const result = user
-    ? await payload.find({ collection: 'rooms', depth: 0, limit: 100, sort: 'name' })
+    ? await payload.find({ collection: 'rooms', depth: 0, limit: 100, req, sort: 'name' })
     : { docs: [] }
   const rooms = result.docs.map((doc) => ({
     id: String(doc.id),
@@ -107,6 +108,7 @@ export const ChatView = async ({ initPageResult, params, searchParams }: AdminVi
       params={params}
       payload={payload}
       permissions={initPageResult.permissions}
+      req={req}
       searchParams={searchParams}
       user={user ?? undefined}
       visibleEntities={initPageResult.visibleEntities}

@@ -161,11 +161,12 @@ export const InlineConversation = ({
 								<div className="conversations-drawer__subtitle">{label}</div>
 							</div>
 							<Button
-								buttonStyle="transparent"
+								aria-label="Close"
+								buttonStyle="ghost"
 								icon={['x']}
 								margin={false}
 								onClick={() => setThread(null)}
-								size="small"
+								size="medium"
 							/>
 						</div>
 						<ChatThread
@@ -690,7 +691,7 @@ export const stories: Story[] = [
 						<ChatComposer
 							above={<div className="pg-slot">above slot</div>}
 							actions={
-								<Button buttonStyle="secondary" margin={false} size="small">
+								<Button buttonStyle="secondary" margin={false} size="medium">
 									Attach
 								</Button>
 							}

@@ -14,6 +14,7 @@ import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { LocalizedLabel } from '../types'
 import { ChatSlot, replaceable } from './components'
+import { payloadComposerIcons } from './composerIcons'
 import { useChatRichText } from './richText'
 import './conversations.css'
 
@@ -132,7 +133,12 @@ const DefaultComposer = ({
 			{failed ? (
 				<div className="conversations-composer__banner conversations-composer__banner--error">
 					<span>{t(keys.couldNotSend)}</span>
-					<Button buttonStyle="secondary" margin={false} onClick={() => void submit()} size="small">
+					<Button
+						buttonStyle="secondary"
+						margin={false}
+						onClick={() => void submit()}
+						size="medium"
+					>
 						{t(keys.retry)}
 					</Button>
 				</div>
@@ -163,6 +169,7 @@ const DefaultComposer = ({
 					below={onSave ? null : <ChatSlot {...slotProps} name="composerBelow" />}
 					editorRef={composer.editorRef}
 					features={resolvedFeatures}
+					icons={payloadComposerIcons}
 					footer={
 						<>
 							<span className="conversations-composer__hint">
@@ -171,7 +178,7 @@ const DefaultComposer = ({
 									: t(submitOn === 'enter' ? keys.enterToSend : keys.modEnterToSend)}
 							</span>
 							{onCancel ? (
-								<Button buttonStyle="secondary" margin={false} onClick={onCancel} size="small">
+								<Button buttonStyle="secondary" margin={false} onClick={onCancel} size="medium">
 									{t(keys.cancel)}
 								</Button>
 							) : null}
@@ -183,7 +190,7 @@ const DefaultComposer = ({
 								disabled={busy}
 								margin={false}
 								onClick={() => void submit()}
-								size="small"
+								size="medium"
 							>
 								{submitLabel ?? t(onSave ? keys.save : keys.send)}
 							</Button>
