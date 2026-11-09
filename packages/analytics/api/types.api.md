@@ -1208,6 +1208,22 @@ export const keys: {
     readonly providerErrorPosthogHostRegion: "analytics:providerErrorPosthogHostRegion";
     readonly providerErrorPosthogTokenAsApiKey: "analytics:providerErrorPosthogTokenAsApiKey";
     readonly providerErrorPosthogKeyAsToken: "analytics:providerErrorPosthogKeyAsToken";
+    readonly providerConnectionLabel: "analytics:providerConnectionLabel";
+    readonly providerConnectionTest: "analytics:providerConnectionTest";
+    readonly providerConnectionWorks: "analytics:providerConnectionWorks";
+    readonly providerConnectionRefused: "analytics:providerConnectionRefused";
+    readonly providerConnectionUnreachable: "analytics:providerConnectionUnreachable";
+    readonly providerConnectionUnchecked: "analytics:providerConnectionUnchecked";
+    readonly providerConnectionLastSuccess: "analytics:providerConnectionLastSuccess";
+    readonly providerConnectionLastError: "analytics:providerConnectionLastError";
+    readonly providerConnectionPaused: "analytics:providerConnectionPaused";
+    readonly providerConnectionSaveFirst: "analytics:providerConnectionSaveFirst";
+    readonly providerConnectionUnsaved: "analytics:providerConnectionUnsaved";
+    readonly providerConnectionRefusedHelp: "analytics:providerConnectionRefusedHelp";
+    readonly providerConnectionUnreachableHelp: "analytics:providerConnectionUnreachableHelp";
+    readonly providerConnectionChecked: "analytics:providerConnectionChecked";
+    readonly providerConnectionFailed: "analytics:providerConnectionFailed";
+    readonly viewErrorVendorSaid: "analytics:viewErrorVendorSaid";
     readonly providerFieldIsDefault: "analytics:providerFieldIsDefault";
     readonly providerFieldIsDefaultHelp: "analytics:providerFieldIsDefaultHelp";
     readonly providerErrorDefaultTaken: "analytics:providerErrorDefaultTaken";
@@ -1590,6 +1606,7 @@ export type ProvidersCollectionOptions = {
     defaultAccess?: ConnectionAccess;
     types?: ProviderId[];
     sourceAccess?: Access;
+    status?: AnalyticsCollectionOptions;
 };
 
 // @public (undocumented)
@@ -1830,6 +1847,7 @@ export interface RoutePaths {
     goals: string;
     ingest: string;
     live: string;
+    providerStatus: string;
     proxy: string;
     proxyPattern: string;
     query: string;
@@ -2102,6 +2120,7 @@ export type TrustedPlatform = 'vercel' | 'cloudflare';
 export interface ViewEndpoints {
     // (undocumented)
     live: string;
+    providerStatus?: string;
     // (undocumented)
     query: string;
     // (undocumented)

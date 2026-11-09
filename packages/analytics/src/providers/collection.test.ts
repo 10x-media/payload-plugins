@@ -12,7 +12,7 @@ import { keys } from '../translations/keys'
 import { createStaticLabels } from '../translations/staticLabel'
 import type { BuildProvidersCollectionArgs, BuildSecretField } from './collection'
 import { analyticsProviderFields, buildProvidersCollection } from './collection'
-import { PROVIDER_IDS } from './factory'
+import { PROVIDER_IDS } from './ids'
 import { CONNECTION_PATHS, SECRET_PATHS } from './secrets'
 
 const named = (fields: Field[] | undefined, name: string): Field | undefined =>
@@ -500,8 +500,11 @@ describe('analyticsProviderFields', () => {
 			onChange: () => {},
 			...unscopedArgs,
 		})
+		// The Connection panel reads the collection's own status rows, which a host store has none of.
 		expect(fields.map((f) => ('name' in f ? f.name : f.type))).toEqual(
-			collection.fields.map((f) => ('name' in f ? f.name : f.type))
+			collection.fields
+				.map((f) => ('name' in f ? f.name : f.type))
+				.filter((name) => name !== 'connection')
 		)
 	})
 

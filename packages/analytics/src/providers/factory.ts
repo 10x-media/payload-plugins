@@ -11,15 +11,7 @@ import { withFixedLabel } from '../core/sourceLabel'
 import { isOneOf, isRecord } from '../core/values'
 import type { WithoutConsentLevel } from '../tracker/config'
 import { checkDocumentHost, type DocumentHost, type ProviderHostPolicy } from './hosts'
-
-export type ProviderId = 'native' | 'plausible' | 'umami' | 'ga4' | 'posthog'
-export const PROVIDER_IDS = [
-	'native',
-	'plausible',
-	'umami',
-	'ga4',
-	'posthog',
-] as const satisfies readonly ProviderId[]
+import { documentAdapterId } from './ids'
 
 /** The provider-settings document shape the adapter factory reads (depth 0, secrets revealed). */
 export type ProviderDoc = {
@@ -82,25 +74,9 @@ export const normalizePrivateKey = (key: string): string => key.replace(/\\n/g, 
 
 const shortId = (id: number | string): string => String(id).slice(-6)
 
-/** The registry id of a provider document's adapter, which grants and stand-ins must match. */
-export const documentAdapterId = (provider: unknown, id: unknown): string =>
-	`${String(provider)}:${String(id)}`
-
 /** A lent `native` adapter under the document's name, so a source reads as its tenant named it. */
 const withDocumentLabel = (adapter: AnalyticsAdapter, doc: ProviderDoc): AnalyticsAdapter =>
 	doc.name ? withFixedLabel(adapter, doc.name) : adapter
-
-/**
- * The provider document a registry id names, the inverse of {@link documentAdapterId}; undefined
- * for an id no document gives.
- */
-export const documentIdOf = (adapterId: string): string | undefined => {
-	const at = adapterId.indexOf(':')
-	const provider = adapterId.slice(0, at)
-	return at > 0 && at < adapterId.length - 1 && PROVIDER_IDS.some((id) => id === provider)
-		? adapterId.slice(at + 1)
-		: undefined
-}
 
 /** Per-document ids keep two projects of one provider type apart in a registry. */
 const withInstanceIdentity = (adapter: AnalyticsAdapter, doc: ProviderDoc): AnalyticsAdapter => {

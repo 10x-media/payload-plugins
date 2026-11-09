@@ -675,6 +675,7 @@ export interface RoutePaths {
     goals: string;
     ingest: string;
     live: string;
+    providerStatus: string;
     proxy: string;
     proxyPattern: string;
     query: string;
