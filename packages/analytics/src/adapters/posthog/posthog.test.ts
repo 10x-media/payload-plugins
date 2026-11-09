@@ -731,6 +731,39 @@ describe('posthog adapter', () => {
 		])
 	})
 
+	describe('read host', () => {
+		const answer = () => HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+
+		it("reads from the region's cloud when no host is set", async () => {
+			server.use(http.post('https://eu.posthog.com/api/projects/123/query/', answer))
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k', region: 'eu' }).query(
+				q({ metrics: ['pageviews'] }),
+				{}
+			)
+			expect(result.totals).toEqual({ pageviews: 1 })
+		})
+
+		it('reads from US Cloud with neither a host nor a region', async () => {
+			server.use(http.post('https://us.posthog.com/api/projects/123/query/', answer))
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews'] }),
+				{}
+			)
+			expect(result.totals).toEqual({ pageviews: 1 })
+		})
+
+		it('reads from a self-hosted host whatever the region says', async () => {
+			server.use(http.post('https://ph.example.com/api/projects/123/query/', answer))
+			const result = await posthog({
+				projectId: '123',
+				apiKey: 'phx_k',
+				host: 'https://ph.example.com',
+				region: 'eu',
+			}).query(q({ metrics: ['pageviews'] }), {})
+			expect(result.totals).toEqual({ pageviews: 1 })
+		})
+	})
+
 	it('targets the configured host (EU / self-host)', async () => {
 		server.use(
 			http.post('https://eu.posthog.com/api/projects/9/query/', () =>

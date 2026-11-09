@@ -36,6 +36,7 @@ import {
 import { readTime } from '../readTime'
 import { dayIso, hourIso } from '../series'
 import { upstreamJson } from '../upstream'
+import { cloudAppHost, cloudRegionOf, type PosthogRegion } from './cloud'
 import { createProjectCheck } from './projectCheck'
 
 export interface PosthogConfig {
@@ -49,7 +50,7 @@ export interface PosthogConfig {
 	/** Personal API key with the "Query Read" scope (phx_...). Never exposed to the browser. */
 	apiKey: string
 	/**
-	 * API address. Defaults to US Cloud; EU is https://eu.posthog.com, self-host is your instance's
+	 * API address. Unset, the `region`'s cloud, US Cloud without one; self-host is your instance's
 	 * address, with the base path when a reverse proxy serves it under one.
 	 */
 	host?: string
@@ -61,8 +62,8 @@ export interface PosthogConfig {
 	 */
 	scopeProperty?: string
 	/**
-	 * PostHog Cloud region for the proxied capture routes. Derived from `host` when omitted. A
-	 * self-hosted `host` takes capture itself and ignores this.
+	 * PostHog Cloud region: where capture goes and, with no `host`, where reads go. Derived from `host`
+	 * when omitted. A self-hosted `host` takes both and ignores this.
 	 */
 	region?: 'us' | 'eu'
 	/**
@@ -85,13 +86,11 @@ export interface PosthogConfig {
 	withoutConsent?: WithoutConsentLevel
 }
 
-const US_CLOUD = 'https://us.posthog.com'
-
-const resolveRegion = (config: PosthogConfig): 'us' | 'eu' => {
+const resolveRegion = (config: PosthogConfig): PosthogRegion => {
 	if (config.region) {
 		return config.region
 	}
-	return config.host?.includes('eu.posthog.com') ? 'eu' : 'us'
+	return (config.host && cloudRegionOf(config.host)) || 'us'
 }
 
 /**
@@ -132,7 +131,7 @@ const captureHosts = (config: PosthogConfig): CaptureHosts => {
 		assets: `https://${region}-assets.i.posthog.com`,
 		ingest: `https://${region}.i.posthog.com`,
 		cloud: true,
-		ui: ui ?? `https://${region}.posthog.com`,
+		ui: ui ?? cloudAppHost(region),
 	}
 }
 
@@ -343,7 +342,7 @@ interface PosthogQueryResponse {
 }
 
 export function posthog(config: PosthogConfig): AnalyticsAdapter {
-	const host = withoutTrailingSlash(config.host ?? US_CLOUD)
+	const host = withoutTrailingSlash(config.host ?? cloudAppHost(resolveRegion(config)))
 	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 730
 	const withoutConsent = adapterWithoutConsent(
 		config.withoutConsent,

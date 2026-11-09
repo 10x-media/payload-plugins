@@ -14,6 +14,7 @@ import {
 } from 'payload'
 import { validateMeasurementId } from '../adapters/ga4/measurementId'
 import { validateScriptId } from '../adapters/plausible/scriptId'
+import { validatePersonalApiKey, validateProjectToken } from '../adapters/posthog/credentials'
 import { optionsObject } from '../core/optionChecks'
 import { isOneOf, kindOf, listOf } from '../core/values'
 import { validateCurrency } from '../goals/currency'
@@ -24,7 +25,7 @@ import { asTranslate, labelForKey } from '../translations/server'
 import { builtInStaticLabel, type StaticLabelFor } from '../translations/staticLabel'
 import { type ProviderAccessArgs, providerCreateAccess, providerRowAccess } from './access'
 import { PROVIDER_IDS, type ProviderId } from './factory'
-import { validateProviderHost } from './hosts'
+import { validatePosthogHost, validateProviderHost } from './hosts'
 import { retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
 import { stampScope } from './stampScope'
@@ -179,12 +180,19 @@ const textField = (
 const secretField = (
 	buildSecret: BuildSecretField,
 	staticLabel: StaticLabelFor,
-	opts: { name: string; label: TranslationKey; help: SingularKey; width?: string }
+	opts: {
+		name: string
+		label: TranslationKey
+		help: SingularKey
+		width?: string
+		validate?: TextFieldSingleValidation
+	}
 ): Field[] =>
 	buildSecret({
 		name: opts.name,
 		type: 'text',
 		label: labelForKey(opts.label),
+		...(opts.validate ? { validate: opts.validate } : {}),
 		admin: {
 			description: staticLabel(opts.help),
 			...(opts.width ? { width: opts.width } : {}),
@@ -230,12 +238,13 @@ const scopeField = (include: boolean): Field[] =>
 
 const hostField = (
 	allowPrivateNetwork: boolean,
-	access: ConnectionFieldAccess | undefined
+	access: ConnectionFieldAccess | undefined,
+	opts: { validate?: TextFieldSingleValidation } = {}
 ): Field => ({
 	name: 'host',
 	type: 'text',
 	label: labelForKey(keys.providerFieldHost),
-	validate: validateProviderHost(allowPrivateNetwork),
+	validate: opts.validate ?? validateProviderHost(allowPrivateNetwork),
 	...(access ? { access } : {}),
 	admin: { description: labelForKey(keys.providerFieldHostHelp) },
 })
@@ -453,12 +462,13 @@ const providerFields = (
 		options.connectionAccess
 	)
 	const allowPrivateNetwork = options.allowPrivateNetwork === true
-	const apiKeyField = (): Field[] =>
+	const apiKeyField = (validate?: TextFieldSingleValidation): Field[] =>
 		secretField(buildSecret, staticLabel, {
 			name: 'apiKey',
 			label: keys.providerFieldApiKey,
 			help: keys.providerFieldApiKeyHelp,
 			width: '50%',
+			...(validate ? { validate } : {}),
 		})
 	return [
 		overrideField(nameField(), options.fields?.name),
@@ -555,13 +565,16 @@ const providerFields = (
 						help: keys.providerFieldProjectIdHelp,
 						access,
 					}),
-					...apiKeyField(),
+					...apiKeyField(validatePersonalApiKey),
 				],
 			},
 			{
 				type: 'row',
 				fields: [
-					captureField('projectToken', keys.providerFieldProjectToken, { width: '50%' }),
+					captureField('projectToken', keys.providerFieldProjectToken, {
+						width: '50%',
+						validate: validateProjectToken,
+					}),
 					{
 						name: 'region',
 						type: 'select',
@@ -582,7 +595,9 @@ const providerFields = (
 				help: keys.providerFieldScopePropertyHelp,
 				access,
 			}),
-			hostField(allowPrivateNetwork, access),
+			hostField(allowPrivateNetwork, access, {
+				validate: validatePosthogHost(allowPrivateNetwork),
+			}),
 		]),
 		overrideField(withoutConsentField(staticLabel), options.fields?.withoutConsent),
 	]

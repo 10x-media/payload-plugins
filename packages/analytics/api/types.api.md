@@ -1196,6 +1196,9 @@ export const keys: {
     readonly providerErrorScriptId: "analytics:providerErrorScriptId";
     readonly providerErrorHostFormat: "analytics:providerErrorHostFormat";
     readonly providerErrorHostInsecure: "analytics:providerErrorHostInsecure";
+    readonly providerErrorPosthogHostRegion: "analytics:providerErrorPosthogHostRegion";
+    readonly providerErrorPosthogTokenAsApiKey: "analytics:providerErrorPosthogTokenAsApiKey";
+    readonly providerErrorPosthogKeyAsToken: "analytics:providerErrorPosthogKeyAsToken";
     readonly providerFieldIsDefault: "analytics:providerFieldIsDefault";
     readonly providerFieldIsDefaultHelp: "analytics:providerFieldIsDefaultHelp";
     readonly providerErrorDefaultTaken: "analytics:providerErrorDefaultTaken";
