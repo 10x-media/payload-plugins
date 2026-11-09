@@ -35,7 +35,7 @@ export const PROVIDERS_SLUG = 'analytics-providers'
 
 /** The list's note to a tenant reading the platform's source in `fallback`. */
 export const PROVIDERS_LIST_NOTICE_COMPONENT = '@10x-media/analytics/client#ProvidersListNotice'
-export const PROVIDER_CONNECTION_COMPONENT = '@10x-media/analytics/client#ProviderConnection'
+const PROVIDER_CONNECTION_COMPONENT = '@10x-media/analytics/client#ProviderConnection'
 
 /** Builds the sealed variant of a secret source field; injected so the fields peer stays lazy. */
 export type BuildSecretField = (source: TextField | TextareaField) => Field[]

@@ -394,7 +394,7 @@ Every field of `status` is absent until it was written, so a document nothing ha
 
 Access is Payload's own for the provider document, asked with the caller's user: `GET` needs read access to it and `POST` update access. A document the caller may not read, another tenant's included, answers `404` exactly like a missing one, and nothing is sent to its vendor.
 
-A check waits 10 seconds for the vendor. A document without its key or ids is refused without asking the vendor. A second `POST` for the same document within 5 seconds on one instance answers the first one's result without `checked`, and asks nothing.
+A check waits 10 seconds for the vendor. A document without its key or ids is refused without asking the vendor. A second `POST` for the same document within 5 seconds on one instance, with no save in between, answers the first one's result without `checked` and asks nothing.
 
 ## Goals endpoint
 
