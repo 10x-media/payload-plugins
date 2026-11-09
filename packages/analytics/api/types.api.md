@@ -1209,10 +1209,11 @@ export const keys: {
     readonly providerErrorPosthogTokenAsApiKey: "analytics:providerErrorPosthogTokenAsApiKey";
     readonly providerErrorPosthogKeyAsToken: "analytics:providerErrorPosthogKeyAsToken";
     readonly providerConnectionLabel: "analytics:providerConnectionLabel";
+    readonly providerConnectionStatus: "analytics:providerConnectionStatus";
     readonly providerConnectionTest: "analytics:providerConnectionTest";
-    readonly providerConnectionWorks: "analytics:providerConnectionWorks";
-    readonly providerConnectionRefused: "analytics:providerConnectionRefused";
-    readonly providerConnectionUnreachable: "analytics:providerConnectionUnreachable";
+    readonly providerConnectionConnected: "analytics:providerConnectionConnected";
+    readonly providerConnectionNotConnected: "analytics:providerConnectionNotConnected";
+    readonly providerConnectionNoAnswer: "analytics:providerConnectionNoAnswer";
     readonly providerConnectionUnchecked: "analytics:providerConnectionUnchecked";
     readonly providerConnectionLastSuccess: "analytics:providerConnectionLastSuccess";
     readonly providerConnectionLastError: "analytics:providerConnectionLastError";
