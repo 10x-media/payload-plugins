@@ -80,6 +80,9 @@ export interface Lane {
 	health(): LaneHealth
 }
 
+/** What a request that reached the source came to; one the lane turned away never did. */
+export type LaneOutcome = { ok: true } | { ok: false; failure: ReadFailure; error?: unknown }
+
 export interface Lanes {
 	/**
 	 * The lane of one adapter instance for `scope`, made on first use; for an adapter built anew on
@@ -112,6 +115,8 @@ export interface LanesOptions {
 	abandonAfterMs?: number
 	/** Told the first time a lane gives back the slots of a request that ignored its abort signal. */
 	onAbandon?: (adapter: AnalyticsAdapter) => void
+	/** Told each request's outcome once it counted, with the lane's health after it. */
+	onOutcome?: (adapter: AnalyticsAdapter, outcome: LaneOutcome, health: LaneHealth) => void
 }
 
 type Release = () => void
@@ -272,6 +277,7 @@ interface LaneSetup {
 	breaker?: Omit<BreakerOptions, 'now'>
 	abandonAfterMs: number
 	onAbandon?: (adapter: AnalyticsAdapter) => void
+	onOutcome?: LanesOptions['onOutcome']
 }
 
 /** What a request that ignored its abort counts as against the breaker. */
@@ -314,6 +320,22 @@ const createLaneCore = (setup: LaneSetup): ((scope: string | null | undefined) =
 				throw new LaneRefusedError('paused', pausedFor)
 			}
 			await sleep(pausedFor, options.signal)
+		}
+	}
+
+	const healthOf = (key: string): LaneHealth => {
+		const breaker = breakers.get(key)
+		const snapshot = breaker?.snapshot()
+		const peek = breaker?.peek() ?? { ok: true as const, probe: false }
+		const pausedFor = pausedUntil - now()
+		const retryAfterMs = Math.max(peek.ok ? 0 : peek.retryAfterMs, pausedFor > 0 ? pausedFor : 0)
+		const last = snapshot?.lastFailure
+		return {
+			open: !peek.ok,
+			...(retryAfterMs > 0 ? { retryAfterMs } : {}),
+			...(last ? { lastFailure: last.kind } : {}),
+			...(last?.hostRefused ? { hostRefused: true as const } : {}),
+			...(abandoned > 0 ? { abandoned } : {}),
 		}
 	}
 
@@ -360,10 +382,17 @@ const createLaneCore = (setup: LaneSetup): ((scope: string | null | undefined) =
 				throw refusedOpen(admission.retryAfterMs)
 			}
 			let counted = false
-			const record = (outcome: 'success' | ReadFailure): void => {
+			const record = (outcome: 'success' | ReadFailure, error?: unknown): void => {
 				if (!counted) {
 					counted = true
 					breaker.record(outcome, admission.probe)
+					setup.onOutcome?.(
+						setup.adapter,
+						outcome === 'success'
+							? { ok: true }
+							: { ok: false, failure: outcome, ...(error === undefined ? {} : { error }) },
+						healthOf(key)
+					)
 				}
 			}
 			const settled = (async () => fn(signal))().then(
@@ -373,13 +402,14 @@ const createLaneCore = (setup: LaneSetup): ((scope: string | null | undefined) =
 				},
 				(err: unknown) => {
 					const failure = classifyError(err)
-					record(failure)
+					// Paused first, so the health the outcome is told with carries the pause.
 					if (failure.kind === 'unavailable' && failure.retryAfterMs !== undefined) {
 						pausedUntil = Math.max(
 							pausedUntil,
 							now() + Math.min(failure.retryAfterMs, BREAKER_MAX_MS)
 						)
 					}
+					record(failure, err)
 					throw err
 				}
 			)
@@ -410,21 +440,7 @@ const createLaneCore = (setup: LaneSetup): ((scope: string | null | undefined) =
 			done.catch(() => {})
 			return untilAborted(done, signal)
 		},
-		health() {
-			const breaker = breakers.get(key)
-			const snapshot = breaker?.snapshot()
-			const peek = breaker?.peek() ?? { ok: true as const, probe: false }
-			const pausedFor = pausedUntil - now()
-			const retryAfterMs = Math.max(peek.ok ? 0 : peek.retryAfterMs, pausedFor > 0 ? pausedFor : 0)
-			const last = snapshot?.lastFailure
-			return {
-				open: !peek.ok,
-				...(retryAfterMs > 0 ? { retryAfterMs } : {}),
-				...(last ? { lastFailure: last.kind } : {}),
-				...(last?.hostRefused ? { hostRefused: true as const } : {}),
-				...(abandoned > 0 ? { abandoned } : {}),
-			}
-		},
+		health: () => healthOf(key),
 	})
 
 	return (scope) => {
@@ -459,6 +475,7 @@ export const createLanes = (options: LanesOptions = {}): Lanes => {
 			...(options.breaker ? { breaker: options.breaker } : {}),
 			abandonAfterMs: options.abandonAfterMs ?? ABANDON_AFTER_MS,
 			...(options.onAbandon ? { onAbandon: options.onAbandon } : {}),
+			...(options.onOutcome ? { onOutcome: options.onOutcome } : {}),
 		})
 	}
 

@@ -20,6 +20,7 @@ describe('routePaths', () => {
 			sources: '/_x/sources',
 			goals: '/_x/goals',
 			refresh: '/_x/refresh',
+			providerStatus: '/_x/provider-status',
 			live: '/_x/live',
 			exclusion: '/_x/exclusion',
 			ingest: '/_x/e',
