@@ -10,13 +10,12 @@ import {
 import { memoryAdapter } from '../testing/memoryAdapter'
 import {
 	adapterFromProviderDoc,
-	documentAdapterId,
-	documentIdOf,
 	normalizePrivateKey,
 	type ProviderDoc,
 	type ProviderFactoryContext,
 } from './factory'
 import { DEFAULT_HOST_POLICY, resolveHostPolicy } from './hosts'
+import { documentAdapterId, documentIdOf } from './ids'
 
 /** The context every document adapter is built with: a fetch, and the vendors' clouds alone. */
 const guarded: ProviderFactoryContext = {

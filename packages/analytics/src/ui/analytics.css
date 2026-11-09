@@ -1073,9 +1073,42 @@
 		color: var(--analytics-text-muted);
 	}
 
+	/* What the vendor said under the view's error: often one long JSON word. */
+	.analytics-view__source-note {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+		overflow-wrap: anywhere;
+	}
+
 	/* The view spaces its children by its gap, which Payload's banner margin would double. */
 	.analytics-view > .analytics-sources-notice {
 		margin-block-end: 0;
+	}
+
+	/* The provider form's Connection panel, in the sidebar. */
+	.analytics-provider-connection__row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: calc(var(--base) * 0.5);
+	}
+
+	.analytics-provider-connection__facts,
+	.analytics-provider-connection__detail {
+		margin: calc(var(--base) * 0.4) 0 0;
+		color: var(--analytics-text-muted);
+		font-size: calc(var(--base) * 0.6);
+	}
+
+	.analytics-provider-connection__facts {
+		padding: 0;
+		list-style: none;
+	}
+
+	/* A vendor's answer is often one long JSON word. */
+	.analytics-provider-connection__detail {
+		overflow-wrap: anywhere;
 	}
 
 	/* The breakdown's tabs, with the filter a row click set beside them. */

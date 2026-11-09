@@ -2,8 +2,8 @@ import type { Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import { createRegistry } from '../core/registry'
 import { memoryAdapter } from '../testing/memoryAdapter'
-import type { ProviderId } from './factory'
 import { resolveHostPolicy } from './hosts'
+import type { ProviderId } from './ids'
 import { createProviderRegistry } from './registry'
 
 vi.mock('../plugin/encrypted', () => ({

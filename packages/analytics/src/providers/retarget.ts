@@ -1,6 +1,6 @@
 import type { CollectionBeforeChangeHook } from 'payload'
 import { isRecord, valueAt } from '../core/values'
-import type { ProviderId } from './factory'
+import type { ProviderId } from './ids'
 import { CONNECTION_PATHS, SECRET_PATHS } from './secrets'
 
 interface RetargetArgs {

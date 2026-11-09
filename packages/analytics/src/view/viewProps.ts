@@ -59,6 +59,8 @@ export interface ViewEndpoints {
 	query: string
 	refresh: string
 	live: string
+	/** The provider status endpoint, mounted while `providers.collection` is on. */
+	providerStatus?: string
 }
 
 /**
@@ -229,6 +231,9 @@ export const resolveViewProps = async (
 			query: apiPath(config, routes.query),
 			refresh: apiPath(config, routes.refresh),
 			live: apiPath(config, routes.live),
+			...(resolved.providers.collection.enabled
+				? { providerStatus: apiPath(config, routes.providerStatus) }
+				: {}),
 		},
 		adminRoute: config.routes?.admin ?? '/admin',
 		locale: intlLocale(req.i18n.language),

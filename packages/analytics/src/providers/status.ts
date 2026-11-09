@@ -5,6 +5,7 @@ import { DETACHED } from '../db/openTransaction'
 import { storeCollection } from '../native/collections/storeCollection'
 import type { ReadFailureKind } from '../surfacing/classifyError'
 import type { LaneHealth, LaneOutcome } from '../surfacing/lanes'
+import type { ConnectionOutcome, ProviderStatus } from './connectionState'
 
 /** The provider status collection's slug, unless `providers.collection.status.slug` names another. */
 export const PROVIDER_STATUS_SLUG = 'analytics-provider-status'
@@ -28,27 +29,6 @@ export const providerStatusCollection = (slug: string = PROVIDER_STATUS_SLUG): C
 		],
 		indexes: [],
 	})
-
-/** One provider document's row, its dates as ISO strings. */
-export interface ProviderStatus {
-	lastSuccessAt?: string
-	lastErrorAt?: string
-	errorKind?: ReadFailureKind
-	errorDetail?: string
-	pausedUntil?: string
-}
-
-/** What one read or check told about a document's connection. */
-export type ConnectionOutcome =
-	| { ok: true }
-	| {
-			ok: false
-			kind: ReadFailureKind
-			/** The vendor's own words, cut to {@link DETAIL_MAX}. */
-			detail?: string
-			/** How long the source rests from now, when it does. */
-			pausedForMs?: number
-	  }
 
 /**
  * What a read that reached the source says about the connection; undefined for a read refused as
