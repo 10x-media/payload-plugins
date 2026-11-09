@@ -1,5 +1,6 @@
 'use client'
 
+import type { ReactNode } from 'react'
 import type { MetricKey } from '../../core/contract'
 import { formatMetricValue, formatRate } from '../../fields/format'
 import type { QueryResponse } from '../../query/response'
@@ -21,6 +22,8 @@ export interface OverviewCardsProps {
 	/** ISO 4217 code revenue renders in; absent leaves it a plain number. */
 	currency?: string
 	onSelect: (metric: MetricKey) => void
+	/** More about a failed read, inside its error banner. */
+	errorNote?: ReactNode
 }
 
 /**
@@ -36,6 +39,7 @@ export function OverviewCards({
 	locale,
 	currency,
 	onSelect,
+	errorNote,
 }: OverviewCardsProps) {
 	const { t } = useTranslation()
 	const totals = query.data?.result.totals
@@ -45,7 +49,7 @@ export function OverviewCards({
 
 	if (query.data === undefined) {
 		return query.status === 'error' ? (
-			<SectionError error={query.error} onRetry={query.refetch} />
+			<SectionError error={query.error} note={errorNote} onRetry={query.refetch} />
 		) : (
 			<div className="analytics-view__cards">
 				<Skeleton delta={compare} rows={Math.max(metrics.length, 1)} />
@@ -55,7 +59,7 @@ export function OverviewCards({
 
 	return (
 		<>
-			<QueryError query={query} />
+			<QueryError note={errorNote} query={query} />
 			{/** biome-ignore lint/a11y/useSemanticElements: a named group of toggle buttons, not a form fieldset */}
 			<div
 				aria-busy={query.isRefetching}

@@ -1226,7 +1226,6 @@ export const keys: {
     readonly providerConnectionUnreachableHelp: "analytics:providerConnectionUnreachableHelp";
     readonly providerConnectionChecked: "analytics:providerConnectionChecked";
     readonly providerConnectionFailed: "analytics:providerConnectionFailed";
-    readonly viewErrorVendorSaid: "analytics:viewErrorVendorSaid";
     readonly providerFieldIsDefault: "analytics:providerFieldIsDefault";
     readonly providerFieldIsDefaultHelp: "analytics:providerFieldIsDefaultHelp";
     readonly providerErrorDefaultTaken: "analytics:providerErrorDefaultTaken";

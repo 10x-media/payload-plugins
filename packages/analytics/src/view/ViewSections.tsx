@@ -65,24 +65,26 @@ function Overview() {
 	const { gate, source, state, queries, answers, props, write } = useViewFrame()
 	const cards = queries.cards
 	return (
-		<>
-			<OverviewCards
-				compare={state.compare}
-				currency={answers.currency}
-				locale={props.locale}
-				metrics={gate.metrics}
-				onSelect={(metric) => write({ ...state, metric })}
-				query={cards}
-				selected={state.metric}
-			/>
-			{cards.status === 'error' && cards.error?.code === 'source_misconfigured' ? (
-				<SourceConnectionNote
-					endpoint={props.endpoints.providerStatus}
-					locale={props.locale}
-					sourceId={source.id}
-				/>
-			) : null}
-		</>
+		<OverviewCards
+			compare={state.compare}
+			currency={answers.currency}
+			{...(cards.status === 'error' && cards.error?.code === 'source_misconfigured'
+				? {
+						errorNote: (
+							<SourceConnectionNote
+								endpoint={props.endpoints.providerStatus}
+								locale={props.locale}
+								sourceId={source.id}
+							/>
+						),
+					}
+				: {})}
+			locale={props.locale}
+			metrics={gate.metrics}
+			onSelect={(metric) => write({ ...state, metric })}
+			query={cards}
+			selected={state.metric}
+		/>
 	)
 }
 
