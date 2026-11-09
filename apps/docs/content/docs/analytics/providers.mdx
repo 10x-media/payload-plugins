@@ -381,6 +381,20 @@ A saved document keeps its key through every save that leaves its connection alo
 
 A cleared key goes together with its hint, so the source reads as not configured until someone enters the key again. To move a document to another host and keep it working, enter the key in the same save. A bulk update follows the same rule for each document it changes. `CONNECTION_PATHS` lists these values, beside `SECRET_PATHS`.
 
+### Checking a connection
+
+The sidebar of a vendor document (Plausible, Umami, GA4, PostHog) has a **Connection** panel. It shows what the document's connection last came to, and a **Test connection** button checks it:
+
+1. Save the document. The button checks the saved settings, so it stays off on a new document and while the form has unsaved changes.
+2. Press **Test connection**. The plugin sends the vendor's cheapest read: one `SELECT 1` HogQL query for PostHog, one day of visitors for Plausible, the website for Umami, one day of active users for GA4.
+3. Read the result. **Works** means the key, the IDs and the host are right. **Refused** means the vendor refused them, with its own words under the label. **Unreachable** means the vendor did not answer within 10 seconds or failed.
+
+The panel also shows when the connection last worked and last failed, and until when reads rest after a failure ([circuit breaker](/analytics/cache#circuit-breaker)). Ordinary reads keep it current too, so a document that started failing at night says so in the morning without a check.
+
+Checking needs update access to the document; anyone who may read it sees the panel. The result is kept in the `analytics-provider-status` collection, one row per document under the document's own ID, which goes with the document when it is deleted. `providers.collection.status` renames or reshapes it. The [provider status endpoint](/analytics/reference/endpoints#provider-status-endpoint) answers the same to code.
+
+When the analytics view says a source is not set up correctly, a reader who may read its document also sees what the vendor answered and until when reads rest.
+
 ### Who may change a connection
 
 `providers.collection.connectionAccess` decides who may set or change those values. It is a Payload field access function, asked on create and on update, or an object with one for each:

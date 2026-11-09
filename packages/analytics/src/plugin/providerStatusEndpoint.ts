@@ -2,7 +2,9 @@ import { docAccessOperation, type PayloadHandler, type PayloadRequest } from 'pa
 import { isCollectionSlug } from '../core/collectionSlug'
 import type { AnalyticsAdapter } from '../core/contract'
 import { monotonicMs } from '../core/monotonic'
+import { isRecord } from '../core/values'
 import type { ConnectionOutcome, ProviderStatusResponse } from '../providers/connectionState'
+import { versionOf } from '../providers/probe'
 import { classifyError } from '../surfacing/classifyError'
 import {
 	analyticsError,
@@ -15,10 +17,10 @@ import { createRefreshDebounce } from './refreshEndpoint'
 import { getRuntime } from './runtime'
 
 /** How long a Test connection waits for the vendor before it counts as unreachable. */
-export const CONNECTION_CHECK_TIMEOUT_MS = 10_000
+const CONNECTION_CHECK_TIMEOUT_MS = 10_000
 
-/** A second check of one document this soon answers the first one's result, asking nothing. */
-export const CONNECTION_CHECK_DEBOUNCE_MS = 5_000
+/** A second check of one saved document this soon answers the first one's result, asking nothing. */
+const CONNECTION_CHECK_DEBOUNCE_MS = 5_000
 
 interface ProviderStatusHandlerOptions {
 	/** Clock behind the debounce window; `monotonicMs` unless a test injects one. */
@@ -89,7 +91,7 @@ export const makeProviderStatusHandler = (
 			)
 		}
 		try {
-			const readable = await req.payload.findByID({
+			const readable: unknown = await req.payload.findByID({
 				collection: slug,
 				id,
 				depth: 0,
@@ -98,10 +100,12 @@ export const makeProviderStatusHandler = (
 				user: req.user,
 				req,
 			})
-			if (!readable) {
+			if (!isRecord(readable)) {
 				return notFound()
 			}
-			if (req.method !== 'POST' || !debounce.allows(id)) {
+			// Per saved version, so a check right after a save asks about the new settings.
+			const version = `${id}@${versionOf(readable.updatedAt)}`
+			if (req.method !== 'POST' || !debounce.allows(version)) {
 				const answer: ProviderStatusResponse = { status: (await store.read(id)) ?? {} }
 				return Response.json(answer, { headers: NO_STORE })
 			}
@@ -124,7 +128,7 @@ export const makeProviderStatusHandler = (
 					)
 				)
 			}
-			debounce.record(id)
+			debounce.record(version)
 			const checked = await runCheck(req, adapter)
 			try {
 				await store.record(id, checked)

@@ -9,7 +9,7 @@ import { useTranslation } from '../../translations/useTranslation'
 import { requestShaped } from '../../ui/data/request'
 import { viewerNow } from '../../ui/viewerClock'
 
-export interface SourceConnectionNoteProps {
+interface SourceConnectionNoteProps {
 	/** The provider status endpoint; absent on an install without provider documents. */
 	endpoint: string | undefined
 	sourceId: string

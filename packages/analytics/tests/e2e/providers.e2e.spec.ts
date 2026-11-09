@@ -135,3 +135,55 @@ for (const [field, label, value] of [
 		await refused(page, label)
 	})
 }
+
+// No vendor is reached: a document without its key is refused before anything is sent, which is
+// the panel's whole round trip through the production build, the endpoint and the status rows.
+test('a new provider document checks its saved connection from the sidebar, and keeps the result', async ({
+	page,
+}) => {
+	await login(page.request)
+	await page.goto(`${COLLECTION}/create`)
+	const panel = page.locator('.analytics-provider-connection')
+	const button = panel.getByRole('button', { name: 'Test connection' })
+	await page.locator('#field-name').fill(`Umami check ${Date.now()}`)
+	await providerSelect(page).locator('.rs__control').click()
+	await page.locator('.rs__option', { hasText: 'Umami' }).click()
+	await page.locator('#field-umami__websiteId').fill('  e2e-website  ')
+	await expect(button).toBeDisabled()
+	await expect(panel).toContainText('Save the document to test it.')
+
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
+	const id = page.url().split('/').pop() ?? ''
+	await expect(panel.locator('.pill')).toHaveText('Not checked')
+	await expect(button).toBeEnabled()
+
+	await button.click()
+	await expect(page.locator('[data-sonner-toast]', { hasText: 'Connection failed' })).toBeVisible()
+	await expect(panel.locator('.pill')).toHaveText('Refused')
+	await expect(panel).toContainText('Check the key, the IDs and the host.')
+
+	const status = await page.request.get(`/api/_x/provider-status?id=${encodeURIComponent(id)}`)
+	expect(status.ok()).toBeTruthy()
+	expect(((await status.json()) as { status: { errorKind?: string } }).status.errorKind).toBe(
+		'source_misconfigured'
+	)
+
+	await page.reload()
+	await expect(panel.locator('.pill')).toHaveText('Refused')
+	await page.locator('#field-name').fill('Umami check, edited')
+	await expect(button).toBeDisabled()
+	await expect(panel).toContainText('Save your changes to test them.')
+})
+
+test('a native document has no Connection panel', async ({ page }) => {
+	await login(page.request)
+	await page.goto(`${COLLECTION}/create`)
+	await providerSelect(page).locator('.rs__control').click()
+	await page.locator('.rs__option', { hasText: 'Umami' }).click()
+	await expect(page.locator('.analytics-provider-connection')).toHaveCount(1)
+	await providerSelect(page).locator('.rs__control').click()
+	// The native engine's type, named after Payload in the select.
+	await page.locator('.rs__option', { hasText: /^Payload$/ }).click()
+	await expect(page.locator('.analytics-provider-connection')).toHaveCount(0)
+})
