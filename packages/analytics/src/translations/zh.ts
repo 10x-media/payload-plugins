@@ -154,7 +154,6 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerConnectionLastError]: '上次失败',
 	[keys.providerConnectionPaused]: '读取暂停至 {{date}}',
 	[keys.providerConnectionResumes]: '恢复读取',
-	[keys.providerConnectionHttpStatus]: 'HTTP {{status}}',
 	[keys.providerConnectionSaveFirst]: '请先保存文档再测试。',
 	[keys.providerConnectionUnsaved]: '请先保存更改再测试。',
 	[keys.providerConnectionRefusedHelp]: '请检查密钥、ID 和主机。',

@@ -159,7 +159,6 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionLastError]: 'Last failed',
 	[keys.providerConnectionPaused]: 'Reads paused until {{date}}',
 	[keys.providerConnectionResumes]: 'Reads resume',
-	[keys.providerConnectionHttpStatus]: 'HTTP {{status}}',
 	[keys.providerConnectionSaveFirst]: 'Save the document to test it.',
 	[keys.providerConnectionUnsaved]: 'Save your changes to test them.',
 	[keys.providerConnectionRefusedHelp]: 'Check the key, the IDs and the host.',

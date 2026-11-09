@@ -155,9 +155,6 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 							<span className="analytics-provider-connection__words">
 								{words.provider ? `${t(PROVIDER_NAMES[words.provider])}: ` : null}
 								{words.message}
-								{words.status
-									? ` (${t(keys.providerConnectionHttpStatus, { status: words.status })})`
-									: null}
 							</span>
 						) : null}
 					</Banner>

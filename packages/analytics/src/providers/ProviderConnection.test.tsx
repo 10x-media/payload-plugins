@@ -120,9 +120,7 @@ describe('ProviderConnection', () => {
 		const banner = screen.getByText(keys.providerConnectionRefusedHelp).closest('[data-banner]')
 		expect(banner?.getAttribute('data-banner')).toBe('error')
 		// The vendor's words as a reader reads them: its name, the message, then the status.
-		expect(banner?.textContent).toContain(
-			`${keys.providerNamePosthog}: Invalid personal API key. (${keys.providerConnectionHttpStatus} 403)`
-		)
+		expect(banner?.textContent).toContain(`${keys.providerNamePosthog}: Invalid personal API key.`)
 		const facts = [...document.querySelectorAll('.analytics-provider-connection__facts li')].map(
 			(li) => li.textContent
 		)

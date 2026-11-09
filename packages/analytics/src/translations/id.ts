@@ -162,7 +162,6 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerConnectionLastError]: 'Terakhir gagal',
 	[keys.providerConnectionPaused]: 'Pembacaan dijeda hingga {{date}}',
 	[keys.providerConnectionResumes]: 'Pembacaan berlanjut',
-	[keys.providerConnectionHttpStatus]: 'HTTP {{status}}',
 	[keys.providerConnectionSaveFirst]: 'Simpan dokumen untuk mengujinya.',
 	[keys.providerConnectionUnsaved]: 'Simpan perubahan untuk mengujinya.',
 	[keys.providerConnectionRefusedHelp]: 'Periksa kunci, ID, dan host.',

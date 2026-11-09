@@ -161,7 +161,6 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionLastError]: 'Zuletzt fehlgeschlagen',
 	[keys.providerConnectionPaused]: 'Abrufe pausiert bis {{date}}',
 	[keys.providerConnectionResumes]: 'Abrufe wieder ab',
-	[keys.providerConnectionHttpStatus]: 'HTTP {{status}}',
 	[keys.providerConnectionSaveFirst]: 'Speichern Sie das Dokument, um es zu testen.',
 	[keys.providerConnectionUnsaved]: 'Speichern Sie Ihre Änderungen, um sie zu testen.',
 	[keys.providerConnectionRefusedHelp]: 'Prüfen Sie Schlüssel, IDs und Host.',

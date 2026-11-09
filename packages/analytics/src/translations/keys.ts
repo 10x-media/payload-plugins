@@ -154,7 +154,6 @@ export const keys = {
 	providerConnectionLastError: 'analytics:providerConnectionLastError',
 	providerConnectionPaused: 'analytics:providerConnectionPaused',
 	providerConnectionResumes: 'analytics:providerConnectionResumes',
-	providerConnectionHttpStatus: 'analytics:providerConnectionHttpStatus',
 	providerConnectionSaveFirst: 'analytics:providerConnectionSaveFirst',
 	providerConnectionUnsaved: 'analytics:providerConnectionUnsaved',
 	providerConnectionRefusedHelp: 'analytics:providerConnectionRefusedHelp',

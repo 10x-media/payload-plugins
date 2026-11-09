@@ -162,7 +162,6 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerConnectionLastError]: 'Último fallo',
 	[keys.providerConnectionPaused]: 'Lecturas en pausa hasta {{date}}',
 	[keys.providerConnectionResumes]: 'Se reanuda',
-	[keys.providerConnectionHttpStatus]: 'HTTP {{status}}',
 	[keys.providerConnectionSaveFirst]: 'Guarda el documento para probarlo.',
 	[keys.providerConnectionUnsaved]: 'Guarda los cambios para probarlos.',
 	[keys.providerConnectionRefusedHelp]: 'Revisa la clave, los ID y el host.',

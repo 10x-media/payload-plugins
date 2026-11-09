@@ -62,11 +62,10 @@ export const isProviderStatusResponse = (value: unknown): value is ProviderStatu
 	(value.checked === undefined ||
 		(isRecord(value.checked) && typeof value.checked.ok === 'boolean'))
 
-/** A stored vendor answer split as a reader reads it: who said it, what, and the HTTP status. */
+/** A stored vendor answer as a reader reads it: who said it and what; the HTTP status stays in the logs. */
 export interface VendorWords {
 	provider?: ProviderId
 	message: string
-	status?: string
 }
 
 /**
@@ -79,5 +78,5 @@ export const vendorWordsOf = (detail: string): VendorWords => {
 	if (!match || !provider) {
 		return { message: detail.trim() }
 	}
-	return { provider, message: (match[3] ?? '').trim(), status: match[2] }
+	return { provider, message: (match[3] ?? '').trim() }
 }
