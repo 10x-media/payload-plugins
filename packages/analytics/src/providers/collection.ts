@@ -24,8 +24,8 @@ import { keys, type SingularKey, type TranslationKey } from '../translations/key
 import { asTranslate, labelForKey } from '../translations/server'
 import { builtInStaticLabel, type StaticLabelFor } from '../translations/staticLabel'
 import { type ProviderAccessArgs, providerCreateAccess, providerRowAccess } from './access'
-import { PROVIDER_IDS, type ProviderId } from './factory'
 import { validatePosthogHost, validatePosthogRegion, validateProviderHost } from './hosts'
+import { PROVIDER_IDS, type ProviderId } from './ids'
 import { retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
 import { stampScope } from './stampScope'
@@ -35,6 +35,7 @@ export const PROVIDERS_SLUG = 'analytics-providers'
 
 /** The list's note to a tenant reading the platform's source in `fallback`. */
 export const PROVIDERS_LIST_NOTICE_COMPONENT = '@10x-media/analytics/client#ProvidersListNotice'
+export const PROVIDER_CONNECTION_COMPONENT = '@10x-media/analytics/client#ProviderConnection'
 
 /** Builds the sealed variant of a secret source field; injected so the fields peer stays lazy. */
 export type BuildSecretField = (source: TextField | TextareaField) => Field[]
@@ -607,6 +608,17 @@ const providerFields = (
 	]
 }
 
+/** The sidebar's Connection panel of a vendor document, its Test connection button inside. */
+const connectionField: Field = {
+	name: 'connection',
+	type: 'ui',
+	admin: {
+		position: 'sidebar',
+		components: { Field: PROVIDER_CONNECTION_COMPONENT },
+		condition: (data) => isOneOf(PROVIDER_IDS, data?.provider) && data?.provider !== 'native',
+	},
+}
+
 /**
  * Runtime provider-settings collection, one document per provider (and scope). Admin-only by
  * default; `access` overrides single operations, `overrides` reshapes the whole config last.
@@ -664,25 +676,31 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 				},
 			],
 		},
-		fields: providerFields(
-			{
-				buildSecret: args.buildSecret,
-				...(args.fields ? { fields: args.fields } : {}),
-				scopeField: args.scopeField === 'scope',
-				allowPrivateNetwork: args.allowPrivateNetwork === true,
-				...(args.connectionAccess ? { connectionAccess: args.connectionAccess } : {}),
-			},
-			staticLabel,
-			{
-				types: args.types ?? PROVIDER_IDS,
-				// A default is picked per scope: an unscoped install has one site and nothing to pick.
-				...(args.scoped
-					? {
-							isDefault: overrideField(isDefaultField(args.defaultAccess), args.fields?.isDefault),
-						}
-					: {}),
-			}
-		),
+		fields: [
+			...providerFields(
+				{
+					buildSecret: args.buildSecret,
+					...(args.fields ? { fields: args.fields } : {}),
+					scopeField: args.scopeField === 'scope',
+					allowPrivateNetwork: args.allowPrivateNetwork === true,
+					...(args.connectionAccess ? { connectionAccess: args.connectionAccess } : {}),
+				},
+				staticLabel,
+				{
+					types: args.types ?? PROVIDER_IDS,
+					// A default is picked per scope: an unscoped install has one site and nothing to pick.
+					...(args.scoped
+						? {
+								isDefault: overrideField(
+									isDefaultField(args.defaultAccess),
+									args.fields?.isDefault
+								),
+							}
+						: {}),
+				}
+			),
+			connectionField,
+		],
 	}
 	return args.overrides ? args.overrides(collection) : collection
 }

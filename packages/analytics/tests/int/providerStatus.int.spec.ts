@@ -4,9 +4,9 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import { createLocalReq, type TypedUser } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
-import type { ProviderStatusResponse } from '../../src/plugin/providerStatusEndpoint'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { PROVIDERS_SLUG } from '../../src/providers/collection'
+import type { ProviderStatusResponse } from '../../src/providers/connectionState'
 import { PROVIDER_STATUS_SLUG } from '../../src/providers/status'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { callEndpoint, handlerAt } from './endpointHelpers'
@@ -197,7 +197,9 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		const missing = await status('GET', 'alpha', '   ')
 		expect(missing.status).toBe(400)
 		expect(((await missing.json()) as ErrorBody).error.param).toBe('id')
-		expect((await status('GET', 'alpha', db === 'mongo' ? '0123456789abcdef01234567' : '999999')).status).toBe(404)
+		expect(
+			(await status('GET', 'alpha', db === 'mongo' ? '0123456789abcdef01234567' : '999999')).status
+		).toBe(404)
 	})
 
 	it(`answers a second check this soon from the first, asking the vendor once, on ${db}`, async () => {

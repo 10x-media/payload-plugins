@@ -21,14 +21,12 @@ import { createEpochFallback, type EpochStore, FIXED_CONFIG_EPOCH } from '../sur
 import { createAdapterPool, type PooledDocument } from './adapterPool'
 import {
 	adapterFromProviderDoc,
-	documentAdapterId,
 	failingAdapter,
-	PROVIDER_IDS,
 	type ProviderDoc,
 	type ProviderFactoryContext,
-	type ProviderId,
 } from './factory'
 import type { ProviderHostPolicy } from './hosts'
+import { documentAdapterId, PROVIDER_IDS, type ProviderId } from './ids'
 import { createCollectionProbe, type Probe, type ProbeRow, scopeOf, versionOf } from './probe'
 import {
 	combineRegistries,

@@ -584,10 +584,11 @@ export type {
 	ProviderFieldsOptions,
 } from './providers/collection'
 export { analyticsProviderFields, PROVIDERS_SLUG } from './providers/collection'
-export type { ProviderDoc, ProviderFactoryContext, ProviderId } from './providers/factory'
-export { adapterFromProviderDoc, PROVIDER_IDS } from './providers/factory'
+export type { ProviderDoc, ProviderFactoryContext } from './providers/factory'
+export { adapterFromProviderDoc } from './providers/factory'
 export type { HostPattern } from './providers/hosts'
 export { type ProviderHostPolicy, resolveHostPolicy } from './providers/hosts'
+export { PROVIDER_IDS, type ProviderId } from './providers/ids'
 export { type RefreshProvidersOptions, refreshProviders } from './providers/refresh'
 export { CONNECTION_PATHS, SECRET_PATHS } from './providers/secrets'
 export { PROVIDER_STATUS_SLUG } from './providers/status'

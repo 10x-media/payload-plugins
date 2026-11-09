@@ -578,6 +578,7 @@ export type TimeframePreset = (typeof TIMEFRAME_PRESETS)[number];
 export interface ViewEndpoints {
     // (undocumented)
     live: string;
+    providerStatus?: string;
     // (undocumented)
     query: string;
     // (undocumented)

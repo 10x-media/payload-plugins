@@ -14,6 +14,7 @@ import { GoalsPanel } from './sections/GoalsPanel'
 import { OverviewCards } from './sections/OverviewCards'
 import { RealtimeStrip } from './sections/RealtimeStrip'
 import { SectionBoundary } from './sections/SectionBoundary'
+import { SourceConnectionNote } from './sections/SourceConnectionNote'
 import { Trend } from './sections/Trend'
 import { withoutFilter } from './state'
 import type { QueryState } from './useViewQueries'
@@ -61,17 +62,27 @@ export function ViewOverview() {
 }
 
 function Overview() {
-	const { gate, state, queries, answers, props, write } = useViewFrame()
+	const { gate, source, state, queries, answers, props, write } = useViewFrame()
+	const cards = queries.cards
 	return (
-		<OverviewCards
-			compare={state.compare}
-			currency={answers.currency}
-			locale={props.locale}
-			metrics={gate.metrics}
-			onSelect={(metric) => write({ ...state, metric })}
-			query={queries.cards}
-			selected={state.metric}
-		/>
+		<>
+			<OverviewCards
+				compare={state.compare}
+				currency={answers.currency}
+				locale={props.locale}
+				metrics={gate.metrics}
+				onSelect={(metric) => write({ ...state, metric })}
+				query={cards}
+				selected={state.metric}
+			/>
+			{cards.status === 'error' && cards.error?.code === 'source_misconfigured' ? (
+				<SourceConnectionNote
+					endpoint={props.endpoints.providerStatus}
+					locale={props.locale}
+					sourceId={source.id}
+				/>
+			) : null}
+		</>
 	)
 }
 

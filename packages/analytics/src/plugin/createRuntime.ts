@@ -28,7 +28,7 @@ import { stateLease, stateStoreOf } from '../maintenance/lease'
 import { trackServerEvent } from '../native/ingest/serverTrack'
 import { NATIVE_ADAPTER_ID } from '../native/nativeAdapter'
 import { createGuardedFetch } from '../net/guardedFetch'
-import { documentIdOf } from '../providers/factory'
+import { documentIdOf } from '../providers/ids'
 import { configTokenBackend } from '../providers/refresh'
 import { createProviderRegistry, type ProviderPlan } from '../providers/registry'
 import {

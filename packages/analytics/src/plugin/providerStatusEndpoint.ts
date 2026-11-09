@@ -2,7 +2,7 @@ import { docAccessOperation, type PayloadHandler, type PayloadRequest } from 'pa
 import { isCollectionSlug } from '../core/collectionSlug'
 import type { AnalyticsAdapter } from '../core/contract'
 import { monotonicMs } from '../core/monotonic'
-import type { ConnectionOutcome, ProviderStatus } from '../providers/status'
+import type { ConnectionOutcome, ProviderStatusResponse } from '../providers/connectionState'
 import { classifyError } from '../surfacing/classifyError'
 import {
 	analyticsError,
@@ -19,14 +19,6 @@ export const CONNECTION_CHECK_TIMEOUT_MS = 10_000
 
 /** A second check of one document this soon answers the first one's result, asking nothing. */
 export const CONNECTION_CHECK_DEBOUNCE_MS = 5_000
-
-/** What the provider status endpoint answers. */
-export interface ProviderStatusResponse {
-	/** The document's row, empty until a read or a check wrote one. */
-	status: ProviderStatus
-	/** What the check this POST ran found; absent on a GET and on a debounced POST. */
-	checked?: ConnectionOutcome
-}
 
 interface ProviderStatusHandlerOptions {
 	/** Clock behind the debounce window; `monotonicMs` unless a test injects one. */

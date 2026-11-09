@@ -1,4 +1,5 @@
 import type { FetchLike } from '../../core/fetch'
+import { isRecord } from '../../core/values'
 import { BREAKER_MAX_MS } from '../../surfacing/breaker'
 
 export class ProviderHttpError extends Error {
@@ -41,6 +42,32 @@ export const parseRetryAfter = (
 	return Number.isNaN(at) ? undefined : Math.min(Math.max(0, at - now), BREAKER_MAX_MS)
 }
 
+/** The keys vendors put their message under: PostHog `detail`, Plausible and Umami `error`. */
+const MESSAGE_KEYS = ['detail', 'message', 'error'] as const
+
+const textOf = (value: unknown): string | undefined =>
+	typeof value === 'string' && value.trim() !== '' ? value.trim() : undefined
+
+/** A vendor's own words in an error body: its JSON message when it sent one, else the body. */
+const vendorMessageOf = (body: string): string => {
+	let parsed: unknown
+	try {
+		parsed = JSON.parse(body)
+	} catch {
+		return body.trim()
+	}
+	if (isRecord(parsed)) {
+		for (const key of MESSAGE_KEYS) {
+			const value = parsed[key]
+			const found = textOf(value) ?? (isRecord(value) ? textOf(value.message) : undefined)
+			if (found) {
+				return found
+			}
+		}
+	}
+	return body.trim()
+}
+
 export interface FetchJsonOptions {
 	method?: 'GET' | 'POST'
 	headers?: Record<string, string>
@@ -69,7 +96,7 @@ export const fetchJson = async <T>(url: string, opts: FetchJsonOptions): Promise
 	})
 	if (!res.ok) {
 		const retryAfterMs = parseRetryAfter(res.headers.get('retry-after'))
-		const detail = await res.text().catch(() => '')
+		const detail = vendorMessageOf(await res.text().catch(() => ''))
 		throw new ProviderHttpError(res.status, opts.provider, {
 			message: `${opts.provider}: HTTP ${res.status} ${detail.slice(0, 200)}`,
 			...(retryAfterMs === undefined ? {} : { retryAfterMs }),
