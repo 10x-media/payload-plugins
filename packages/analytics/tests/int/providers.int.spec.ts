@@ -72,7 +72,7 @@ describeForDb('analytics providers collection', {}, (db) => {
 				name: 'PH',
 				provider: 'posthog',
 				enabled: true,
-				posthog: { projectId: '123', apiKey: 'phx_secret_value_abcd' },
+				posthog: { region: 'us', projectId: '123', apiKey: 'phx_secret_value_abcd' },
 			} as never,
 			overrideAccess: true,
 		})
@@ -179,7 +179,7 @@ describeForDb('analytics providers collection', {}, (db) => {
 				provider: 'posthog',
 				enabled: true,
 				scope,
-				posthog: { projectId: '123', apiKey: 'about-to-be-corrupted' },
+				posthog: { region: 'us', projectId: '123', apiKey: 'about-to-be-corrupted' },
 			} as never,
 			overrideAccess: true,
 		})
@@ -302,7 +302,7 @@ describeForDb('analytics providers collection', {}, (db) => {
 				provider: 'posthog',
 				enabled: true,
 				scope,
-				posthog: { projectId: 'proj-a', apiKey: 'key-a-secret-value' },
+				posthog: { region: 'us', projectId: 'proj-a', apiKey: 'key-a-secret-value' },
 			} as never,
 			overrideAccess: true,
 		})
@@ -313,7 +313,7 @@ describeForDb('analytics providers collection', {}, (db) => {
 				provider: 'posthog',
 				enabled: true,
 				scope,
-				posthog: { projectId: 'proj-b', apiKey: 'key-b-secret-value' },
+				posthog: { region: 'us', projectId: 'proj-b', apiKey: 'key-b-secret-value' },
 			} as never,
 			overrideAccess: true,
 		})

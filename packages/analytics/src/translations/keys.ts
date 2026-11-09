@@ -139,6 +139,7 @@ export const keys = {
 	providerErrorScriptId: 'analytics:providerErrorScriptId',
 	providerErrorHostFormat: 'analytics:providerErrorHostFormat',
 	providerErrorHostInsecure: 'analytics:providerErrorHostInsecure',
+	providerErrorPosthogRegionRequired: 'analytics:providerErrorPosthogRegionRequired',
 	providerErrorPosthogHostRegion: 'analytics:providerErrorPosthogHostRegion',
 	providerErrorPosthogTokenAsApiKey: 'analytics:providerErrorPosthogTokenAsApiKey',
 	providerErrorPosthogKeyAsToken: 'analytics:providerErrorPosthogKeyAsToken',

@@ -1,4 +1,8 @@
-import type { TextFieldSingleValidation } from 'payload'
+import {
+	type SelectFieldSingleValidation,
+	type TextFieldSingleValidation,
+	validations,
+} from 'payload'
 import { cloudRegionOf, POSTHOG_CLOUD_HOSTS } from '../adapters/posthog/cloud'
 import { isRecord, onlyKeys } from '../core/values'
 import { type OriginProblem, parseHttpUrl, parseOrigin } from '../net/origin'
@@ -207,3 +211,14 @@ export const validatePosthogHost =
 			? asTranslate(args.req.t)(keys.providerErrorPosthogHostRegion)
 			: true
 	}
+
+/**
+ * A PostHog document's Region, required while Host is blank: then it alone decides where reads and
+ * capture go, and an unset one would read from US Cloud without anyone choosing it.
+ */
+export const validatePosthogRegion: SelectFieldSingleValidation = (value, options) => {
+	const host = isRecord(options.siblingData) ? options.siblingData.host : undefined
+	return !value && (typeof host !== 'string' || host.trim() === '')
+		? asTranslate(options.req.t)(keys.providerErrorPosthogRegionRequired)
+		: validations.select(value, options)
+}

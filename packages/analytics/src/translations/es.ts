@@ -147,6 +147,7 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Escribe solo la dirección, por ejemplo https://analytics.example.com o https://example.com/analytics, sin ninguna parte que empiece por ? o # y sin usuario ni contraseña.',
 	[keys.providerErrorHostInsecure]: 'La dirección debe empezar por https://.',
+	[keys.providerErrorPosthogRegionRequired]: 'Elige la región de tu proyecto.',
 	[keys.providerErrorPosthogHostRegion]: 'Dirección de la otra región de PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Token de proyecto (phc_), no clave API.',
 	[keys.providerErrorPosthogKeyAsToken]: 'Clave privada. Usa el token phc_.',

@@ -141,6 +141,7 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'주소만 입력하세요. 예: https://analytics.example.com 또는 https://example.com/analytics. ? 또는 #로 시작하는 부분과 사용자 이름, 비밀번호는 넣지 마세요.',
 	[keys.providerErrorHostInsecure]: '주소는 https://로 시작해야 합니다.',
+	[keys.providerErrorPosthogRegionRequired]: 'PostHog 프로젝트 지역을 선택하세요.',
 	[keys.providerErrorPosthogHostRegion]: '다른 PostHog 지역의 주소입니다.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'API 키가 아닌 프로젝트 토큰(phc_)입니다.',
 	[keys.providerErrorPosthogKeyAsToken]: '비공개 키입니다. phc_ 토큰을 쓰세요.',

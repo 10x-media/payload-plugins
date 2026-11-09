@@ -148,6 +148,7 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Введите только адрес, например https://analytics.example.com или https://example.com/analytics, без части, начинающейся с ? или #, и без имени пользователя и пароля.',
 	[keys.providerErrorHostInsecure]: 'Адрес должен начинаться с https://.',
+	[keys.providerErrorPosthogRegionRequired]: 'Выберите регион проекта PostHog.',
 	[keys.providerErrorPosthogHostRegion]: 'Этот адрес из другого региона PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Токен проекта (phc_), а не ключ API.',
 	[keys.providerErrorPosthogKeyAsToken]: 'Приватный ключ. Нужен токен phc_.',

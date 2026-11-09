@@ -146,6 +146,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Gib nur die Adresse ein, zum Beispiel https://analytics.example.com oder https://example.com/analytics, ohne einen Teil mit ? oder # und ohne Benutzername oder Passwort.',
 	[keys.providerErrorHostInsecure]: 'Die Adresse muss mit https:// beginnen.',
+	[keys.providerErrorPosthogRegionRequired]: 'Wählen Sie die Region des Projekts.',
 	[keys.providerErrorPosthogHostRegion]: 'Adresse aus der anderen PostHog-Region.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Projekt-Token (phc_), kein API-Schlüssel.',
 	[keys.providerErrorPosthogKeyAsToken]: 'Privater Schlüssel. phc_-Token nutzen.',
