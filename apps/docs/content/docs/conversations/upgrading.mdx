@@ -55,7 +55,7 @@ The admin UI takes Payload 4's look, built from Payload's own components on Payl
 - **Tabs.** The channel tabs are Payload's tabs (`TabsList` and `TabButton`, `role="tab"`). `conversations-tabs__tab` and `conversations-tabs__tab--active` sit on the tab button, beside Payload's `tabs__tab-button` classes.
 - **Trigger.** The Comments button is Payload's secondary `Button` (`conversations-trigger`).
 - **Message menu.** The "⋯" button is Payload's ghost `Button` (`conversations-message__menu-button`); the menu is Payload's popup.
-- **Composer.** The editor box follows Payload's inputs (`--field-*`), its toolbar buttons, `/` and `@` menus and link field follow Payload's rich text editor.
+- **Composer.** The editor box follows Payload's inputs (`--field-*`); its toolbar buttons, `/` and `@` menus and link tooltip follow Payload's rich text editor, with its icons. The link tooltip gains a link icon and an actions group (`conversations-link-editor__icon`, `__actions`), and Remove is a trash icon. A website `Composer` takes its icons through the new `icons` prop.
 - **Text.** Message bodies use Payload 4's large body text, as its rich text field does. Payload 4's root size is 16px (Payload 3's 13px), so `rem` values of your own grow.
 
 The theme variables are Payload 4's (`--color-*`, `--spacer-*`, `--text-body-*`, `--radius-*`); Payload 3's `--base`, `--theme-*` and `--style-radius-*` no longer reach the plugin. `--conversations-avatar-hue` is unchanged. A component you replaced keeps working, but restyle it against Payload 4's tokens.

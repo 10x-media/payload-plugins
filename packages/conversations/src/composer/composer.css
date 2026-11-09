@@ -267,7 +267,7 @@
 	flex: none;
 	align-items: center;
 	justify-content: center;
-	width: var(--spacer-3);
+	width: var(--spacer-4);
 	color: var(--color-icon-secondary);
 }
 
@@ -300,7 +300,7 @@
 
 /* The link bubble: a slim dark bar, as Payload's own editor shows over a link. */
 .conversations-link-editor {
-	padding: var(--spacer-1) var(--spacer-1) var(--spacer-1) var(--spacer-2-5);
+	padding: 0 var(--spacer-2);
 	border-radius: var(--radius-large);
 	background: var(--color-bg-menu);
 	color: var(--color-text-onbrand);
@@ -310,8 +310,20 @@
 .conversations-link-editor__row {
 	display: flex;
 	align-items: center;
+	gap: var(--spacer-2);
+	height: var(--spacer-6);
+}
+
+.conversations-link-editor__icon {
+	display: flex;
+	flex: none;
+	color: var(--color-icon-onbrand-secondary);
+}
+
+.conversations-link-editor__actions {
+	display: flex;
+	flex: none;
 	gap: var(--spacer-1);
-	min-height: var(--spacer-5);
 }
 
 .conversations-link-editor__input {
@@ -336,7 +348,6 @@
 .conversations-link-editor__url {
 	min-width: 0;
 	max-width: 240px;
-	margin-inline-end: var(--spacer-2);
 	overflow: hidden;
 	color: var(--color-text-onbrand);
 	text-decoration: underline;
@@ -367,8 +378,9 @@
 	outline: var(--stroke-width-small, 1px) solid var(--color-border-brand-strong);
 }
 
+/* Under the field, lined up with its text. */
 .conversations-link-editor__error {
-	padding: 0 0 var(--spacer-1);
+	padding: 0 0 var(--spacer-2) calc(var(--spacer-4) + var(--spacer-2));
 	color: var(--color-text-onbrand-secondary);
 	font-size: var(--text-body-small-font-size);
 	line-height: var(--text-body-small-line-height);

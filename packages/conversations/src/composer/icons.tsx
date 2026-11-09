@@ -134,3 +134,18 @@ export const GlobeIcon = () => (
 		/>
 	</Svg>
 )
+
+/** After the icon of a toolbar dropdown. */
+export const CaretIcon = () => (
+	<svg aria-hidden="true" fill="none" height="10" viewBox="0 0 10 10" width="10">
+		<path d="M2.5 4l2.5 2.5L7.5 4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.3" />
+	</svg>
+)
+
+export const MoreIcon = () => (
+	<Svg>
+		<circle cx="3.5" cy="8" fill="currentColor" r="1.2" />
+		<circle cx="8" cy="8" fill="currentColor" r="1.2" />
+		<circle cx="12.5" cy="8" fill="currentColor" r="1.2" />
+	</Svg>
+)

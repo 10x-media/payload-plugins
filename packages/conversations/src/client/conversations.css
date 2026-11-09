@@ -63,10 +63,6 @@
 	padding-bottom: var(--spacer-3);
 }
 
-.conversations-drawer > :not(.drawer__header) {
-	margin-inline: var(--gutter-h);
-}
-
 .conversations-drawer__header {
 	flex: none;
 	align-items: flex-start;
@@ -238,8 +234,22 @@
 	bottom: var(--spacer-3);
 	left: 50%;
 	transform: translateX(-50%);
-	border-radius: var(--radius-full);
-	box-shadow: var(--elevation-400-menu-panel);
+}
+
+/*
+ * Payload's pill, lifted off the feed by a wide, soft shadow. Payload's own elevations draw
+ * hairlines at the edge in the dark theme, which read as a border on a button.
+ */
+.conversations-feed__jump .btn {
+	box-shadow:
+		0 8px 24px 0 rgb(0 0 0 / 0.14),
+		0 2px 8px 0 rgb(0 0 0 / 0.08);
+}
+
+[data-theme="dark"] .conversations-feed__jump .btn {
+	box-shadow:
+		0 8px 28px 0 rgb(0 0 0 / 0.45),
+		0 2px 10px 0 rgb(0 0 0 / 0.35);
 }
 
 .conversations-avatar {
@@ -439,7 +449,8 @@
 	flex-wrap: wrap;
 	gap: 2px;
 	margin-bottom: var(--spacer-1);
-	padding: var(--spacer-1) var(--spacer-1) var(--spacer-1-5);
+	/* The inline padding of Payload's list below, so the hover boxes line up. */
+	padding: var(--spacer-1) var(--spacer-2) var(--spacer-1-5);
 	border-bottom: 1px solid var(--color-border-menu-separator);
 }
 
@@ -576,4 +587,36 @@
 	.conversations-composer__hint {
 		display: none;
 	}
+}
+
+/*
+ * Lines that structure the drawer run edge to edge, as the one under Payload's header: under the
+ * tabs, and over the composer. The feed scrolls edge to edge too, its scrollbar on the drawer's
+ * edge. Their content, and everything else, keeps the drawer's gutter; separators inside the feed
+ * (days, new messages) are content.
+ */
+.conversations-drawer
+> :not(
+	.drawer__header,
+	.conversations-tabs,
+	.conversations-feed,
+	.conversations-composer,
+	.conversations-thread
+),
+.conversations-drawer > .conversations-thread > .conversations-thread__root {
+	margin-inline: var(--gutter-h);
+}
+
+:is(.conversations-drawer, .conversations-drawer > .conversations-thread)
+	> .conversations-feed
+	> .conversations-feed__scroller,
+:is(.conversations-drawer, .conversations-drawer > .conversations-thread)
+	> .conversations-composer {
+	padding-inline: var(--gutter-h);
+}
+
+/* Payload draws the tabs' line on the list itself, so the gutter goes inside it. */
+.conversations-drawer > .conversations-tabs .tabs__tabs {
+	box-sizing: border-box;
+	padding-inline: var(--gutter-h);
 }

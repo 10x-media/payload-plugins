@@ -14,6 +14,7 @@ import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import type { LocalizedLabel } from '../types'
 import { ChatSlot, replaceable } from './components'
+import { payloadComposerIcons } from './composerIcons'
 import { useChatRichText } from './richText'
 import './conversations.css'
 
@@ -168,6 +169,7 @@ const DefaultComposer = ({
 					below={onSave ? null : <ChatSlot {...slotProps} name="composerBelow" />}
 					editorRef={composer.editorRef}
 					features={resolvedFeatures}
+					icons={payloadComposerIcons}
 					footer={
 						<>
 							<span className="conversations-composer__hint">

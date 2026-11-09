@@ -26,7 +26,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 
 import { useComposerClasses } from '../classes'
-import { CheckIcon, CrossIcon, PencilIcon } from '../icons'
+import { useComposerIcons } from '../iconSet'
 import { displayUrl, normalizeUrl } from '../links'
 import { caretRect, useFloatingPlacement, usePortalTarget } from '../Menu'
 import { OPEN_LINK_EDITOR_COMMAND, useComposerRuntime } from '../runtime'
@@ -103,6 +103,7 @@ export const LinkEditor = () => {
 	const [editor] = useLexicalComposerContext()
 	const { labels, setOverlay } = useComposerRuntime()
 	const cx = useComposerClasses()
+	const icons = useComposerIcons()
 	const [editing, setEditing] = useState<Editing | null>(null)
 	const [current, setCurrent] = useState<Current | null>(null)
 	const [focused, setFocused] = useState(false)
@@ -269,6 +270,9 @@ export const LinkEditor = () => {
 			<Floating className={cx('linkEditor')} rect={editing.rect}>
 				<div ref={box}>
 					<div className={cx('linkRow')}>
+						<span className={cx('linkIcon')}>
+							<icons.linkLeading />
+						</span>
 						<input
 							aria-invalid={invalid}
 							className={cx('linkInput')}
@@ -297,7 +301,7 @@ export const LinkEditor = () => {
 							onClick={apply}
 							type="button"
 						>
-							<CheckIcon />
+							<icons.linkApply />
 						</button>
 						{editing.linkKey ? (
 							<button
@@ -307,7 +311,7 @@ export const LinkEditor = () => {
 								onClick={() => remove(editing.linkKey as string)}
 								type="button"
 							>
-								<CrossIcon />
+								<icons.linkRemove />
 							</button>
 						) : null}
 					</div>
@@ -322,27 +326,32 @@ export const LinkEditor = () => {
 			<Floating className={cx('linkEditor', 'linkPreview')} rect={current.rect}>
 				{/* biome-ignore lint/a11y/noStaticElementInteractions: keeps the editor focused while the buttons are pressed. */}
 				<div className={cx('linkRow')} onMouseDown={(event) => event.preventDefault()}>
+					<span className={cx('linkIcon')}>
+						<icons.linkLeading />
+					</span>
 					<a className={cx('linkUrl')} href={current.url} rel="noopener noreferrer" target="_blank">
 						{displayUrl(current.url)}
 					</a>
-					<button
-						className={cx('linkButton')}
-						aria-label={labels.linkEdit}
-						title={labels.linkEdit}
-						onClick={open}
-						type="button"
-					>
-						<PencilIcon />
-					</button>
-					<button
-						className={cx('linkButton')}
-						aria-label={labels.linkRemove}
-						title={labels.linkRemove}
-						onClick={() => remove(current.key)}
-						type="button"
-					>
-						<CrossIcon />
-					</button>
+					<div className={cx('linkActions')}>
+						<button
+							className={cx('linkButton')}
+							aria-label={labels.linkEdit}
+							title={labels.linkEdit}
+							onClick={open}
+							type="button"
+						>
+							<icons.linkEdit />
+						</button>
+						<button
+							className={cx('linkButton')}
+							aria-label={labels.linkRemove}
+							title={labels.linkRemove}
+							onClick={() => remove(current.key)}
+							type="button"
+						>
+							<icons.linkRemove />
+						</button>
+					</div>
 				</div>
 			</Floating>
 		)

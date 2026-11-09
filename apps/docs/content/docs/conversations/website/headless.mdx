@@ -221,7 +221,7 @@ function MessageInput({ conversationKey, channel }: { conversationKey: string; c
 | `onFiles` | Files dropped on the composer or pasted into it. Absent, it takes neither. The root has `data-dragging` while files are over it |
 | `editorRef`, `initialBody`, `onChange`, `onFiles` | From `useComposer` |
 | `autoFocus`, `placeholder`, `className`, `t` | |
-| `classNames`, `unstyled` | Skinning, below |
+| `classNames`, `unstyled`, `icons` | Skinning, below |
 
 The server validates the body against the instance's editor. A feature that stores new nodes must be registered there too, or the server refuses the message; see [Rich text](/conversations/rich-text).
 
@@ -255,7 +255,7 @@ Components inside it call `useComposerAddon(name, { prepare, reset, onFiles })` 
 
 Out of the box the composer carries the admin's look, on Payload's CSS variables. On a website you style its parts yourself:
 
-- `classNames` adds classes to named parts. `COMPOSER_CLASSES` lists every part with its default class: `root`, `toolbar`, `toolbarGroup`, `toolbarDivider`, `tool`, `toolActive`, `toolDropdown`, `input`, `content`, `placeholder`, `footer`, `footerEnd`, the menus (`menu`, `menuDropdown`, `menuItem`, `menuItemSelected`, `menuIcon`, `menuLabel`, `menuAvatar`, `menuGroup`, `menuEmpty`), the link field (`linkEditor`, `linkPreview`, `linkRow`, `linkInput`, `linkUrl`, `linkButton`, `linkError`) and the text (`bold`, `italic`, `link`, `paragraph`, `ul`, `ol`, `listItem`, `nestedListItem`).
+- `classNames` adds classes to named parts. `COMPOSER_CLASSES` lists every part with its default class: `root`, `toolbar`, `toolbarGroup`, `toolbarDivider`, `tool`, `toolActive`, `toolDropdown`, `input`, `content`, `placeholder`, `footer`, `footerEnd`, the menus (`menu`, `menuDropdown`, `menuItem`, `menuItemSelected`, `menuIcon`, `menuLabel`, `menuAvatar`, `menuGroup`, `menuEmpty`), the link field (`linkEditor`, `linkPreview`, `linkRow`, `linkIcon`, `linkInput`, `linkUrl`, `linkActions`, `linkButton`, `linkError`) and the text (`bold`, `italic`, `link`, `paragraph`, `ul`, `ol`, `listItem`, `nestedListItem`).
 - `unstyled` drops the default classes, so only yours apply.
 
 ```tsx
@@ -274,6 +274,25 @@ Out of the box the composer carries the admin's look, on Payload's CSS variables
 ```
 
 The registry's `conversation-composer.tsx` is a complete Tailwind skin to copy from.
+
+`icons` replaces the composer's own line icons by role: `bold`, `italic`, `link`, `mention`, `bulletList`, `numberedList` (toolbar and `/` menu), `more` and `caret` (toolbar overflow and dropdowns), `linkLeading`, `linkApply`, `linkEdit` and `linkRemove` (the link field and tooltip). Each is a component without props; leave a role out to keep its default (`defaultComposerIcons`). With lucide, for example:
+
+```tsx
+import { Bold, Italic, Link, Pencil, Trash2 } from 'lucide-react'
+
+const icons = {
+  bold: () => <Bold className="size-4" />,
+  italic: () => <Italic className="size-4" />,
+  link: () => <Link className="size-4" />,
+  linkLeading: () => <Link className="size-4" />,
+  linkEdit: () => <Pencil className="size-4" />,
+  linkRemove: () => <Trash2 className="size-4" />,
+}
+
+<Composer icons={icons} /* ... */ />
+```
+
+Define the map once, outside the component, so the composer does not redraw its icons on every render.
 
 Floating parts (the `/` and `@` menus, toolbar dropdowns, the link field) render in a portal: into the nearest `dialog` or `[role="dialog"]` around the editor, so a modal's focus trap keeps working, else into `body`. Style them through `classNames`, not through a parent selector, and give `menu` and `linkEditor` a `z-index` above your dialogs.
 

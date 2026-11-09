@@ -34,9 +34,9 @@
 	opacity: 0.7;
 }
 
-/* Your own reaction: Payload's selected pair, as a pressed toggle. */
+/* Your own reaction: Payload's selected fill and text, as its nav marks the current page. */
 .conversations-reactions__pill--mine {
-	border-color: var(--color-border-selected);
+	border-color: transparent;
 	background: var(--color-bg-selected);
 	color: var(--color-text-selected);
 }
@@ -71,6 +71,11 @@
 	.conversations-reactions__add {
 		opacity: 1;
 	}
+}
+
+/* The add button's popup: the inline padding of Payload's popup lists. */
+.conversations-reactions__picker {
+	padding-inline: var(--spacer-2);
 }
 
 /* The emoji row: at the top of a message's menu, and in the add button's popup. */

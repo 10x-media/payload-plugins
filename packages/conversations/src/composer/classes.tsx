@@ -48,6 +48,10 @@ export const COMPOSER_CLASSES = {
 	/** Added to `linkEditor` for the tooltip over an existing link. */
 	linkPreview: 'conversations-link-editor--preview',
 	linkRow: 'conversations-link-editor__row',
+	/** The link icon at the start of the field and the tooltip. */
+	linkIcon: 'conversations-link-editor__icon',
+	/** The tooltip's Edit and Remove buttons. */
+	linkActions: 'conversations-link-editor__actions',
 	linkInput: 'conversations-link-editor__input',
 	linkUrl: 'conversations-link-editor__url',
 	linkButton: 'conversations-link-editor__button',

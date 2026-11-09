@@ -62,6 +62,19 @@ export type SupportedTimezones =
   | 'Pacific/Fiji';
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "LexicalNodes_C8E2B098".
+ */
+export type LexicalNodes_C8E2B098 =
+  | SerializedTextNode
+  | SerializedTabNode
+  | SerializedLineBreakNode
+  | SerializedParagraphNode<LexicalNodes_C8E2B098>
+  | SerializedListNode<LexicalNodes_C8E2B098>
+  | SerializedListItemNode<LexicalNodes_C8E2B098>
+  | SerializedAutoLinkNode<LexicalNodes_C8E2B098, LexicalLinkFields>
+  | SerializedLinkNode<LexicalNodes_C8E2B098, LexicalLinkFields>;
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "LexicalNodes_09B7E84D".
  */
 export type LexicalNodes_09B7E84D =
@@ -103,6 +116,7 @@ export interface Config {
     rooms: Room;
     tickets: Ticket;
     projects: Project;
+    reference: Reference;
     'comments-messages': CommentsMessage;
     'comments-reads': CommentsRead;
     'comments-attachments': CommentsAttachment;
@@ -131,6 +145,7 @@ export interface Config {
     rooms: RoomsSelect<false> | RoomsSelect<true>;
     tickets: TicketsSelect<false> | TicketsSelect<true>;
     projects: ProjectsSelect<false> | ProjectsSelect<true>;
+    reference: ReferenceSelect<false> | ReferenceSelect<true>;
     'comments-messages': CommentsMessagesSelect<false> | CommentsMessagesSelect<true>;
     'comments-reads': CommentsReadsSelect<false> | CommentsReadsSelect<true>;
     'comments-attachments': CommentsAttachmentsSelect<false> | CommentsAttachmentsSelect<true>;
@@ -537,6 +552,35 @@ export interface Project {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reference".
+ */
+export interface Reference {
+  id: string;
+  title?: string | null;
+  body?: LexicalRichText<LexicalNodes_C8E2B098> | null;
+  createdBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedBy?:
+    | ({
+        relationTo: 'users';
+        value: string | User;
+      } | null)
+    | ({
+        relationTo: 'customers';
+        value: string | Customer;
+      } | null);
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "comments-messages".
  */
 export interface CommentsMessage {
@@ -886,6 +930,10 @@ export interface PayloadLockedDocument {
         value: string | Project;
       } | null)
     | ({
+        relationTo: 'reference';
+        value: string | Reference;
+      } | null)
+    | ({
         relationTo: 'comments-messages';
         value: string | CommentsMessage;
       } | null)
@@ -1177,6 +1225,18 @@ export interface TicketsSelect<T extends boolean = true> {
  */
 export interface ProjectsSelect<T extends boolean = true> {
   name?: T;
+  createdBy?: T;
+  updatedBy?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "reference_select".
+ */
+export interface ReferenceSelect<T extends boolean = true> {
+  title?: T;
+  body?: T;
   createdBy?: T;
   updatedBy?: T;
   updatedAt?: T;
@@ -1486,6 +1546,7 @@ export interface CollectionQueryWidget {
       | 'rooms'
       | 'tickets'
       | 'projects'
+      | 'reference'
       | 'comments-attachments';
     where?:
       | {
@@ -1519,6 +1580,7 @@ export interface ActivityWidget {
           | 'rooms'
           | 'tickets'
           | 'projects'
+          | 'reference'
           | 'comments-attachments'
         )[]
       | null;
@@ -1594,15 +1656,6 @@ export interface SerializedParagraphNode<TChildren> extends SerializedLexicalEle
   textStyle: string;
 }
 
-export interface SerializedConversationsMentionNode {
-  type: 'conversationsMention';
-  /** The name at the time of mentioning; readers prefer the live projection. */
-  label: string;
-  userKey: string;
-  /** @deprecated Ignored when loading. */
-  version: number;
-}
-
 export interface SerializedListNode<TChildren> extends SerializedLexicalElementBase<TChildren> {
   type: 'list';
   checked?: boolean;
@@ -1648,6 +1701,15 @@ export interface LexicalRichText<TNode> {
     /** @deprecated Ignored when loading. Typed as required only to match Lexical's types: rich text sent through the API, CLI or MCP may not contain it. */
     version: number;
   };
+}
+
+export interface SerializedConversationsMentionNode {
+  type: 'conversationsMention';
+  /** The name at the time of mentioning; readers prefer the live projection. */
+  label: string;
+  userKey: string;
+  /** @deprecated Ignored when loading. */
+  version: number;
 }
 
 export interface SerializedHeadingNode<

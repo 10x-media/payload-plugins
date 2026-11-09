@@ -77,7 +77,11 @@ const AddReaction = ({ message }: { message: ConversationMessage }) => {
 		<Popup
 			caret={false}
 			horizontalAlign="left"
-			render={({ close }) => <EmojiRow message={message} onPicked={close} />}
+			render={({ close }) => (
+				<div className="conversations-reactions__picker">
+					<EmojiRow message={message} onPicked={close} />
+				</div>
+			)}
 			renderButton={({ active, ...props }) => (
 				<button
 					{...props}

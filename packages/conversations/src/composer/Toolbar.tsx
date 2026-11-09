@@ -6,6 +6,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import { createPortal } from 'react-dom'
 
 import { useComposerClasses } from './classes'
+import { useComposerIcons } from './iconSet'
 import { useFloatingPlacement, usePortalTarget } from './Menu'
 import { mergeToolbarGroups, pickToolbar } from './model'
 import { useComposerRuntime } from './runtime'
@@ -21,12 +22,6 @@ const useLabel = () => {
 	return (label: ComposerToolbarItem['label'], fallback: string) =>
 		labelOf(label, fallback, { labels, t })
 }
-
-const Caret = () => (
-	<svg aria-hidden="true" fill="none" height="10" viewBox="0 0 10 10" width="10">
-		<path d="M2.5 4l2.5 2.5L7.5 4" stroke="currentColor" strokeLinecap="round" strokeWidth="1.3" />
-	</svg>
-)
 
 const ItemButton = ({
 	close,
@@ -170,6 +165,7 @@ const Dropdown = ({
 }) => {
 	const label = useLabel()
 	const cx = useComposerClasses()
+	const { caret: Caret } = useComposerIcons()
 	const [open, setOpen] = useState(false)
 	const button = useRef<HTMLButtonElement>(null)
 	const active = group.items.find((item) => states[item.key]?.active)
@@ -226,14 +222,6 @@ const toUnits = (groups: ComposerToolbarGroup[]): Unit[] =>
 				}))
 	)
 
-const MoreIcon = () => (
-	<svg aria-hidden="true" fill="none" height="16" viewBox="0 0 16 16" width="16">
-		<circle cx="3.5" cy="8" fill="currentColor" r="1.2" />
-		<circle cx="8" cy="8" fill="currentColor" r="1.2" />
-		<circle cx="12.5" cy="8" fill="currentColor" r="1.2" />
-	</svg>
-)
-
 /** The units that did not fit, in one dropdown; dropdown groups keep their title. */
 const More = ({
 	buttonRef,
@@ -247,6 +235,7 @@ const More = ({
 	units: Unit[]
 }) => {
 	const { labels } = useComposerRuntime()
+	const { more: MoreIcon } = useComposerIcons()
 	const label = useLabel()
 	const cx = useComposerClasses()
 	const [open, setOpen] = useState(false)

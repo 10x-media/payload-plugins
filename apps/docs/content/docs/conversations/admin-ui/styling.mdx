@@ -98,4 +98,4 @@ The line above the editor (`conversations-composer__banner`) shows the channel's
 
 ### Class names on the composer itself
 
-The underlying `Composer` from `@10x-media/conversations/composer` names about 35 parts (`COMPOSER_CLASSES`) and takes `classNames` and `unstyled`, which is how the website skin restyles it with Tailwind. `ChatComposer` does not forward those props: in the admin, style the `conversations-editor*` classes with CSS. The skinning API is described in [Headless](/conversations/website/headless).
+The underlying `Composer` from `@10x-media/conversations/composer` names about 40 parts (`COMPOSER_CLASSES`) and takes `classNames` and `unstyled`, which is how the website skin restyles it with Tailwind. `ChatComposer` does not forward those props: in the admin, style the `conversations-editor*` classes with CSS. It passes the composer Payload's own rich text icons (`icons`), so its toolbar, `/` menu and link tooltip match a native rich text field. The skinning API is described in [Headless](/conversations/website/headless).
