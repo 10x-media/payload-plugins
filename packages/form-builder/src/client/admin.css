@@ -261,7 +261,7 @@
 /* Payload 4 gives every .field-type a bottom margin; inside a condensed row the row gap spaces
  * them instead, so the remove button stays level with the inputs. */
 .fb-condensed-array__fields > .field-type {
-	flex: 0 1 calc(var(--field-width, 50%) - 5px);
+	flex: 0 1 calc(var(--field-width, 50%) - var(--spacer-2) / 2);
 	min-width: 0;
 	margin-block-end: 0;
 }
@@ -417,9 +417,9 @@ div:has(> .fb-calc-builder__seed) {
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-/* 200px fits the longest kind label in both locales ("Gewichtetes Feld" / "Weighted field":
- * ~110px at the 13px admin body size) plus the react-select control chrome (2 x base(0.6)
- * padding + indicator), with room for zoomed fonts. */
+/* 200px fits the longest kind label in both locales ("Gewichtetes Feld" / "Weighted field")
+ * at the admin body size plus the react-select control chrome (padding + indicator), with room
+ * for zoomed fonts. */
 .fb-calc-operand__header > :is(.fb-calc-operand__kind, div:has(> .fb-calc-operand__kind)) {
 	flex: 0 0 200px;
 	min-width: 0;
