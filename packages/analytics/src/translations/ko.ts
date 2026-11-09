@@ -156,7 +156,6 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerConnectionLastError]: '마지막 실패',
 	[keys.providerConnectionPaused]: '{{date}}까지 읽기 일시 중지',
 	[keys.providerConnectionResumes]: '읽기 재개',
-	[keys.providerConnectionHttpStatus]: 'HTTP {{status}}',
 	[keys.providerConnectionSaveFirst]: '테스트하려면 문서를 저장하세요.',
 	[keys.providerConnectionUnsaved]: '테스트하려면 변경 사항을 저장하세요.',
 	[keys.providerConnectionRefusedHelp]: '키, ID, 호스트를 확인하세요.',

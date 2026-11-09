@@ -163,7 +163,6 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionLastError]: 'Последняя ошибка',
 	[keys.providerConnectionPaused]: 'Чтение приостановлено до {{date}}',
 	[keys.providerConnectionResumes]: 'Чтение возобновится',
-	[keys.providerConnectionHttpStatus]: 'HTTP {{status}}',
 	[keys.providerConnectionSaveFirst]: 'Сохраните документ, чтобы проверить его.',
 	[keys.providerConnectionUnsaved]: 'Сохраните изменения, чтобы проверить их.',
 	[keys.providerConnectionRefusedHelp]: 'Проверьте ключ, ID и хост.',

@@ -188,16 +188,14 @@ describe('providerStatusStore', () => {
 })
 
 describe('vendorWordsOf', () => {
-	it('splits a refusal fetchJson worded into the vendor, its message and the status', () => {
+	it('splits a refusal fetchJson worded into the vendor and its message, leaving the status out', () => {
 		expect(vendorWordsOf('posthog: HTTP 403 Invalid personal API key.')).toEqual({
 			provider: 'posthog',
 			message: 'Invalid personal API key.',
-			status: '403',
 		})
 		expect(vendorWordsOf('umami: HTTP 502')).toEqual({
 			provider: 'umami',
 			message: '',
-			status: '502',
 		})
 	})
 

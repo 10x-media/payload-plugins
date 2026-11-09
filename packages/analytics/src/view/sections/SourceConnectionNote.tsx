@@ -62,9 +62,6 @@ export function SourceConnectionNote({ endpoint, sourceId, locale }: SourceConne
 				<span className="analytics-view__source-note">
 					{words.provider ? `${t(PROVIDER_NAMES[words.provider])}: ` : null}
 					{words.message}
-					{words.status
-						? ` (${t(keys.providerConnectionHttpStatus, { status: words.status })})`
-						: null}
 				</span>
 			) : null}
 			{pausedUntil ? (

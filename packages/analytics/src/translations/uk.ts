@@ -159,7 +159,6 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionLastError]: 'Остання помилка',
 	[keys.providerConnectionPaused]: 'Читання призупинено до {{date}}',
 	[keys.providerConnectionResumes]: 'Читання відновиться',
-	[keys.providerConnectionHttpStatus]: 'HTTP {{status}}',
 	[keys.providerConnectionSaveFirst]: 'Збережіть документ, щоб перевірити його.',
 	[keys.providerConnectionUnsaved]: 'Збережіть зміни, щоб перевірити їх.',
 	[keys.providerConnectionRefusedHelp]: 'Перевірте ключ, ID і хост.',
