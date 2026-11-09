@@ -12,6 +12,7 @@ import {
 	type AnalyticsQuery,
 	type AnalyticsResult,
 	type AnalyticsRow,
+	type ConnectionCheckContext,
 	DIMENSION_KEYS,
 	type DimensionKey,
 	type FilterOperator,
@@ -34,6 +35,7 @@ import {
 	splitGoalMetrics,
 } from '../goalRead'
 import { withoutTrailingSlash } from '../http/baseUrl'
+import { fetchJson } from '../http/fetchJson'
 import {
 	calendarDays,
 	declaredFilters,
@@ -302,6 +304,16 @@ export function plausible(config: PlausibleConfig): AnalyticsAdapter {
 			? { capture: buildCapture(config, scriptId, withoutConsent) }
 			: {}),
 		isConfigured: () => Boolean(config.siteId && config.apiKey),
+		async checkConnection(ctx: ConnectionCheckContext): Promise<void> {
+			await fetchJson<unknown>(`${host}/api/v2/query`, {
+				method: 'POST',
+				headers: { authorization: `Bearer ${config.apiKey}` },
+				body: { site_id: config.siteId, metrics: ['visitors'], date_range: 'day' },
+				provider: 'plausible',
+				signal: ctx.signal,
+				...(config.fetch ? { fetch: config.fetch } : {}),
+			})
+		},
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = readTime(ctx)
 			const dims = (q.dimensions ?? []).filter((d) => DIMENSION_MAP[d])

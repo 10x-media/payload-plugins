@@ -13,6 +13,7 @@ import {
 	type AnalyticsQuery,
 	type AnalyticsResult,
 	type AnalyticsRow,
+	type ConnectionCheckContext,
 	DIMENSION_KEYS,
 	type DimensionKey,
 	type FilterOperator,
@@ -26,6 +27,7 @@ import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
 import type { WithoutConsentLevel } from '../../tracker/config'
 import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { hostnameOf, withoutTrailingSlash } from '../http/baseUrl'
+import { fetchJson } from '../http/fetchJson'
 import {
 	declaredFilters,
 	everyOperatorOn,
@@ -391,6 +393,20 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				}
 			: {}),
 		isConfigured: () => Boolean(config.projectId && config.apiKey),
+		// The Query API reads go through, rather than the project settings, which need project:read.
+		async checkConnection(ctx: ConnectionCheckContext): Promise<void> {
+			await fetchJson<unknown>(
+				`${host}/api/projects/${encodeURIComponent(config.projectId)}/query/`,
+				{
+					method: 'POST',
+					headers: { authorization: `Bearer ${config.apiKey}` },
+					body: { query: { kind: 'HogQLQuery', query: 'SELECT 1' } },
+					provider: 'posthog',
+					signal: ctx.signal,
+					...(config.fetch ? { fetch: config.fetch } : {}),
+				}
+			)
+		},
 		register(_config, context) {
 			fillsCountingSlot = context?.adapterCountsWithoutConsent !== false
 		},

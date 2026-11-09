@@ -854,3 +854,33 @@ describe('plausible capture', () => {
 		expect(JSON.parse(JSON.stringify(capture?.client))).toEqual({ kind: 'plausible' })
 	})
 })
+
+describe('plausible checkConnection', () => {
+	const ctx = () => ({ signal: AbortSignal.timeout(5_000), timeoutMs: 5_000 })
+
+	it("asks the Stats API for one day's visitors of the site, with the key", async () => {
+		let sent: { auth: string | null; body: unknown } | undefined
+		server.use(
+			http.post('https://plausible.io/api/v2/query', async ({ request }) => {
+				sent = { auth: request.headers.get('authorization'), body: await request.json() }
+				return HttpResponse.json({ results: [{ metrics: [3], dimensions: [] }] })
+			})
+		)
+		await plausible({ siteId: 'example.com', apiKey: 'k' }).checkConnection?.(ctx())
+		expect(sent).toEqual({
+			auth: 'Bearer k',
+			body: { site_id: 'example.com', metrics: ['visitors'], date_range: 'day' },
+		})
+	})
+
+	it('throws what Plausible refused with', async () => {
+		server.use(
+			http.post('https://plausible.io/api/v2/query', () =>
+				HttpResponse.json({ error: 'Invalid API key' }, { status: 401 })
+			)
+		)
+		await expect(
+			plausible({ siteId: 'example.com', apiKey: 'bad' }).checkConnection?.(ctx())
+		).rejects.toMatchObject({ name: 'ProviderHttpError', status: 401 })
+	})
+})
