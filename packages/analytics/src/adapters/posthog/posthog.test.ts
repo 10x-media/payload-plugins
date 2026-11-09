@@ -686,7 +686,49 @@ describe('posthog adapter', () => {
 			q({ metrics: ['pageviews'], granularity: 'hour', timezone: 'Europe/Berlin' }),
 			{}
 		)
-		expect(seriesSql).toContain("toStartOfHour(timestamp, 'Europe/Berlin')")
+		expect(seriesSql).toContain("toStartOfHour(toTimeZone(timestamp, 'Europe/Berlin')) AS hour")
+	})
+
+	it('buckets the hour series explicitly in UTC by default (HogQL toStartOfHour takes one argument)', async () => {
+		let seriesSql = ''
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY hour')) {
+					seriesSql = sql
+					return HttpResponse.json({ columns: ['hour', 'm0'], types: [], results: [] })
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'hour' }),
+			{}
+		)
+		expect(seriesSql).toContain("toStartOfHour(toTimeZone(timestamp, 'UTC')) AS hour")
+	})
+
+	it('reads an hour label as the Query API serves it, offset and all, at its wall-clock hour', async () => {
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY hour')) {
+					return HttpResponse.json({
+						columns: ['hour', 'm0'],
+						types: [],
+						results: [['2026-01-01T05:00:00+01:00', 4]],
+					})
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[4]] })
+			})
+		)
+		const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'hour', timezone: 'Europe/Berlin' }),
+			{}
+		)
+		expect(result.rows).toEqual([
+			{ timestamp: '2026-01-01T05:00:00.000Z', metrics: { pageviews: 4 } },
+		])
 	})
 
 	it('targets the configured host (EU / self-host)', async () => {
