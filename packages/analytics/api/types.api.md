@@ -123,6 +123,7 @@ export interface AnalyticsAdapter {
     // (undocumented)
     readonly capabilities: AnalyticsCapabilities;
     readonly capture?: CaptureSupport;
+    checkConnection?(ctx: ConnectionCheckContext): Promise<void>;
     close?(payload: Payload): void | Promise<void>;
     // (undocumented)
     readonly id: string;
@@ -727,6 +728,13 @@ export type CollectionOverrides = (collection: CollectionConfig) => CollectionCo
 
 // @public
 export type ConnectionAccess = FieldAccess | ConnectionFieldAccess;
+
+// @public
+export interface ConnectionCheckContext {
+    payload?: Payload;
+    signal: AbortSignal;
+    timeoutMs: number;
+}
 
 // @public
 export interface ConnectionFieldAccess {
