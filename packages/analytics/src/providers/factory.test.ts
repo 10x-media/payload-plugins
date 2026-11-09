@@ -99,6 +99,29 @@ describe('adapterFromProviderDoc', () => {
 
 	// Capture is declared only from public config, so these fields are what let a provider
 	// document fill a tenant capture slot at all.
+	it('reads a PostHog document with Region EU and a blank Host from EU Cloud', async () => {
+		const urls: string[] = []
+		const fetch: FetchLike = async (input) => {
+			urls.push(String(input))
+			return Response.json({ columns: ['m0'], types: [], results: [[0]] })
+		}
+		const adapter = build(
+			{ provider: 'posthog', posthog: { projectId: '1', apiKey: 'phx_x', region: 'eu', host: '' } },
+			{ fetch }
+		)
+		await adapter?.query(
+			{
+				metrics: ['pageviews'],
+				dateRange: {
+					start: new Date('2026-01-01T00:00:00Z'),
+					end: new Date('2026-01-02T00:00:00Z'),
+				},
+			},
+			{}
+		)
+		expect(urls).toEqual(['https://eu.posthog.com/api/projects/1/query/'])
+	})
+
 	it('passes the public posthog capture fields through to the adapter', () => {
 		const adapter = build({
 			provider: 'posthog',
