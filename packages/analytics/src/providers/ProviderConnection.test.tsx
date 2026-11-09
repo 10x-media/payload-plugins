@@ -31,9 +31,6 @@ vi.mock('@payloadcms/ui', () => ({
 	FieldDescription: ({ description }: { description?: string }) => <p>{description}</p>,
 	FieldLabel: ({ label }: { label?: string }) => <span>{label}</span>,
 	fieldBaseClass: 'field-type',
-	Pill: ({ children, pillStyle }: { children?: ReactNode; pillStyle?: string }) => (
-		<span data-pill={pillStyle}>{children}</span>
-	),
 	ShimmerEffect: () => <span data-testid="shimmer" />,
 	toast: toasts,
 	useConfig: () => ({
@@ -68,6 +65,12 @@ const renderPanel = async () => {
 	return result
 }
 
+/** The value after the panel's "Status:" label. */
+const statusOf = () =>
+	document.querySelector(
+		'.analytics-provider-connection__facts li .analytics-provider-connection__fact-value'
+	)?.textContent
+
 const testButton = () => screen.getByRole('button', { name: keys.providerConnectionTest })
 
 beforeEach(() => {
@@ -91,7 +94,7 @@ describe('ProviderConnection', () => {
 		expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
 			'/api/_x/provider-status?id=6650f1c2a9e4b3d2c1a09f87'
 		)
-		expect(screen.getByText(keys.providerConnectionUnchecked).dataset.pill).toBe('light-gray')
+		expect(statusOf()).toBe(keys.providerConnectionUnchecked)
 		expect((testButton() as HTMLButtonElement).disabled).toBe(false)
 	})
 
@@ -113,7 +116,7 @@ describe('ProviderConnection', () => {
 			fireEvent.click(testButton())
 		})
 		expect(fetchMock.mock.calls[1]?.[1]?.method).toBe('POST')
-		expect(screen.getByText(keys.providerConnectionRefused).dataset.pill).toBe('error')
+		expect(statusOf()).toBe(keys.providerConnectionNotConnected)
 		const banner = screen.getByText(keys.providerConnectionRefusedHelp).closest('[data-banner]')
 		expect(banner?.getAttribute('data-banner')).toBe('error')
 		// The vendor's words as a reader reads them: its name, the message, then the status.
@@ -124,6 +127,7 @@ describe('ProviderConnection', () => {
 			(li) => li.textContent
 		)
 		expect(facts).toEqual([
+			`${keys.providerConnectionStatus}:\u00a0${keys.providerConnectionNotConnected}`,
 			`${keys.providerConnectionLastError}:\u00a0<2026-11-09T10:00:00.000Z>`,
 			`${keys.providerConnectionResumes}:\u00a0<2999-01-01T00:00:00.000Z>`,
 		])
@@ -140,7 +144,7 @@ describe('ProviderConnection', () => {
 			},
 		})
 		await renderPanel()
-		expect(screen.getByText(keys.providerConnectionWorks).dataset.pill).toBe('success')
+		expect(statusOf()).toBe(keys.providerConnectionConnected)
 		expect(screen.queryByText('old outage')).toBeNull()
 		expect(screen.queryByText(keys.providerConnectionLastError, { exact: false })).toBeNull()
 	})
@@ -148,7 +152,7 @@ describe('ProviderConnection', () => {
 	it('says an outage is unreachable rather than refused', async () => {
 		answers({ status: { lastErrorAt: '2026-11-09T10:00:00.000Z', errorKind: 'unavailable' } })
 		await renderPanel()
-		expect(screen.getByText(keys.providerConnectionUnreachable).dataset.pill).toBe('warning')
+		expect(statusOf()).toBe(keys.providerConnectionNoAnswer)
 		expect(
 			screen
 				.getByText(keys.providerConnectionUnreachableHelp)
@@ -167,7 +171,7 @@ describe('ProviderConnection', () => {
 			fireEvent.click(testButton())
 		})
 		expect(toasts.success).toHaveBeenCalledWith(keys.providerConnectionChecked)
-		expect(screen.getByText(keys.providerConnectionWorks)).toBeDefined()
+		expect(screen.getByText(keys.providerConnectionConnected)).toBeDefined()
 	})
 
 	it('asks for a save first on a new document, and reads nothing', async () => {

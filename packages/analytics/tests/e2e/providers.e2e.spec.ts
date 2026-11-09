@@ -145,6 +145,7 @@ test('a new provider document checks its saved connection from the sidebar, and 
 	await page.goto(`${COLLECTION}/create`)
 	const panel = page.locator('.analytics-provider-connection')
 	const button = panel.getByRole('button', { name: 'Test connection' })
+	const status = panel.locator('.analytics-provider-connection__facts li').first()
 	await page.locator('#field-name').fill(`Umami check ${Date.now()}`)
 	await providerSelect(page).locator('.rs__control').click()
 	await page.locator('.rs__option', { hasText: 'Umami' }).click()
@@ -155,22 +156,22 @@ test('a new provider document checks its saved connection from the sidebar, and 
 	await page.getByRole('button', { name: 'Save' }).click()
 	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
 	const id = page.url().split('/').pop() ?? ''
-	await expect(panel.locator('.pill')).toHaveText('Not checked')
+	await expect(status).toHaveText('Status:\u00a0Not checked')
 	await expect(button).toBeEnabled()
 
 	await button.click()
 	await expect(page.locator('[data-sonner-toast]', { hasText: 'Connection failed' })).toBeVisible()
-	await expect(panel.locator('.pill')).toHaveText('Refused')
+	await expect(status).toHaveText('Status:\u00a0Not connected')
 	await expect(panel).toContainText('Check the key, the IDs and the host.')
 
-	const status = await page.request.get(`/api/_x/provider-status?id=${encodeURIComponent(id)}`)
-	expect(status.ok()).toBeTruthy()
-	expect(((await status.json()) as { status: { errorKind?: string } }).status.errorKind).toBe(
+	const stored = await page.request.get(`/api/_x/provider-status?id=${encodeURIComponent(id)}`)
+	expect(stored.ok()).toBeTruthy()
+	expect(((await stored.json()) as { status: { errorKind?: string } }).status.errorKind).toBe(
 		'source_misconfigured'
 	)
 
 	await page.reload()
-	await expect(panel.locator('.pill')).toHaveText('Refused')
+	await expect(status).toHaveText('Status:\u00a0Not connected')
 	await page.locator('#field-name').fill('Umami check, edited')
 	await expect(button).toBeDisabled()
 	await expect(panel).toContainText('Save your changes to test them.')

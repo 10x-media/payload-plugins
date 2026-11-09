@@ -6,7 +6,6 @@ import {
 	FieldDescription,
 	FieldLabel,
 	fieldBaseClass,
-	Pill,
 	ShimmerEffect,
 	toast,
 	useConfig,
@@ -32,17 +31,10 @@ import {
 import { PROVIDER_NAMES } from './ids'
 import '../ui/analytics.css'
 
-const PILL_STYLE = {
-	works: 'success',
-	refused: 'error',
-	unreachable: 'warning',
-	unchecked: 'light-gray',
-} as const satisfies Record<ConnectionState, string>
-
-const PILL_LABEL: Readonly<Record<ConnectionState, TranslationKey>> = {
-	works: keys.providerConnectionWorks,
-	refused: keys.providerConnectionRefused,
-	unreachable: keys.providerConnectionUnreachable,
+const STATE_LABEL: Readonly<Record<ConnectionState, TranslationKey>> = {
+	works: keys.providerConnectionConnected,
+	refused: keys.providerConnectionNotConnected,
+	unreachable: keys.providerConnectionNoAnswer,
 	unchecked: keys.providerConnectionUnchecked,
 }
 
@@ -133,25 +125,29 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 	return (
 		<div className={`${fieldBaseClass} analytics-provider-connection`}>
 			<FieldLabel as="span" label={t(keys.providerConnectionLabel)} />
-			<div className="analytics-provider-connection__body" aria-live="polite">
-				<div className="analytics-provider-connection__row">
-					{docId === undefined ? null : state ? (
-						<Pill pillStyle={PILL_STYLE[state]} size="small">
-							{t(PILL_LABEL[state])}
-						</Pill>
-					) : (
-						<ShimmerEffect height="calc(var(--base) * 1.2)" width="calc(var(--base) * 4)" />
-					)}
-					<Button
-						buttonStyle="secondary"
-						disabled={blocked !== undefined || checking || state === undefined}
-						margin={false}
-						onClick={check}
-						size="small"
-					>
-						{t(keys.providerConnectionTest)}
-					</Button>
-				</div>
+			<div className="analytics-provider-connection__body">
+				{docId === undefined ? null : (
+					<ul aria-live="polite" className="analytics-provider-connection__facts">
+						<li>
+							<span className="analytics-provider-connection__fact-label">
+								{`${t(keys.providerConnectionStatus)}:\u00a0`}
+							</span>
+							{state ? (
+								<span className="analytics-provider-connection__fact-value">
+									{t(STATE_LABEL[state])}
+								</span>
+							) : (
+								<ShimmerEffect height="calc(var(--base) * 0.8)" width="calc(var(--base) * 5)" />
+							)}
+						</li>
+						{shown.map(([label, value]) => (
+							<li key={label}>
+								<span className="analytics-provider-connection__fact-label">{`${t(label)}:\u00a0`}</span>
+								<span className="analytics-provider-connection__fact-value">{value}</span>
+							</li>
+						))}
+					</ul>
+				)}
 				{failed && help ? (
 					<Banner type={state === 'refused' ? 'error' : 'default'}>
 						<strong className="analytics-provider-connection__help">{t(help)}</strong>
@@ -166,19 +162,20 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 						) : null}
 					</Banner>
 				) : null}
-				{shown.length > 0 ? (
-					<ul className="analytics-provider-connection__facts">
-						{shown.map(([label, value]) => (
-							<li key={label}>
-								<span className="analytics-provider-connection__fact-label">{`${t(label)}:\u00a0`}</span>
-								<span className="analytics-provider-connection__fact-value">{value}</span>
-							</li>
-						))}
-					</ul>
-				) : null}
-				{blocked ? (
-					<FieldDescription description={t(blocked)} marginPlacement="top" path={path} />
-				) : null}
+				<div className="analytics-provider-connection__action">
+					<Button
+						buttonStyle="secondary"
+						disabled={blocked !== undefined || checking || state === undefined}
+						margin={false}
+						onClick={check}
+						size="medium"
+					>
+						{t(keys.providerConnectionTest)}
+					</Button>
+					{blocked ? (
+						<FieldDescription description={t(blocked)} marginPlacement="top" path={path} />
+					) : null}
+				</div>
 			</div>
 		</div>
 	)
