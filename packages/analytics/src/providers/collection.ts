@@ -25,7 +25,7 @@ import { asTranslate, labelForKey } from '../translations/server'
 import { builtInStaticLabel, type StaticLabelFor } from '../translations/staticLabel'
 import { type ProviderAccessArgs, providerCreateAccess, providerRowAccess } from './access'
 import { PROVIDER_IDS, type ProviderId } from './factory'
-import { validatePosthogHost, validateProviderHost } from './hosts'
+import { validatePosthogHost, validatePosthogRegion, validateProviderHost } from './hosts'
 import { retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
 import { stampScope } from './stampScope'
@@ -579,6 +579,7 @@ const providerFields = (
 						name: 'region',
 						type: 'select',
 						label: labelForKey(keys.providerFieldRegion),
+						validate: validatePosthogRegion,
 						options: [
 							{ label: 'US', value: 'us' },
 							{ label: 'EU', value: 'eu' },

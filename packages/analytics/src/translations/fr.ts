@@ -149,6 +149,7 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Saisissez uniquement l’adresse, par exemple https://analytics.example.com ou https://example.com/analytics, sans partie commençant par ? ou # et sans nom d’utilisateur ni mot de passe.',
 	[keys.providerErrorHostInsecure]: 'L’adresse doit commencer par https://.',
+	[keys.providerErrorPosthogRegionRequired]: 'Choisissez la région du projet.',
 	[keys.providerErrorPosthogHostRegion]: 'Adresse d’une autre région PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Jeton de projet (phc_), pas une clé API.',
 	[keys.providerErrorPosthogKeyAsToken]: 'Clé privée. Utilisez le jeton phc_.',

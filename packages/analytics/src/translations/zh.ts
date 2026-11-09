@@ -139,6 +139,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'只需输入地址，例如 https://analytics.example.com 或 https://example.com/analytics，不要包含以 ? 或 # 开头的部分，也不要包含用户名或密码。',
 	[keys.providerErrorHostInsecure]: '地址必须以 https:// 开头。',
+	[keys.providerErrorPosthogRegionRequired]: '请选择 PostHog 项目的区域。',
 	[keys.providerErrorPosthogHostRegion]: '此地址属于另一个 PostHog 区域。',
 	[keys.providerErrorPosthogTokenAsApiKey]: '这是项目令牌（phc_），不是 API 密钥。',
 	[keys.providerErrorPosthogKeyAsToken]: '这是私钥。请使用 phc_ 令牌。',
