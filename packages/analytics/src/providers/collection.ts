@@ -601,6 +601,8 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			plural: labelForKey(keys.providersCollectionPlural),
 		},
 		disableDuplicate: true,
+		// No history: an old version would keep a rotated secret's ciphertext.
+		versions: false,
 		admin: {
 			useAsTitle: 'name',
 			defaultColumns: ['name', 'provider', 'enabled'],

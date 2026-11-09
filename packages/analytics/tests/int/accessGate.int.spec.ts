@@ -1,11 +1,11 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import {
 	type CollectionConfig,
-	createLocalReq,
+	createPayloadRequest,
 	handleEndpoints,
 	type Payload,
 	type PayloadRequest,
-	type TypedUser,
+	type User,
 } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { tenantMembership } from '../../src/access/membership'
@@ -101,7 +101,8 @@ const resolveTenant = async ({
 	return tenant ? String(tenant.id) : null
 }
 
-const isPlatform = ({ req }: { req: PayloadRequest }): boolean => req.user?.platform === true
+const isPlatform = ({ req }: { req: PayloadRequest }): boolean =>
+	(req.user as { platform?: boolean } | null)?.platform === true
 
 const PASSWORD = 'test-pass-1234'
 
@@ -110,8 +111,13 @@ const login = async (
 	account: { collection: 'users' | 'customers'; email: string; data?: Record<string, unknown> }
 ) => {
 	const { collection, email } = account
-	await payload.create({ collection, data: { email, password: PASSWORD, ...account.data } })
-	return payload.login({ collection, data: { email, password: PASSWORD } })
+	await payload.create({
+		collection,
+		data: { email, password: PASSWORD, ...account.data },
+		overrideAccess: true,
+	})
+	const result = await payload.login({ collection, data: { email, password: PASSWORD } })
+	return { ...result, user: { ...result.user, collection } as User }
 }
 
 type ErrorBody = { error: { code: string; param?: string } }
@@ -140,7 +146,9 @@ describeForDb('analytics access: read gate, membership and capture identity', {}
 				providers: { collection: true },
 				scope: {
 					resolve: resolveTenant,
-					member: tenantMembership({ userHasAccessToAllTenants: (user) => user.platform === true }),
+					member: tenantMembership({
+						userHasAccessToAllTenants: (user) => (user as { platform?: boolean }).platform === true,
+					}),
 				},
 				access: { crossScope: isPlatform },
 			}),
@@ -311,13 +319,11 @@ describeForDb('analytics access: read gate, membership and capture identity', {}
 				collection: PROVIDERS_SLUG,
 				overrideAccess: false,
 				disableErrors: true,
-				req: await createLocalReq(
-					{
-						req: { headers: new Headers({ cookie: `${TENANT_COOKIE}=${tenant}` }) },
-						user: { ...editor.user, collection: 'users' } as TypedUser,
-					},
-					booted.payload
-				),
+				req: await createPayloadRequest({
+					payload: booted.payload,
+					req: { headers: new Headers({ cookie: `${TENANT_COOKIE}=${tenant}` }) },
+					user: { ...editor.user, collection: 'users' } as User,
+				}),
 			})
 		expect((await asEditor(betaId)).docs).toEqual([])
 		const own = await asEditor(alphaId)
@@ -383,7 +389,7 @@ describeForDb('analytics access: read gate, membership and capture identity', {}
 		// Each tenant's own reader asks for the dashboard once, which records how to read it again.
 		expect((await widgetRead(readerReq(editor.user, 'users', alphaId))).status).toBe('ok')
 		expect((await widgetRead(readerReq(platform.user, 'users', betaId))).status).toBe('ok')
-		const jobReq = await createLocalReq({}, booted.payload)
+		const jobReq = await createPayloadRequest({ payload: booted.payload })
 		expect((await widgetRead(jobReq)).status).toBe('no-access')
 		// A read stores its entry, and the recipe the warm task replays, in the background.
 		await runtime.engine.idle?.()

@@ -6,19 +6,12 @@ import type { AdapterRegistry } from '../core/registry'
 import { systemRegistryFor } from '../core/scopedRead'
 import {
 	type LeaseHold,
-	leaseHeld,
 	stateLease,
 	stateStoreOf,
 	TASK_LEASE_MS,
 	underLease,
 } from '../maintenance/lease'
-import {
-	concurrencyFor,
-	scheduleFor,
-	stuckJobGuard,
-	TASK_BUDGET_MS,
-	TASK_DEAD_AFTER_MS,
-} from '../maintenance/taskSchedule'
+import { concurrencyFor, scheduleFor, TASK_BUDGET_MS } from '../maintenance/taskSchedule'
 import type { CacheStore, ReadRecipe } from '../surfacing/cacheStore'
 import { recipeWindow } from '../surfacing/recipe'
 import { HOUR_MS } from '../timeframe/tz'
@@ -32,8 +25,6 @@ export interface WarmTaskOptions {
 	windowHours: number
 	/** `cache.warm.maxReads`: the most reads one run refreshes. */
 	maxReads: number
-	/** The host's `jobs.enableConcurrencyControl`, without which Payload refuses a concurrency key. */
-	concurrency?: boolean
 	/** How long one run works before it leaves the rest to the next; {@link TASK_BUDGET_MS}. */
 	budgetMs?: number
 	/** Milliseconds the budget is spent in; `monotonicMs` unless a test hands one in. */
@@ -222,13 +213,6 @@ export const warmTask = (
 			)
 		return { output: { ran: true, ...outcome.value } }
 	},
-	...scheduleFor(
-		opts.schedule,
-		stuckJobGuard({
-			slug: WARM_TASK_SLUG,
-			deadAfterMs: TASK_DEAD_AFTER_MS,
-			alive: (req) => leaseHeld(req.payload, WARM_TASK_SLUG),
-		})
-	),
-	...concurrencyFor('warm', opts.concurrency === true),
+	...scheduleFor(opts.schedule),
+	...concurrencyFor('warm'),
 })

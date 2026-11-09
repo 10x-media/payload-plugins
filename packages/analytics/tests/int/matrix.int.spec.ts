@@ -5,7 +5,7 @@ import {
 	installTestClock,
 	type TestClock,
 } from '@10x-media/payload-test-harness'
-import type { PayloadRequest, Where } from 'payload'
+import type { PayloadRequest, User, Where } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { DimensionKey } from '../../src/core/contract'
 import { DEFAULT_JOBS } from '../../src/core/jobs'
@@ -1106,7 +1106,7 @@ describeForDb('analytics sync tier: scope fan-out', {}, (db) => {
 			collection: SYNC_SLUG as never,
 			limit: 100,
 			overrideAccess: false,
-			user: { id: 'u1' },
+			user: { id: 'u1', collection: 'users' } as User,
 			req: { headers: new Headers({ 'x-tenant': 't1' }) } as unknown as PayloadRequest,
 		})
 		expect(docs.length).toBeGreaterThan(0)

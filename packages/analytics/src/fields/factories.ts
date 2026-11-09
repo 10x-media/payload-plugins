@@ -131,7 +131,7 @@ const statField = (name: string, serverProps: StatServerProps, position?: 'sideb
 	admin: {
 		...(position ? { position } : {}),
 		// Read-only display fields have no cell value; a list column would render empty.
-		disableListColumn: true,
+		disabled: { column: true },
 		components: {
 			Field: { path: STAT_FIELD_COMPONENT, serverProps },
 		},
@@ -183,7 +183,7 @@ const panelField = (options: AnalyticsTabOptions): UIField => ({
 	type: 'ui',
 	label: ANALYTICS_LABEL,
 	admin: {
-		disableListColumn: true,
+		disabled: { column: true },
 		components: {
 			Field: {
 				path: PANEL_FIELD_COMPONENT,

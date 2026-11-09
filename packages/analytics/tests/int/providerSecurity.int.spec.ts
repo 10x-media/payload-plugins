@@ -2,10 +2,11 @@ import { decryptFieldValue, withRawEncrypted } from '@10x-media/fields/encrypted
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import {
 	type CollectionConfig,
-	createLocalReq,
+	createPayloadRequest,
 	handleEndpoints,
 	type Payload,
 	type PayloadRequest,
+	type User,
 } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { tenantMembership } from '../../src/access/membership'
@@ -81,7 +82,8 @@ const resolveTenant = async ({ req }: { req: PayloadRequest }): Promise<string |
 	return tenant ? String(tenant.id) : null
 }
 
-const isPlatform = ({ req }: { req: PayloadRequest }): boolean => req.user?.platform === true
+const isPlatform = ({ req }: { req: PayloadRequest }): boolean =>
+	(req.user as { platform?: boolean } | null)?.platform === true
 
 /** Signs a user in; Payload stamps the result's user with the collection it signed in through. */
 const login = async (
@@ -89,8 +91,13 @@ const login = async (
 	account: { collection: 'users' | 'customers'; email: string; data?: Record<string, unknown> }
 ) => {
 	const { collection, email } = account
-	await payload.create({ collection, data: { email, password: PASSWORD, ...account.data } })
-	return payload.login({ collection, data: { email, password: PASSWORD } })
+	await payload.create({
+		collection,
+		data: { email, password: PASSWORD, ...account.data },
+		overrideAccess: true,
+	})
+	const result = await payload.login({ collection, data: { email, password: PASSWORD } })
+	return { ...result, user: { ...result.user, collection } as User }
 }
 
 type Login = Awaited<ReturnType<typeof login>>
@@ -132,7 +139,9 @@ describeForDb('analytics provider security: hosts, retargeting and access', {}, 
 				capture: { gate: 'off' },
 				scope: {
 					resolve: resolveTenant,
-					member: tenantMembership({ userHasAccessToAllTenants: (user) => user.platform === true }),
+					member: tenantMembership({
+						userHasAccessToAllTenants: (user) => (user as { platform?: boolean }).platform === true,
+					}),
 				},
 				access: { crossScope: isPlatform },
 				providers: {
@@ -222,7 +231,7 @@ describeForDb('analytics provider security: hosts, retargeting and access', {}, 
 
 	/** The stored document as it sits in the database, ciphertext included. */
 	const stored = async (id: string | number): Promise<ProviderRow> => {
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		return (await withRawEncrypted(req, () =>
 			booted.payload.findByID({ collection: PROVIDERS_SLUG, id, req, overrideAccess: true })
 		)) as unknown as ProviderRow

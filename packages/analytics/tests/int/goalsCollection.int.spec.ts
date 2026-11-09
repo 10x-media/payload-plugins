@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, Endpoint, Payload, PayloadRequest } from 'payload'
+import type { CollectionConfig, Endpoint, Payload, PayloadRequest, User } from 'payload'
 import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { GOALS_SLUG } from '../../src/goals/collection'
@@ -177,9 +177,13 @@ const emailOf = (req: { user?: unknown }): string => (req.user as { email?: stri
 
 const login = async (payload: Payload, email: string) => {
 	const password = 'test-pass-1234'
-	await payload.create({ collection: 'access-users', data: { email, password } })
+	await payload.create({
+		collection: 'access-users',
+		data: { email, password },
+		overrideAccess: true,
+	})
 	const result = await payload.login({ collection: 'access-users', data: { email, password } })
-	return result.user
+	return { ...result.user, collection: 'access-users' } as User
 }
 
 describeForDb('analytics goals collection: scoped', {}, (db) => {

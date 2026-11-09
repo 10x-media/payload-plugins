@@ -1,6 +1,5 @@
-import { DefaultTemplate } from '@payloadcms/next/templates'
 import { Gutter, HydrateAuthProvider, SetStepNav } from '@payloadcms/ui'
-import { notFound, redirect } from 'next/navigation'
+import { DefaultTemplate } from '@payloadcms/ui/rsc'
 import type { AdminViewServerProps } from 'payload'
 import { runtimeFactoryOf } from '../plugin/runtime'
 import { keys } from '../translations/keys'
@@ -25,6 +24,7 @@ export async function AnalyticsView({
 	initPageResult,
 	params,
 	searchParams,
+	server,
 	user: viewUser,
 	viewActions,
 }: AnalyticsViewProps) {
@@ -32,12 +32,12 @@ export async function AnalyticsView({
 	const t = asTranslate(req.i18n.t)
 
 	if (!req.user) {
-		redirect(loginRedirectUrl({ config: req.payload.config, params, searchParams }))
+		return server.redirect(loginRedirectUrl({ config: req.payload.config, params, searchParams }))
 	}
 
 	const resolved = runtimeFactoryOf(req.payload.config)?.resolved
 	if (!resolved) {
-		notFound()
+		return server.notFound()
 	}
 	const result = await resolveViewProps(req, resolved, searchParams)
 	const navLabel = resolveNavLabel({

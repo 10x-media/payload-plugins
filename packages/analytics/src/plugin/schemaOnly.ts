@@ -2,7 +2,6 @@ import type { CollectionConfig, Config, TaskConfig } from 'payload'
 import { type ScheduledTask, TASK_SLUGS } from '../core/jobs'
 import type { ResolvedOptions } from '../core/options'
 import type { TranslationsOption } from '../translations'
-import { restrictJobControls } from './jobsAccess'
 import { addStateCollection, type CollectionContext, cacheCollectionOf } from './pluginCollections'
 import { registerTranslations } from './registerTranslations'
 import { relabelFactoryFields } from './relabelFields'
@@ -57,7 +56,7 @@ interface SchemaOnlyArgs {
 
 /**
  * `disabled: true`: the running plugin's schema and nothing that runs, with the same collections
- * and task slugs, inert and unscheduled. Job controls stay restricted, its only `onInit`.
+ * and task slugs, inert and unscheduled. It adds no `onInit`.
  */
 export const schemaOnly = (config: Config, args: SchemaOnlyArgs): Config => {
 	const { resolved, context } = args
@@ -80,7 +79,6 @@ export const schemaOnly = (config: Config, args: SchemaOnlyArgs): Config => {
 		config.collections = [...(config.collections ?? []), cache]
 	}
 	addStateCollection(config, resolved, context)
-	restrictJobControls(config)
 	relabelFactoryFields(config, context.staticLabel)
 	if (args.collections.length > 0 || args.sync) {
 		registerTranslations(config, args.translations)

@@ -3,7 +3,7 @@ import { GRAPHQL_POST } from '@payloadcms/next/routes'
 import { getNavGroups, getVisibleEntities } from '@payloadcms/ui/shared'
 import {
 	type CollectionConfig,
-	createLocalReq,
+	createPayloadRequest,
 	Forbidden,
 	getAccessResults,
 	handleEndpoints,
@@ -235,7 +235,10 @@ describeForDb('engine store collections', {}, (db) => {
 				collection: USERS,
 				data: { email: `store-admin-${db}@example.test`, password: 'store-admin-pw' },
 			})
-			const req = await createLocalReq({ user: { ...admin, collection: USERS } }, payload)
+			const req = await createPayloadRequest({
+				payload: payload,
+				user: { ...admin, collection: USERS },
+			})
 			const visible = getVisibleEntities({ req })
 			expect(visible.collections).toContain(PROBES)
 			for (const slug of STORE_SLUGS) {

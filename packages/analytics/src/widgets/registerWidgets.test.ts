@@ -300,13 +300,17 @@ describe('registerWidgets', () => {
 			throw new Error('metric select with filterOptions not registered')
 		}
 		const filterOptions = metricField.filterOptions
-		const filter = (dataSource?: string) =>
-			filterOptions({
+		const filter = (dataSource?: string) => {
+			const options = filterOptions({
 				data: {},
 				options: metricField.options,
 				req: {} as never,
 				siblingData: { dataSource },
-			}).map((o) => (typeof o === 'object' ? o.value : o))
+			} as never)
+			return (options as Array<string | { value: string }>).map((o) =>
+				typeof o === 'object' ? o.value : o
+			)
+		}
 		expect(filter('events-only')).toEqual(['events'])
 		expect(filter('native')).toContain('pageviews')
 		// An id unknown at config time (runtime/DB provider) keeps the union.
@@ -1207,12 +1211,14 @@ describe('registerWidgets: visits and sessions', () => {
 		}
 		const filterOptions = metricField.filterOptions
 		const offered = (metric?: string) =>
-			filterOptions({
-				data: {},
-				options: metricField.options,
-				req: {} as never,
-				siblingData: { metric },
-			}).map((o) => (typeof o === 'object' ? o.value : o))
+			(
+				filterOptions({
+					data: {},
+					options: metricField.options,
+					req: {} as never,
+					siblingData: { metric },
+				} as never) as Array<string | { value: string }>
+			).map((o) => (typeof o === 'object' ? o.value : o))
 		expect(offered()).toEqual(['pageviews', 'visitors', 'sessions'])
 		expect(offered('visits')).toEqual(['pageviews', 'visitors', 'visits', 'sessions'])
 	})

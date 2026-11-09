@@ -436,13 +436,27 @@ The tracker still sends `hostname`, and native ingest still ignores it: the stor
 
 ## Taking beacons in a route of your own
 
-Payload's REST routing signs every request in before its handler runs, so each beacon to the [ingest endpoint](/analytics/native#the-ingest-endpoint) pays for auth strategies a visitor never needs. `ingestRoute` from `@10x-media/analytics/next` takes the same beacons in a Next.js route handler of your own, outside that routing:
+Payload's REST routing signs every request in before its handler runs, so each beacon to the [ingest endpoint](/analytics/native#the-ingest-endpoint) pays for auth strategies a visitor never needs. `ingestRoute` from `@10x-media/analytics/routes` takes the same beacons in a route handler of your own, outside that routing. It returns a plain `(request: Request) => Promise<Response>`; on Next.js:
 
 ```ts title="app/(analytics)/api/collect/route.ts"
 import config from '@payload-config'
-import { ingestRoute } from '@10x-media/analytics/next'
+import { ingestRoute } from '@10x-media/analytics/routes'
 
 export const POST = ingestRoute(config)
+```
+
+On TanStack Start, in a server route:
+
+```ts title="src/routes/api/collect.ts"
+import config from '@payload-config'
+import { ingestRoute } from '@10x-media/analytics/routes'
+import { createFileRoute } from '@tanstack/react-router'
+
+const receive = ingestRoute(config)
+
+export const Route = createFileRoute('/api/collect')({
+  server: { handlers: { POST: ({ request }) => receive(request) } },
+})
 ```
 
 ```ts title="payload.config.ts"
@@ -463,7 +477,7 @@ A page on another site that [`capture.allowedOrigins`](#beacons-from-other-sites
 
 ```ts title="app/(analytics)/api/collect/route.ts"
 import config from '@payload-config'
-import { ingestPreflight, ingestRoute } from '@10x-media/analytics/next'
+import { ingestPreflight, ingestRoute } from '@10x-media/analytics/routes'
 
 export const POST = ingestRoute(config)
 export const OPTIONS = ingestPreflight(config)

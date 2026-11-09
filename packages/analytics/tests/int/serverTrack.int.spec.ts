@@ -1,6 +1,6 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { sqliteTestAdapter } from '@10x-media/payload-test-harness/db/sqlite'
-import { type CollectionConfig, createLocalReq, type PayloadRequest } from 'payload'
+import { type CollectionConfig, createPayloadRequest, type PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import type { DimensionKey, MetricKey, MetricValues } from '../../src/core/contract'
 import { AnalyticsTrackError } from '../../src/core/serverEvent'
@@ -401,7 +401,7 @@ describeForDb('analytics server track: inside a host transaction', {}, (db) => {
 		const { payload } = transactional
 		const transactionID = await payload.db.beginTransaction()
 		expect(transactionID).toBeTruthy()
-		const req = await createLocalReq({}, payload)
+		const req = await createPayloadRequest({ payload: payload })
 		req.transactionID = transactionID ?? undefined
 		await payload.create({ collection: ORDERS, data: { total: 5 }, req })
 		const started = Date.now()
@@ -426,7 +426,7 @@ describeForDb('analytics server track: inside a host transaction', {}, (db) => {
 	it(`stores the hit of a sale the host commits on ${db}`, async () => {
 		const { payload } = transactional
 		const transactionID = await payload.db.beginTransaction()
-		const req = await createLocalReq({}, payload)
+		const req = await createPayloadRequest({ payload: payload })
 		req.transactionID = transactionID ?? undefined
 		await payload.create({ collection: ORDERS, data: { total: 7 }, req })
 		await trackServerEvent(

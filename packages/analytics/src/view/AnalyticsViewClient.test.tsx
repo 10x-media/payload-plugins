@@ -31,21 +31,6 @@ const navigate = (search: string): void => {
 	}
 }
 
-vi.mock('next/navigation', async () => {
-	const { useSyncExternalStore } = await import('react')
-	const subscribe = (listener: () => void) => {
-		mocks.listeners.add(listener)
-		return () => {
-			mocks.listeners.delete(listener)
-		}
-	}
-	return {
-		usePathname: () => '/admin/analytics',
-		useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
-		useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => mocks.search)),
-	}
-})
-
 vi.mock('../query/fetchQuery', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../query/fetchQuery')>()
 	return { ...actual, fetchQuery: mocks.fetchQueryMock, refreshCache: mocks.refreshCacheMock }
@@ -53,6 +38,21 @@ vi.mock('../query/fetchQuery', async (importOriginal) => {
 
 vi.mock('@payloadcms/ui', async () => ({
 	...(await import('../testing/selectMocks')).selectMocks,
+	...(await (async () => {
+		const { useSyncExternalStore } = await import('react')
+		const subscribe = (listener: () => void) => {
+			mocks.listeners.add(listener)
+			return () => {
+				mocks.listeners.delete(listener)
+			}
+		}
+		return {
+			usePathname: () => '/admin/analytics',
+			useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
+			useSearchParams: () =>
+				new URLSearchParams(useSyncExternalStore(subscribe, () => mocks.search)),
+		}
+	})()),
 	Banner: ({ children }: { children?: ReactNode }) => <div role="alert">{children}</div>,
 	DatePicker: ({
 		onChange,

@@ -101,7 +101,7 @@ export function ComparisonDelta({
 			<Pill
 				className={`analytics-delta__change analytics-delta__change--${tone}`}
 				pillStyle={PILL_STYLE[tone]}
-				size="small"
+				size="medium"
 			>
 				{delta.direction !== 'none' ? <DeltaArrow direction={delta.direction} /> : null}
 				{visible}

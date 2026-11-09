@@ -1,5 +1,11 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { type CollectionConfig, handleEndpoints, type Payload, type PayloadRequest } from 'payload'
+import {
+	type CollectionConfig,
+	handleEndpoints,
+	type Payload,
+	type PayloadRequest,
+	type User,
+} from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { tenantMembership } from '../../src/access/membership'
 import { exclusionToken, exclusionTokenHash } from '../../src/capture/exclusionToken'
@@ -162,8 +168,13 @@ const login = async (
 	account: { collection: 'users' | 'customers'; email: string; data?: Record<string, unknown> }
 ) => {
 	const { collection, email } = account
-	await payload.create({ collection, data: { email, password: PASSWORD, ...account.data } })
-	return payload.login({ collection, data: { email, password: PASSWORD } })
+	await payload.create({
+		collection,
+		data: { email, password: PASSWORD, ...account.data },
+		overrideAccess: true,
+	})
+	const result = await payload.login({ collection, data: { email, password: PASSWORD } })
+	return { ...result, user: { ...result.user, collection } as User }
 }
 
 /** Each tenant's site is its own domain; the platform's own scope has none. */
@@ -204,14 +215,16 @@ describeForDb('analytics capture security: exclusion endpoint', {}, (db) => {
 				scope: {
 					resolve: resolveTenant,
 					member: tenantMembership({
-						userHasAccessToAllTenants: (user) => user.platform === true,
+						userHasAccessToAllTenants: (user) => (user as { platform?: boolean }).platform === true,
 					}),
 					list: async ({ payload }) =>
 						(await payload.find({ collection: 'tenants', depth: 0, pagination: false })).docs.map(
 							(tenant) => String(tenant.id)
 						),
 				},
-				access: { crossScope: ({ req }) => req.user?.platform === true },
+				access: {
+					crossScope: ({ req }) => (req.user as { platform?: boolean } | null)?.platform === true,
+				},
 			}),
 		})
 		const { payload } = booted

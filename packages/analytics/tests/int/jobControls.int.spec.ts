@@ -1,7 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import {
 	type CollectionConfig,
-	createLocalReq,
+	createPayloadRequest,
 	Forbidden,
 	handleEndpoints,
 	type Payload,
@@ -10,7 +10,8 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { TASK_SLUGS } from '../../src/core/jobs'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
-import { JOB_STATS_GLOBAL } from '../../src/plugin/jobsAccess'
+
+const JOB_STATS_GLOBAL = 'payload-jobs-stats'
 
 /** The admin collection: the first one with auth, so `admin.user` names it. */
 const users: CollectionConfig = { slug: 'users', auth: true, fields: [] }
@@ -100,10 +101,10 @@ describeForDb('Payload job controls once the plugin turns jobs on', {}, (db) => 
 
 	it(`refuses that user payload.jobs.queue and cancel without overrideAccess on ${db}`, async () => {
 		const { payload } = booted
-		const req = await createLocalReq(
-			{ user: { ...customer.user, collection: 'customers' } },
-			payload
-		)
+		const req = await createPayloadRequest({
+			payload: payload,
+			user: { ...customer.user, collection: 'customers' },
+		})
 		await expect(
 			payload.jobs.queue({
 				task: TASK_SLUGS.maintain,
@@ -137,7 +138,10 @@ describeForDb('Payload job controls once the plugin turns jobs on', {}, (db) => 
 		const run = await call(`/payload-jobs/run?queue=${QUEUE}&disableScheduling=true`, token)
 		expect(run.status).toBe(200)
 		const { payload } = booted
-		const req = await createLocalReq({ user: { ...admin.user, collection: 'users' } }, payload)
+		const req = await createPayloadRequest({
+			payload: payload,
+			user: { ...admin.user, collection: 'users' },
+		})
 		const queued = await payload.jobs.queue({
 			task: TASK_SLUGS.maintain,
 			input: {},

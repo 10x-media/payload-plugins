@@ -75,10 +75,10 @@
 			"types": "./src/exports/geo.ts",
 			"default": "./dist/exports/geo.js"
 		},
-		"./next": {
-			"development": "./src/exports/next.ts",
-			"types": "./src/exports/next.ts",
-			"default": "./dist/exports/next.js"
+		"./routes": {
+			"development": "./src/exports/routes.ts",
+			"types": "./src/exports/routes.ts",
+			"default": "./dist/exports/routes.js"
 		},
 		"./migrations": {
 			"development": "./src/exports/migrations.ts",
@@ -168,10 +168,8 @@
 	"peerDependencies": {
 		"@10x-media/fields": "^4.0.0-alpha.0",
 		"@google-analytics/data": "^6.0.0",
-		"@payloadcms/next": "^4.0.0-beta.6",
 		"@payloadcms/ui": "^4.0.0-beta.6",
 		"maxmind": "^4.3.24",
-		"next": "^16.4.0",
 		"payload": "^4.0.0-beta.6",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
@@ -267,10 +265,10 @@
 				"import": "./dist/exports/geo.js",
 				"default": "./dist/exports/geo.js"
 			},
-			"./next": {
-				"types": "./dist/exports/next.d.ts",
-				"import": "./dist/exports/next.js",
-				"default": "./dist/exports/next.js"
+			"./routes": {
+				"types": "./dist/exports/routes.d.ts",
+				"import": "./dist/exports/routes.js",
+				"default": "./dist/exports/routes.js"
 			},
 			"./migrations": {
 				"types": "./dist/exports/migrations.d.ts",

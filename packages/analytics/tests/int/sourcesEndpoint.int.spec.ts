@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
+import type { CollectionConfig, Payload, PayloadRequest, User } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { makeSourcesHandler } from '../../src/plugin/sourcesEndpoint'
@@ -19,9 +19,13 @@ const BROKEN_EMAIL = 'broken@t.dev'
 
 const login = async (payload: Payload, email: string) => {
 	const password = 'test-pass-1234'
-	await payload.create({ collection: 'access-users', data: { email, password } })
+	await payload.create({
+		collection: 'access-users',
+		data: { email, password },
+		overrideAccess: true,
+	})
 	const result = await payload.login({ collection: 'access-users', data: { email, password } })
-	return result.user
+	return { ...result.user, collection: 'access-users' } as User
 }
 
 type ProviderRow = { id: string | number; name?: string | null }

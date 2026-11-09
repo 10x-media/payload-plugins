@@ -1,4 +1,4 @@
-import { createLocalReq, getPayload, type Payload, type SanitizedConfig } from 'payload'
+import { createPayloadRequest, getPayload, type Payload, type SanitizedConfig } from 'payload'
 import { normalizeOrigin } from '../../net/origin'
 import { analyticsError, errorResponse } from '../../plugin/errors'
 import { getRuntime } from '../../plugin/runtime'
@@ -77,10 +77,10 @@ export const receiveBeacon = async (
 	const cors = corsHeaders(request, payload)
 	let response: Response
 	try {
-		const req = await createLocalReq(
-			{ req: Object.assign(request, { payloadAPI: 'REST' as const }) },
-			payload
-		)
+		const req = await createPayloadRequest({
+			payload,
+			req: Object.assign(request, { payloadAPI: 'REST' as const }) as never,
+		})
 		response = await adapter.receive(req)
 	} catch (err) {
 		logFailure(payload, err)

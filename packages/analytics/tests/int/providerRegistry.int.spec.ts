@@ -9,7 +9,7 @@ import {
 	type TestClock,
 } from '@10x-media/payload-test-harness'
 import { sqliteTestAdapter } from '@10x-media/payload-test-harness/db/sqlite'
-import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import { createPayloadRequest, type Payload, type PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter, AnalyticsQuery } from '../../src/core/contract'
 import type { Ga4Sdk } from '../../src/core/sdks'
@@ -327,7 +327,7 @@ describeForDb('analytics provider registry: one instance', {}, (db) => {
 		const update = async (data: Record<string, unknown>) => {
 			const transactionID = await payload.db.beginTransaction()
 			expect(transactionID).toBeTruthy()
-			const req = await createLocalReq({}, payload)
+			const req = await createPayloadRequest({ payload: payload })
 			req.transactionID = transactionID ?? undefined
 			await payload.update({
 				collection: PROVIDERS_SLUG,
@@ -375,13 +375,13 @@ describeForDb('analytics provider registry: one instance', {}, (db) => {
 		const scope = 'tx-g'
 		const slugsFor = async (req: PayloadRequest) =>
 			((await runtime.resolveGoals?.(req, scope)) ?? []).map((goal) => goal.slug)
-		const outside = await createLocalReq({}, payload)
+		const outside = await createPayloadRequest({ payload: payload })
 		expect(await slugsFor(outside)).not.toContain('pending')
 		const committed = await runtime.configEpoch?.(scope)
 
 		const transactionID = await payload.db.beginTransaction()
 		expect(transactionID).toBeTruthy()
-		const req = await createLocalReq({}, payload)
+		const req = await createPayloadRequest({ payload: payload })
 		req.transactionID = transactionID ?? undefined
 		await payload.create({
 			collection: GOALS_SLUG,

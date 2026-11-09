@@ -440,11 +440,6 @@ export interface AdapterRegisterContext {
 	 * false when the install registers no task and the adapter's own requests do that work instead.
 	 */
 	jobs?: AdapterJobs
-	/**
-	 * The host's `jobs.enableConcurrencyControl`: only then may a task an adapter registers carry a
-	 * concurrency key, which Payload refuses otherwise.
-	 */
-	jobsConcurrency?: boolean
 	/** Says something at init, once the instance can log: what the boot warns about rather than refuses. */
 	notice?: (message: string) => void
 }

@@ -1,4 +1,4 @@
-import type { PayloadRequest, TypedUser } from 'payload'
+import type { PayloadRequest, User } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import { isScopeMember, tenantMembership, userTenantIds } from './membership'
 
@@ -48,7 +48,8 @@ describe('tenantMembership', () => {
 	})
 
 	it('admits the users userHasAccessToAllTenants names to every tenant', async () => {
-		const staff = (user: TypedUser): boolean => user.roles?.includes('moderator') === true
+		const staff = (user: User): boolean =>
+			(user as { roles?: string[] }).roles?.includes('moderator') === true
 		const membership = tenantMembership({ userHasAccessToAllTenants: staff })
 		const moderator = reqOf({ id: 1, collection: 'users', roles: ['moderator'], tenants: [] })
 		const editor = reqOf({ id: 2, collection: 'users', roles: ['editor'], tenants: [] })

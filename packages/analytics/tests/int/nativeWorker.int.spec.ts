@@ -9,7 +9,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { trackServerEvent } from '../../src/native/ingest/serverTrack'
 import { native } from '../../src/native/nativeAdapter'
-import { MAINTAIN_DEAD_AFTER_MS, MAINTAIN_TASK_SLUG } from '../../src/native/tasks/maintainTask'
+import { MAINTAIN_TASK_SLUG } from '../../src/native/tasks/maintainTask'
 import { addCalendarDays, type CalendarDay, calendarDayStart } from '../../src/timeframe/calendar'
 import { nativeOf, pageviewHit } from './nativeHelpers'
 
@@ -94,7 +94,7 @@ describeForDb('native maintenance on a jobs worker', {}, (db) => {
 		expect(read.meta.partial).toBeUndefined()
 	})
 
-	const openRuns = async (): Promise<Array<{ id: string | number; processing?: boolean }>> => {
+	const openRuns = async (): Promise<Array<{ id: string | number }>> => {
 		const { docs } = await worker.payload.find({
 			collection: 'payload-jobs',
 			where: {
@@ -115,38 +115,26 @@ describeForDb('native maintenance on a jobs worker', {}, (db) => {
 		expect(await openRuns()).toHaveLength(1)
 	})
 
-	it(`schedules again once a run killed mid-way has been processing too long on ${db}`, async () => {
+	it(`runs a maintenance run killed mid-way again once its lease lapsed on ${db}`, async () => {
 		const [queued] = await openRuns()
 		expect(queued).toBeDefined()
-		const markProcessing = (minutesAgo: number) =>
-			worker.payload.db.updateJobs({
-				id: queued?.id ?? '',
-				data: {
-					processing: true,
-					updatedAt: new Date(NOW.getTime() - minutesAgo * MINUTE).toISOString(),
-				},
-				returning: false,
-			})
-		// Still within what a live run can take: left alone, and nothing new is queued.
-		await markProcessing(MAINTAIN_DEAD_AFTER_MS / MINUTE - 1)
-		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
-		expect(await openRuns()).toEqual([
-			expect.objectContaining({ id: queued?.id, processing: true }),
-		])
-		// Past it: the run was killed, so it is failed and the next one is queued, once.
-		await markProcessing(MAINTAIN_DEAD_AFTER_MS / MINUTE + 1)
-		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
-		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
-		const stuck = await worker.payload.findByID({
-			collection: 'payload-jobs',
+		await worker.payload.db.updateJobs({
 			id: queued?.id ?? '',
-			depth: 0,
+			data: {
+				processingUntil: new Date(NOW.getTime() - 60 * MINUTE).toISOString(),
+				processingToken: 'killed-run',
+			},
+			returning: false,
 		})
-		expect(stuck).toMatchObject({ processing: false, hasError: true })
+		// No second run is scheduled beside it: the killed one is still the open run.
+		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
+		expect(await openRuns()).toEqual([expect.objectContaining({ id: queued?.id })])
+		await worker.payload.jobs.run({ queue: 'analytics', overrideAccess: true })
+		expect(await openRuns()).toEqual([])
+		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
 		const next = await openRuns()
 		expect(next).toHaveLength(1)
 		expect(next[0]?.id).not.toEqual(queued?.id)
-		expect(next[0]?.processing).toBe(false)
 	})
 
 	it(`records a server event on the worker that the web instance reads on ${db}`, async () => {

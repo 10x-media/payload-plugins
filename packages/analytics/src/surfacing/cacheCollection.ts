@@ -16,6 +16,8 @@ export const cacheCollection = (args: { slug: string; mongo: boolean }): Collect
 	endpoints: false,
 	graphQL: false,
 	timestamps: false,
+	versions: false,
+	authorship: false,
 	lockDocuments: false,
 	fields: [
 		{ name: 'key', type: 'text', required: true, unique: true, index: true },

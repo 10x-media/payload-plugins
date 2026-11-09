@@ -100,7 +100,8 @@ describe('blocks', () => {
 		await analytics({ adapters: [memoryAdapter()], revenue: false })(config)
 
 		const layout = pagesOf(config)[0]
-		const fields = layout && 'blocks' in layout ? (layout.blocks[0]?.fields ?? []) : []
+		const block = layout && 'blocks' in layout ? layout.blocks[0] : undefined
+		const fields = block && typeof block !== 'string' ? block.fields : []
 		expect(shown(named(fields, 'goalValue'), { goal: 'purchase' })).toBe(false)
 	})
 

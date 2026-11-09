@@ -340,7 +340,12 @@ export function AnalyticsPanelClient(props: AnalyticsPanelClientProps) {
 	const offered = sources.filter((source) => report === 'page' || source.perItemQuery === true)
 	const retryButton =
 		documentId === null ? null : (
-			<Button buttonStyle="secondary" margin={false} onClick={() => request.refetch()} size="small">
+			<Button
+				buttonStyle="secondary"
+				margin={false}
+				onClick={() => request.refetch()}
+				size="medium"
+			>
 				{t(keys.viewRetry)}
 			</Button>
 		)
@@ -366,7 +371,7 @@ export function AnalyticsPanelClient(props: AnalyticsPanelClientProps) {
 			const retry = retryOfferFor(data.status, data.retryAfterMs, { t, locale })
 			return (
 				<div className="analytics-panel__state">
-					<Banner type="error">{t(FIELD_STATE_KEYS[data.status])}</Banner>
+					<Banner type="danger">{t(FIELD_STATE_KEYS[data.status])}</Banner>
 					{retry?.after ? <span className="analytics-panel__caption">{retry.after}</span> : null}
 					{retry ? retryButton : null}
 				</div>

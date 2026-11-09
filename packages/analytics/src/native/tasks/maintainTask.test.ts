@@ -1,10 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { memoryStateStore } from '../store/memory/memoryState'
-import { leaseKey, MAINTAIN_LEASE_NAME } from '../store/state'
 import {
-	beforeMaintainSchedule,
-	MAINTAIN_DEAD_AFTER_MS,
 	MAINTAIN_TASK_SLUG,
 	type MaintainTaskOutput,
 	maintainTask,
@@ -100,9 +96,7 @@ describe('maintainTask', () => {
 		expect(task).toMatchObject({
 			slug: MAINTAIN_TASK_SLUG,
 			retries: 0,
-			schedule: [
-				{ cron: '0 * * * *', queue: 'q', hooks: { beforeSchedule: beforeMaintainSchedule } },
-			],
+			schedule: [{ cron: '0 * * * *', queue: 'q' }],
 		})
 		const req = { payload: {} } as unknown as PayloadRequest
 		if (typeof task.handler !== 'function') {
@@ -121,76 +115,10 @@ describe('maintainTask', () => {
 		})
 	})
 
-	it('marks a run killed mid-way failed, then asks Payload whether to schedule another', async () => {
-		const updateJobs = vi.fn(async () => null)
-		const decision = { input: {}, shouldSchedule: true }
-		const defaultBeforeSchedule = vi.fn(async () => decision)
-		const req = { payload: { db: { updateJobs } } } as unknown as PayloadRequest
-		const task = maintainTask({
-			schedule: { queue: 'q', cron: '0 * * * *', intervalMs: 3_600_000 },
-			run: async () => report,
-		})
-		const hook = task.schedule?.[0]?.hooks?.beforeSchedule
-		expect(hook).toBe(beforeMaintainSchedule)
-		const before = Date.now()
-		const answer = await beforeMaintainSchedule({
-			defaultBeforeSchedule,
-			jobStats: {},
-			queueable: { scheduleConfig: { cron: '0 * * * *', queue: 'q' } },
-			req,
-		} as never)
-		expect(answer).toBe(decision)
-		expect(defaultBeforeSchedule).toHaveBeenCalledTimes(1)
-		const [args] = updateJobs.mock.calls[0] as unknown as [
-			{ where: { and: Array<Record<string, Record<string, unknown>>> }; data: object },
-		]
-		expect(args.data).toMatchObject({ processing: false, hasError: true })
-		expect(args.where.and).toContainEqual({ queue: { equals: 'q' } })
-		expect(args.where.and).toContainEqual({ processing: { equals: true } })
-		const cutoff = args.where.and.find((each) => 'updatedAt' in each)?.updatedAt?.less_than
-		expect(Date.parse(String(cutoff))).toBeLessThanOrEqual(before - MAINTAIN_DEAD_AFTER_MS + 1000)
-		expect(Date.parse(String(cutoff))).toBeGreaterThan(before - MAINTAIN_DEAD_AFTER_MS - 5000)
-	})
-
-	it('marks no job failed while a live run holds the maintenance lease, however old its job', async () => {
-		const updateJobs = vi.fn(async () => null)
-		const state = memoryStateStore()
-		const payload = { db: { updateJobs } }
-		const engine = { read: vi.fn(), realtime: vi.fn(), idle: vi.fn(), close: vi.fn() }
-		const writer = { write: vi.fn(), defer: vi.fn(), flush: vi.fn(), close: vi.fn() }
-		Reflect.set(payload, Symbol.for('@10x-media/analytics/native-engine'), {
-			registration: {},
-			nudge: () => {},
-			engine,
-			writer,
-			salts: { forHit: vi.fn(), forDay: vi.fn() },
-			state,
-		})
-		expect(await state.claim(leaseKey(MAINTAIN_LEASE_NAME), 'live-run', 60_000)).toBe(true)
-		const decision = { input: {}, shouldSchedule: false }
-		const answer = await beforeMaintainSchedule({
-			defaultBeforeSchedule: async () => decision,
-			jobStats: {},
-			queueable: { scheduleConfig: { cron: '0 * * * *', queue: 'q' } },
-			req: { payload } as unknown as PayloadRequest,
-		} as never)
-		expect(answer).toBe(decision)
-		expect(updateJobs).not.toHaveBeenCalled()
-		await state.release(leaseKey(MAINTAIN_LEASE_NAME), 'live-run')
-		await beforeMaintainSchedule({
-			defaultBeforeSchedule: async () => decision,
-			jobStats: {},
-			queueable: { scheduleConfig: { cron: '0 * * * *', queue: 'q' } },
-			req: { payload } as unknown as PayloadRequest,
-		} as never)
-		expect(updateJobs).toHaveBeenCalledTimes(1)
-	})
-
 	it('keys a rebuild apart from upkeep, so a scheduled run never replaces one someone queued', () => {
 		const task = maintainTask({
 			schedule: { queue: 'q', cron: '0 * * * *', intervalMs: 3_600_000 },
 			run: async () => report,
-			concurrency: true,
 		})
 		const concurrency = task.concurrency
 		if (typeof concurrency !== 'object') {

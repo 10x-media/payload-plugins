@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, Payload, PayloadRequest, Where } from 'payload'
+import type { CollectionConfig, Payload, PayloadRequest, User, Where } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { PLATFORM_SCOPE } from '../../src/core/contract'
 import { GOALS_SLUG } from '../../src/goals/collection'
@@ -87,7 +87,7 @@ describeForDb('analytics goals owned through a tenant relationship', {}, (db) =>
 		payload.create({
 			collection: GOALS_SLUG as never,
 			data: { ...data, match: { kind: 'goal' } } as never,
-			user: { ...staff, collection: 'editors' },
+			user: { ...staff, collection: 'editors' } as User,
 		})
 
 	beforeAll(async () => {

@@ -10,7 +10,7 @@ import '../analytics.css'
 export function SourcesNoticeBanner({ notice }: { notice: SourcesNotice | undefined }) {
 	const { t } = useTranslation()
 	return notice === 'platformFallback' ? (
-		<Banner className="analytics-sources-notice" type="info">
+		<Banner className="analytics-sources-notice" type="default">
 			{t(keys.sourcesPlatformFallback)}
 		</Banner>
 	) : null

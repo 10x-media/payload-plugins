@@ -22,10 +22,9 @@ vi.mock('@payloadcms/ui', () => ({
 			{children}
 		</a>
 	),
+	usePathname: () => mocks.pathname,
 	useTranslation: () => ({ i18n: { language: mocks.language }, t: (key: string) => key }),
 }))
-
-vi.mock('next/navigation', () => ({ usePathname: () => mocks.pathname }))
 
 const HREF = '/admin/analytics'
 

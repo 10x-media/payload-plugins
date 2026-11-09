@@ -195,7 +195,7 @@ export function Toolbar() {
 					</span>
 					{/* A cached read is the normal case, so it is told in a neutral pill, not a warning. */}
 					{notices.stale ? (
-						<Pill pillStyle="light-gray" size="small">
+						<Pill pillStyle="light-gray" size="medium">
 							{t(keys.viewStale)}
 						</Pill>
 					) : null}
@@ -207,7 +207,7 @@ export function Toolbar() {
 			{/* Mounted whether or not it has anything to say: a live region added at the same
 			    moment as its text is not announced. A success is said once and never shown. */}
 			<div role="status">
-				{refreshFailed ? <Banner type="error">{t(keys.viewRefreshFailed)}</Banner> : null}
+				{refreshFailed ? <Banner type="danger">{t(keys.viewRefreshFailed)}</Banner> : null}
 				{done === true && !refreshFailed ? (
 					<span className="analytics-sr-only">{t(keys.viewRefreshed)}</span>
 				) : null}

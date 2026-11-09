@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, PayloadRequest, TypedUser } from 'payload'
+import type { CollectionConfig, PayloadRequest, User } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { makeProxyHandler } from '../../src/capture/proxyEndpoint'
 import type { AnalyticsAdapter } from '../../src/core/contract'
@@ -33,8 +33,8 @@ const errorOf = async (res: Response): Promise<ErrorBody['error']> => {
 	return error
 }
 
-const userWith = (email: string): TypedUser =>
-	({ id: `user-${email}`, collection: 'users', email }) as unknown as TypedUser
+const userWith = (email: string): User =>
+	({ id: `user-${email}`, collection: 'users', email }) as unknown as User
 
 const ALLOWED = userWith('allowed@t.dev')
 const DENIED = userWith('denied@t.dev')
@@ -132,15 +132,15 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 		await booted.stop()
 	})
 
-	const reqFor = (url: string, user: TypedUser | undefined, payload: unknown = booted.payload) =>
+	const reqFor = (url: string, user: User | undefined, payload: unknown = booted.payload) =>
 		({ url, user, payload, headers: new Headers() }) as unknown as PayloadRequest
 
 	const noRuntime = { logger: { warn: () => undefined } }
 
-	const document = (query: string, user?: TypedUser, payload?: unknown) =>
+	const document = (query: string, user?: User, payload?: unknown) =>
 		makeDocumentHandler()(reqFor(`http://x/api${routes.document}?${query}`, user, payload))
 
-	const realtime = (user?: TypedUser, query = 'metric=visitors') =>
+	const realtime = (user?: User, query = 'metric=visitors') =>
 		makeRealtimeHandler()(reqFor(`http://x/api${routes.live}?${query}`, user))
 
 	const proxy = (init: RequestInit = {}, slot = 'global') =>
@@ -151,11 +151,10 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 			}) as unknown as PayloadRequest
 		)
 
-	const sources = (user?: TypedUser) =>
+	const sources = (user?: User) =>
 		makeSourcesHandler()(reqFor(`http://x/api${routes.sources}`, user))
 
-	const goals = (user?: TypedUser) =>
-		makeGoalsHandler()(reqFor(`http://x/api${routes.goals}`, user))
+	const goals = (user?: User) => makeGoalsHandler()(reqFor(`http://x/api${routes.goals}`, user))
 
 	it(`answers the document endpoint's 401 as unauthorized, uncached, on ${db}`, async () => {
 		const res = await document('collection=pages&id=1')

@@ -1,4 +1,4 @@
-import type { PayloadRequest, TypedUser } from 'payload'
+import type { PayloadRequest, User } from 'payload'
 import type { ScopeMemberAccess } from '../core/options'
 import { isRecord } from '../core/values'
 import { decideOnce } from './decideOnce'
@@ -12,7 +12,7 @@ export interface TenantMembershipOptions {
 	 * Users who belong to every tenant, platform staff for instance. Pass the same function the
 	 * multi-tenant plugin's own `userHasAccessToAllTenants` is.
 	 */
-	userHasAccessToAllTenants?: (user: TypedUser) => boolean
+	userHasAccessToAllTenants?: (user: User) => boolean
 }
 
 const TENANTS_ARRAY_FIELD = 'tenants'

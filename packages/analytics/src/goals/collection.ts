@@ -306,6 +306,7 @@ export const buildGoalsCollection = (args: BuildGoalsCollectionArgs): Collection
 		},
 		// A duplicate would carry the slug over, which the uniqueness hook refuses anyway.
 		disableDuplicate: true,
+		versions: false,
 		admin: {
 			useAsTitle: 'name',
 			defaultColumns: ['name', 'slug', 'match.kind', 'enabled'],

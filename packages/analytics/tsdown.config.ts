@@ -9,7 +9,7 @@ export default definePluginBuild({
 		'exports/i18n': 'src/exports/i18n.ts',
 		'exports/testing': 'src/exports/testing.ts',
 		'exports/geo': 'src/exports/geo.ts',
-		'exports/next': 'src/exports/next.ts',
+		'exports/routes': 'src/exports/routes.ts',
 		'exports/migrations': 'src/exports/migrations.ts',
 		'migrations/predefined/dropLegacyMongo': 'src/migrations/predefined/dropLegacyMongo.ts',
 		'exports/rsc': 'src/exports/rsc.ts',

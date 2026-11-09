@@ -64,7 +64,7 @@ export function AnalyticsEmptyState({ isNew, children }: { isNew: boolean; child
 				className="analytics-empty-state analytics-empty-state--new"
 				pillStyle="light-gray"
 				rounded
-				size="small"
+				size="medium"
 			>
 				{children}
 			</Pill>

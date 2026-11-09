@@ -51,7 +51,7 @@ export function FilterChip({ filter, shown, countryFlags, onRemove }: FilterChip
 	const flag =
 		countryFlags !== false && filter.dimension === 'country' ? countryCode(filter.value) : null
 	return (
-		<Pill size="small">
+		<Pill size="medium">
 			{before}
 			{flag === null ? null : (
 				<>

@@ -87,11 +87,11 @@ Setting either option ends it; it cannot tell whether the count is right, so cou
 
 ## A route handler of your own
 
-`captureRoute` from `@10x-media/analytics/next` relays one adapter's routes from a Next.js route handler, by the runtime endpoint's rules: only declared routes, the same header allowlists, no cookie or credential upstream, no `set-cookie` back, and the same content types, `nosniff` and sandbox. Mount it as a catch-all under the path the slot's snippet will point at:
+`captureRoute` from `@10x-media/analytics/routes` relays one adapter's routes from a route handler of your own, by the runtime endpoint's rules: only declared routes, the same header allowlists, no cookie or credential upstream, no `set-cookie` back, and the same content types, `nosniff` and sandbox. It is a plain `(request: Request) => Promise<Response>`, so it serves a Next.js route handler and a TanStack Start server route alike. Mount it as a catch-all under the path the slot's snippet will point at:
 
 ```ts title="app/ph/[...path]/route.ts"
 import { posthog } from '@10x-media/analytics/adapters/posthog'
-import { captureRoute } from '@10x-media/analytics/next'
+import { captureRoute } from '@10x-media/analytics/routes'
 
 const relay = captureRoute({
   path: '/ph',
@@ -101,6 +101,25 @@ const relay = captureRoute({
 })
 
 export { relay as GET, relay as POST, relay as OPTIONS }
+```
+
+On TanStack Start the same handler goes into a splat server route:
+
+```ts title="src/routes/ph/$.ts"
+import { posthog } from '@10x-media/analytics/adapters/posthog'
+import { captureRoute } from '@10x-media/analytics/routes'
+import { createFileRoute } from '@tanstack/react-router'
+
+const relay = captureRoute({
+  path: '/ph',
+  adapter: posthog({ projectId: '', apiKey: '', region: 'eu', projectToken: 'phc_...' }),
+  trustedProxyHops: 1,
+})
+const handler = ({ request }: { request: Request }) => relay(request)
+
+export const Route = createFileRoute('/ph/$')({
+  server: { handlers: { GET: handler, POST: handler, OPTIONS: handler } },
+})
 ```
 
 Then point the slot at the same path so its snippet stops using the runtime mount:
@@ -117,16 +136,16 @@ What differs from the runtime endpoint:
 
 - **The adapter is fixed.** The route relays the adapter it was built with, for every request: no slot, scope or provider document is resolved. Build it with the same capture config as the one in `adapters`, so the snippet and the route agree.
 - **The plugin's options do not reach it.** Pass `trustedProxyHops` or `trustedPlatform` (not both) and `allowedOrigins` as the plugin has them; without a trust option the leftmost `x-forwarded-for` entry is forwarded upstream ([Trusted proxies](#trusted-proxies)): a trust option set on the plugin silences the boot warning about cookieless counting without reaching the route. `timeoutMs` (default 10000) and `maxBodyBytes` (default 1 MiB) stand in for `capture.proxy`.
-- **Methods.** Export the handler as `GET`, `POST` and `OPTIONS`. It answers `OPTIONS` with `204` itself, and any other method that reaches it with `405`.
+- **Methods.** Serve the handler for `GET`, `POST` and `OPTIONS`. It answers `OPTIONS` with `204` itself, and any other method that reaches it with `405`.
 - **No scope.** A cross-site `POST` is refused with `403` unless `allowedOrigins` lists it, but the runtime endpoint's check of a sibling subdomain's post against the tenant slot does not apply.
 - **Connection and logs.** The vendor is reached through the adapter's own `fetch` option, else the global `fetch`. With no Payload logger at hand, a failure is logged with `console.warn`: an upstream that fails answers `502`, and an error in the route itself `500`.
 - **Refused when built.** A mount that normalizes to the site root, an adapter with no proxy routes (native, GA4, or a PostHog without `projectToken`), both trust options at once, a `timeoutMs` or `maxBodyBytes` that is not a positive number, and an `allowedOrigins` entry that is not one exact origin each throw when the route module loads.
 - **Trailing slashes.** PostHog's capture endpoints end in a slash (its descriptor sets `capture.proxy.trailingSlashes`), so set `skipTrailingSlashRedirect: true` in `next.config`: otherwise Next redirects `/ph/e/` to `/ph/e` before the route runs.
 - **A Next `basePath`.** Pass `path` and `capture.paths` without it. The route finds its mount anywhere in the address, and the tracker config puts the base path in front of every path it hands out.
 
-### Next rewrites
+### Not a rewrite
 
-`captureRewrites` and `posthogProxyRewrites` from `@10x-media/analytics/next` throw when called. A Next rewrite to a vendor forwards every request header, the visitor's cookies and the site's `payload-token` among them, and passes the vendor's `set-cookie` back to the site. Relay the vendor with [`captureRoute`](#a-route-handler-of-your-own) instead, or leave `capture.paths` unset to use the runtime endpoint.
+Do not point a Next rewrite (or any other plain reverse proxy) at a vendor: it forwards every request header, the visitor's cookies and the site's `payload-token` among them, and passes the vendor's `set-cookie` back to the site. Relay the vendor with [`captureRoute`](#a-route-handler-of-your-own), or leave `capture.paths` unset to use the runtime endpoint.
 
 ## Per-vendor routes
 

@@ -1,4 +1,4 @@
-import { createLocalReq, type Payload } from 'payload'
+import { createPayloadRequest, type Payload } from 'payload'
 import { currentTime } from '../core/clock'
 import { isCollectionSlug } from '../core/collectionSlug'
 import type { AnalyticsAdapter, AnalyticsCapabilities } from '../core/contract'
@@ -332,7 +332,7 @@ const collectionRegistry = (
 		const { decryptFieldValue, withRawEncrypted } = await loadEncrypted()
 		// Never the caller's: the raw window is not a concurrency boundary, so a request shared with
 		// other reads would hand them ciphertext, and it may also hold an uncommitted transaction.
-		const req = await createLocalReq({}, payload)
+		const req = await createPayloadRequest({ payload })
 		const { docs } = await withRawEncrypted(req, () =>
 			payload.find({
 				collection: slug,

@@ -5,7 +5,7 @@ import {
 	type SupportedDb,
 } from '@10x-media/payload-test-harness'
 import type { MongooseAdapter } from '@payloadcms/db-mongodb'
-import { type CollectionConfig, createLocalReq, type Payload } from 'payload'
+import { type CollectionConfig, createPayloadRequest, type Payload } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { captureRequest } from '../../src/capture/captureRequest'
 import { isUniqueViolation } from '../../src/db/errors'
@@ -130,7 +130,10 @@ describeForDb('analytics database foundation', {}, (db) => {
 			collection: USERS,
 			data: { email: 'depth-admin@example.test', password: 'depth-admin-pw' },
 		})
-		const req = await createLocalReq({ user: { ...admin, collection: USERS } }, payload)
+		const req = await createPayloadRequest({
+			payload: payload,
+			user: { ...admin, collection: USERS },
+		})
 		const read = (as: typeof req) =>
 			payload.findByID({
 				collection: PROBES,

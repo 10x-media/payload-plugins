@@ -9,7 +9,7 @@ const mocks = vi.hoisted(() => ({
 	replace: vi.fn<(url: string) => void>(),
 }))
 
-vi.mock('next/navigation', () => ({
+vi.mock('@payloadcms/ui', () => ({
 	usePathname: () => '/admin/analytics',
 	useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
 	useSearchParams: () => new URLSearchParams(mocks.search),

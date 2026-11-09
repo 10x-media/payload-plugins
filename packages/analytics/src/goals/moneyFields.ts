@@ -49,7 +49,7 @@ export const applyRevenueVisibility = (fields: Field[], money: boolean): Field[]
 
 /**
  * {@link applyRevenueVisibility} over every field tree a config holds, including the `blocks` it
- * defines once for `blockReferences`.
+ * defines once for the blocks fields that name them by slug.
  */
 export const applyConfigRevenueVisibility = (config: Config, money: boolean): void => {
 	if (money) {

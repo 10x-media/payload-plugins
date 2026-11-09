@@ -228,7 +228,7 @@ describe('admin wording', () => {
 		const files = sources(SRC)
 		expect(files.length).toBeGreaterThan(100)
 		const found = files.flatMap((path) =>
-			literalsIn(relative(SRC, path), readFileSync(path, 'utf8'))
+			literalsIn(relative(SRC, path).replaceAll('\\', '/'), readFileSync(path, 'utf8'))
 		)
 		expect(found).toEqual([])
 	})
