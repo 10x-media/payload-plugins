@@ -48,6 +48,7 @@ describeForDb('form-builder action dispatch', { dbs: ['mongo'] }, (db) => {
 		runs.length = 0
 		events.length = 0
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -56,6 +57,7 @@ describeForDb('form-builder action dispatch', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'fullName', value: 'Ada' }] },
 		})
@@ -80,6 +82,7 @@ describeForDb('form-builder action dispatch', { dbs: ['mongo'] }, (db) => {
 		runs.length = 0
 		events.length = 0
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Throwing',
@@ -89,6 +92,7 @@ describeForDb('form-builder action dispatch', { dbs: ['mongo'] }, (db) => {
 		})
 
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'fullName', value: 'Grace' }] },
 		})
@@ -108,6 +112,7 @@ describeForDb('form-builder action dispatch', { dbs: ['mongo'] }, (db) => {
 		runs.length = 0
 		events.length = 0
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'No actions',
@@ -115,6 +120,7 @@ describeForDb('form-builder action dispatch', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'fullName', value: 'Lin' }] },
 		})
@@ -168,6 +174,7 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 
 	const makeForm = () =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Newsletter',
@@ -184,8 +191,8 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 			(entry) => entry.method === 'post' && entry.path === '/'
 		)
 		if (!endpoint) throw new Error('no root POST endpoint registered')
-		const { createLocalReq } = await import('payload')
-		const req = await createLocalReq({}, booted.payload)
+		const { createPayloadRequest } = await import('payload')
+		const req = await createPayloadRequest({ payload: booted.payload })
 		req.data = { form: formId, values: [{ field: 'email', value: email }] }
 		req.routeParams = { collection: 'form-submissions' }
 		const response = await endpoint.handler(req)
@@ -195,6 +202,7 @@ describeForDb('form-builder essential actions', { dbs: ['mongo'] }, (db) => {
 	const submissionCount = async (formId: number | string) =>
 		(
 			await booted.payload.count({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				where: { form: { equals: formId } },
 			})
@@ -309,6 +317,7 @@ describeForDb('form-builder essential deadline breach', { dbs: ['mongo'] }, (db)
 
 	const makeForm = () =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Gated newsletter',
@@ -324,8 +333,8 @@ describeForDb('form-builder essential deadline breach', { dbs: ['mongo'] }, (db)
 			(entry) => entry.method === 'post' && entry.path === '/'
 		)
 		if (!endpoint) throw new Error('no root POST endpoint registered')
-		const { createLocalReq } = await import('payload')
-		const req = await createLocalReq({}, booted.payload)
+		const { createPayloadRequest } = await import('payload')
+		const req = await createPayloadRequest({ payload: booted.payload })
 		req.data = { form: formId, values: [{ field: 'email', value: email }] }
 		req.routeParams = { collection: 'form-submissions' }
 		const response = await endpoint.handler(req)
@@ -394,6 +403,7 @@ describeForDb('form-builder essential deadline breach', { dbs: ['mongo'] }, (db)
 	it('refuses to save a form whose action config fails its validateConfig', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Bad template',
@@ -406,6 +416,7 @@ describeForDb('form-builder essential deadline breach', { dbs: ['mongo'] }, (db)
 
 	it('saves a form whose action config passes its validateConfig', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Good template',

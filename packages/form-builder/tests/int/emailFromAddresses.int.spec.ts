@@ -20,9 +20,16 @@ const fromAddresses = ({ req }: { req: PayloadRequest }): FromAddressOption[] =>
 describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 	describe('with the option set', () => {
 		let booted: BootedPayload
+		let admin: { id: number | string }
 
 		beforeAll(async () => {
 			booted = await bootPayload({ plugin: formBuilder({ email: { fromAddresses } }), db })
+			// Payload 4 stamps createdBy/updatedBy from req.user, so the acting admin must exist.
+			admin = await booted.payload.create({
+				collection: 'users',
+				data: { email: 'admin@example.com', password: 'password' },
+				overrideAccess: true,
+			})
 		})
 
 		afterAll(async () => {
@@ -40,7 +47,7 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 						{ blockType: 'confirmation', toField: 'email', from, subject: 'Hi', body: '' },
 					],
 				},
-				req: { user: { id: 1, collection: 'users', tenant: 'acme' } } as never,
+				req: { user: { ...admin, collection: 'users', tenant: 'acme' } } as never,
 			})
 
 		const fromAddressesEndpoint = () => {
@@ -60,17 +67,17 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 				| undefined
 			const idless = endpoints?.find((endpoint) => endpoint.path === '/from-addresses')
 			expect(idless).toBeDefined()
-			const { createLocalReq } = await import('payload')
-			const authed = await createLocalReq(
-				{ req: { user: { id: 1, collection: 'users', tenant: 'acme' } } as never },
-				booted.payload
-			)
+			const { createPayloadRequest } = await import('payload')
+			const authed = await createPayloadRequest({
+				payload: booted.payload,
+				req: { user: { ...admin, collection: 'users', tenant: 'acme' } } as never,
+			})
 			const response = await idless?.handler(authed)
 			expect(response?.status).toBe(200)
 			const body = (await response?.json()) as { options?: unknown }
 			expect(body.options).toEqual(tenantOptions.acme)
 
-			const anonymous = await createLocalReq({}, booted.payload)
+			const anonymous = await createPayloadRequest({ payload: booted.payload })
 			expect((await idless?.handler(anonymous))?.status).toBe(403)
 		})
 
@@ -83,13 +90,13 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 
 		it('serves tenant-scoped options through the endpoint, keyed off the real request', async () => {
 			const acme = await fromAddressesEndpoint()?.handler({
-				user: { id: 1, collection: 'users', tenant: 'acme' },
+				user: { ...admin, collection: 'users', tenant: 'acme' },
 			} as unknown as PayloadRequest)
 			expect(acme?.status).toBe(200)
 			expect(await acme?.json()).toEqual({ options: tenantOptions.acme })
 
 			const globex = await fromAddressesEndpoint()?.handler({
-				user: { id: 1, collection: 'users', tenant: 'globex' },
+				user: { ...admin, collection: 'users', tenant: 'globex' },
 			} as unknown as PayloadRequest)
 			expect(await globex?.json()).toEqual({ options: tenantOptions.globex })
 		})
@@ -109,7 +116,7 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 					fields: [],
 					actions: [{ blockType: 'emailTeam', to: 'team@x.com', subject: 'Hi', body: '' }],
 				},
-				req: { user: { id: 1, collection: 'users', tenant: 'acme' } } as never,
+				req: { user: { ...admin, collection: 'users', tenant: 'acme' } } as never,
 			})
 			const actions = form.actions as Array<Record<string, unknown>>
 			expect(actions[0]?.from ?? '').toBe('')
@@ -136,7 +143,7 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 							},
 						],
 					},
-					req: { user: { id: 1, collection: 'users' } } as never,
+					req: { user: { ...admin, collection: 'users' } } as never,
 				})
 			).rejects.toThrow()
 		})
@@ -176,11 +183,11 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 				| undefined
 			const endpoint = endpoints?.find((entry) => entry.path === '/:id/from-addresses')
 			expect(endpoint).toBeDefined()
-			const { createLocalReq } = await import('payload')
-			const req = await createLocalReq(
-				{ req: { user: { id: 1, collection: 'users' } } as never },
-				booted.payload
-			)
+			const { createPayloadRequest } = await import('payload')
+			const req = await createPayloadRequest({
+				payload: booted.payload,
+				req: { user: { id: 1, collection: 'users' } } as never,
+			})
 			const response = await endpoint?.handler(req)
 			expect(response?.status).toBe(200)
 			const body = (await response?.json()) as { options?: unknown }
@@ -189,6 +196,7 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 
 		it('stores the source value and sends with the freshly resolved address', async () => {
 			const form = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Tenant form',
@@ -212,6 +220,7 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 			}) as typeof booted.payload.sendEmail
 			try {
 				await booted.payload.create({
+					overrideAccess: true,
 					collection: 'form-submissions',
 					depth: 0,
 					data: { form: form.id, values: [{ field: 'email', value: 'visitor@x.com' }] },
@@ -266,6 +275,7 @@ describeForDb('form-builder email.fromAddresses', { dbs: ['mongo'] }, (db) => {
 
 		it('still accepts an emailTeam action (a bare "from" key is simply an unrecognized extra, ignored by the block schema)', async () => {
 			const form = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'No email option',

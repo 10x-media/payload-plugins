@@ -5,112 +5,112 @@
 .fb-flow-builder {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
-	margin-block-end: 1rem;
+	gap: var(--spacer-1-5);
+	margin-block-end: var(--spacer-2-5);
 }
 .fb-flow-builder__description {
-	color: var(--theme-elevation-400);
-	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	margin: 0;
 }
 .fb-flow-builder__hint {
-	color: var(--theme-elevation-400);
-	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	margin: 0;
 }
 .fb-flow-builder__steps {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-flow-builder__actions {
-	margin-block-start: 0.25rem;
+	margin-block-start: var(--spacer-1);
 }
 
 .fb-flow-step__header-content {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 	overflow: hidden;
 }
 .fb-flow-step__index {
-	font-size: 0.6875rem;
+	font-size: var(--text-body-small-font-size);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
-	color: var(--theme-elevation-400);
+	color: var(--color-text-secondary);
 	flex-shrink: 0;
 }
 .fb-flow-step__title {
-	font-size: 0.875rem;
+	font-size: var(--text-body-medium-font-size);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 .fb-flow-step__body {
-	padding: 0.75rem;
+	padding: var(--spacer-2);
 	display: flex;
 	flex-direction: column;
-	gap: 0.25rem;
+	gap: var(--spacer-1);
 }
 .fb-flow-step__row {
 	display: flex;
 	flex-direction: column;
-	gap: 0.25rem;
+	gap: var(--spacer-1);
 }
 .fb-flow-step__hint {
-	font-size: 0.75rem;
-	color: var(--theme-elevation-400);
+	font-size: var(--text-body-small-font-size);
+	color: var(--color-text-secondary);
 	margin: 0;
 }
 .fb-flow-step__field-picker {
 	display: flex;
 	flex-wrap: wrap;
-	gap: 0.25rem 1.25rem;
-	padding-block: 0.25rem;
+	gap: var(--spacer-1) var(--spacer-3);
+	padding-block: var(--spacer-1);
 }
 .fb-flow-step__field-option {
 	display: flex;
 	align-items: center;
-	gap: 0.375rem;
+	gap: var(--spacer-1);
 }
 .fb-flow-step__field-hint {
-	font-size: 0.75rem;
-	color: var(--theme-elevation-400);
+	font-size: var(--text-body-small-font-size);
+	color: var(--color-text-secondary);
 	white-space: nowrap;
 }
 .fb-flow-step__transitions {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
-	padding-block-start: 0.5rem;
+	gap: var(--spacer-1-5);
+	padding-block-start: var(--spacer-1-5);
 }
 .fb-flow-step__transitions-header {
 	display: flex;
 	align-items: baseline;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 
 .fb-flow-unassigned {
 	display: flex;
 	flex-direction: column;
-	gap: 0.25rem;
-	padding: 0.75rem;
-	border: 1px solid var(--theme-border-color);
-	border-radius: var(--style-radius-s);
+	gap: var(--spacer-1);
+	padding: var(--spacer-2);
+	border: 1px solid var(--color-border);
+	border-radius: var(--field-border-radius);
 }
 .fb-flow-unassigned__rows {
 	display: flex;
 	flex-direction: column;
-	gap: 0.375rem;
+	gap: var(--spacer-1);
 }
 .fb-flow-unassigned__row {
 	display: flex;
 	align-items: center;
-	gap: 0.75rem;
+	gap: var(--spacer-2);
 }
 .fb-flow-unassigned__name {
-	font-size: 0.875rem;
+	font-size: var(--text-body-medium-font-size);
 	flex: 1;
 	min-width: 0;
 	overflow: hidden;
@@ -118,29 +118,29 @@
 	white-space: nowrap;
 }
 .fb-flow-unassigned__select {
-	flex: 0 1 14rem;
-	min-width: 9rem;
+	flex: 0 1 182px;
+	min-width: 117px;
 }
 
 .fb-flow-transition {
-	border: 1px solid var(--theme-border-color);
-	border-radius: var(--style-radius-s);
-	padding: 0.5rem 0.75rem;
+	border: 1px solid var(--color-border);
+	border-radius: var(--field-border-radius);
+	padding: var(--spacer-1-5) var(--spacer-2);
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-flow-transition__header {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-flow-transition__label {
-	font-size: 0.6875rem;
+	font-size: var(--text-body-small-font-size);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
-	color: var(--theme-elevation-400);
+	color: var(--color-text-secondary);
 	flex-shrink: 0;
 }
 .fb-flow-transition__goto {
@@ -150,82 +150,82 @@
 .fb-flow-transition__actions {
 	display: flex;
 	align-items: center;
-	gap: 0.25rem;
+	gap: var(--spacer-1);
 	flex-shrink: 0;
 }
 .fb-flow-transition__when-label {
-	font-size: 0.6875rem;
+	font-size: var(--text-body-small-font-size);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
-	color: var(--theme-elevation-400);
+	color: var(--color-text-secondary);
 }
 .fb-flow-transition__condition {
-	padding-inline-start: 0.25rem;
+	padding-inline-start: var(--spacer-1);
 }
 
 /* Condition builder */
 .fb-condition-builder {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-condition-builder__hint {
-	color: var(--theme-elevation-400);
-	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	margin: 0;
 }
 .fb-condition-builder__group {
 	display: flex;
 	flex-direction: column;
-	gap: 0.375rem;
-	padding: 0.75rem;
-	border: 1px solid var(--theme-border-color);
-	border-radius: var(--style-radius-m);
+	gap: var(--spacer-1);
+	padding: var(--spacer-2);
+	border: 1px solid var(--color-border);
+	border-radius: var(--radius-medium);
 }
 .fb-condition-builder__or-label {
 	display: inline-block;
-	font-size: 11px;
+	font-size: var(--text-body-small-font-size);
 	font-weight: 500;
 	text-transform: uppercase;
-	margin-block: 0.125rem;
+	margin-block: 0;
 }
 .fb-condition-builder__and-row {
 	display: flex;
 	flex-direction: column;
-	gap: 0.25rem;
+	gap: var(--spacer-1);
 }
 .fb-condition-builder__and-label {
-	font-size: 10px;
+	font-size: var(--text-body-small-font-size);
 	font-weight: 500;
 	text-transform: uppercase;
-	padding-inline-start: 0.125rem;
+	padding-inline-start: 0;
 }
 .fb-condition-builder__add-condition {
 	align-self: flex-start;
-	margin-block-start: 0.25rem;
+	margin-block-start: var(--spacer-1);
 }
 .fb-condition-builder__actions {
 	display: flex;
-	gap: 0.5rem;
-	margin-top: 0.5rem;
+	gap: var(--spacer-1-5);
+	margin-top: var(--spacer-1-5);
 }
 .fb-condition-row {
 	display: flex;
 	align-items: flex-start;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 	flex-wrap: nowrap;
 }
 .fb-condition-row__field {
-	flex: 1 1 9rem;
+	flex: 1 1 117px;
 	min-width: 0;
 }
 .fb-condition-row__operator {
-	flex: 0 1 9rem;
+	flex: 0 1 117px;
 	min-width: 0;
 }
 .fb-condition-row__value {
-	flex: 1 1 9rem;
+	flex: 1 1 117px;
 	min-width: 0;
 }
 .fb-condition-row__remove {
@@ -238,29 +238,32 @@
 .fb-condensed-array {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
-	margin-block-end: 1rem;
+	gap: var(--spacer-1-5);
+	margin-block-end: var(--spacer-2-5);
 }
 .fb-condensed-array__rows {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-condensed-array__row {
 	display: flex;
 	align-items: flex-end;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-condensed-array__fields {
 	flex: 1;
 	min-width: 0;
 	display: flex;
 	flex-wrap: wrap;
-	column-gap: 0.75rem;
+	column-gap: var(--spacer-2);
 }
+/* Payload 4 gives every .field-type a bottom margin; inside a condensed row the row gap spaces
+ * them instead, so the remove button stays level with the inputs. */
 .fb-condensed-array__fields > .field-type {
-	flex: 0 1 calc(var(--field-width, 50%) - 0.375rem);
+	flex: 0 1 calc(var(--field-width, 50%) - var(--spacer-2) / 2);
 	min-width: 0;
+	margin-block-end: 0;
 }
 .fb-condensed-array__remove {
 	flex-shrink: 0;
@@ -268,20 +271,25 @@
 	align-items: center;
 	/* Payload input height, so with the row's flex-end the button centers on the input, not the
 	 * taller label+input stack. */
-	height: 40px;
+	height: var(--field-min-height-large);
 }
 .fb-condensed-array__actions {
-	margin-block-start: 0.25rem;
+	margin-block-start: var(--spacer-1);
+}
+
+/* Payload 4 stretches a .field-type child to the column; the poll button keeps its own width. */
+.fb-close-poll > .fb-close-poll__button {
+	align-self: flex-start;
 }
 
 /* Calculation expression builder */
 .fb-calc-builder {
-	margin-block-end: 1rem;
+	margin-block-end: var(--spacer-2-5);
 }
 .fb-calc-builder > .field-type__wrap {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-visually-hidden {
 	position: absolute;
@@ -295,49 +303,49 @@
 	border: 0;
 }
 .fb-calc-builder__hint {
-	color: var(--theme-elevation-400);
-	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	margin: 0;
 }
 .fb-calc-builder__empty {
 	display: flex;
 	flex-direction: column;
-	gap: 0.375rem;
+	gap: var(--spacer-1);
 }
-.fb-calc-builder__seed {
-	max-width: 16rem;
+div:has(> .fb-calc-builder__seed) {
+	max-width: 208px;
 }
 .fb-calc-builder__preview {
-	color: var(--theme-elevation-400);
-	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	margin: 0;
 }
 .fb-calc-builder__actions {
 	align-self: flex-start;
 }
 .fb-calc-builder__warning {
-	color: var(--theme-elevation-400);
-	font-size: 0.8125rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	margin: 0;
 }
 .fb-calc-builder__kinds {
 	margin: 0;
-	margin-inline-start: 0.75rem;
-	padding-inline-start: 1rem;
-	color: var(--theme-elevation-400);
-	font-size: 0.8125rem;
+	margin-inline-start: var(--spacer-2);
+	padding-inline-start: var(--spacer-2-5);
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	display: flex;
 	flex-direction: column;
-	gap: 0.125rem;
+	gap: 0;
 }
 .fb-calc-builder__kind-label {
-	color: var(--theme-elevation-600);
+	color: var(--color-text-secondary);
 	font-weight: 600;
 }
 .fb-calc-chain {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 	min-width: 0;
 }
 /* Flat three-column grid, identical at every depth: [op select | spacer, fixed 90px]
@@ -347,13 +355,13 @@
 .fb-calc-row {
 	display: flex;
 	align-items: flex-start;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-calc-row--divided {
-	border-block-start: 1px solid var(--theme-elevation-100);
-	padding-block-start: 0.5rem;
+	border-block-start: 1px solid var(--color-border);
+	padding-block-start: var(--spacer-1-5);
 }
-.fb-calc-row__op,
+.fb-calc-row > div:has(> .fb-calc-row__op),
 .fb-calc-row__op-spacer {
 	flex: 0 0 90px;
 	min-width: 0;
@@ -362,12 +370,12 @@
 	flex: 1;
 	min-width: 0;
 }
-/* A fixed 40px centering box pins the remove level with the first control line even when
+/* A control-height centering box pins the remove level with the first control line even when
  * secondary content (weight rows, nested chains) extends the row downward. */
 .fb-calc-row__remove {
 	flex: 0 0 auto;
 	align-self: flex-start;
-	height: 40px;
+	height: var(--field-min-height-large);
 	display: flex;
 	align-items: center;
 	justify-content: flex-end;
@@ -375,33 +383,33 @@
 .fb-calc-chain__add {
 	align-self: flex-start;
 	/* Column 1 width + row gap: aligns the button with the operand column. */
-	margin-inline-start: calc(90px + 0.5rem);
+	margin-inline-start: calc(90px + var(--spacer-1-5));
 }
 .fb-calc-operand {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 	min-width: 0;
 }
 .fb-calc-operand--group > .fb-calc-chain {
-	padding-inline-start: 0.75rem;
-	border-inline-start: 2px solid var(--theme-elevation-100);
+	padding-inline-start: var(--spacer-2);
+	border-inline-start: 2px solid var(--color-border);
 }
 .fb-calc-operand__title {
-	font-size: 0.6875rem;
+	font-size: var(--text-body-small-font-size);
 	font-weight: 600;
 	text-transform: uppercase;
 	letter-spacing: 0.04em;
-	color: var(--theme-elevation-400);
+	color: var(--color-text-secondary);
 }
 .fb-calc-operand__header {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-calc-hint {
-	color: var(--theme-elevation-400);
-	font-size: 0.875rem;
+	color: var(--color-text-secondary);
+	font-size: var(--text-body-medium-font-size);
 	margin: 0;
 	flex: 1 1 auto;
 	min-width: 0;
@@ -409,51 +417,33 @@
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
-/* 200px fits the longest kind label in both locales ("Gewichtetes Feld" / "Weighted field":
- * ~110px at the 13px admin body size) plus the react-select control chrome (2 x base(0.6)
- * padding + indicator), with room for zoomed fonts. */
-.fb-calc-operand__header > .fb-calc-operand__kind {
+/* 200px fits the longest kind label in both locales ("Gewichtetes Feld" / "Weighted field")
+ * at the admin body size plus the react-select control chrome (padding + indicator), with room
+ * for zoomed fonts. */
+.fb-calc-operand__header > :is(.fb-calc-operand__kind, div:has(> .fb-calc-operand__kind)) {
 	flex: 0 0 200px;
 	min-width: 0;
 }
-.fb-calc-operand__header > .fb-calc-operand__fn {
+.fb-calc-operand__header > :is(.fb-calc-operand__fn, div:has(> .fb-calc-operand__fn)) {
 	flex: 0 0 110px;
 	min-width: 0;
 }
-.fb-calc-operand__header > .fb-calc-operand__ref,
-.fb-calc-operand__header > .fb-calc-operand__weight-field {
+.fb-calc-operand__header > :is(.fb-calc-operand__ref, .fb-calc-operand__weight-field),
+.fb-calc-operand__header > div:has(> :is(.fb-calc-operand__ref, .fb-calc-operand__weight-field)) {
 	flex: 1 1 auto;
 	min-width: 0;
+}
+/* v4 ReactSelect wraps its element in an unclassed div; the sizing rules above target that
+ * wrapper, so the select itself fills it. */
+.fb-calc-builder .react-select {
+	width: 100%;
 }
 .fb-calc-builder .rs__single-value {
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.fb-calc-operand__number,
-.fb-calc-operand__weight {
-	height: 40px;
-	padding: 0 15px;
-	font-size: 1rem;
-	font-family: inherit;
-	color: var(--theme-elevation-800);
-	background: var(--theme-input-bg);
-	border: 1px solid var(--theme-elevation-150);
-	border-radius: var(--style-radius-s);
-	transition:
-		border-color 100ms ease,
-		background-color 100ms ease,
-		box-shadow 100ms ease;
-}
-.fb-calc-operand__number:hover,
-.fb-calc-operand__weight:hover {
-	border-color: var(--theme-elevation-250);
-}
-.fb-calc-operand__number:focus,
-.fb-calc-operand__weight:focus {
-	border-color: var(--theme-elevation-400);
-	outline: none;
-}
+/* Chrome, states and height come from Payload's .form-input on the same element. */
 .fb-calc-operand__header > .fb-calc-operand__number {
 	flex: 1 1 auto;
 	min-width: 60px;
@@ -462,14 +452,14 @@
 .fb-calc-fn__args {
 	display: flex;
 	flex-direction: column;
-	gap: 0.5rem;
-	padding-inline-start: 0.75rem;
-	border-inline-start: 2px solid var(--theme-elevation-100);
+	gap: var(--spacer-1-5);
+	padding-inline-start: var(--spacer-2);
+	border-inline-start: 2px solid var(--color-border);
 }
 .fb-calc-fn__arg {
 	display: flex;
 	align-items: flex-start;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-calc-fn__arg-chain {
 	flex: 1;
@@ -478,7 +468,7 @@
 .fb-calc-fn__arg-remove {
 	flex: 0 0 auto;
 	align-self: flex-start;
-	height: 40px;
+	height: var(--field-min-height-large);
 	display: flex;
 	align-items: center;
 }
@@ -488,8 +478,8 @@
 .fb-calc-operand__source {
 	flex: 1 1 auto;
 	min-width: 0;
-	line-height: 40px;
-	font-size: 0.875rem;
+	line-height: var(--field-min-height-large);
+	font-size: var(--text-body-medium-font-size);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
@@ -497,61 +487,62 @@
 .fb-calc-operand__weight-values-row {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-calc-operand__weight-values-label {
 	flex: 0 0 90px;
 	min-width: 0;
-	line-height: 40px;
-	font-size: 0.875rem;
-	color: var(--theme-elevation-600);
+	line-height: var(--field-min-height-large);
+	font-size: var(--text-body-medium-font-size);
+	color: var(--color-text-secondary);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.fb-calc-operand__weight-values-row > .fb-calc-operand__weight-values {
+.fb-calc-operand__weight-values-row
+	> :is(.fb-calc-operand__weight-values, div:has(> .fb-calc-operand__weight-values)) {
 	flex: 0 0 200px;
 	min-width: 0;
 }
 .fb-calc-operand__weights {
 	display: flex;
 	flex-direction: column;
-	gap: 0.375rem;
+	gap: var(--spacer-1);
 }
 .fb-calc-operand__weight-row {
 	display: flex;
 	align-items: center;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
 .fb-calc-operand__weight-label {
 	flex: 1;
 	min-width: 0;
-	font-size: 0.875rem;
+	font-size: var(--text-body-medium-font-size);
 	overflow: hidden;
 	text-overflow: ellipsis;
 	white-space: nowrap;
 }
 .fb-calc-operand__weight-row > .fb-calc-operand__weight {
-	flex: 0 0 8rem;
+	flex: 0 0 104px;
 }
 .fb-calc-finish {
 	display: flex;
 	align-items: flex-start;
-	gap: 0.5rem;
+	gap: var(--spacer-1-5);
 }
-/* The wording occupies column 1 (the 90px op column), centered on the 40px control line, so the
+/* The wording occupies column 1 (the 90px op column), centered on the control line, so the
  * select below aligns exactly with the operand column's kind selects. */
 .fb-calc-finish__label {
 	flex: 0 0 90px;
 	min-width: 0;
-	line-height: 40px;
-	font-size: 0.875rem;
-	color: var(--theme-elevation-600);
+	line-height: var(--field-min-height-large);
+	font-size: var(--text-body-medium-font-size);
+	color: var(--color-text-secondary);
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.fb-calc-finish__select {
+.fb-calc-finish > :is(.fb-calc-finish__select, div:has(> .fb-calc-finish__select)) {
 	flex: 0 0 200px;
 	min-width: 0;
 }

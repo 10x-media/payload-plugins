@@ -95,9 +95,9 @@ export const registerPollCloseTask = (config: Config, pollVotesEnabled = false):
 const canQueue = (payload: Payload): boolean => typeof payload.jobs?.queue === 'function'
 
 /**
- * Delete this form's pending (never-run) close jobs so a re-enqueue supersedes the prior one. Payload
- * 3.85's `jobs.queue` has no concurrency key, so this mirrors core's `deleteScheduledPublishJobs`:
- * a direct `db.deleteMany` on the jobs collection, scoped by task slug and the JSON `input.formId`.
+ * Delete this form's pending (never-run) close jobs so a re-enqueue supersedes the prior one. A
+ * concurrency key would only serialize the jobs, not replace one, so this mirrors core's
+ * `deleteScheduledPublishJobs`: a direct `db.deleteMany` on the jobs collection, scoped by task slug and the JSON `input.formId`.
  * Best-effort; a failure here only risks a duplicate future job, which the idempotent handler absorbs.
  */
 const deletePendingCloseJobs = async (
@@ -112,7 +112,13 @@ const deletePendingCloseJobs = async (
 			where: {
 				and: [
 					{ completedAt: { exists: false } },
-					{ processing: { equals: false } },
+					// Not claimed by a runner right now: no processing lease, or one that has lapsed.
+					{
+						or: [
+							{ processingUntil: { exists: false } },
+							{ processingUntil: { less_than_equal: new Date().toISOString() } },
+						],
+					},
 					{ taskSlug: { equals: POLL_CLOSE_TASK_SLUG } },
 					{ 'input.formId': { equals: String(formId) } },
 				],
@@ -159,6 +165,8 @@ export const enqueuePollClose = async (args: {
 			task: POLL_CLOSE_TASK_SLUG,
 			input: { formId: String(form.id) },
 			waitUntil,
+			// The save already passed the forms collection's access; the queue is the plugin's own.
+			overrideAccess: true,
 			req,
 		})
 	} catch (error) {

@@ -2,14 +2,16 @@
 
 import {
 	Button,
+	CirclePlusIcon,
 	FieldDescription,
 	FieldLabel,
+	LineIcon,
 	RenderCustomComponent,
 	RenderFields,
 	useField,
 	useForm,
 } from '@payloadcms/ui'
-import type { ArrayFieldClientComponent } from 'payload'
+import type { ArrayFieldClientProps } from 'payload'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
 import './admin.css'
@@ -25,7 +27,7 @@ const baseClass = 'fb-condensed-array'
  * at `{path}.{index}` exactly as the native array does, so localization, validation, and descriptions
  * work natively. Placed by {@link departmentsField}.
  */
-export const CondensedArray: ArrayFieldClientComponent = (props) => {
+export const CondensedArray = (props: ArrayFieldClientProps) => {
 	const {
 		field: { name, admin: { description } = {}, fields, label, localized },
 		forceRender = false,
@@ -62,7 +64,6 @@ export const CondensedArray: ArrayFieldClientComponent = (props) => {
 								className={`${baseClass}__fields`}
 								fields={fields}
 								forceRender={forceRender}
-								margins={false}
 								parentIndexPath=""
 								parentPath={`${path}.${index}`}
 								parentSchemaPath={schemaPath}
@@ -72,8 +73,8 @@ export const CondensedArray: ArrayFieldClientComponent = (props) => {
 							{!readOnly ? (
 								<div className={`${baseClass}__remove`}>
 									<Button
-										buttonStyle="icon-label"
-										icon="x"
+										buttonStyle="ghost"
+										icon={<LineIcon size={24} />}
 										onClick={() => removeFieldRow({ path, rowIndex: index })}
 										aria-label={t(keys.departmentRemoveRow)}
 										margin={false}
@@ -87,9 +88,8 @@ export const CondensedArray: ArrayFieldClientComponent = (props) => {
 			{!readOnly ? (
 				<div className={`${baseClass}__actions`}>
 					<Button
-						buttonStyle="icon-label"
-						icon="plus"
-						iconStyle="with-border"
+						buttonStyle="ghost"
+						icon={<CirclePlusIcon size={24} />}
 						iconPosition="left"
 						onClick={() => addFieldRow({ path, rowIndex: rows.length, schemaPath })}
 						margin={false}

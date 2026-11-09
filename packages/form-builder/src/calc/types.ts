@@ -1,4 +1,4 @@
-/** Canonical operator grammar; `CalcExpression`, `normalizeCalc`, and the admin editor's jsonSchema all derive from this list. */
+/** Canonical operator grammar; `CalcExpression`, `normalizeCalc` and the calc builder derive from this list. */
 export const CALC_OPS = ['+', '-', '*', '/', '%'] as const
 export type CalcOp = (typeof CALC_OPS)[number]
 

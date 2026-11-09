@@ -3,6 +3,7 @@
 import {
 	Button,
 	DateCondition,
+	LineIcon,
 	NumberCondition,
 	ReactSelect,
 	type ReactSelectOption,
@@ -109,8 +110,8 @@ export const ConditionRow = ({ condition, operands, onChange, onRemove }: Condit
 			</div>
 			<div className="fb-condition-row__remove">
 				<Button
-					buttonStyle="icon-label"
-					icon="x"
+					buttonStyle="ghost"
+					icon={<LineIcon size={24} />}
 					onClick={onRemove}
 					aria-label={t(keys.conditionRemove)}
 					margin={false}

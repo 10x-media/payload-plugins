@@ -291,7 +291,7 @@ Server code of your own reads the live slugs with `collectionSlugsOf(payload)` i
 import { collectionSlugsOf } from '@10x-media/form-builder'
 
 const { formSubmissions } = collectionSlugsOf(payload)
-const recent = await payload.find({ collection: formSubmissions, limit: 10 })
+const recent = await payload.find({ collection: formSubmissions, limit: 10, overrideAccess: true })
 ```
 
 Renaming on a live database is a migration, not a config tweak. Existing rows stay under the old collection, and voted cookies issued before the change stop matching: a renamed cookie prefix is a different cookie, and a signed allow-change cookie names the collection it was issued for, so a re-vote after the rename counts as a new voter.

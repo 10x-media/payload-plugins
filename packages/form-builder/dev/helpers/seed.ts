@@ -29,6 +29,7 @@ const ensureForm = async (
 	data: Record<string, unknown>
 ): Promise<{ doc: Form; created: boolean }> => {
 	const existing = await payload.find({
+		overrideAccess: true,
 		collection: 'forms',
 		where: { title: { equals: title } },
 		limit: 1,
@@ -38,7 +39,11 @@ const ensureForm = async (
 	if (found) {
 		return { doc: found, created: false }
 	}
-	const created = await payload.create({ collection: 'forms', data: { title, ...data } })
+	const created = await payload.create({
+		overrideAccess: true,
+		collection: 'forms',
+		data: { title, ...data },
+	})
 	payload.logger.info(`Seeded form: ${title}`)
 	return { doc: created, created: true }
 }
@@ -49,6 +54,7 @@ const ensurePage = async (
 	data: Record<string, unknown>
 ): Promise<number | string> => {
 	const existing = await payload.find({
+		overrideAccess: true,
 		collection,
 		where: { slug: { equals: data.slug } },
 		limit: 1,
@@ -58,7 +64,7 @@ const ensurePage = async (
 	if (found) {
 		return found.id
 	}
-	const created = await payload.create({ collection, data })
+	const created = await payload.create({ overrideAccess: true, collection, data })
 	payload.logger.info(`Seeded ${collection}: ${String(data.slug)}`)
 	return created.id
 }
@@ -111,7 +117,7 @@ const idByName = (rows: SeededConsentRow[], name: string): string =>
  * content is simply repeated into the `de` write rather than translated.
  */
 const seedConsentSources = async (payload: Payload): Promise<ConsentSourceIds> => {
-	const current = await payload.findGlobal({ slug: 'settings', depth: 0 })
+	const current = await payload.findGlobal({ overrideAccess: true, slug: 'settings', depth: 0 })
 	const existingRows = (current.consentSources ?? []) as unknown as SeededConsentRow[]
 	if (existingRows.length > 0) {
 		return {
@@ -130,6 +136,7 @@ const seedConsentSources = async (payload: Payload): Promise<ConsentSourceIds> =
 	})
 	const marketingStatementEn = statement('Send me occasional product news')
 	const updated = await payload.updateGlobal({
+		overrideAccess: true,
 		slug: 'settings',
 		data: {
 			consentSources: [
@@ -152,6 +159,7 @@ const seedConsentSources = async (payload: Payload): Promise<ConsentSourceIds> =
 	const marketingRowId = idByName(savedRows, 'Marketing emails')
 
 	await payload.updateGlobal({
+		overrideAccess: true,
 		slug: 'settings',
 		locale: 'de',
 		data: {
@@ -195,12 +203,13 @@ const idByLabel = (rows: SeededDepartmentRow[], label: string): string =>
  * so it never has an English one. Idempotent (skips once any row exists).
  */
 const seedDepartments = async (payload: Payload): Promise<void> => {
-	const current = await payload.findGlobal({ slug: 'settings', depth: 0 })
+	const current = await payload.findGlobal({ overrideAccess: true, slug: 'settings', depth: 0 })
 	const existingRows = (current.departmentEmails ?? []) as unknown as SeededDepartmentRow[]
 	if (existingRows.length > 0) {
 		return
 	}
 	const updated = await payload.updateGlobal({
+		overrideAccess: true,
 		slug: 'settings',
 		data: {
 			departmentEmails: [
@@ -217,6 +226,7 @@ const seedDepartments = async (payload: Payload): Promise<void> => {
 	const billingId = idByLabel(savedRows, 'Billing')
 
 	await payload.updateGlobal({
+		overrideAccess: true,
 		slug: 'settings',
 		locale: 'de',
 		data: {
@@ -255,12 +265,12 @@ const VOTEABLE_NAMES = ATHLETES.slice(0, 4).map((athlete) => athlete.name)
 
 /** Seed the ten athletes the `athleteVote` field draws from. Idempotent (skips once any exist). */
 const seedAthletes = async (payload: Payload): Promise<void> => {
-	const existing = await payload.count({ collection: 'athletes' })
+	const existing = await payload.count({ overrideAccess: true, collection: 'athletes' })
 	if (existing.totalDocs > 0) {
 		return
 	}
 	for (const data of ATHLETES) {
-		await payload.create({ collection: 'athletes', data })
+		await payload.create({ overrideAccess: true, collection: 'athletes', data })
 	}
 	payload.logger.info(`Seeded ${ATHLETES.length} athletes`)
 }
@@ -278,6 +288,7 @@ const localizeDemoContact = async (payload: Payload, form: Form): Promise<void> 
 		row.name === 'fullName' ? { ...row, label: 'Vollständiger Name' } : row
 	)
 	await payload.update({
+		overrideAccess: true,
 		collection: 'forms',
 		id: form.id,
 		locale: 'de',
@@ -295,6 +306,7 @@ const localizeDemoContact = async (payload: Payload, form: Form): Promise<void> 
  */
 const seedDemoContactSubmissions = async (payload: Payload, formId: string): Promise<void> => {
 	await payload.create({
+		overrideAccess: true,
 		collection: 'form-submissions',
 		locale: 'en',
 		data: {
@@ -309,6 +321,7 @@ const seedDemoContactSubmissions = async (payload: Payload, formId: string): Pro
 		},
 	})
 	await payload.create({
+		overrideAccess: true,
 		collection: 'form-submissions',
 		locale: 'de',
 		data: {
@@ -333,6 +346,7 @@ const seedDemoContactSubmissions = async (payload: Payload, formId: string): Pro
  */
 const seedLayoutShowcaseSubmission = async (payload: Payload, formId: string): Promise<void> => {
 	await payload.create({
+		overrideAccess: true,
 		collection: 'form-submissions',
 		locale: 'en',
 		data: {
@@ -365,9 +379,10 @@ const seedLayoutShowcaseSubmission = async (payload: Payload, formId: string): P
  * Idempotent (keyed on title, or on the presence of rows/docs for the global fields and submissions).
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ overrideAccess: true, collection: 'users' })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
 		})
@@ -446,6 +461,7 @@ export const seedDev = async (payload: Payload): Promise<void> => {
 	})
 
 	const voteable = await payload.find({
+		overrideAccess: true,
 		collection: 'athletes',
 		where: { name: { in: VOTEABLE_NAMES } },
 		depth: 0,

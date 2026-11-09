@@ -18,9 +18,9 @@ afterEach(() => {
 })
 
 describe('ConsentRetentionNotice', () => {
-	it('renders the translated retention warning as an info banner', () => {
+	it('renders the translated retention warning as a default banner', () => {
 		render(<ConsentRetentionNotice />)
-		expect(screen.getByTestId('banner')).toHaveAttribute('data-type', 'info')
+		expect(screen.getByTestId('banner')).toHaveAttribute('data-type', 'default')
 		expect(screen.getByTestId('banner')).toHaveTextContent(
 			'formBuilder:form.consentRetentionNotice'
 		)

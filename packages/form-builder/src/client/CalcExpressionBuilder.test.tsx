@@ -39,6 +39,8 @@ const baseFields = vi.hoisted(() => [
 const formData = vi.hoisted(() => ({ current: { fields: [] as unknown[] } }))
 
 vi.mock('@payloadcms/ui', () => ({
+	CirclePlusIcon: () => null,
+	LineIcon: () => null,
 	useField: () => fieldState.current,
 	useFormFields: (sel: (arg: [unknown]) => unknown) => sel([{}]),
 	FieldLabel: () => null,

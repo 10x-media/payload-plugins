@@ -67,6 +67,7 @@ describeForDb('form-builder email locale', {}, (db) => {
 
 		// A `?locale=de` submit reaches the create hook as `req.locale`, which is what gets stored.
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			locale: 'de',
 			data: { form: form.id, values: [{ field: 'email', value: 'visitor@example.com' }] },
@@ -112,6 +113,7 @@ describeForDb('form-builder email locale', {}, (db) => {
 		})
 		for (const locale of ['all', '*', 'fr']) {
 			const submission = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				locale: locale as 'en',
 				data: { form: form.id, values: [] },
@@ -167,6 +169,7 @@ describeForDb('form-builder email locale', {}, (db) => {
 			overrideAccess: true,
 		})
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'vote', value: 'red' }] },
 		})
@@ -278,6 +281,7 @@ describeForDb('form-builder email locale without fallback', {}, (db) => {
 			forced.add(form.id)
 		}
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			locale: 'de',
 			data: { form: form.id, values: [] },
@@ -368,6 +372,7 @@ describeForDb('form-builder per-form fallback locale', {}, (db) => {
 
 	const runFor = async (formId: number | string) => {
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			locale: 'de',
 			data: { form: formId, values: [] },

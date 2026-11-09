@@ -368,6 +368,10 @@ export const buildSubmissionsCollection = ({
 	]
 
 	return {
+		// Rows are written by the submit pipeline and never edited: no history, no core authorship
+		// (Payload 4 turns both on by default). A host override can still turn them back on.
+		versions: false,
+		authorship: false,
 		...(overrides ?? {}),
 		slug: slugs.formSubmissions,
 		labels: {

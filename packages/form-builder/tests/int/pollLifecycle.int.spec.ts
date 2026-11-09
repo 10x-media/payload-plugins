@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq, type PayloadRequest } from 'payload'
+import { createPayloadRequest, type PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import {
 	type FormResultsAccess,
@@ -30,6 +30,7 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 
 	const makeForm = async (over: Record<string, unknown>) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Poll',
@@ -50,6 +51,7 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 
 	const vote = async (formId: number | string, opts?: { req?: PayloadRequest }) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: formId, values: [{ field: 'colour', value: 'red' }] },
@@ -84,7 +86,7 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 
 	it('sets the httpOnly voted cookie on a poll submission create', async () => {
 		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		await vote(form.id, { req })
 		const cookie = req.responseHeaders?.get('set-cookie')
 		expect(cookie).toContain(`fb-voted-${form.id}=1`)
@@ -94,7 +96,7 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 
 	it('sets no cookie for a non-poll form', async () => {
 		const form = await makeForm({})
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		await vote(form.id, { req })
 		expect(req.responseHeaders?.get('set-cookie') ?? null).toBeNull()
 	})
@@ -102,7 +104,7 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 	it('access seam: allows an anonymous read when the host grants it', async () => {
 		const form = await makeForm({ pollEnabled: true, poll: { resultsField: 'colour' } })
 		await vote(form.id)
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		const res = await resolveFormResultsRequest({
 			payload: booted.payload,
 			formId: form.id,
@@ -119,7 +121,7 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 			pollEnabled: true,
 			poll: { resultsField: 'colour' },
 		})
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		const res = await resolveFormResultsRequest({
 			payload: booted.payload,
 			formId: form.id,
@@ -136,7 +138,7 @@ describeForDb('form-builder poll lifecycle', { dbs: ['mongo'] }, (db) => {
 			pollEnabled: true,
 			poll: { resultsField: 'colour' },
 		})
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		const res = await resolveFormResultsRequest({
 			payload: booted.payload,
 			formId: form.id,

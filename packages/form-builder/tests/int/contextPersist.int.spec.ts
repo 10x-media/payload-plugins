@@ -17,6 +17,7 @@ describeForDb('form-builder context + persistSubmissions', { dbs: ['mongo'] }, (
 
 	const makeForm = (data: Record<string, unknown> = {}) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -26,7 +27,11 @@ describeForDb('form-builder context + persistSubmissions', { dbs: ['mongo'] }, (
 		})
 
 	const submit = (formId: number | string, values: { field: string; value: unknown }[]) =>
-		booted.payload.create({ collection: 'form-submissions', data: { form: formId, values } })
+		booted.payload.create({
+			overrideAccess: true,
+			collection: 'form-submissions',
+			data: { form: formId, values },
+		})
 
 	it('verifies a signed context, stores it, and keeps it out of the answers', async () => {
 		const form = await makeForm()
@@ -57,7 +62,7 @@ describeForDb('form-builder context + persistSubmissions', { dbs: ['mongo'] }, (
 		const form = await makeForm({ persistSubmissions: false })
 		const submission = await submit(form.id, [{ field: 'name', value: 'Jo' }])
 		const found = await booted.payload
-			.findByID({ collection: 'form-submissions', id: submission.id })
+			.findByID({ collection: 'form-submissions', id: submission.id, overrideAccess: true })
 			.catch(() => null)
 		expect(found).toBeNull()
 	})
@@ -66,7 +71,7 @@ describeForDb('form-builder context + persistSubmissions', { dbs: ['mongo'] }, (
 		const form = await makeForm({ persistSubmissions: true })
 		const submission = await submit(form.id, [{ field: 'name', value: 'Jo' }])
 		const found = await booted.payload
-			.findByID({ collection: 'form-submissions', id: submission.id })
+			.findByID({ collection: 'form-submissions', id: submission.id, overrideAccess: true })
 			.catch(() => null)
 		expect(found?.id).toBe(submission.id)
 	})

@@ -62,21 +62,37 @@ describeForDb('form-builder department emails (localized host)', { dbs: ['mongo'
 
 	it('stores a different email per locale for the same row, addressed by its own id', async () => {
 		await booted.payload.updateGlobal({
+			overrideAccess: true,
 			slug: 'settings',
 			data: { departmentEmails: [{ label: 'Sales', email: 'sales@example.com' }] },
 		})
-		const seeded = await booted.payload.findGlobal({ slug: 'settings', depth: 0 })
+		const seeded = await booted.payload.findGlobal({
+			overrideAccess: true,
+			slug: 'settings',
+			depth: 0,
+		})
 		const rowId = rowsOf(seeded)[0]?.id
 		expect(rowId).toBeDefined()
 
 		await booted.payload.updateGlobal({
+			overrideAccess: true,
 			slug: 'settings',
 			locale: 'de',
 			data: { departmentEmails: [{ id: rowId, label: 'Vertrieb', email: 'vertrieb@example.de' }] },
 		})
 
-		const en = await booted.payload.findGlobal({ slug: 'settings', locale: 'en', depth: 0 })
-		const de = await booted.payload.findGlobal({ slug: 'settings', locale: 'de', depth: 0 })
+		const en = await booted.payload.findGlobal({
+			overrideAccess: true,
+			slug: 'settings',
+			locale: 'en',
+			depth: 0,
+		})
+		const de = await booted.payload.findGlobal({
+			overrideAccess: true,
+			slug: 'settings',
+			locale: 'de',
+			depth: 0,
+		})
 		expect(rowsOf(en)[0]?.email).toBe('sales@example.com')
 		expect(rowsOf(de)[0]?.email).toBe('vertrieb@example.de')
 	})

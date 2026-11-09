@@ -30,6 +30,8 @@ export const resolvePublishedVersionRef = async (
 			sort: '-updatedAt',
 			limit: 1,
 			depth: 0,
+			// A system lookup on behalf of a submission: the submitter has no read access to versions.
+			overrideAccess: true,
 			req: args.req,
 		})
 		const doc = result?.docs?.[0]

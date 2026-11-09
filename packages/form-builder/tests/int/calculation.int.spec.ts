@@ -22,6 +22,7 @@ describeForDb('form-builder calculation field', { dbs: ['mongo'] }, (db) => {
 
 	it('round-trips a valid expression unchanged', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Calc valid',
@@ -43,6 +44,7 @@ describeForDb('form-builder calculation field', { dbs: ['mongo'] }, (db) => {
 
 	it('drops a malformed expression to undefined', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Calc malformed',
@@ -64,6 +66,7 @@ describeForDb('form-builder calculation field', { dbs: ['mongo'] }, (db) => {
 
 	it('stores the server-computed calc value, ignoring any client-sent value', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Calc trust boundary',
@@ -84,6 +87,7 @@ describeForDb('form-builder calculation field', { dbs: ['mongo'] }, (db) => {
 		})
 
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: {
 				form: form.id,
@@ -102,6 +106,7 @@ describeForDb('form-builder calculation field', { dbs: ['mongo'] }, (db) => {
 
 	it('gates conditions on the computed calc value, not the client-sent one', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Calc gates condition',
@@ -118,6 +123,7 @@ describeForDb('form-builder calculation field', { dbs: ['mongo'] }, (db) => {
 		})
 
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: {
 				form: form.id,

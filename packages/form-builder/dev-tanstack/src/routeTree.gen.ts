@@ -10,12 +10,30 @@
 
 import { Route as rootRouteImport } from './app/__root'
 import { Route as PayloadRouteImport } from './app/_payload'
+import { Route as AthletesRouteImport } from './app/athletes'
+import { Route as FormRouteImport } from './app/form'
+import { Route as PollRouteImport } from './app/poll'
 import { Route as PayloadAdminIndexRouteImport } from './app/_payload/admin.index'
 import { Route as PayloadAdminSplatRouteImport } from './app/_payload/admin.$'
 import { Route as PayloadApiSplatRouteImport } from './app/_payload/api.$'
 
 const PayloadRoute = PayloadRouteImport.update({
   id: '/_payload',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AthletesRoute = AthletesRouteImport.update({
+  id: '/athletes',
+  path: '/athletes',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FormRoute = FormRouteImport.update({
+  id: '/form',
+  path: '/form',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PollRoute = PollRouteImport.update({
+  id: '/poll',
+  path: '/poll',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PayloadAdminIndexRoute = PayloadAdminIndexRouteImport.update({
@@ -36,12 +54,18 @@ const PayloadApiSplatRoute = PayloadApiSplatRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof PayloadRouteWithChildren
+  '/athletes': typeof AthletesRoute
+  '/form': typeof FormRoute
+  '/poll': typeof PollRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/api/$': typeof PayloadApiSplatRoute
   '/admin/': typeof PayloadAdminIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof PayloadRouteWithChildren
+  '/athletes': typeof AthletesRoute
+  '/form': typeof FormRoute
+  '/poll': typeof PollRoute
   '/admin/$': typeof PayloadAdminSplatRoute
   '/api/$': typeof PayloadApiSplatRoute
   '/admin': typeof PayloadAdminIndexRoute
@@ -49,18 +73,25 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_payload': typeof PayloadRouteWithChildren
+  '/athletes': typeof AthletesRoute
+  '/form': typeof FormRoute
+  '/poll': typeof PollRoute
   '/_payload/admin/$': typeof PayloadAdminSplatRoute
   '/_payload/api/$': typeof PayloadApiSplatRoute
   '/_payload/admin/': typeof PayloadAdminIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/admin/$' | '/api/$' | '/admin/'
+  fullPaths:
+    '/' | '/athletes' | '/form' | '/poll' | '/admin/$' | '/api/$' | '/admin/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/admin/$' | '/api/$' | '/admin'
+  to: '/' | '/athletes' | '/form' | '/poll' | '/admin/$' | '/api/$' | '/admin'
   id:
     | '__root__'
     | '/_payload'
+    | '/athletes'
+    | '/form'
+    | '/poll'
     | '/_payload/admin/$'
     | '/_payload/api/$'
     | '/_payload/admin/'
@@ -68,6 +99,9 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   PayloadRoute: typeof PayloadRouteWithChildren
+  AthletesRoute: typeof AthletesRoute
+  FormRoute: typeof FormRoute
+  PollRoute: typeof PollRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -77,6 +111,27 @@ declare module '@tanstack/react-router' {
       path: ''
       fullPath: '/'
       preLoaderRoute: typeof PayloadRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/athletes': {
+      id: '/athletes'
+      path: '/athletes'
+      fullPath: '/athletes'
+      preLoaderRoute: typeof AthletesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/form': {
+      id: '/form'
+      path: '/form'
+      fullPath: '/form'
+      preLoaderRoute: typeof FormRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/poll': {
+      id: '/poll'
+      path: '/poll'
+      fullPath: '/poll'
+      preLoaderRoute: typeof PollRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_payload/admin/': {
@@ -120,6 +175,9 @@ const PayloadRouteWithChildren =
 
 const rootRouteChildren: RootRouteChildren = {
   PayloadRoute: PayloadRouteWithChildren,
+  AthletesRoute: AthletesRoute,
+  FormRoute: FormRoute,
+  PollRoute: PollRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

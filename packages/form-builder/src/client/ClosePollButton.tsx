@@ -4,6 +4,7 @@ import { Button, useDocumentInfo, useForm, useFormFields } from '@payloadcms/ui'
 import { useState } from 'react'
 import { keys, type TranslationKey } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
+import './admin.css'
 
 /** The help line under the button when closing, tailored to the strategy that closing will apply. */
 const closeHintKeyFor = (type: string): TranslationKey => {
@@ -84,13 +85,16 @@ export const ClosePollButton = () => {
 			: closeHintKeyFor(type)
 
 	return (
-		<div className="field-type" style={{ marginBlockEnd: '1rem' }}>
-			<Button buttonStyle="secondary" onClick={closed ? reopen : close} disabled={disabled}>
+		<div className="field-type fb-close-poll">
+			<Button
+				buttonStyle="secondary"
+				className="fb-close-poll__button"
+				onClick={closed ? reopen : close}
+				disabled={disabled}
+			>
 				{t(closed ? keys.pollReopenButton : keys.pollCloseButton)}
 			</Button>
-			<p className="field-description" style={{ marginBlockStart: '0.5rem' }}>
-				{t(hintKey)}
-			</p>
+			<p className="field-description">{t(hintKey)}</p>
 		</div>
 	)
 }

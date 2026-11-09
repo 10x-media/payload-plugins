@@ -22,7 +22,7 @@ export const FormConditionField = (props: FormConditionFieldProps) => {
 	const { path, setValue, value } = useField<Where>()
 	const label = toStaticLabel(props.field?.label ?? props.label)
 	return (
-		<div className="field-type" style={{ marginBlockEnd: '1rem' }}>
+		<div className="field-type">
 			<FieldLabel label={label} path={path} />
 			<ConditionBuilder
 				value={value ?? undefined}

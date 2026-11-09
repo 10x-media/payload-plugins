@@ -49,9 +49,14 @@ describeForDb('form-builder redirectRelationships', { dbs: ['mongo'] }, (db) => 
 		})
 
 		it('persists response.redirect.reference and surfaces it through toFormDocument', async () => {
-			const page = await booted.payload.create({ collection: 'pages', data: { title: 'Thanks' } })
+			const page = await booted.payload.create({
+				overrideAccess: true,
+				collection: 'pages',
+				data: { title: 'Thanks' },
+			})
 
 			const form = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Redirect form',
@@ -73,6 +78,7 @@ describeForDb('form-builder redirectRelationships', { dbs: ['mongo'] }, (db) => 
 			})
 
 			const fetched = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'forms',
 				id: form.id,
 				depth: 0,
@@ -83,6 +89,7 @@ describeForDb('form-builder redirectRelationships', { dbs: ['mongo'] }, (db) => 
 
 		it('leaves the reference unset when the author never picks one', async () => {
 			const form = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'URL-only redirect',
@@ -92,6 +99,7 @@ describeForDb('form-builder redirectRelationships', { dbs: ['mongo'] }, (db) => 
 			})
 
 			const fetched = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'forms',
 				id: form.id,
 				depth: 0,
@@ -121,6 +129,7 @@ describeForDb('form-builder redirectRelationships', { dbs: ['mongo'] }, (db) => 
 
 		it('still accepts a URL-only redirect', async () => {
 			const form = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'No redirectRelationships',

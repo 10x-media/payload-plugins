@@ -46,6 +46,7 @@ describeForDb('form-builder email.departments routing', { dbs: ['mongo'] }, (db)
 		})
 		// Sales carries both locales; Support is en-only (its de address falls back to en at resolve).
 		await booted.payload.updateGlobal({
+			overrideAccess: true,
 			slug: 'settings',
 			data: {
 				departmentEmails: [
@@ -54,9 +55,14 @@ describeForDb('form-builder email.departments routing', { dbs: ['mongo'] }, (db)
 				],
 			},
 		})
-		const seeded = await booted.payload.findGlobal({ slug: 'settings', depth: 0 })
+		const seeded = await booted.payload.findGlobal({
+			overrideAccess: true,
+			slug: 'settings',
+			depth: 0,
+		})
 		const rows = (seeded as { departmentEmails?: Row[] }).departmentEmails ?? []
 		await booted.payload.updateGlobal({
+			overrideAccess: true,
 			slug: 'settings',
 			locale: 'de',
 			data: {
@@ -180,12 +186,14 @@ describeForDb('form-builder email.departments routing', { dbs: ['mongo'] }, (db)
 
 		// The localized `to` round-trips per locale.
 		const en = await booted.payload.findByID({
+			overrideAccess: true,
 			collection: 'forms',
 			id: form.id,
 			locale: 'en',
 			depth: 0,
 		})
 		const de = await booted.payload.findByID({
+			overrideAccess: true,
 			collection: 'forms',
 			id: form.id,
 			locale: 'de',

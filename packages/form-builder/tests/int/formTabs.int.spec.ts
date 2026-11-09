@@ -53,6 +53,7 @@ describeForDb('form-builder form-type tabs', { dbs: ['mongo'] }, (db) => {
 
 	it('still validates outcome membership on a pollEnabled form with the flag hoisted to the root', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Coexist',

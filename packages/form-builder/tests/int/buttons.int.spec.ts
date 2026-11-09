@@ -57,6 +57,7 @@ describeForDb('form-builder button labels (localized host)', { dbs: ['mongo'] },
 
 	it('round-trips per-locale button labels', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Buttons',
@@ -67,13 +68,24 @@ describeForDb('form-builder button labels (localized host)', { dbs: ['mongo'] },
 			},
 		})
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'forms',
 			id: form.id,
 			locale: 'de',
 			data: { submitLabel: 'Abschicken', nextLabel: 'Weiter', prevLabel: 'Zurück' },
 		})
-		const de = await booted.payload.findByID({ collection: 'forms', id: form.id, locale: 'de' })
-		const en = await booted.payload.findByID({ collection: 'forms', id: form.id, locale: 'en' })
+		const de = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			locale: 'de',
+		})
+		const en = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			locale: 'en',
+		})
 		expect(de).toMatchObject({
 			submitLabel: 'Abschicken',
 			nextLabel: 'Weiter',
@@ -137,6 +149,7 @@ describeForDb('form-builder buttons seam (host-extended submit)', {}, (db) => {
 
 	it('persists the host-added field at the top level; toFormDocument forwards only the labels', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Iconed submit',

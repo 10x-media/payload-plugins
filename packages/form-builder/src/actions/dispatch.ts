@@ -99,6 +99,8 @@ export const dispatchActions = async (
 				await payload.jobs.queue({
 					task: ACTIONS_TASK_SLUG,
 					input: { formId: String(formId), submissionId: String(submissionId), ...subset },
+					// Queued for an anonymous submitter: the plugin's own task, not the visitor's.
+					overrideAccess: true,
 					...(withReq ? { req: withReq } : {}),
 				})
 			} catch (error) {

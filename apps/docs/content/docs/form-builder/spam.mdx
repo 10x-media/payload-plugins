@@ -26,7 +26,7 @@ App-level limiting complements edge/CDN/WAF limiting; it does not replace it. It
 
 ## Identity
 
-Payload v3 has no `req.ip`. Identity resolves to the authenticated user id, else the first hop of a trusted IP header (default `x-forwarded-for`). This is proxy-dependent: set `ipHeader` to whatever your proxy sets, or supply your own `identify(req)` (a signed cookie, a session id). When no identity resolves, rate limiting and upload ownership fail open rather than blocking legitimate traffic, so configure your proxy for these controls to bite.
+Payload has no `req.ip`. Identity resolves to the authenticated user id, else the first hop of a trusted IP header (default `x-forwarded-for`). This is proxy-dependent: set `ipHeader` to whatever your proxy sets, or supply your own `identify(req)` (a signed cookie, a session id). When no identity resolves, rate limiting and upload ownership fail open rather than blocking legitimate traffic, so configure your proxy for these controls to bite.
 
 ## Honeypot
 

@@ -15,6 +15,7 @@ describeForDb('form-builder flow normalization', { dbs: ['mongo'] }, (db) => {
 
 	it('stores a valid 2-step flow with transitions intact', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Multi-step with transition',
@@ -62,6 +63,7 @@ describeForDb('form-builder flow normalization', { dbs: ['mongo'] }, (db) => {
 	it('rejects a single-step flow instead of silently discarding it', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Single-step flow',
@@ -75,6 +77,7 @@ describeForDb('form-builder flow normalization', { dbs: ['mongo'] }, (db) => {
 	it('rejects a step that claims the reserved end-of-form sentinel as its id', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					// The reserved-id check is the flow field's own validate, which runs only when the
@@ -100,6 +103,7 @@ describeForDb('form-builder flow normalization', { dbs: ['mongo'] }, (db) => {
 	it('rejects a flow whose steps collapse to fewer than two unique ids', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Duplicate-id flow',
@@ -120,6 +124,7 @@ describeForDb('form-builder flow normalization', { dbs: ['mongo'] }, (db) => {
 
 	it('drops ghost fields, bad transition targets, and bad default next', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Flow with bad refs',

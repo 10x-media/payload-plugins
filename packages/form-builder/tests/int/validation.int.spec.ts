@@ -15,6 +15,7 @@ describeForDb('form-builder validation', { dbs: ['mongo'] }, (db) => {
 
 	it('rejects a submission violating a declarative minLength rule', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Codes',
@@ -30,6 +31,7 @@ describeForDb('form-builder validation', { dbs: ['mongo'] }, (db) => {
 		})
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'code', value: 'ab' }] },
 			})
@@ -38,6 +40,7 @@ describeForDb('form-builder validation', { dbs: ['mongo'] }, (db) => {
 
 	it('accepts a submission satisfying the rule', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Codes',
@@ -52,6 +55,7 @@ describeForDb('form-builder validation', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: form.id, values: [{ field: 'code', value: 'abcd' }] },
@@ -61,6 +65,7 @@ describeForDb('form-builder validation', { dbs: ['mongo'] }, (db) => {
 
 	it('enforces a server-only notAlreadySubmitted rule across submissions', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Signups',
@@ -76,11 +81,13 @@ describeForDb('form-builder validation', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'email', value: 'a@b.com' }] },
 		})
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'email', value: 'a@b.com' }] },
 			})

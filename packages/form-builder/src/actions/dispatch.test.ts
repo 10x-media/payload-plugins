@@ -49,6 +49,7 @@ describe('dispatchActions', () => {
 				task: ACTIONS_TASK_SLUG,
 				input: { formId: 'form-1', submissionId: 'sub-42' },
 				req,
+				overrideAccess: true,
 			})
 		})
 
@@ -237,6 +238,7 @@ describe('dispatchActions', () => {
 				task: ACTIONS_TASK_SLUG,
 				input: { formId: 'form-1', submissionId: 'sub-1', subset: 'rest' },
 				req,
+				overrideAccess: true,
 			})
 			expect((req as { context: Record<string, unknown> }).context).toEqual({})
 		})
@@ -408,6 +410,7 @@ describe('dispatchActions', () => {
 				expect(queue).toHaveBeenCalledWith({
 					task: ACTIONS_TASK_SLUG,
 					input: { formId: 'form-1', submissionId: 'sub-1', subset: 'rest' },
+					overrideAccess: true,
 				})
 			})
 		})

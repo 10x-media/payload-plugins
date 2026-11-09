@@ -17,7 +17,14 @@ export function AthletePoll({
 	pollOptions?: ToFormDocumentOptions['pollOptions']
 }) {
 	return (
-		<main style={{ maxWidth: 640, margin: '2rem auto', padding: '0 1rem' }}>
+		<main
+			style={{
+				fontFamily: 'system-ui, sans-serif',
+				maxWidth: 640,
+				margin: '2rem auto',
+				padding: '0 1rem',
+			}}
+		>
 			<h1>Who will win?</h1>
 			<Poll
 				form={toFormDocument(form, { pollOptions })}

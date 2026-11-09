@@ -49,10 +49,13 @@ const login = async (page: Page): Promise<void> => {
 	expect(res.ok()).toBeTruthy()
 }
 
-/** Open a Payload react-select (its `.react-select` container) and pick the option labeled `name`. */
+/**
+ * Open a Payload react-select (its `.react-select` container) and pick the option labeled `name`.
+ * Payload 4 portals the menu to the body, so the option is looked up page-wide.
+ */
 const pickField = async (fieldSelect: Locator, name: string): Promise<void> => {
 	await fieldSelect.locator('.rs__control').click()
-	await fieldSelect.locator('.rs__option', { hasText: name }).click()
+	await fieldSelect.page().locator('.rs__option', { hasText: name }).click()
 	await expect(fieldSelect).toContainText(name)
 }
 
@@ -85,7 +88,7 @@ test.describe('Kitchen Sink admin', () => {
 		for (let i = 0; i < FIELD_BLOCKS.length; i++) {
 			const block = blocks.nth(i)
 			for (const tab of ['Field', 'Validation', 'Advanced'] as const) {
-				await block.getByRole('button', { name: tab, exact: true }).click()
+				await block.getByRole('tab', { name: tab, exact: true }).click()
 				await expectNoRuntimeErrors(page, errors, `${FIELD_BLOCKS[i]} block / ${tab} tab`)
 			}
 		}
@@ -93,19 +96,19 @@ test.describe('Kitchen Sink admin', () => {
 		// The two the owner actually hit. Text.visibleWhen names the Select operand (SelectCondition),
 		// Number.visibleWhen names the Date operand (DateCondition). Pre-fix both render nothing.
 		const textBlock = blocks.nth(0)
-		await textBlock.getByRole('button', { name: 'Advanced', exact: true }).click()
+		await textBlock.getByRole('tab', { name: 'Advanced', exact: true }).click()
 		await expect(textBlock.locator('.fb-condition-row__value .rs__control')).toBeVisible()
 		await expect(textBlock.locator('.fb-condition-row__value')).toContainText('Option A')
 
 		const numberBlock = blocks.nth(1)
-		await numberBlock.getByRole('button', { name: 'Advanced', exact: true }).click()
+		await numberBlock.getByRole('tab', { name: 'Advanced', exact: true }).click()
 		await expect(
 			numberBlock.locator('.fb-condition-row__value .condition-value-date')
 		).toBeVisible()
 		await expectNoRuntimeErrors(page, errors, 'seeded select and date leaves')
 
 		// Flow tab: the step field list and the interactive WHEN builder.
-		await page.getByRole('button', { name: 'Flow', exact: true }).click()
+		await page.getByRole('tab', { name: 'Flow', exact: true }).click()
 		await expectNoRuntimeErrors(page, errors, 'flow tab')
 
 		const step1 = page.locator('.fb-flow-step').first()
@@ -132,11 +135,12 @@ test.describe('Kitchen Sink admin', () => {
 
 		// The new condition defaults to the first operand (text); cycle the field select through every
 		// type and assert the matching value control renders after each. The select step is the crash.
-		await expect(value.locator('.condition-value-text')).toBeVisible()
+		// Payload 4's text and number leaves are bare `.form-input`s; date and select keep their classes.
+		await expect(value.locator('input.form-input[type="text"]')).toBeVisible()
 		await expectNoRuntimeErrors(page, errors, 'when builder / text leaf')
 
 		await pickField(fieldSelect, 'Number field')
-		await expect(value.locator('.condition-value-number')).toBeVisible()
+		await expect(value.locator('input.form-input[type="number"]')).toBeVisible()
 		await expectNoRuntimeErrors(page, errors, 'when builder / number leaf')
 
 		await pickField(fieldSelect, 'Date field')
@@ -152,11 +156,11 @@ test.describe('Kitchen Sink admin', () => {
 		await expectNoRuntimeErrors(page, errors, 'when builder / checkbox leaf')
 
 		// Poll (gated on pollEnabled) and Actions tabs render without error.
-		await page.getByRole('button', { name: 'Poll', exact: true }).click()
+		await page.getByRole('tab', { name: 'Poll', exact: true }).click()
 		await expect(page.getByText('Vote field')).toBeVisible()
 		await expectNoRuntimeErrors(page, errors, 'poll tab')
 
-		await page.getByRole('button', { name: 'Actions', exact: true }).click()
+		await page.getByRole('tab', { name: 'Actions', exact: true }).click()
 		await expectNoRuntimeErrors(page, errors, 'actions tab')
 	})
 })

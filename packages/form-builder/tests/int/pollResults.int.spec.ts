@@ -19,6 +19,7 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 
 	const makeForm = async (over: Record<string, unknown>) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Poll',
@@ -40,6 +41,7 @@ describeForDb('form-builder poll results gating', { dbs: ['mongo'] }, (db) => {
 
 	const vote = async (formId: number | string, value: string) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: formId, values: [{ field: 'colour', value }] },

@@ -31,6 +31,7 @@ formBuilder({
         depth: 1,
         locale: req.locale,
         req,
+        overrideAccess: true,
       })
       return (settings.consentSources ?? []).map((row) => ({
         id: row.id,

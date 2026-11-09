@@ -31,6 +31,7 @@ describeForDb('form-builder submission status bypass prevention', { dbs: ['mongo
 		runs.length = 0
 		events.length = 0
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Status test',
@@ -39,6 +40,7 @@ describeForDb('form-builder submission status bypass prevention', { dbs: ['mongo
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			// A client cannot bypass the post-submit pipeline by sending status:'partial'.
 			// validateSubmission forces it to 'complete' server-side.
@@ -55,6 +57,7 @@ describeForDb('form-builder submission status bypass prevention', { dbs: ['mongo
 
 	it('a normal submission without explicit status is also complete', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Normal',
@@ -62,6 +65,7 @@ describeForDb('form-builder submission status bypass prevention', { dbs: ['mongo
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'name', value: 'Grace' }] },
 		})

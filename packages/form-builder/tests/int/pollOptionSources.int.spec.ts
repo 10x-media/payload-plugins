@@ -81,6 +81,7 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 
 	const makeForm = async (pollOver: Record<string, unknown> = {}) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Race prediction',
@@ -97,6 +98,7 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 
 	const vote = async (formId: number | string, value: string) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: formId, values: [{ field: 'winner', value }] },
@@ -213,6 +215,7 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 
 	it('forbids anonymous sourced results when the results field type is not poll-eligible', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Planted sourced poll',
@@ -263,7 +266,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 	it('records the outcome via resolvePollOutcome and rejects non-poll forms', async () => {
 		const form = await makeForm()
 		await resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValues: ['ada'] })
-		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const updated = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		const outcome = (
 			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
 		).outcome
@@ -271,6 +279,7 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		expect(typeof outcome?.resolvedAt).toBe('string')
 
 		const plain = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: { title: 'No poll', fields: [] },
 		})
@@ -287,7 +296,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			winningValues: ['ada', 'grace'],
 		})
 		expect(recorded).toEqual(['ada', 'grace'])
-		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const updated = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		const outcome = (
 			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
 		).outcome
@@ -322,7 +336,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		})
 		const recorded = await resolvePollOutcome({ payload: booted.payload, formId: form.id })
 		expect(recorded).toEqual(['grace'])
-		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const updated = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		const outcome = (
 			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
 		).outcome
@@ -337,7 +356,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		})
 		const recorded = await resolvePollOutcome({ payload: booted.payload, formId: form.id })
 		expect(recorded).toEqual(['ada', 'grace'])
-		const updated = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const updated = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		const outcome = (
 			updated.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
 		).outcome
@@ -350,6 +374,7 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		const undecided = await makeForm({ type: 'source', sourceConfig: { eventId: 'race-1' } })
 		expect(await resolvePollOutcome({ payload: booted.payload, formId: undecided.id })).toEqual([])
 		const undecidedDoc = await booted.payload.findByID({
+			overrideAccess: true,
 			collection: 'forms',
 			id: undecided.id,
 			depth: 0,
@@ -362,6 +387,7 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 		const manual = await makeForm({ sourceConfig: { eventId: 'race-1', winner: 'grace' } })
 		expect(await resolvePollOutcome({ payload: booted.payload, formId: manual.id })).toEqual([])
 		const manualDoc = await booted.payload.findByID({
+			overrideAccess: true,
 			collection: 'forms',
 			id: manual.id,
 			depth: 0,
@@ -380,7 +406,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			data: { poll: { outcome: { winningValues: ['ada', 'grace'] } } },
 			overrideAccess: false,
 		})
-		const recorded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const recorded = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		const outcome = (
 			recorded.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
 		).outcome
@@ -393,7 +424,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			data: { poll: { outcome: { winningValues: [] } } },
 			overrideAccess: false,
 		})
-		const cleared = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const cleared = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		const clearedOutcome = (
 			cleared.poll as { outcome?: { winningValues?: string[] | null; resolvedAt?: string | null } }
 		).outcome
@@ -417,7 +453,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 	it('keeps resolvedAt locked against direct writes', async () => {
 		const form = await makeForm()
 		await resolvePollOutcome({ payload: booted.payload, formId: form.id, winningValues: ['ada'] })
-		const recorded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const recorded = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		const stamp = (recorded.poll as { outcome?: { resolvedAt?: string } }).outcome?.resolvedAt
 		expect(stamp).toBeTruthy()
 
@@ -431,7 +472,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			},
 			overrideAccess: false,
 		})
-		const after = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const after = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		const outcome = (after.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } })
 			.outcome
 		expect(outcome?.winningValues).toEqual(['ada'])
@@ -444,7 +490,12 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 			data: { poll: { outcome: { resolvedAt: '2000-01-01T00:00:00.000Z' } } },
 			overrideAccess: false,
 		})
-		const untouched = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const untouched = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		expect((untouched.poll as { outcome?: { resolvedAt?: string } }).outcome?.resolvedAt).toBe(
 			stamp
 		)
@@ -481,6 +532,7 @@ describeForDb('form-builder poll option sources', { dbs: ['mongo'] }, (db) => {
 
 	it('serves authored options for a static poll and errors like the results endpoint', async () => {
 		const staticPoll = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Static poll',

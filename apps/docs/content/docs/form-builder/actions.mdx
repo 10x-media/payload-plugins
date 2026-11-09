@@ -195,7 +195,13 @@ import { departmentsField, formBuilder, resolveDepartmentOptions } from '@10x-me
 formBuilder({
   email: {
     departments: async ({ req }) => {
-      const settings = await req.payload.findGlobal({ slug: 'settings', depth: 0, locale: 'all', req })
+      const settings = await req.payload.findGlobal({
+        slug: 'settings',
+        depth: 0,
+        locale: 'all',
+        req,
+        overrideAccess: true,
+      })
       return resolveDepartmentOptions({ payload: req.payload, req, doc: settings })
     },
   },

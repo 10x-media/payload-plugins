@@ -222,7 +222,7 @@ export const RecipientsSelect = (props: RecipientsSelectProps) => {
 				.filter(Boolean)
 				.join(' ')}
 			id={path ? `field-${path.replace(/\./g, '__')}` : undefined}
-			style={{ marginBlockEnd: '1rem', ...fieldStyle }}
+			style={fieldStyle}
 		>
 			<RenderCustomComponent
 				CustomComponent={Label}
