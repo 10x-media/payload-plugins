@@ -144,6 +144,9 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Введіть лише адресу, наприклад https://analytics.example.com або https://example.com/analytics, без частини, що починається з ? чи #, і без імені користувача та пароля.',
 	[keys.providerErrorHostInsecure]: 'Адреса має починатися з https://.',
+	[keys.providerErrorPosthogHostRegion]: 'Ця адреса з іншого регіону PostHog.',
+	[keys.providerErrorPosthogTokenAsApiKey]: 'Токен проєкту (phc_), а не ключ API.',
+	[keys.providerErrorPosthogKeyAsToken]: 'Приватний ключ. Потрібен токен phc_.',
 	[keys.providerFieldIsDefault]: 'За замовчуванням для цього сайту',
 	[keys.providerFieldIsDefaultHelp]:
 		'Аналітика відкривається в цьому інструменті, якщо читач не вибере інший. За замовчуванням на сайті може бути лише один інструмент.',
