@@ -57,6 +57,7 @@ describeForDb('form-builder calc sources', { dbs: ['mongo'] }, (db) => {
 
 	const makeSourcedForm = () =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Quote',
@@ -87,6 +88,7 @@ describeForDb('form-builder calc sources', { dbs: ['mongo'] }, (db) => {
 
 	it('still drops expressions referencing unregistered keys', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Unregistered',
@@ -105,7 +107,11 @@ describeForDb('form-builder calc sources', { dbs: ['mongo'] }, (db) => {
 
 	it('embeds calcResolved on form reads', async () => {
 		const form = await makeSourcedForm()
-		const read = await booted.payload.findByID({ collection: 'forms', id: form.id })
+		const read = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+		})
 		expect((read as { calcResolved?: unknown }).calcResolved).toEqual({
 			sources: { taxRate: 0.5 },
 			weights: { 'productPrices product': { small: 10, large: 24 } },
@@ -114,6 +120,7 @@ describeForDb('form-builder calc sources', { dbs: ['mongo'] }, (db) => {
 
 	it('does not stamp calcResolved on forms without source usage', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Plain',
@@ -127,13 +134,18 @@ describeForDb('form-builder calc sources', { dbs: ['mongo'] }, (db) => {
 				],
 			},
 		})
-		const read = await booted.payload.findByID({ collection: 'forms', id: form.id })
+		const read = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+		})
 		expect((read as { calcResolved?: unknown }).calcResolved).toBeUndefined()
 	})
 
 	it('computes submissions with resolved sources, weights, and custom functions, ignoring client-sent calc values', async () => {
 		const form = await makeSourcedForm()
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: {
 				form: form.id,
@@ -152,6 +164,7 @@ describeForDb('form-builder calc sources', { dbs: ['mongo'] }, (db) => {
 
 	it('rejects a submission when a used resolver throws, but form reads still succeed', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Broken pricing',
@@ -164,12 +177,17 @@ describeForDb('form-builder calc sources', { dbs: ['mongo'] }, (db) => {
 				],
 			},
 		})
-		const read = await booted.payload.findByID({ collection: 'forms', id: form.id })
+		const read = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+		})
 		expect(read.id).toBe(form.id)
 		expect((read as { calcResolved?: unknown }).calcResolved).toBeUndefined()
 		// The outage surfaces as a translated 503, never a generic 500 leaking the resolver error.
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [] },
 			})

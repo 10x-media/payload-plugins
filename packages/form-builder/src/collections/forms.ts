@@ -81,6 +81,8 @@ const validateFormTitle: TextFieldSingleValidation = (value, { req }) => {
 	return true
 }
 
+const FLOW_SCHEMA_URI = 'https://10xmedia.de/schemas/form-builder/flow.json'
+
 /**
  * Field-level validation for the raw flow JSON: step ids must be non-empty, unique, and not the
  * reserved `END_OF_FORM` sentinel, and every explicit step-id reference (a string `next`, a
@@ -489,10 +491,13 @@ export const buildFormsCollection = ({
 				Field: { path: FLOW_BUILDER_REF, clientProps: { conditionTypes, bareTypeLabels } },
 			},
 		},
-		// Narrows the generated TypeScript type from opaque JSON to FormFlow so callers
-		// don't need a cast. Keep this in sync with src/flow/types.ts.
-		typescriptSchema: [
-			() => ({
+		// Narrows the generated TypeScript type from opaque JSON to FormFlow so callers don't need a
+		// cast (Payload 4 types a json field from jsonSchema.schema). validateFlow replaces the stock
+		// json validate, so the schema never gates a save. Keep this in sync with src/flow/types.ts.
+		jsonSchema: {
+			uri: FLOW_SCHEMA_URI,
+			fileMatch: [FLOW_SCHEMA_URI],
+			schema: {
 				type: 'object' as const,
 				required: ['steps'],
 				additionalProperties: false,
@@ -524,8 +529,8 @@ export const buildFormsCollection = ({
 						},
 					},
 				},
-			}),
-		],
+			},
+		},
 	}
 
 	const actionsField: Field = {
@@ -904,6 +909,9 @@ export const buildFormsCollection = ({
 	})
 
 	return {
+		// Payload 4 versions every collection by default; forms had no history on Payload 3 and keep
+		// none unless the host's `overrides` turns it on.
+		versions: false,
 		...(overrides ?? {}),
 		slug: slugs.forms,
 		labels: {

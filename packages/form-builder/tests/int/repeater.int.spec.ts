@@ -15,6 +15,7 @@ describeForDb('form-builder repeater', { dbs: ['mongo'] }, (db) => {
 
 	it('rejects a zero-row submission when minRows is set', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Members',
@@ -31,6 +32,7 @@ describeForDb('form-builder repeater', { dbs: ['mongo'] }, (db) => {
 		})
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [] },
 			})
@@ -39,6 +41,7 @@ describeForDb('form-builder repeater', { dbs: ['mongo'] }, (db) => {
 
 	it('accepts a submission that meets minRows', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Members2',
@@ -54,6 +57,7 @@ describeForDb('form-builder repeater', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: {
@@ -66,6 +70,7 @@ describeForDb('form-builder repeater', { dbs: ['mongo'] }, (db) => {
 
 	it('accepts a zero-row submission when minRows is 0 (or unset)', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Optional repeater',
@@ -80,6 +85,7 @@ describeForDb('form-builder repeater', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: form.id, values: [] },
@@ -89,6 +95,7 @@ describeForDb('form-builder repeater', { dbs: ['mongo'] }, (db) => {
 
 	it('rejects a submission that exceeds maxRows', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Capped list',
@@ -105,6 +112,7 @@ describeForDb('form-builder repeater', { dbs: ['mongo'] }, (db) => {
 		})
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: {
 					form: form.id,

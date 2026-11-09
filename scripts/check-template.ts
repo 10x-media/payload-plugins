@@ -52,8 +52,9 @@ const TRACKED = [
  * `routeTree.gen.ts`), never for boilerplate that drifted.
  */
 const EXEMPT: Record<string, readonly string[]> = {
-	// The website demo page its e2e suite drives on both frameworks (`dev-tanstack/src/app/index.tsx`).
+	// The website demo pages their e2e suites drive on both frameworks (`dev-tanstack/src/app/*.tsx`).
 	'dual-session': ['dev-tanstack/src/routeTree.gen.ts'],
+	'form-builder': ['dev-tanstack/src/routeTree.gen.ts'],
 	impersonation: ['dev-tanstack/src/routeTree.gen.ts'],
 }
 

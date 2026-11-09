@@ -17,6 +17,7 @@ describeForDb('form-builder access: actions field', { dbs: ['mongo'] }, (db) => 
 	beforeAll(async () => {
 		booted = await bootPayload({ plugin: formBuilder({ actions: { noop } }), db })
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Webhook Test',

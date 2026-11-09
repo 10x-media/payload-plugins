@@ -109,7 +109,7 @@ formBuilder({
       taxRate: defineCalcSource({
         label: { en: 'Tax rate', de: 'Steuersatz' },
         resolve: async ({ payload }) => {
-          const settings = await payload.findGlobal({ slug: 'settings' })
+          const settings = await payload.findGlobal({ slug: 'settings', overrideAccess: true })
           return settings.taxRate ?? 1.19
         },
       }),
@@ -122,6 +122,7 @@ formBuilder({
             collection: 'products',
             where: { id: { in: ids } },
             depth: 0,
+            overrideAccess: true,
           })
           return Object.fromEntries(products.docs.map((p) => [String(p.id), p.price]))
         },

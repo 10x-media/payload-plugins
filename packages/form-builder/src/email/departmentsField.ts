@@ -41,7 +41,12 @@ export type DepartmentsFieldOptions = {
  * formBuilder({
  *   email: {
  *     departments: async ({ req }) => {
- *       const settings = await req.payload.findGlobal({ slug: 'settings', depth: 0, locale: 'all' })
+ *       const settings = await req.payload.findGlobal({
+ *         slug: 'settings',
+ *         depth: 0,
+ *         locale: 'all',
+ *         overrideAccess: true,
+ *       })
  *       return resolveDepartmentOptions({ payload: req.payload, req, doc: settings })
  *     },
  *   },

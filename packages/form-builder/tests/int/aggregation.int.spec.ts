@@ -8,9 +8,16 @@ import { formBuilder } from '../../src/index'
 
 describeForDb('form-builder response aggregation', { dbs: ['mongo'] }, (db) => {
 	let booted: BootedPayload
+	let admin: { id: number | string }
 
 	beforeAll(async () => {
 		booted = await bootPayload({ plugin: formBuilder({}), db })
+		// Payload 4 stamps createdBy/updatedBy from req.user, so the acting admin must exist.
+		admin = await booted.payload.create({
+			collection: 'users',
+			data: { email: 'admin@example.com', password: 'password' },
+			overrideAccess: true,
+		})
 	})
 
 	afterAll(async () => {
@@ -19,6 +26,7 @@ describeForDb('form-builder response aggregation', { dbs: ['mongo'] }, (db) => {
 
 	const makePollForm = async () =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Colour poll',
@@ -39,6 +47,7 @@ describeForDb('form-builder response aggregation', { dbs: ['mongo'] }, (db) => {
 
 	const vote = async (formId: number | string, value: string) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: formId, values: [{ field: 'colour', value }] },
@@ -83,7 +92,7 @@ describeForDb('form-builder response aggregation', { dbs: ['mongo'] }, (db) => {
 			depth: 0,
 			// Authenticated (admin) creates can set partial; an unauthenticated create would be
 			// forced to 'complete' by validateSubmission. Simulate an admin-created partial.
-			req: { user: { id: 'admin', collection: 'users' } } as never,
+			req: { user: { ...admin, collection: 'users' } } as never,
 			data: { form: form.id, status: 'partial', values: [{ field: 'colour', value: 'blue' }] },
 		})
 		const completeOnly = await aggregateFieldResponses({
@@ -134,6 +143,7 @@ describeForDb('form-builder response aggregation', { dbs: ['mongo'] }, (db) => {
 			await aggregateFieldResponses({ payload: booted.payload, formId: form.id, field: 'nope' })
 		).toBeNull()
 		const textForm = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: { title: 'Text', fields: [{ blockType: 'text', name: 'msg', label: 'Message' }] },
 		})

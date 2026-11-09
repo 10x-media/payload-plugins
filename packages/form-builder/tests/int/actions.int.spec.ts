@@ -15,6 +15,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 
 	it('stores a form with an emailTeam action block', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -39,6 +40,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 
 	it('stores multiple action blocks of different types', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Multi-action',
@@ -58,6 +60,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 	it('rejects a confirmation toField that names no field on the form', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Unknown toField',
@@ -73,6 +76,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 	it('rejects a confirmation toField that names a non-email field', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Non-email toField',
@@ -87,6 +91,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 
 	it('accepts a confirmation toField that names a real email field', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Valid toField',
@@ -104,6 +109,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 	it('rejects a signedWebhook url that is not a valid http(s) URL', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Invalid webhook url',
@@ -116,6 +122,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 
 	it('accepts a signedWebhook url that is a valid https URL', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Valid webhook url',
@@ -130,6 +137,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 
 	it('stores a form with no actions', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: { title: 'No actions', fields: [] },
 		})
@@ -155,6 +163,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		}
 
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Rich body',
@@ -164,6 +173,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		})
 
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'name', value: 'Ada & Bo' }] },
 		})
@@ -183,6 +193,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		booted.payload.sendEmail = sendEmail as typeof booted.payload.sendEmail
 
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Legacy body',
@@ -194,6 +205,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		})
 
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'name', value: 'Ada & Bo' }] },
 		})
@@ -213,6 +225,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		booted.payload.sendEmail = sendEmail as typeof booted.payload.sendEmail
 
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Cc/bcc/replyTo form',
@@ -232,6 +245,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		})
 
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'name', value: 'ada' }] },
 		})
@@ -254,6 +268,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		booted.payload.sendEmail = sendEmail as typeof booted.payload.sendEmail
 
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Confirmation cc/bcc/replyTo form',
@@ -273,6 +288,7 @@ describeForDb('form-builder actions storage', { dbs: ['mongo'] }, (db) => {
 		})
 
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: { form: form.id, values: [{ field: 'email', value: 'visitor@example.com' }] },
 		})

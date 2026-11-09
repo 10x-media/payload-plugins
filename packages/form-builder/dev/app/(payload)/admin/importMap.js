@@ -5,6 +5,9 @@ import { FieldNameSelect as FieldNameSelect_bf8585411c882b493b730d03575f3f2f } f
 import { FormConditionField as FormConditionField_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FieldBlockLabel as FieldBlockLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { CalcExpressionBuilder as CalcExpressionBuilder_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
+import { EndpointOptionsSelect as EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
+import { ConsentBlockLabel as ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
+import { ByteSizeField as ByteSizeField_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { RscEntryLexicalCell as RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { RscEntryLexicalField as RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
 import { LexicalDiffComponent as LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e } from '@payloadcms/richtext-lexical/rsc'
@@ -32,7 +35,6 @@ import { FieldCountCell as FieldCountCell_bf8585411c882b493b730d03575f3f2f } fro
 import { FlowStepsCell as FlowStepsCell_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { FlowBuilder as FlowBuilder_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { ClosePollButton as ClosePollButton_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
-import { EndpointOptionsSelect as EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { RecipientsSelect as RecipientsSelect_bf8585411c882b493b730d03575f3f2f } from '@10x-media/form-builder/client'
 import { SubmissionAnswers as SubmissionAnswers_1bd79870ef6e5eeafe3661c2cad4b1f5 } from '@10x-media/form-builder/rsc'
 import { LLMInstructionsDescription as LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
@@ -59,6 +61,9 @@ export const importMap = {
   "@10x-media/form-builder/client#FormConditionField": FormConditionField_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FieldBlockLabel": FieldBlockLabel_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#CalcExpressionBuilder": CalcExpressionBuilder_bf8585411c882b493b730d03575f3f2f,
+  "@10x-media/form-builder/client#EndpointOptionsSelect": EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f,
+  "@10x-media/form-builder/client#ConsentBlockLabel": ConsentBlockLabel_bf8585411c882b493b730d03575f3f2f,
+  "@10x-media/form-builder/client#ByteSizeField": ByteSizeField_bf8585411c882b493b730d03575f3f2f,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalCell": RscEntryLexicalCell_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#RscEntryLexicalField": RscEntryLexicalField_44fe37237e0ebf4470c9990d8cb7b07e,
   "@payloadcms/richtext-lexical/rsc#LexicalDiffComponent": LexicalDiffComponent_44fe37237e0ebf4470c9990d8cb7b07e,
@@ -86,7 +91,6 @@ export const importMap = {
   "@10x-media/form-builder/client#FlowStepsCell": FlowStepsCell_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#FlowBuilder": FlowBuilder_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#ClosePollButton": ClosePollButton_bf8585411c882b493b730d03575f3f2f,
-  "@10x-media/form-builder/client#EndpointOptionsSelect": EndpointOptionsSelect_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/client#RecipientsSelect": RecipientsSelect_bf8585411c882b493b730d03575f3f2f,
   "@10x-media/form-builder/rsc#SubmissionAnswers": SubmissionAnswers_1bd79870ef6e5eeafe3661c2cad4b1f5,
   "@payloadcms/ui#LLMInstructionsDescription": LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de,

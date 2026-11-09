@@ -3,16 +3,20 @@
 import {
 	Button,
 	CheckboxInput,
+	ChevronIcon,
+	CirclePlusIcon,
 	Collapsible,
 	FieldLabel,
+	LineIcon,
+	MoreIcon,
+	Popup,
+	PopupList,
 	ReactSelect,
 	type ReactSelectOption,
 	TextInput,
 	useField,
 	useFormFields,
 } from '@payloadcms/ui'
-import { Popup, PopupList } from '@payloadcms/ui/elements/Popup'
-import { MoreIcon } from '@payloadcms/ui/icons/More'
 import { reduceFieldsToValues } from 'payload/shared'
 import type { ChangeEvent } from 'react'
 import { useMemo, useRef, useState } from 'react'
@@ -107,27 +111,25 @@ const TransitionRow = ({
 					/>
 				</div>
 				<div className="fb-flow-transition__actions">
-					<button
-						type="button"
-						className="fb-flow__move-btn"
+					<Button
+						buttonStyle="ghost"
+						icon={<ChevronIcon direction="up" size={24} />}
 						onClick={onMoveUp}
 						disabled={isFirst}
+						margin={false}
 						aria-label={t(keys.flowMoveTransitionUp)}
-					>
-						↑
-					</button>
-					<button
-						type="button"
-						className="fb-flow__move-btn"
+					/>
+					<Button
+						buttonStyle="ghost"
+						icon={<ChevronIcon direction="down" size={24} />}
 						onClick={onMoveDown}
 						disabled={isLast}
+						margin={false}
 						aria-label={t(keys.flowMoveTransitionDown)}
-					>
-						↓
-					</button>
+					/>
 					<Button
-						buttonStyle="icon-label"
-						icon="x"
+						buttonStyle="ghost"
+						icon={<LineIcon size={24} />}
 						onClick={onRemove}
 						margin={false}
 						aria-label={t(keys.flowRemoveTransition)}
@@ -360,9 +362,8 @@ const StepCard = ({
 						)
 					})}
 					<Button
-						buttonStyle="icon-label"
-						icon="plus"
-						iconStyle="with-border"
+						buttonStyle="ghost"
+						icon={<CirclePlusIcon size={24} />}
 						iconPosition="left"
 						onClick={addTransition}
 						margin={false}
@@ -490,11 +491,15 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 
 	return (
 		<div className="field-type fb-flow-builder">
-			<div className="blocks-field__header">
+			<header className="blocks-field__header">
 				<div className="blocks-field__header-wrap">
-					<h3>{typeof label === 'string' ? label : t(keys.flowFallbackTitle)}</h3>
+					<div className="blocks-field__header-content">
+						<h3 className="blocks-field__title">
+							{typeof label === 'string' ? label : t(keys.flowFallbackTitle)}
+						</h3>
+					</div>
 				</div>
-			</div>
+			</header>
 			<p className="fb-flow-builder__description">{t(keys.flowDescription)}</p>
 			{steps.length === 0 ? (
 				<p className="fb-flow-builder__hint">{t(keys.flowNoSteps)}</p>
@@ -555,9 +560,8 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 			) : null}
 			<div className="fb-flow-builder__actions">
 				<Button
-					buttonStyle="icon-label"
-					icon="plus"
-					iconStyle="with-border"
+					buttonStyle="ghost"
+					icon={<CirclePlusIcon size={24} />}
 					iconPosition="left"
 					onClick={addStep}
 					margin={false}

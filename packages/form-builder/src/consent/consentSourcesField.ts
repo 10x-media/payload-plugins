@@ -51,7 +51,13 @@ export type ConsentSourcesFieldOptions = {
  * formBuilder({
  *   consent: {
  *     sources: async ({ req }) => {
- *       const settings = await req.payload.findGlobal({ slug: 'settings', depth: 0, locale: req.locale, req })
+ *       const settings = await req.payload.findGlobal({
+ *         slug: 'settings',
+ *         depth: 0,
+ *         locale: req.locale,
+ *         overrideAccess: true,
+ *         req,
+ *       })
  *       return (settings.consentSources ?? []).map((row) => ({ ... }))
  *     },
  *   },

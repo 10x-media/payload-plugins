@@ -154,7 +154,7 @@ export const EndpointOptionsSelect = (props: EndpointOptionsSelectProps) => {
 		: undefined
 
 	return (
-		<div className="field-type" style={{ marginBlockEnd: '1rem', ...fieldStyle }}>
+		<div className="field-type" style={fieldStyle}>
 			<FieldLabel label={label} localized={props.field?.localized} path={path} />
 			<ReactSelect
 				options={allOptions}

@@ -50,7 +50,6 @@ describe('validateExpression', () => {
 type FieldWithJSONShape = {
 	name: string
 	jsonSchema?: { fileMatch: string[]; schema: unknown; uri: string }
-	typescriptSchema?: Array<(args: { jsonSchema: unknown }) => unknown>
 	admin?: { components?: { Field?: unknown }; description?: unknown }
 }
 
@@ -59,18 +58,9 @@ const expressionField = (calculationField.config as FieldWithJSONShape[]).find(
 )
 
 describe('calculationField expression config', () => {
-	it('carries a jsonSchema for editor autocomplete', () => {
-		expect(expressionField?.jsonSchema).toBeDefined()
+	it('hands type generation a flat, ref-free object schema', () => {
 		expect(expressionField?.jsonSchema?.uri).toContain('calc-expression.json')
-		expect(expressionField?.jsonSchema?.fileMatch).toEqual([expressionField?.jsonSchema?.uri])
-	})
-
-	it('gives type generation a flat, $ref-free schema via typescriptSchema', () => {
-		const overrides = expressionField?.typescriptSchema
-		expect(overrides).toHaveLength(1)
-		const generated = overrides?.[0]?.({ jsonSchema: expressionField?.jsonSchema?.schema })
-		expect(generated).toEqual({ type: 'object' })
-		expect(JSON.stringify(generated)).not.toContain('$ref')
+		expect(expressionField?.jsonSchema?.schema).toEqual({ type: 'object' })
 	})
 
 	it('mounts the visual expression builder without a field description', () => {

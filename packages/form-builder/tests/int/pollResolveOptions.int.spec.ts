@@ -99,7 +99,7 @@ describeForDb('form-builder poll resolveOptions', { dbs: ['mongo'] }, (db) => {
 		})
 		const created = await Promise.all(
 			['Ada', 'Grace', 'Linus', 'Margaret'].map((name) =>
-				booted.payload.create({ collection: 'athletes', data: { name } })
+				booted.payload.create({ overrideAccess: true, collection: 'athletes', data: { name } })
 			)
 		)
 		athleteIds = created.map((doc) => doc.id)
@@ -113,6 +113,7 @@ describeForDb('form-builder poll resolveOptions', { dbs: ['mongo'] }, (db) => {
 
 	const makeVoteForm = async () =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Best athlete',
@@ -124,6 +125,7 @@ describeForDb('form-builder poll resolveOptions', { dbs: ['mongo'] }, (db) => {
 
 	const vote = async (formId: number | string, value: string) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: formId, values: [{ field: 'pick', value }] },
@@ -258,7 +260,12 @@ describeForDb('form-builder poll resolveOptions', { dbs: ['mongo'] }, (db) => {
 			data: { poll: { outcome: { winningValues: [String(athleteIds[0])] } } },
 			overrideAccess: false,
 		})
-		const recorded = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const recorded = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		const outcome = (
 			recorded.poll as { outcome?: { winningValues?: string[]; resolvedAt?: string } }
 		).outcome

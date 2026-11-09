@@ -15,6 +15,7 @@ describeForDb('form-builder condition normalization', { dbs: ['mongo'] }, (db) =
 
 	it('canonicalizes a shorthand visibleWhen to OR-of-ANDs on create', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Normalize Shorthand',
@@ -37,6 +38,7 @@ describeForDb('form-builder condition normalization', { dbs: ['mongo'] }, (db) =
 
 	it('drops a visibleWhen referencing a field not in the form', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Drop Unknown Ref',

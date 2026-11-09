@@ -12,5 +12,5 @@ import { useTranslation } from '../translations/useTranslation'
  */
 export const ConsentRetentionNotice = () => {
 	const { t } = useTranslation()
-	return <Banner type="info">{t(keys.formConsentRetentionNotice)}</Banner>
+	return <Banner type="default">{t(keys.formConsentRetentionNotice)}</Banner>
 }

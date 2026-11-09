@@ -97,7 +97,13 @@ type ConsentSourceRow = {
  * stays an id so a page can be renamed or re-slugged without stranding past proofs.
  */
 const consentSources = async ({ req }: { req: PayloadRequest }): Promise<ConsentSourceEntry[]> => {
-	const doc = await req.payload.findGlobal({ slug: 'settings', depth: 1, locale: req.locale, req })
+	const doc = await req.payload.findGlobal({
+		slug: 'settings',
+		depth: 1,
+		locale: req.locale,
+		overrideAccess: true,
+		req,
+	})
 	const rows = (doc.consentSources ?? []) as unknown as ConsentSourceRow[]
 	return rows.map((row): ConsentSourceEntry => {
 		const page = row.page
@@ -120,7 +126,13 @@ const consentSources = async ({ req }: { req: PayloadRequest }): Promise<Consent
  * fallback (which does not apply to an `'all'` read).
  */
 const departmentEmails: DepartmentEmailsResolver = async ({ req }) => {
-	const doc = await req.payload.findGlobal({ slug: 'settings', locale: 'all', depth: 0, req })
+	const doc = await req.payload.findGlobal({
+		slug: 'settings',
+		locale: 'all',
+		depth: 0,
+		overrideAccess: true,
+		req,
+	})
 	return resolveDepartmentOptions({
 		payload: req.payload,
 		req,

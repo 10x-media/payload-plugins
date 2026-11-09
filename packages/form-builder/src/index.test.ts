@@ -1,4 +1,4 @@
-import type { Config } from 'payload'
+import type { Block, Config } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { formBuilder } from './index'
 import { keys } from './translations'
@@ -34,7 +34,7 @@ describe('formBuilder factory', () => {
 			)
 		const fieldOf = (blocks: ReturnType<typeof blocksFieldNamed>, slug: string, name: string) =>
 			blocks?.blocks
-				?.find((b) => b.slug === slug)
+				?.find((b): b is Block => typeof b !== 'string' && b.slug === slug)
 				?.fields.find((f) => 'name' in f && f.name === name) as { editor?: unknown } | undefined
 		const actionsField = blocksFieldNamed('actions')
 		const fieldsField = blocksFieldNamed('fields')
@@ -45,7 +45,9 @@ describe('formBuilder factory', () => {
 		const responseMessage = responseGroup?.fields.find(
 			(f) => 'name' in f && f.name === 'message'
 		) as { editor?: unknown } | undefined
-		const messageBlock = fieldsField?.blocks?.find((b) => b.slug === 'message')
+		const messageBlock = fieldsField?.blocks?.find(
+			(b): b is Block => typeof b !== 'string' && b.slug === 'message'
+		)
 		const messageContent = messageBlock?.fields.find((f) => 'name' in f && f.name === 'content') as
 			| { editor?: unknown }
 			| undefined
@@ -139,7 +141,7 @@ describe('formBuilder factory', () => {
 		)
 		const fromFieldOf = (slug: string) =>
 			actionsField?.blocks
-				?.find((b) => b.slug === slug)
+				?.find((b): b is Block => typeof b !== 'string' && b.slug === slug)
 				?.fields.find((f) => 'name' in f && f.name === 'from')
 		const endpoints = forms?.endpoints as Array<{ path: string }> | undefined
 		return {

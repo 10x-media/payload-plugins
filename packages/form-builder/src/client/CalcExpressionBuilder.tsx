@@ -2,8 +2,10 @@
 
 import {
 	Button,
+	CirclePlusIcon,
 	FieldError,
 	FieldLabel,
+	LineIcon,
 	ReactSelect,
 	type ReactSelectOption,
 	RenderCustomComponent,
@@ -406,8 +408,8 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 							{operand.args.length > 1 ? (
 								<div className="fb-calc-fn__arg-remove">
 									<Button
-										buttonStyle="icon-label"
-										icon="x"
+										buttonStyle="ghost"
+										icon={<LineIcon size={24} />}
 										aria-label={t(keys.calcBuilderRemove)}
 										margin={false}
 										disabled={readOnly}
@@ -424,9 +426,8 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 					))}
 					<div className="fb-calc-fn__add">
 						<Button
-							buttonStyle="icon-label"
-							icon="plus"
-							iconStyle="with-border"
+							buttonStyle="ghost"
+							icon={<CirclePlusIcon size={24} />}
 							iconPosition="left"
 							margin={false}
 							disabled={readOnly}
@@ -554,7 +555,7 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 				) : null}
 				{operand.kind === 'lit' ? (
 					<NumberInput
-						className="fb-calc-operand__number"
+						className="form-input fb-calc-operand__number"
 						id={`${idPrefix}-number`}
 						aria-label={t(keys.calcBuilderNumber)}
 						disabled={readOnly}
@@ -651,7 +652,7 @@ const OperandCard = ({ operand, onChange, ctx, idPrefix }: OperandCardProps) => 
 								{option.label}
 							</label>
 							<NumberInput
-								className="fb-calc-operand__weight"
+								className="form-input fb-calc-operand__weight"
 								id={`${idPrefix}-weight-${option.value}`}
 								disabled={readOnly}
 								value={operand.weights?.[option.value]}
@@ -758,8 +759,8 @@ const ChainEditor = ({ chain, onChange, onEmptied, isRoot, ctx, idPrefix }: Chai
 					{rows.length > 1 || isRoot ? (
 						<div className="fb-calc-row__remove">
 							<Button
-								buttonStyle="icon-label"
-								icon="x"
+								buttonStyle="ghost"
+								icon={<LineIcon size={24} />}
 								aria-label={t(keys.calcBuilderRemove)}
 								margin={false}
 								disabled={readOnly}
@@ -771,9 +772,8 @@ const ChainEditor = ({ chain, onChange, onEmptied, isRoot, ctx, idPrefix }: Chai
 			))}
 			<div className="fb-calc-chain__add">
 				<Button
-					buttonStyle="icon-label"
-					icon="plus"
-					iconStyle="with-border"
+					buttonStyle="ghost"
+					icon={<CirclePlusIcon size={24} />}
 					iconPosition="left"
 					margin={false}
 					disabled={readOnly}

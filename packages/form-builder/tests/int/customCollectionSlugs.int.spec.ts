@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq, type Endpoint, type PayloadRequest } from 'payload'
+import { createPayloadRequest, type Endpoint, type PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { defineAction } from '../../src/actions/defineAction'
 import { ACTIONS_TASK_SLUG } from '../../src/actions/task'
@@ -58,6 +58,7 @@ describeForDb('form-builder with renamed collections and cookie prefix', {}, (db
 
 	const makePoll = (over: Record<string, unknown> = {}) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: FORMS,
 			data: {
 				title: 'Renamed poll',
@@ -96,10 +97,10 @@ describeForDb('form-builder with renamed collections and cookie prefix', {}, (db
 			},
 			body: JSON.stringify(data),
 		})
-		const req = await createLocalReq(
-			{ req: request as unknown as Partial<PayloadRequest> },
-			booted.payload
-		)
+		const req = await createPayloadRequest({
+			payload: booted.payload,
+			req: request as unknown as Partial<PayloadRequest>,
+		})
 		req.routeParams = { collection: SUBMISSIONS }
 		const response = await endpoint.handler(req)
 		const body = (await response.json()) as { doc?: { id: number | string } }
@@ -163,6 +164,7 @@ describeForDb('form-builder with renamed collections and cookie prefix', {}, (db
 		expect(second.status).toBe(200)
 		expect(String(second.doc?.id)).toBe(String(first.doc?.id))
 		const { totalDocs } = await booted.payload.count({
+			overrideAccess: true,
 			collection: SUBMISSIONS,
 			where: { form: { equals: form.id } },
 		})
@@ -192,7 +194,7 @@ describeForDb('form-builder with renamed collections and cookie prefix', {}, (db
 			expect((await submit({ form: form.id, values: [{ field: 'vote', value }] })).status).toBe(201)
 		}
 		const read = async () => {
-			const req = await createLocalReq({}, booted.payload)
+			const req = await createPayloadRequest({ payload: booted.payload })
 			const res = await resolveFormResultsRequest({
 				payload: booted.payload,
 				formId: form.id,
@@ -220,7 +222,7 @@ describeForDb('form-builder with renamed collections and cookie prefix', {}, (db
 		const outcome = (resolved as { poll?: { outcome?: Outcome } }).poll?.outcome
 		expect(outcome?.winningValues).toEqual(['a'])
 
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		const closed = await resolvePollCloseRequest({
 			payload: booted.payload,
 			formId: form.id,
@@ -233,6 +235,7 @@ describeForDb('form-builder with renamed collections and cookie prefix', {}, (db
 	it('runs actions and prunes from the renamed submissions collection', async () => {
 		recorded.length = 0
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: FORMS,
 			data: {
 				title: 'Renamed signup',
@@ -249,6 +252,7 @@ describeForDb('form-builder with renamed collections and cookie prefix', {}, (db
 		await vi.waitFor(async () => {
 			expect(recorded).toContain(String(doc?.id))
 			const { totalDocs } = await booted.payload.count({
+				overrideAccess: true,
 				collection: SUBMISSIONS,
 				where: { form: { equals: form.id } },
 			})
@@ -258,6 +262,7 @@ describeForDb('form-builder with renamed collections and cookie prefix', {}, (db
 
 	it('enforces notAlreadySubmitted by querying the renamed submissions collection', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: FORMS,
 			data: {
 				title: 'Renamed dedup',
@@ -312,6 +317,7 @@ describeForDb('form-builder renamed collections on the queued path', {}, (db) =>
 	const pendingJobs = async (taskSlug: string): Promise<number> =>
 		(
 			await booted.payload.count({
+				overrideAccess: true,
 				collection: 'payload-jobs',
 				where: { and: [{ taskSlug: { equals: taskSlug } }, { completedAt: { exists: false } }] },
 			})
@@ -320,6 +326,7 @@ describeForDb('form-builder renamed collections on the queued path', {}, (db) =>
 	it('queues the actions task, then runs and prunes against the renamed collections', async () => {
 		recorded.length = 0
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: FORMS,
 			data: {
 				title: 'Queued signup',
@@ -329,16 +336,18 @@ describeForDb('form-builder renamed collections on the queued path', {}, (db) =>
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: SUBMISSIONS,
 			data: { form: form.id, values: [{ field: 'name', value: 'Ada' }] },
 		})
 		expect(recorded).toEqual([])
 		expect(await pendingJobs(ACTIONS_TASK_SLUG)).toBe(1)
 
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 
 		expect(recorded).toEqual([String(submission.id)])
 		const { totalDocs } = await booted.payload.count({
+			overrideAccess: true,
 			collection: SUBMISSIONS,
 			where: { form: { equals: form.id } },
 		})
@@ -348,6 +357,7 @@ describeForDb('form-builder renamed collections on the queued path', {}, (db) =>
 	it('runs the queued poll close job against the renamed forms and tallies', async () => {
 		const poll = (closesAt: string) => ({ resultsField: 'vote', type: 'mostVoted', closesAt })
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: FORMS,
 			data: {
 				title: 'Queued close',
@@ -368,6 +378,7 @@ describeForDb('form-builder renamed collections on the queued path', {}, (db) =>
 		})
 		for (const value of ['b', 'b', 'a']) {
 			await booted.payload.create({
+				overrideAccess: true,
 				collection: SUBMISSIONS,
 				data: { form: form.id, values: [{ field: 'vote', value }] },
 			})
@@ -390,7 +401,7 @@ describeForDb('form-builder renamed collections on the queued path', {}, (db) =>
 		expect(await winners()).toEqual([])
 		expect(await pendingJobs(POLL_CLOSE_TASK_SLUG)).toBeGreaterThan(0)
 
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 
 		expect(await winners()).toEqual(['b'])
 		expect(await pendingJobs(POLL_CLOSE_TASK_SLUG)).toBe(0)

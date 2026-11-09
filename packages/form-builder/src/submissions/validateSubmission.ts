@@ -107,6 +107,8 @@ export const validateSubmission =
 				payload: req.payload,
 				id: formId as string | number,
 				locale,
+				// The submitter may not read the whole form (actions are signed-in only); validation does.
+				overrideAccess: true,
 				req,
 			})
 

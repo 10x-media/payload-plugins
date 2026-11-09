@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq, type Endpoint, type PayloadRequest } from 'payload'
+import { createPayloadRequest, type Endpoint, type PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { formBuilder } from '../../src/index'
 import { POLL_VOTES_SLUG, RESPONDENTS_VALUE } from '../../src/poll/votes/votesCollection'
@@ -26,6 +26,7 @@ describeForDb(
 
 		const makeForm = async (over: Record<string, unknown> = {}) =>
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Changeable poll',
@@ -59,10 +60,10 @@ describeForDb(
 		): Promise<{ status: number; doc?: { id: number | string }; req: PayloadRequest }> => {
 			const [endpoint] = rootPostEndpoints()
 			if (!endpoint) throw new Error('no root POST endpoint registered')
-			const req = await createLocalReq(
-				{ req: { headers: new Headers(cookieHeader ? { cookie: cookieHeader } : {}) } },
-				booted.payload
-			)
+			const req = await createPayloadRequest({
+				payload: booted.payload,
+				req: { headers: new Headers(cookieHeader ? { cookie: cookieHeader } : {}) },
+			})
 			req.data = data
 			req.routeParams = { collection: 'form-submissions' }
 			const response = await endpoint.handler(req)
@@ -85,10 +86,10 @@ describeForDb(
 				},
 				body: JSON.stringify(data),
 			})
-			const req = await createLocalReq(
-				{ req: request as unknown as Partial<PayloadRequest> },
-				booted.payload
-			)
+			const req = await createPayloadRequest({
+				payload: booted.payload,
+				req: request as unknown as Partial<PayloadRequest>,
+			})
 			req.routeParams = { collection: 'form-submissions' }
 			const response = await endpoint.handler(req)
 			const body = (await response.json()) as { doc?: { id: number | string } }
@@ -107,6 +108,7 @@ describeForDb(
 
 		const submissionCount = async (formId: number | string): Promise<number> => {
 			const { totalDocs } = await booted.payload.count({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				where: { form: { equals: formId } },
 			})
@@ -178,6 +180,7 @@ describeForDb(
 			expect(await submissionCount(form.id)).toBe(1)
 
 			const stored = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				id: first.doc?.id as number | string,
 				depth: 0,
@@ -218,6 +221,7 @@ describeForDb(
 			expect(await submissionCount(form.id)).toBe(1)
 
 			const stored = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				id: first.doc?.id as number | string,
 				depth: 0,
@@ -252,6 +256,7 @@ describeForDb(
 			const cookie = asCookieHeader(setCookieOf(first.req) ?? '')
 
 			await booted.payload.update({
+				overrideAccess: true,
 				collection: 'forms',
 				id: form.id,
 				data: { poll: { closesAt: new Date(Date.now() - 60_000).toISOString() } },
@@ -272,6 +277,7 @@ describeForDb(
 			).rejects.toThrow()
 			expect(await tallySum(form.id, 'a')).toBe(1)
 			const stored = await booted.payload.findByID({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				id: first.doc?.id as number | string,
 				depth: 0,
@@ -326,6 +332,7 @@ describeForDb(
 			const first = await submitViaRest({ form: form.id, values: [{ field: 'vote', value: 'a' }] })
 			const cookie = asCookieHeader(setCookieOf(first.req) ?? '')
 			await booted.payload.delete({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				id: first.doc?.id as number | string,
 			})
@@ -358,6 +365,7 @@ describeForDb(
 			const form = await makeForm()
 			await expect(
 				booted.payload.update({
+					overrideAccess: true,
 					collection: 'forms',
 					id: form.id,
 					data: { persistSubmissions: false },
@@ -426,6 +434,7 @@ describeForDb(
 			).toBeNull()
 
 			await booted.payload.delete({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				id: first.doc?.id as number | string,
 			})
@@ -459,6 +468,7 @@ describeForDb('form-builder changeable votes (secure auth cookies)', { dbs: ['mo
 
 	const makePoll = async (allowChange: boolean) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Secure poll',
@@ -476,7 +486,7 @@ describeForDb('form-builder changeable votes (secure auth cookies)', { dbs: ['mo
 		})
 
 	const voteWithReq = async (formId: number | string) => {
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		await booted.payload.create({
 			collection: 'form-submissions',
 			depth: 0,

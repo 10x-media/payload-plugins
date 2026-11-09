@@ -24,6 +24,7 @@ describeForDb('form-builder message field + response settings', {}, (db) => {
 
 	it('round-trips a message-type response with rich text', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Response message',
@@ -44,6 +45,7 @@ describeForDb('form-builder message field + response settings', {}, (db) => {
 
 	it('round-trips a redirect-type response and validates the URL', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Response redirect',
@@ -60,6 +62,7 @@ describeForDb('form-builder message field + response settings', {}, (db) => {
 
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Bad redirect',
@@ -71,6 +74,7 @@ describeForDb('form-builder message field + response settings', {}, (db) => {
 
 	it('authors a nameless message block and stores its content with the row id intact', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Message block',
@@ -90,6 +94,7 @@ describeForDb('form-builder message field + response settings', {}, (db) => {
 
 	it('normalizes a flow that assigns a bare message by its row id', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Flow with bare message',
@@ -113,6 +118,7 @@ describeForDb('form-builder message field + response settings', {}, (db) => {
 
 	it('a submission stores only the surrounding answers: no message key, no validation', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Message submission',
@@ -128,6 +134,7 @@ describeForDb('form-builder message field + response settings', {}, (db) => {
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: {

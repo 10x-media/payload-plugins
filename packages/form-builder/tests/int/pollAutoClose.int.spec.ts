@@ -46,6 +46,7 @@ describeForDb('form-builder poll auto-close', { dbs: ['mongo', 'postgres'] }, (d
 
 	const makePoll = async (over: Record<string, unknown> = {}) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Colour poll',
@@ -67,6 +68,7 @@ describeForDb('form-builder poll auto-close', { dbs: ['mongo', 'postgres'] }, (d
 
 	const vote = async (formId: number | string, value: string) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: formId, values: [{ field: 'colour', value }] },
@@ -76,18 +78,25 @@ describeForDb('form-builder poll auto-close', { dbs: ['mongo', 'postgres'] }, (d
 	// Payload merges over the stored group (resultsField/type are preserved).
 	const close = async (formId: number | string) =>
 		booted.payload.update({
+			overrideAccess: true,
 			collection: 'forms',
 			id: formId,
 			data: { poll: { closesAt: pastIso() } },
 		})
 
 	const outcomeOf = async (formId: number | string): Promise<Outcome> => {
-		const doc = await booted.payload.findByID({ collection: 'forms', id: formId, depth: 0 })
+		const doc = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: formId,
+			depth: 0,
+		})
 		return (doc.poll as { outcome?: NonNullable<Outcome> }).outcome
 	}
 
 	const pendingCloseJobs = async (formId: number | string): Promise<number> => {
 		const { totalDocs } = await booted.payload.find({
+			overrideAccess: true,
 			collection: 'payload-jobs',
 			where: {
 				and: [
@@ -208,6 +217,7 @@ describeForDb('form-builder poll auto-close', { dbs: ['mongo', 'postgres'] }, (d
 		expect(await pendingCloseJobs(form.id)).toBe(1)
 		// Re-saving reschedules: the prior pending job is deleted before the new one is queued.
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'forms',
 			id: form.id,
 			data: { title: 'Colour poll (edited)' },

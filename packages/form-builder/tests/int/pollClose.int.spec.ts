@@ -2,7 +2,7 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import {
 	type CollectionConfig,
 	type Condition,
-	createLocalReq,
+	createPayloadRequest,
 	type Field,
 	type SelectField,
 } from 'payload'
@@ -109,6 +109,7 @@ describeForDb('form-builder poll close endpoint', { dbs: ['mongo'] }, (db) => {
 
 	const makePoll = async (over: Record<string, unknown> = {}) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Colour poll',
@@ -130,23 +131,34 @@ describeForDb('form-builder poll close endpoint', { dbs: ['mongo'] }, (db) => {
 
 	const vote = async (formId: number | string, value: string) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: formId, values: [{ field: 'colour', value }] },
 		})
 
 	const outcomeOf = async (formId: number | string): Promise<Outcome> => {
-		const doc = await booted.payload.findByID({ collection: 'forms', id: formId, depth: 0 })
+		const doc = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: formId,
+			depth: 0,
+		})
 		return (doc.poll as { outcome?: NonNullable<Outcome> }).outcome
 	}
 
 	const closedAtOf = async (formId: number | string): Promise<string | null | undefined> => {
-		const doc = await booted.payload.findByID({ collection: 'forms', id: formId, depth: 0 })
+		const doc = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: formId,
+			depth: 0,
+		})
 		return pollConfigOf(doc.poll)?.closesAt
 	}
 
 	const closeReq = async (formId: number | string | undefined, isAuthed: boolean) => {
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		return resolvePollCloseRequest({ payload: booted.payload, formId, isAuthed, req })
 	}
 
@@ -178,7 +190,12 @@ describeForDb('form-builder poll close endpoint', { dbs: ['mongo'] }, (db) => {
 		})
 		const res = await closeReq(form.id, true)
 		expect(res.status).toBe(200)
-		const doc = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const doc = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		expect(isPollClosed(pollConfigOf(doc.poll))).toBe(true)
 		expect((await outcomeOf(form.id))?.winningValues).toEqual(['red'])
 	})

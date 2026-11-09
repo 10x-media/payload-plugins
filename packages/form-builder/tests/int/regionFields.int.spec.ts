@@ -28,6 +28,7 @@ describeForDb('form-builder country/state fields', { dbs: ['mongo'] }, (db) => {
 
 	const makeForm = () =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Address',
@@ -41,6 +42,7 @@ describeForDb('form-builder country/state fields', { dbs: ['mongo'] }, (db) => {
 	it('round-trips valid country/state codes and resolves their names', async () => {
 		const form = await makeForm()
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: {
@@ -70,6 +72,7 @@ describeForDb('form-builder country/state fields', { dbs: ['mongo'] }, (db) => {
 		const form = await makeForm()
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'country', value: 'ZZ' }] },
 			})
@@ -80,6 +83,7 @@ describeForDb('form-builder country/state fields', { dbs: ['mongo'] }, (db) => {
 		const form = await makeForm()
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: {
 					form: form.id,

@@ -35,6 +35,7 @@ describeForDb('form-builder upload ownership', { dbs: ['mongo'] }, (db) => {
 
 	const upload = async (owner?: string) => {
 		const doc = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'app-uploads',
 			data: {},
 			file: { data: Buffer.alloc(64, 1), mimetype: 'application/pdf', name: 'r.pdf', size: 64 },
@@ -61,7 +62,12 @@ describeForDb('form-builder upload ownership', { dbs: ['mongo'] }, (db) => {
 
 	it('the attached hook stamps the resolved identity onto owner at create', async () => {
 		const id = await upload()
-		const doc = await booted.payload.findByID({ collection: 'app-uploads', id, depth: 0 })
+		const doc = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'app-uploads',
+			id,
+			depth: 0,
+		})
 		expect((doc as { owner?: string }).owner).toBe('ip:9.9.9.9')
 	})
 

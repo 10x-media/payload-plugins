@@ -64,8 +64,8 @@ export const ConsentBlockLabel = ({ typeLabelKey }: { typeLabelKey?: string }) =
 	const number = String((rowNumber ?? 0) + 1).padStart(2, '0')
 	const name = source ? (names[source] ?? '') : ''
 	return (
-		<span style={{ alignItems: 'center', display: 'inline-flex', gap: '0.5rem' }}>
-			<span style={{ color: 'var(--theme-elevation-500)' }}>
+		<span style={{ alignItems: 'center', display: 'inline-flex', gap: 'var(--spacer-2)' }}>
+			<span style={{ color: 'var(--color-text-secondary)' }}>
 				{typeLabel ? `${number} ${typeLabel}` : number}
 			</span>
 			{name ? <span>{name}</span> : null}

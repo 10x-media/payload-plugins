@@ -26,7 +26,7 @@ import { resolveValidationRules } from './validation/registry'
 export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 	slug: '@10x-media/form-builder',
 	order: 50,
-	plugin: ({ config, plugins, ...options }): Config => {
+	plugin: ({ config, options = {}, plugins }): Config => {
 		if (options.disabled === true) {
 			return config
 		}

@@ -19,7 +19,11 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 	})
 
 	it('creates a form with a title', async () => {
-		const form = await booted.payload.create({ collection: 'forms', data: { title: 'Contact' } })
+		const form = await booted.payload.create({
+			overrideAccess: true,
+			collection: 'forms',
+			data: { title: 'Contact' },
+		})
 		expect(form.title).toBe('Contact')
 	})
 
@@ -42,6 +46,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 
 	it('stores a form with a fields blocks array', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -57,6 +62,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 
 	it('stores typed values and localized descriptors on submit', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -67,6 +73,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: {
@@ -93,6 +100,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 
 	it('snapshots an authored field width onto its descriptor', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -103,6 +111,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 			},
 		})
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: {
@@ -121,6 +130,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 
 	it('rejects an invalid submission server-side', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -129,6 +139,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 		})
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'email', value: 'not-an-email' }] },
 			})
@@ -137,6 +148,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 
 	it('stores a form with a date field block', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -150,6 +162,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 
 	it('rejects a submission missing a required field', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -158,6 +171,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 		})
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [] },
 			})
@@ -166,6 +180,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 
 	it('createSubmission runs the full submission pipeline', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -197,6 +212,7 @@ describeForDb('form-builder collections', { dbs: ['mongo'] }, (db) => {
 
 	it('createSubmission still enforces server-side validation', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',

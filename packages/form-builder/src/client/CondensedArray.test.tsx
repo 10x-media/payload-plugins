@@ -19,6 +19,8 @@ const { addFieldRow, removeFieldRow, fieldState } = vi.hoisted(() => ({
 type ButtonProps = { children?: ReactNode; onClick?: () => void; 'aria-label'?: string }
 
 vi.mock('@payloadcms/ui', () => ({
+	CirclePlusIcon: () => null,
+	LineIcon: () => null,
 	Button: ({ children, onClick, 'aria-label': ariaLabel }: ButtonProps) => (
 		<button type="button" onClick={onClick} aria-label={ariaLabel}>
 			{children}

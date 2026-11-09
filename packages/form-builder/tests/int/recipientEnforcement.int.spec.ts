@@ -26,6 +26,7 @@ describeForDb('form-builder recipient enforcement', { dbs: ['mongo'] }, (db) => 
 
 		const createTeam = (over: Record<string, unknown>) =>
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Team',
@@ -64,6 +65,7 @@ describeForDb('form-builder recipient enforcement', { dbs: ['mongo'] }, (db) => 
 
 		it('saves any valid email', async () => {
 			const form = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Team',

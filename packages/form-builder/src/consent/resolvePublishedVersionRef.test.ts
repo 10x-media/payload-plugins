@@ -35,6 +35,7 @@ describe('resolvePublishedVersionRef', () => {
 			limit: 1,
 			depth: 0,
 			req,
+			overrideAccess: true,
 		})
 	})
 

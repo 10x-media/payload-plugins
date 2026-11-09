@@ -1,6 +1,6 @@
 'use client'
 
-import { Button, useFormFields } from '@payloadcms/ui'
+import { Button, CirclePlusIcon, useFormFields } from '@payloadcms/ui'
 import type { Operator, Where } from 'payload'
 import { reduceFieldsToValues, transformWhereQuery } from 'payload/shared'
 import { useMemo } from 'react'
@@ -157,9 +157,8 @@ export const ConditionBuilder = ({
 						))}
 						<div className="fb-condition-builder__add-condition">
 							<Button
-								buttonStyle="icon-label"
-								icon="plus"
-								iconStyle="with-border"
+								buttonStyle="ghost"
+								icon={<CirclePlusIcon size={24} />}
 								iconPosition="left"
 								onClick={() => addCondition(groupIndex)}
 								margin={false}
@@ -172,9 +171,8 @@ export const ConditionBuilder = ({
 			)}
 			<div className="fb-condition-builder__actions">
 				<Button
-					buttonStyle="icon-label"
-					icon="plus"
-					iconStyle="with-border"
+					buttonStyle="ghost"
+					icon={<CirclePlusIcon size={24} />}
 					iconPosition="left"
 					onClick={() => (groups.length === 0 ? addCondition(0) : addOrGroup())}
 					margin={false}

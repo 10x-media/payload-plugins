@@ -15,6 +15,7 @@ describeForDb('form-builder hidden fields', { dbs: ['mongo'] }, (db) => {
 
 	it('stores hidden: true at the top level on a field instance (unnamed tabs do not nest)', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Hidden field test',

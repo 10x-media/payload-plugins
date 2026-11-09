@@ -40,7 +40,11 @@ describeForDb('form-builder poll vote-field binding', { dbs: ['mongo'] }, (db) =
 	})
 
 	const create = (data: Record<string, unknown>) =>
-		booted.payload.create({ collection: 'forms', data: { title: 'Poll', ...data } })
+		booted.payload.create({
+			overrideAccess: true,
+			collection: 'forms',
+			data: { title: 'Poll', ...data },
+		})
 
 	it('defaults an enabled poll to the mostVoted outcome type', async () => {
 		const form = await create({
@@ -119,7 +123,12 @@ describeForDb('form-builder poll vote-field binding', { dbs: ['mongo'] }, (db) =
 			},
 			overrideAccess: true,
 		})
-		const closed = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const closed = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		expect(pollConfigOf(closed.poll)?.closesAt).toBe(closesAt)
 		expect(outcomeOf(closed.poll)?.winningValues).toEqual(['red'])
 		expect(outcomeOf(closed.poll)?.resolvedAt).toBeTruthy()
@@ -137,7 +146,12 @@ describeForDb('form-builder poll vote-field binding', { dbs: ['mongo'] }, (db) =
 			},
 			overrideAccess: true,
 		})
-		const reopened = await booted.payload.findByID({ collection: 'forms', id: form.id, depth: 0 })
+		const reopened = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			depth: 0,
+		})
 		expect(pollConfigOf(reopened.poll)?.closesAt ?? null).toBeNull()
 		expect(outcomeOf(reopened.poll)?.winningValues ?? []).toEqual([])
 		expect(outcomeOf(reopened.poll)?.resolvedAt ?? null).toBeNull()
@@ -165,6 +179,7 @@ describeForDb('form-builder poll vote-field source exemption', { dbs: ['mongo'] 
 
 	it('exempts a source-type poll from the vote-field requirement', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Source poll',
@@ -179,6 +194,7 @@ describeForDb('form-builder poll vote-field source exemption', { dbs: ['mongo'] 
 
 	it('exempts an optionSource poll from the vote-field requirement', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Sourced poll',

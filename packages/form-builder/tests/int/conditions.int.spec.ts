@@ -15,6 +15,7 @@ describeForDb('form-builder conditions', { dbs: ['mongo'] }, (db) => {
 
 	const buildForm = () =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Conditional',
@@ -34,6 +35,7 @@ describeForDb('form-builder conditions', { dbs: ['mongo'] }, (db) => {
 	it('does not enforce a hidden required field and does not store it', async () => {
 		const form = await buildForm()
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: form.id, values: [{ field: 'plan', value: 'free' }] },
@@ -45,6 +47,7 @@ describeForDb('form-builder conditions', { dbs: ['mongo'] }, (db) => {
 		const form = await buildForm()
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'plan', value: 'pro' }] },
 			})
@@ -54,6 +57,7 @@ describeForDb('form-builder conditions', { dbs: ['mongo'] }, (db) => {
 	it('ignores a client-sent value for a hidden field', async () => {
 		const form = await buildForm()
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: {

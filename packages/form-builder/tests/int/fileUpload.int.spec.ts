@@ -31,6 +31,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 
 	const uploadPdf = async (size = 1024) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'app-uploads',
 			data: {},
 			file: { data: Buffer.alloc(size, 1), mimetype: 'application/pdf', name: 'resume.pdf', size },
@@ -38,6 +39,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 
 	const makeForm = async (config: Record<string, unknown> = {}) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Application',
@@ -47,6 +49,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 
 	const makeRepeaterForm = async (config: Record<string, unknown> = {}) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Attachments',
@@ -76,6 +79,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 		const form = await makeForm()
 		const upload = await uploadPdf()
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: form.id, values: [{ field: 'resume', value: upload.id }] },
@@ -93,6 +97,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 		const upload = await uploadPdf()
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'resume', value: upload.id }] },
 			})
@@ -104,6 +109,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 		const upload = await uploadPdf(2048)
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'resume', value: upload.id }] },
 			})
@@ -114,6 +120,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 		const form = await makeForm({ required: true })
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [] },
 			})
@@ -124,6 +131,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 		const form = await makeRepeaterForm()
 		const upload = await uploadPdf()
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: form.id, values: [{ field: 'items', value: [{ doc: upload.id }] }] },
@@ -141,6 +149,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 		const form = await makeRepeaterForm()
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'items', value: [{ doc: 'does-not-exist' }] }] },
 			})
@@ -152,6 +161,7 @@ describeForDb('form-builder file uploads', { dbs: ['mongo'] }, (db) => {
 		const upload = await uploadPdf()
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'items', value: [{ doc: upload.id }] }] },
 			})

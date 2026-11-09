@@ -45,17 +45,20 @@ export const ByteSizeField = (props: ByteSizeFieldProps) => {
 	}
 
 	return (
-		<div className="field-type number" style={{ marginBlockEnd: '1rem' }}>
+		<div className="field-type number">
 			<FieldLabel label={label} path={path} />
 			<div className="field-type__wrap">
-				<input
-					id={`field-${path.replace(/\./g, '__')}`}
-					min={0}
-					name={path}
-					onChange={handleChange}
-					type="number"
-					value={typeof value === 'number' ? value : ''}
-				/>
+				<div className="form-input-group">
+					<input
+						className="form-input"
+						id={`field-${path.replace(/\./g, '__')}`}
+						min={0}
+						name={path}
+						onChange={handleChange}
+						type="number"
+						value={typeof value === 'number' ? value : ''}
+					/>
+				</div>
 				{typeof value === 'number' && value > 0 ? (
 					<div className="field-description">{`= ${formatBytes(value)}`}</div>
 				) : null}

@@ -22,7 +22,9 @@ const blockOf = (fields: Field[], blocksName: string, slug: string): Block | und
 	if (blocksField?.type !== 'blocks') {
 		return undefined
 	}
-	return blocksField.blocks.find((block) => block.slug === slug)
+	return blocksField.blocks.find(
+		(block): block is Block => typeof block !== 'string' && block.slug === slug
+	)
 }
 
 const isLocalized = (field: Field | undefined): boolean =>
@@ -54,14 +56,16 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 
 	it('requires the title in the default locale but lets other locales fall back', async () => {
 		await expect(
-			booted.payload.create({ collection: 'forms', data: { fields: [] } })
+			booted.payload.create({ overrideAccess: true, collection: 'forms', data: { fields: [] } })
 		).rejects.toThrow()
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: { title: 'Present', fields: [] },
 		})
 		// A non-default-locale write may omit the title; it falls back to the default-locale value.
 		const updated = await booted.payload.update({
+			overrideAccess: true,
 			collection: 'forms',
 			id: form.id,
 			locale: 'de',
@@ -124,6 +128,7 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 
 	it('stores per-locale labels and keeps plain writes working', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Contact',
@@ -134,6 +139,7 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 		expect(rows[0]?.label).toBe('Full name')
 
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'forms',
 			id: form.id,
 			locale: 'de',
@@ -142,13 +148,24 @@ describeForDb('form-builder content localization (localized host)', { dbs: ['mon
 			},
 		})
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'forms',
 			id: form.id,
 			locale: 'de',
 			data: { title: 'Kontakt' },
 		})
-		const de = await booted.payload.findByID({ collection: 'forms', id: form.id, locale: 'de' })
-		const en = await booted.payload.findByID({ collection: 'forms', id: form.id, locale: 'en' })
+		const de = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			locale: 'de',
+		})
+		const en = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'forms',
+			id: form.id,
+			locale: 'en',
+		})
 		expect((de.fields as Array<{ label: string }>)[0]?.label).toBe('Voller Name')
 		expect((en.fields as Array<{ label: string }>)[0]?.label).toBe('Full name')
 		expect(de.title).toBe('Kontakt')
@@ -183,6 +200,7 @@ describeForDb(
 
 		it('plain-string labels keep working', async () => {
 			const form = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'forms',
 				data: {
 					title: 'Contact',

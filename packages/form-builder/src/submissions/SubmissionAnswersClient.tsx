@@ -62,7 +62,7 @@ type Props = {
 const noop = (_e: ChangeEvent<HTMLInputElement>) => {}
 
 /** Horizontal gutter between fields sharing a row; also trimmed from each fractional basis so widths wrap cleanly rather than overflow. */
-const FIELD_GAP = 'calc(var(--base, 20px) / 2)'
+const FIELD_GAP = 'var(--spacer-3)'
 
 const BASIS: Record<SubmissionWidth, string> = {
 	full: '100%',
@@ -80,7 +80,7 @@ const widthStyle = (width?: SubmissionWidth): React.CSSProperties => {
 	const basis = BASIS[width ?? 'full']
 	return basis === '100%'
 		? { flex: '1 1 100%' }
-		: { flex: `0 1 calc(${basis} - ${FIELD_GAP})`, minWidth: 'min(100%, 12rem)' }
+		: { flex: `0 1 calc(${basis} - ${FIELD_GAP})`, minWidth: 'min(100%, 156px)' }
 }
 
 const answersGrid: React.CSSProperties = {
@@ -92,16 +92,16 @@ const answersGrid: React.CSSProperties = {
 const fullWidth: React.CSSProperties = { flex: '1 1 100%' }
 
 const rowHeading: React.CSSProperties = {
-	fontSize: '0.75rem',
+	fontSize: 'var(--text-body-small-font-size)',
 	fontWeight: 600,
-	color: 'var(--theme-elevation-500)',
+	color: 'var(--color-text-secondary)',
 	margin: '0 0 4px',
 }
 
 const linkStyle: React.CSSProperties = {
 	display: 'block',
 	padding: '8px 0',
-	color: 'var(--theme-text)',
+	color: 'var(--color-text)',
 	textDecoration: 'underline',
 }
 
@@ -110,7 +110,7 @@ export const SubmissionAnswersClient = ({ answers, repeaters, consent, meta, lab
 		answers.length > 0 || repeaters.length > 0 || consent.length > 0 || meta.length > 0
 
 	if (!hasContent) {
-		return <p style={{ color: 'var(--theme-elevation-500)' }}>{labels.empty}</p>
+		return <p style={{ color: 'var(--color-text-secondary)' }}>{labels.empty}</p>
 	}
 
 	return (
@@ -164,8 +164,8 @@ export const SubmissionAnswersClient = ({ answers, repeaters, consent, meta, lab
 											<div
 												key={row.id}
 												style={{
-													border: '1px solid var(--theme-elevation-150)',
-													borderRadius: '4px',
+													border: '1px solid var(--color-border)',
+													borderRadius: 'var(--radius-medium)',
 													padding: '4px 12px 0',
 												}}
 											>
@@ -207,18 +207,33 @@ export const SubmissionAnswersClient = ({ answers, repeaters, consent, meta, lab
 											{entry.agreed ? labels.agreed : labels.declined}
 										</Pill>
 										{entry.name ? (
-											<span style={{ fontSize: '0.8rem', color: 'var(--theme-text)' }}>
+											<span
+												style={{
+													fontSize: 'var(--text-body-medium-font-size)',
+													color: 'var(--color-text)',
+												}}
+											>
 												{entry.name}
 												{entry.versionRef ? ` (v${entry.versionRef})` : ''}
 											</span>
 										) : null}
 									</div>
 									{entry.statementText ? (
-										<span style={{ fontSize: '0.8rem', color: 'var(--theme-elevation-600)' }}>
+										<span
+											style={{
+												fontSize: 'var(--text-body-medium-font-size)',
+												color: 'var(--color-text-secondary)',
+											}}
+										>
 											{entry.statementText}
 										</span>
 									) : null}
-									<span style={{ fontSize: '0.75rem', color: 'var(--theme-elevation-500)' }}>
+									<span
+										style={{
+											fontSize: 'var(--text-body-small-font-size)',
+											color: 'var(--color-text-secondary)',
+										}}
+									>
 										{entry.at}
 									</span>
 								</div>

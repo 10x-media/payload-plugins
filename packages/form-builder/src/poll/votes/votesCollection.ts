@@ -49,6 +49,9 @@ export const buildPollVotesCollection = (args: {
 	]
 
 	return {
+		// A system-maintained tally: no history, no core authorship (both default on in Payload 4).
+		versions: false,
+		authorship: false,
 		...(args.overrides ?? {}),
 		slug: args.slug ?? POLL_VOTES_SLUG,
 		labels: {

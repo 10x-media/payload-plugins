@@ -1,0 +1,94 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x beta) to 4.x, on Next.js or TanStack Start.
+---
+
+`@10x-media/form-builder` 4.x is the Payload 4 line; the 0.x betas run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin's options, collections, stored data and website components are unchanged, and it runs on Next.js and TanStack Start. This page covers what changes around them.
+
+## Checklist
+
+1. Upgrade `@10x-media/form-builder` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.7` (and `@payloadcms/db-postgres` at the same range when you use Postgres).
+2. Pass `overrideAccess: true` in the resolvers you hand the plugin and in your own reads of forms, submissions and votes (see [Local API access](#local-api-access)).
+3. Check who may author forms (see [Who can edit forms](#who-can-edit-forms)).
+4. On Postgres, create and apply a migration (see [Database](#database)).
+5. Regenerate the import map (`pnpm payload generate:importmap`) and your types (`pnpm payload generate:types`).
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## Local API access
+
+Payload 4's Local API applies access control by default. The plugin's own reads and writes (the form at submit time, published consent versions, queued action and poll-close jobs) pass `overrideAccess: true`. A resolver of yours that relied on Payload 3's default now runs as the requesting visitor, usually no one, and gets `Forbidden` or an empty result. That covers every callback that reads your data:
+
+- `consent.sources`, `email.departments` and `email.fromAddresses`, which usually read a settings global;
+- calculation sources (`defineCalcSource`'s `resolve` and `resolveWeights`);
+- poll option and outcome resolvers (`resolveOptions`, `resolveOutcome`).
+
+Pass `overrideAccess: true` where the read is meant to bypass access, and keep passing `req` so it joins the request's transaction:
+
+```ts
+consent: {
+  sources: async ({ req }) => {
+    const settings = await req.payload.findGlobal({
+      slug: 'settings',
+      locale: req.locale,
+      req,
+      overrideAccess: true,
+    })
+    // ...
+  },
+},
+```
+
+Your own code needs the same review. Reading forms for the website works as before without it: the `forms` collection's `read` access is public, and the signed-in-only `actions` field stays out of an anonymous read. Reading submissions or votes, or running `payload.jobs.queue` and `payload.jobs.run`, needs `overrideAccess: true` or a `user`.
+
+## Who can edit forms
+
+`forms` sets only its `read` access; `create`, `update` and `delete` fall back to Payload's default, as does `delete` on `form-submissions`. Payload 3's default let any signed-in user through. Payload 4's lets only users of the `admin.user` collection through. With a single auth collection nothing changes. With a second one (website customers, say), its users can no longer write forms or delete submissions through the REST or GraphQL API. That is almost always what you want; if not, set `access` in the collection overrides.
+
+## Database
+
+Payload 4 versions every collection and stamps `createdBy` / `updatedBy` on it by default. The plugin turns versions off on `forms`, `form-submissions` and the poll votes collection, as they were on Payload 3, and turns authorship off on submissions and votes, whose rows the submit pipeline writes. `forms` keeps Payload's authorship, so the edit view shows who created and last changed a form. A host that wants form history turns versions back on through the collection overrides.
+
+On Mongo there is nothing to migrate. On Postgres, the `createdBy` and `updatedBy` columns on `forms` are a schema change: run `pnpm payload migrate:create` after the upgrade and apply it with `pnpm payload migrate`, in the same migration as the rest of Payload 4's changes.
+
+## TanStack Start
+
+The website components (`<Form>`, the poll and results components, the shadcn registry) are plain React and run on both frameworks. What differs is where the data comes from. On Next.js a server component reads the form and resolves its consent statements or poll options. On TanStack Start a route's component renders on the client, so do the same reads in a server function and return them from the route's `loader`:
+
+```tsx title="src/routes/contact.tsx"
+import { Form, toFormDocument } from '@10x-media/form-builder/react'
+import { createFileRoute } from '@tanstack/react-router'
+import { createServerFn } from '@tanstack/react-start'
+
+const loadContactForm = createServerFn({ method: 'GET' }).handler(async () => {
+  const { createPayloadRequest, getPayload } = await import('payload')
+  const { default: config } = await import('@payload-config')
+  const { resolveConsentStatements } = await import('@10x-media/form-builder/rsc')
+  const payload = await getPayload({ config })
+  const { docs } = await payload.find({
+    collection: 'forms',
+    where: { title: { equals: 'Contact' } },
+    limit: 1,
+  })
+  const form = docs[0]
+  if (!form) return null
+  const req = await createPayloadRequest({ payload })
+  return { form, consentStatements: await resolveConsentStatements({ payload, req, form }) }
+})
+
+export const Route = createFileRoute('/contact')({
+  loader: () => loadContactForm(),
+  component: () => {
+    const data = Route.useLoaderData()
+    return data ? (
+      <Form form={toFormDocument(data.form, { consentStatements: data.consentStatements })} />
+    ) : null
+  },
+})
+```
+
+The imports inside the handler keep Payload out of the client bundle. `createPayloadRequest` replaces Payload 3's `createLocalReq` wherever you build a `req` outside a route handler.
+
+## Look
+
+The admin components take Payload 4's look, built from Payload's own components on Payload 4's tokens: add and remove buttons are Payload's ghost buttons with its plus and line icons, the flow builder's move controls are chevron buttons, and the number and byte-size inputs use Payload's `.form-input`. The `fb-*` class names are unchanged, so CSS of your own that targets them keeps matching, but restyle it against Payload 4's tokens (`--color-border`, `--color-text-secondary`, `--spacer-*`; 1rem is now 16px rather than 13px).

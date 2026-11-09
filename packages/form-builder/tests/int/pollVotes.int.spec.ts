@@ -18,9 +18,16 @@ type VoteRow = {
 // ON CONFLICT DO UPDATE path, so this earns cross-DB coverage rather than the usual mongo-only default.
 describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres'] }, (db) => {
 	let booted: BootedPayload
+	let admin: { id: number | string }
 
 	beforeAll(async () => {
 		booted = await bootPayload({ plugin: formBuilder({}), db })
+		// Payload 4 stamps createdBy/updatedBy from req.user, so the acting admin must exist.
+		admin = await booted.payload.create({
+			collection: 'users',
+			data: { email: 'admin@example.com', password: 'password' },
+			overrideAccess: true,
+		})
 	})
 
 	afterAll(async () => {
@@ -29,6 +36,7 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 
 	const makeForm = async (over: Record<string, unknown> = {}) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: {
 				title: 'Vote poll',
@@ -52,6 +60,7 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 
 	const vote = async (formId: number | string, value: string) =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			depth: 0,
 			data: { form: formId, values: [{ field: 'vote', value }] },
@@ -119,6 +128,7 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 		const form = await makeForm()
 		const submission = await vote(form.id, 'a')
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			id: submission.id,
 			data: { locale: 'de' },
@@ -135,12 +145,13 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 			depth: 0,
 			// Authenticated (admin) creates can set partial; an unauthenticated create is forced
 			// to 'complete' by validateSubmission (see submissionStatus.int.spec.ts).
-			req: { user: { id: 'admin', collection: 'users' } } as never,
+			req: { user: { ...admin, collection: 'users' } } as never,
 			data: { form: form.id, status: 'partial', values: [{ field: 'vote', value: 'a' }] },
 		})
 		expect(await tallyRows(form.id)).toEqual([])
 
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			id: submission.id,
 			data: { status: 'complete' },
@@ -154,7 +165,7 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 		const form = await makeForm({ persistSubmissions: false })
 		const submission = await vote(form.id, 'a')
 		const found = await booted.payload
-			.findByID({ collection: 'form-submissions', id: submission.id })
+			.findByID({ collection: 'form-submissions', id: submission.id, overrideAccess: true })
 			.catch(() => null)
 		expect(found).toBeNull()
 
@@ -166,7 +177,11 @@ describeForDb('form-builder poll vote tally store', { dbs: ['mongo', 'postgres']
 	it('keeps votes when a submission is deleted by an admin', async () => {
 		const form = await makeForm()
 		const submission = await vote(form.id, 'a')
-		await booted.payload.delete({ collection: 'form-submissions', id: submission.id })
+		await booted.payload.delete({
+			overrideAccess: true,
+			collection: 'form-submissions',
+			id: submission.id,
+		})
 		const rows = await tallyRows(form.id)
 		expect(sumByValue(rows, 'a')).toBe(1)
 		expect(sumByValue(rows, RESPONDENTS_VALUE)).toBe(1)
@@ -270,6 +285,7 @@ describeForDb(
 		it('rejects pollEnabled with persistSubmissions false when poll.votes is false', async () => {
 			await expect(
 				booted.payload.create({
+					overrideAccess: true,
 					collection: 'forms',
 					data: {
 						title: 'Vote poll',

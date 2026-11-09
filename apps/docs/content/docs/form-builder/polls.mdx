@@ -121,6 +121,7 @@ const raceEntrants = definePollOptionSource({
     const { docs } = await payload.find({
       collection: 'entrants',
       where: { race: { equals: config.raceId } },
+      overrideAccess: true,
     })
     return docs.map((doc) => ({ label: doc.name, value: String(doc.id) }))
   },
@@ -168,6 +169,7 @@ const athleteVote = defineFormField<'text'>({
       where: { id: { in: ids } },
       depth: 0,
       req,
+      overrideAccess: true,
     })
     return docs.map((doc) => ({ value: String(doc.id), label: doc.name }))
   },
@@ -217,6 +219,7 @@ const raceEntrants = definePollOptionSource({
     const { docs } = await payload.find({
       collection: 'entrants',
       where: { race: { equals: config.raceId } },
+      overrideAccess: true,
     })
     return docs.map((doc) => ({ label: doc.name, value: String(doc.id) }))
   },
@@ -224,6 +227,7 @@ const raceEntrants = definePollOptionSource({
     const { docs } = await payload.find({
       collection: 'race-results',
       where: { race: { equals: config.raceId } },
+      overrideAccess: true,
     })
     // undefined = not decided yet.
     // Return a string for a single winner or a string[] for a tie.
@@ -244,6 +248,7 @@ const judgesPick = definePollType({
     const { docs } = await payload.find({
       collection: 'judge-scores',
       where: { form: { equals: form.id } },
+      overrideAccess: true,
     })
     return docs[0] ? [String(docs[0].winner)] : undefined
   },

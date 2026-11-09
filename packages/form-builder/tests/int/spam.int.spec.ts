@@ -18,6 +18,7 @@ describeForDb('form-builder spam guard', { dbs: ['mongo'] }, (db) => {
 
 	const makeForm = () =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: { title: 'Contact', fields: [{ blockType: 'text', name: 'name', label: 'Name' }] },
 		})
@@ -25,6 +26,7 @@ describeForDb('form-builder spam guard', { dbs: ['mongo'] }, (db) => {
 	it('stores a clean submission, strips reserved entries, writes meta.at', async () => {
 		const form = await makeForm()
 		const submission = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: {
 				form: form.id,
@@ -43,6 +45,7 @@ describeForDb('form-builder spam guard', { dbs: ['mongo'] }, (db) => {
 		const form = await makeForm()
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: '__fb_hp', value: 'spam' }] },
 			})
@@ -76,6 +79,7 @@ describeForDb('form-builder spam captcha', { dbs: ['mongo'] }, (db) => {
 
 	const makeForm = () =>
 		booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: { title: 'Gated', fields: [{ blockType: 'text', name: 'name', label: 'Name' }] },
 		})
@@ -84,11 +88,13 @@ describeForDb('form-builder spam captcha', { dbs: ['mongo'] }, (db) => {
 		const form = await makeForm()
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: { form: form.id, values: [{ field: 'name', value: 'A' }] },
 			})
 		).rejects.toThrow()
 		const ok = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: {
 				form: form.id,
@@ -125,11 +131,13 @@ describeForDb('form-builder spam bundled turnstile adapter', { dbs: ['mongo'] },
 
 	it('verifies the token against the siteverify endpoint', async () => {
 		const form = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'forms',
 			data: { title: 'Gated', fields: [{ blockType: 'text', name: 'name', label: 'Name' }] },
 		})
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: 'form-submissions',
 				data: {
 					form: form.id,
@@ -141,6 +149,7 @@ describeForDb('form-builder spam bundled turnstile adapter', { dbs: ['mongo'] },
 			})
 		).rejects.toThrow()
 		const ok = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'form-submissions',
 			data: {
 				form: form.id,
