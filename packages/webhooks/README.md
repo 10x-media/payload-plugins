@@ -3,13 +3,15 @@
 # @10x-media/webhooks
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/webhooks` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/webhooks` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/webhooks).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/webhooks@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/webhooks) and is released as `latest`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
-Outbound webhook subscriptions for Payload v3. Opt collections in, let subscribers register URLs in the admin panel (or in code), and deliver signed HTTP POSTs on every create, update, and delete, inline or through Payload's jobs queue, with retries and an append-only delivery log.
+Outbound webhook subscriptions for Payload. Opt collections in, let subscribers register URLs in the admin panel (or in code), and deliver signed HTTP POSTs on every create, update, and delete, inline or through Payload's jobs queue, with retries and an append-only delivery log.
 
 [![npm](https://img.shields.io/npm/v/@10x-media/webhooks?style=flat-square)](https://www.npmjs.com/package/@10x-media/webhooks)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 ## Features
 
@@ -62,6 +64,7 @@ Full documentation at [docs.10xmedia.de](https://docs.10xmedia.de/webhooks):
 - [Signing and secrets](https://docs.10xmedia.de/webhooks/signing)
 - [Security model](https://docs.10xmedia.de/webhooks/security)
 - [Multi-tenancy](https://docs.10xmedia.de/webhooks/multi-tenancy)
+- [Upgrading to Payload 4](https://docs.10xmedia.de/webhooks/upgrading)
 - [i18n](https://docs.10xmedia.de/webhooks/i18n)
 
 ## License

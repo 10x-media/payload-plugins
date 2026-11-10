@@ -8,6 +8,7 @@
 		"signing",
 		"security",
 		"multi-tenancy",
-		"i18n"
+		"i18n",
+		"upgrading"
 	]
 }

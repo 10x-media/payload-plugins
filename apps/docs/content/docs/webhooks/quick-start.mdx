@@ -87,4 +87,4 @@ export async function POST(req: Request) {
 
 ## If nothing is delivered
 
-With no job runner configured, `delivery: 'auto'` runs deliveries inline inside the hook, so they should fire immediately. If you set `delivery: 'queue'` (or installed [Jobs](/jobs), which switches auto to queue), deliveries wait as `pending` until a worker or `payload.jobs.run()` processes them. See [Deliveries](/webhooks/deliveries).
+With no job runner configured, `delivery: 'auto'` runs deliveries inline inside the hook, so they should fire immediately. If you set `delivery: 'queue'` (or installed [Jobs](/jobs), which switches auto to queue), deliveries wait as `pending` until a worker or `payload.jobs.run({ overrideAccess: true })` processes them. See [Deliveries](/webhooks/deliveries).
