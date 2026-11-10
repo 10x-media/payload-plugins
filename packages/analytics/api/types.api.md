@@ -57,7 +57,6 @@ export interface AdapterRegisterContext {
         pages: boolean;
     };
     jobs?: AdapterJobs;
-    jobsConcurrency?: boolean;
     notice?: (message: string) => void;
     resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>;
     resolveScope: (req: PayloadRequest) => Promise<string | null>;
@@ -1151,6 +1150,7 @@ export const keys: {
     readonly widgetFilterValueTooLong: "analytics:widgetFilterValueTooLong";
     readonly widgetFilterCaption: "analytics:widgetFilterCaption";
     readonly widgetCaptionWithFilter: "analytics:widgetCaptionWithFilter";
+    readonly widgetCaptionWithComparison: "analytics:widgetCaptionWithComparison";
     readonly filterOperatorEq: "analytics:filterOperatorEq";
     readonly filterOperatorContains: "analytics:filterOperatorContains";
     readonly filterOperatorMatches: "analytics:filterOperatorMatches";

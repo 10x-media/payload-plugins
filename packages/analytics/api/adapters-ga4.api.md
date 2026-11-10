@@ -41,7 +41,6 @@ export interface AdapterRegisterContext {
         pages: boolean;
     };
     jobs?: AdapterJobs;
-    jobsConcurrency?: boolean;
     notice?: (message: string) => void;
     resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>;
     resolveScope: (req: PayloadRequest) => Promise<string | null>;

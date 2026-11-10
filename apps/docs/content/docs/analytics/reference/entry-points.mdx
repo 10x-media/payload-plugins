@@ -17,7 +17,7 @@ The package splits its exports by where they run, so a page loads only what it n
 | [`@10x-media/analytics/client`](#10x-mediaanalyticsclient) | Client components of the admin (`'use client'`). It loads Payload's admin UI, Next's navigation and the stylesheet. |
 | [`@10x-media/analytics/i18n`](#10x-mediaanalyticsi18n) | Anywhere. It loads no package. |
 | [`@10x-media/analytics/geo`](#10x-mediaanalyticsgeo) | Server code, in your Payload config. It loads no package until a MaxMind lookup needs one. |
-| [`@10x-media/analytics/next`](#10x-mediaanalyticsnext) | Your Next.js route handlers. It loads Payload only when a route handler first runs. |
+| [`@10x-media/analytics/routes`](#10x-mediaanalyticsroutes) | Route handlers of your own: Next.js route handlers and TanStack Start server routes. It loads Payload only when a handler first runs. |
 | [`@10x-media/analytics/migrations`](#10x-mediaanalyticsmigrations) | Migration files, which Payload's CLI runs. It loads no package. |
 | [`@10x-media/analytics/migrations/drop-legacy-mongo`](#10x-mediaanalyticsmigrationsdrop-legacy-mongo) | Payload's CLI, as `payload migrate:create --file`. |
 | [`@10x-media/analytics/testing`](#10x-mediaanalyticstesting) | Tests. |
@@ -133,15 +133,14 @@ The [geo resolvers](/analytics/geo#custom-pipelines) for a pipeline of your own.
 - **Stable values:** `composeGeoResolvers`, `maxmindResolver`, `noopResolver`, `platformHeaderResolver`
 - **Stable types:** `Geo`, `GeoResolver`, `GeoResolverOptions`, `MaxmindOptions`, `MaxmindReader`, `MaxmindSdk`, `TrustedPlatform`
 
-## `@10x-media/analytics/next`
+## `@10x-media/analytics/routes`
 
-**Where:** Your Next.js route handlers. It loads Payload only when a route handler first runs.
+**Where:** Route handlers of your own: Next.js route handlers and TanStack Start server routes. It loads Payload only when a handler first runs.
 
-`captureRoute`, which relays a vendor through a [route handler of your own](/analytics/proxy#a-route-handler-of-your-own) by the first-party proxy's rules, and `ingestRoute` and `ingestPreflight` for [beacons in a route of your own](/analytics/capture#taking-beacons-in-a-route-of-your-own). `captureRewrites` and `posthogProxyRewrites` stay exported, deprecated, and throw when called: a Next rewrite forwards the visitor's cookies to the vendor.
+`captureRoute`, which relays a vendor through a [route handler of your own](/analytics/proxy#a-route-handler-of-your-own) by the first-party proxy's rules, and `ingestRoute` and `ingestPreflight` for [beacons in a route of your own](/analytics/capture#taking-beacons-in-a-route-of-your-own). Each is a plain `(request: Request) => Promise<Response>`.
 
 - **Stable values:** `captureRoute`, `ingestPreflight`, `ingestRoute`
-- **Stable types:** `CaptureRewrite`, `CaptureRewriteMount`, `CaptureRouteOptions`, `IngestRouteOptions`, `PosthogProxyRegion`, `PosthogProxyRewrite`, `PosthogProxyRewritesOptions`
-- **Deprecated:** `captureRewrites`, `posthogProxyRewrites`
+- **Stable types:** `CaptureRouteOptions`, `IngestRouteOptions`
 - **Also:** [the adapter contract types](#the-adapter-contract-types).
 
 ## `@10x-media/analytics/migrations`
