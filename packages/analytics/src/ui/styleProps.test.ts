@@ -1,5 +1,5 @@
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { dirname, join, relative, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import ts from 'typescript'
 import { describe, expect, it } from 'vitest'
@@ -67,7 +67,7 @@ const scan = (): StyleProp[] => {
 	for (const path of components(SRC)) {
 		const file = ts.createSourceFile(path, readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true)
 		const where = (node: ts.Node): string =>
-			`${relative(SRC, path)}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`
+			`${relative(SRC, path).split(sep).join('/')}:${file.getLineAndCharacterOfPosition(node.getStart(file)).line + 1}`
 		const visit = (node: ts.Node): void => {
 			if (
 				(ts.isJsxOpeningElement(node) || ts.isJsxSelfClosingElement(node)) &&

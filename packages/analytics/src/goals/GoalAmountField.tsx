@@ -5,6 +5,7 @@ import {
 	FieldError,
 	FieldLabel,
 	fieldBaseClass,
+	InputStepper,
 	ReactSelect,
 	type ReactSelectOption,
 	RenderCustomComponent,
@@ -87,6 +88,22 @@ const GoalAmountFieldComponent = (props: GoalAmountFieldProps) => {
 		setValue(Number.isNaN(parsed) ? null : parsed)
 	}
 
+	const step = typeof field.admin?.step === 'number' ? field.admin.step : 1
+
+	/** Payload's own stepper rule: from zero when empty, clamped to the field's bounds. */
+	const onStep = (direction: 'down' | 'up') => {
+		if (locked) {
+			return
+		}
+		const next = (isAmount(value) ? value : 0) + (direction === 'up' ? step : -step)
+		setValue(
+			Math.min(
+				field.max ?? Number.POSITIVE_INFINITY,
+				Math.max(field.min ?? Number.NEGATIVE_INFINITY, next)
+			)
+		)
+	}
+
 	const onCurrencyChange = (picked: ReactSelectOption | ReactSelectOption[]) => {
 		const option = Array.isArray(picked) ? picked[0] : picked
 		if (typeof option?.value === 'string') {
@@ -121,26 +138,37 @@ const GoalAmountFieldComponent = (props: GoalAmountFieldProps) => {
 				{BeforeInput}
 				<div className="analytics-goal-amount__row">
 					<div
-						className={[fieldBaseClass, 'number', showError && 'error'].filter(Boolean).join(' ')}
+						className={[fieldBaseClass, 'number', showError && 'error', locked && 'read-only']
+							.filter(Boolean)
+							.join(' ')}
+						data-size="large"
 					>
 						<div className={`${fieldBaseClass}__wrap`}>
 							<RenderCustomComponent
 								CustomComponent={ErrorComponent}
 								Fallback={<FieldError path={path} showError={showError} />}
 							/>
-							<input
-								disabled={locked}
-								id={`field-${path.replace(/\./g, '__')}`}
-								max={field.max}
-								min={field.min}
-								name={path}
-								onChange={onAmountChange}
-								onWheel={(event) => event.currentTarget.blur()}
-								placeholder={resolvePlaceholder(field.admin?.placeholder, i18n.language)}
-								step={typeof field.admin?.step === 'number' ? field.admin.step : 1}
-								type="number"
-								value={isAmount(value) ? value : ''}
-							/>
+							<div className="form-input-group">
+								<input
+									className="form-input"
+									disabled={locked}
+									id={`field-${path.replace(/\./g, '__')}`}
+									max={field.max}
+									min={field.min}
+									name={path}
+									onChange={onAmountChange}
+									onWheel={(event) => event.currentTarget.blur()}
+									placeholder={resolvePlaceholder(field.admin?.placeholder, i18n.language)}
+									step={step}
+									type="number"
+									value={isAmount(value) ? value : ''}
+								/>
+								<InputStepper
+									disabled={locked}
+									onDecrement={() => onStep('down')}
+									onIncrement={() => onStep('up')}
+								/>
+							</div>
 						</div>
 					</div>
 					{/* Payload's SelectInput labels its wrapper, so the hidden label names the input itself. */}

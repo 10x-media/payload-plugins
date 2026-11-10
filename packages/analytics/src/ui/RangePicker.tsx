@@ -122,6 +122,11 @@ export function RangePicker({
 				onChange={onPick}
 				overrides={{
 					selectsRange: true,
+					// Payload 4's own handler reads a single date (`getFullYear`) and throws on the pair a
+					// range hands back, so the pair goes straight to the plugin's.
+					onChange: onPick,
+					// The calendar is portaled out of the field, so its own class is what the stylesheet reaches.
+					calendarClassName: 'analytics-range-calendar',
 					startDate: start,
 					endDate: end,
 					openToDate: openingMonth({ start, end, maxDate, today: viewerNow() }),
@@ -133,14 +138,11 @@ export function RangePicker({
 						setSettling(true)
 						onCalendarClose?.()
 					},
+					// The buttons keep Payload's chevrons; only their names are the plugin's.
 					previousMonthAriaLabel: previousMonth,
-					previousMonthButtonLabel: previousMonth,
 					nextMonthAriaLabel: nextMonth,
-					nextMonthButtonLabel: nextMonth,
 					previousYearAriaLabel: previousYear,
-					previousYearButtonLabel: previousYear,
 					nextYearAriaLabel: nextYear,
-					nextYearButtonLabel: nextYear,
 					chooseDayAriaLabelPrefix: t(keys.dateRangeChooseDay),
 					disabledDayAriaLabelPrefix: t(keys.dateRangeDayUnavailable),
 					monthAriaLabelPrefix: t(keys.dateRangeMonth),

@@ -198,10 +198,12 @@ describe('OverviewCards before the first answer', () => {
 	it('sizes each block as the line it stands in for', () => {
 		const label = declarationsOf('.analytics-view__skeleton--label')
 		expect(label['margin-block']).toBe(`calc((1lh - ${label.height}) / 2)`)
-		const number = declarationsOf('.analytics-view__card .analytics-metric__value')['font-size']
-		const leading = declarationsOf('.analytics-metric__value')['line-height']
+		// The number shrinks with a narrow card, its line box does not.
+		expect(declarationsOf('.analytics-view__card .analytics-metric__value')).not.toHaveProperty(
+			'line-height'
+		)
 		expect(declarationsOf('.analytics-view__skeleton--value').height).toBe(
-			`calc(${number} * ${leading})`
+			declarationsOf('.analytics-metric__value')['line-height']
 		)
 		expect(declarationsOf('.analytics-view__skeleton--delta').height).toBe(
 			declarationsOf('.analytics-delta__change')['line-height']

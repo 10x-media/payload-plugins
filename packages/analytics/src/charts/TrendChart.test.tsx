@@ -576,7 +576,7 @@ describe('TrendChart comparison look', () => {
 	it('dashes the comparison line and its legend swatch', () => {
 		expect(declarationsOf('.analytics-chart__comparison')['stroke-dasharray']).toBe('4 3')
 		expect(analyticsCss()).toContain(
-			'.analytics-chart__legend-swatch--comparison {\n\t\twidth: 0.875rem;\n\t\tbackground: repeating-linear-gradient('
+			'.analytics-chart__legend-swatch--comparison {\n\t\twidth: 14px;\n\t\tbackground: repeating-linear-gradient('
 		)
 	})
 })

@@ -79,7 +79,7 @@ export const resolveMetricLabel = (
  * @internal
  */
 export const AnalyticsStatField = (props: AnalyticsStatFieldProps) => (
-	<Suspense fallback={<FieldShimmer height="3.5rem" />}>
+	<Suspense fallback={<FieldShimmer height="56px" />}>
 		<WithScopeToken req={props.req}>
 			<StatFieldBody {...props} />
 		</WithScopeToken>

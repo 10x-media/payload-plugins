@@ -47,7 +47,7 @@ describe('the package stylesheet', () => {
 		expect(closedAt).toBe(rest.length - 1)
 	})
 
-	it('defines every documented token on :root, on Payload theme variables', () => {
+	it('defines every documented token on :root, on Payload 4 variables with a fallback', () => {
 		const root = declarationsOf(':root')
 		for (const token of [
 			'--analytics-chart-1',
@@ -56,6 +56,7 @@ describe('the package stylesheet', () => {
 			'--analytics-card-border',
 			'--analytics-card-radius',
 			'--analytics-card-padding',
+			'--analytics-text-muted',
 			'--analytics-bar-fill',
 			'--analytics-bar-label',
 			'--analytics-bar-label-on-fill',
@@ -64,12 +65,26 @@ describe('the package stylesheet', () => {
 			'--analytics-delta-down-fg',
 			'--analytics-delta-down-bg',
 		]) {
-			expect(root[token], token).toMatch(/var\(--(theme-|style-|base\b|color-|analytics-)/)
+			expect(root[token], token).toMatch(/var\(--(color|radius|spacer)-[\w-]+, [^)]+\)/)
 		}
 	})
 
-	it('reads no variable Payload does not define', () => {
-		expect(analyticsCss()).not.toContain('--theme-base-')
+	// Payload 4 retired the v3 theme variables; one left behind resolves to nothing.
+	it('reads only variables Payload 4 or the stylesheet itself defines', () => {
+		const defined = payloadVariables()
+		const own = new Set(
+			[...analyticsCss().matchAll(/(--analytics-[\w-]+)\s*:/g)].map((match) => match[1] ?? '')
+		)
+		const unknown = [
+			...new Set([...analyticsCss().matchAll(/var\((--[\w-]+)/g)].map((m) => m[1] ?? '')),
+		]
+			.filter((name) => !defined.has(name) && !own.has(name))
+			.filter((name) => !/^--analytics-(bar|chart-height|rows|x|y)$/.test(name))
+		expect(unknown).toEqual([])
+	})
+
+	it('sizes nothing in rem, whose root differs between Payload versions', () => {
+		expect(withoutComments(analyticsCss())).not.toMatch(/\d(\.\d+)?rem\b/)
 	})
 
 	// A label past the end of a short bar sits on bare track, so it cannot stay the bar's color.
@@ -103,7 +118,7 @@ describe('the package stylesheet', () => {
 		const css = withoutComments(analyticsCss())
 		const forced = css.slice(css.indexOf('@media (forced-colors: active)'))
 		expect(forced).toContain('.analytics-bars__track::before {')
-		expect(forced).toContain('border-block-end: 0.25rem solid CanvasText;')
+		expect(forced).toContain('border-block-end: 4px solid CanvasText;')
 	})
 
 	// The pointer tooltip follows clientX, which is physical whichever way the page reads.
@@ -121,41 +136,114 @@ describe('the package stylesheet', () => {
 	})
 })
 
-/** Payload's own palette, read from the installed `@payloadcms/ui`, light and dark. */
-const payloadPalette = (): { light: Map<string, string>; dark: Map<string, string> } => {
-	const scss = readFileSync(
-		join(
-			dirname(createRequire(import.meta.url).resolve('@payloadcms/ui/scss/app.scss')),
-			'colors.scss'
-		),
-		'utf8'
+/** The directory of `@payloadcms/ui`'s global stylesheets: its tokens, its palette, its themes. */
+const payloadCssDir = (): string =>
+	dirname(createRequire(import.meta.url).resolve('@payloadcms/ui/css/app.css'))
+
+const declarationsIn = (block: string): Map<string, string> =>
+	new Map(
+		[...block.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((match) => [
+			match[1] ?? '',
+			(match[2] ?? '').trim(),
+		])
 	)
-	const darkAt = scss.indexOf("html[data-theme='dark']")
-	const declarations = (block: string) =>
-		new Map(
-			[...block.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((match) => [
-				match[1] ?? '',
-				match[2] ?? '',
-			])
-		)
-	const light = declarations(scss.slice(0, darkAt))
-	return { light, dark: new Map([...light, ...declarations(scss.slice(darkAt))]) }
+
+/** Every custom property Payload 4's admin CSS declares, its components' own included. */
+const payloadVariables = (): Set<string> => {
+	const sheets = (dir: string): string[] =>
+		readdirSync(dir).flatMap((name) => {
+			const path = join(dir, name)
+			if (statSync(path).isDirectory()) {
+				return sheets(path)
+			}
+			return path.endsWith('.css') ? [path] : []
+		})
+	return new Set(
+		sheets(join(payloadCssDir(), '..')).flatMap((path) => [
+			...declarationsIn(readFileSync(path, 'utf8')).keys(),
+		])
+	)
 }
 
-const rgbOf = (palette: Map<string, string>, variable: string): [number, number, number] => {
-	let value = palette.get(variable) ?? ''
-	for (let hop = 0; hop < 5 && value.startsWith('var('); hop++) {
-		value = palette.get(/var\((--[\w-]+)/.exec(value)?.[1] ?? '') ?? ''
+type Theme = 'light' | 'dark'
+
+/** Payload's palette, light and dark: the raw ramp, then the theme tokens built on it. */
+const payloadPalette = (): Record<Theme, Map<string, string>> => {
+	const ramp = declarationsIn(readFileSync(join(payloadCssDir(), 'design-tokens.css'), 'utf8'))
+	const colors = readFileSync(join(payloadCssDir(), 'colors.css'), 'utf8')
+	const darkAt = colors.indexOf("[data-theme='dark'] {")
+	const enhancedAt = colors.indexOf('html[data-enhanced-contrast]')
+	const light = new Map([...ramp, ...declarationsIn(colors.slice(0, darkAt))])
+	return {
+		light,
+		dark: new Map([...light, ...declarationsIn(colors.slice(darkAt, enhancedAt))]),
 	}
-	const [r = Number.NaN, g = Number.NaN, b = Number.NaN] = (/rgb\(([^)]+)\)/.exec(value)?.[1] ?? '')
-		.split(',')
-		.map(Number)
-	return [r, g, b]
 }
 
-const contrast = (a: [number, number, number], b: [number, number, number]): number => {
-	const luminance = (rgb: [number, number, number]) => {
-		const [r = 0, g = 0, bl = 0] = rgb.map((channel) => {
+/** An sRGB color with its alpha, channels 0 to 255 and alpha 0 to 1. */
+type Rgba = [number, number, number, number]
+
+/** The arguments of a CSS function, split on its top-level commas. */
+const argumentsOf = (call: string): string[] => {
+	const inner = call.slice(call.indexOf('(') + 1, call.lastIndexOf(')'))
+	const parts: string[] = []
+	let depth = 0
+	let current = ''
+	for (const char of inner) {
+		if (char === ',' && depth === 0) {
+			parts.push(current.trim())
+			current = ''
+			continue
+		}
+		depth += char === '(' ? 1 : char === ')' ? -1 : 0
+		current += char
+	}
+	return [...parts, current.trim()]
+}
+
+const PERCENT = /\s(\d+(?:\.\d+)?)%$/
+
+/**
+ * A color value as the admin computes it: a hex or `rgb()`/`rgba()` literal, a variable resolved
+ * through the palette (its fallback when the palette lacks it, as on a page outside the admin), or
+ * an sRGB `color-mix()` of either.
+ */
+const colorOf = (palette: Map<string, string>, value: string): Rgba => {
+	const css = value.trim()
+	if (css.startsWith('var(')) {
+		const [name = '', fallback = ''] = argumentsOf(css)
+		return colorOf(palette, palette.get(name) ?? fallback)
+	}
+	if (css.startsWith('color-mix(')) {
+		const [, first = '', second = ''] = argumentsOf(css)
+		const share = Number(PERCENT.exec(first)?.[1] ?? 50) / 100
+		const a = colorOf(palette, first.replace(PERCENT, ''))
+		const b = colorOf(palette, second)
+		const alpha = a[3] * share + b[3] * (1 - share)
+		const channel = (i: 0 | 1 | 2) => (a[i] * a[3] * share + b[i] * b[3] * (1 - share)) / alpha
+		return [channel(0), channel(1), channel(2), alpha]
+	}
+	if (css.startsWith('#')) {
+		const hex = css.slice(1)
+		const full = hex.length === 3 ? [...hex].map((digit) => digit + digit).join('') : hex
+		const byte = (at: number) => Number.parseInt(full.slice(at, at + 2), 16)
+		return [byte(0), byte(2), byte(4), full.length === 8 ? byte(6) / 255 : 1]
+	}
+	const [r = Number.NaN, g = Number.NaN, b = Number.NaN, a = 1] = argumentsOf(css).map(Number)
+	return [r, g, b, a]
+}
+
+/** `top` painted over an opaque `under`. */
+const over = (top: Rgba, under: Rgba): Rgba => [
+	top[0] * top[3] + under[0] * (1 - top[3]),
+	top[1] * top[3] + under[1] * (1 - top[3]),
+	top[2] * top[3] + under[2] * (1 - top[3]),
+	1,
+]
+
+const contrast = (a: Rgba, b: Rgba): number => {
+	const luminance = (rgb: Rgba) => {
+		const [r = 0, g = 0, bl = 0] = rgb.slice(0, 3).map((channel) => {
 			const s = channel / 255
 			return s <= 0.03928 ? s / 12.92 : ((s + 0.055) / 1.055) ** 2.4
 		})
@@ -165,6 +253,14 @@ const contrast = (a: [number, number, number], b: [number, number, number]): num
 	return ((high ?? 0) + 0.05) / ((low ?? 0) + 0.05)
 }
 
+/** The contrast of `text` on `surface`, both CSS values, the surface laid on the page. */
+const ratioOn = (theme: Theme, text: string, surface: string): number => {
+	const palette = payloadPalette()[theme]
+	const page = over(colorOf(palette, 'var(--color-bg)'), [255, 255, 255, 1])
+	const ground = over(colorOf(palette, surface), page)
+	return contrast(over(colorOf(palette, text), ground), ground)
+}
+
 /** Every innermost rule: its selector and the declarations in it. */
 const cssRules = (): Array<{ selector: string; declarations: Map<string, string> }> =>
 	[...withoutComments(analyticsCss()).matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
@@ -172,35 +268,25 @@ const cssRules = (): Array<{ selector: string; declarations: Map<string, string>
 		declarations: new Map(
 			[...(match[2] ?? '').matchAll(/([-\w]+)\s*:\s*([^;]+);/g)].map((declaration) => [
 				declaration[1] ?? '',
-				(declaration[2] ?? '').trim(),
+				(declaration[2] ?? '').trim().replace(/\s*\n\s*/g, ' '),
 			])
 		),
 	}))
 
-const mix = (
-	top: [number, number, number],
-	under: [number, number, number],
-	share: number
-): [number, number, number] => [
-	top[0] * share + under[0] * (1 - share),
-	top[1] * share + under[1] * (1 - share),
-	top[2] * share + under[2] * (1 - share),
-]
+const THEMES = ['light', 'dark'] as const
 
 describe('muted text', () => {
-	// Text on an inverted fill: the picked days of a range, light on elevation-800.
-	const INVERTED = /react-datepicker__day--range-start/
-
-	it('is one token, elevation 600, which every text color lighter than the body text uses', () => {
-		expect(declarationsOf(':root')['--analytics-text-muted']).toMatch(
-			/^var\(--theme-elevation-600,/
+	it('is one token, secondary text pulled toward the body text as the activity widget does', () => {
+		expect(declarationsOf(':root')['--analytics-text-muted']).toBe(
+			'color-mix(in srgb, var(--color-text-secondary, #808080) 75%, var(--color-text, #1a1a1a))'
 		)
-		const lighter = cssRules().flatMap(({ selector, declarations }) => {
-			const color = declarations.get('color')
-			const step = Number(/--theme-elevation-(\d+)/.exec(color ?? '')?.[1] ?? Number.NaN)
-			return step < 600 && !INVERTED.test(selector) ? [`${selector}: ${color}`] : []
+		const fainter = cssRules().flatMap(({ selector, declarations }) => {
+			const color = declarations.get('color') ?? ''
+			return /--color-text-(secondary|tertiary|disabled)/.test(color)
+				? [`${selector}: ${color}`]
+				: []
 		})
-		expect(lighter).toEqual([])
+		expect(fainter).toEqual([])
 		const muted = cssRules().filter(
 			({ declarations }) => declarations.get('color') === 'var(--analytics-text-muted)'
 		)
@@ -219,71 +305,73 @@ describe('muted text', () => {
 		expect(dimmed).toEqual([])
 	})
 
-	it('reads at 4.5:1 or better on the page, a card, a pressed card and a tooltip, in both themes', () => {
-		const palette = payloadPalette()
-		for (const theme of ['light', 'dark'] as const) {
-			const text = rgbOf(palette[theme], '--theme-elevation-600')
+	it('reads at 4.5:1 or better on a card, a hovered or pressed card and a tooltip, in both themes', () => {
+		const muted = declarationsOf(':root')['--analytics-text-muted'] ?? ''
+		for (const theme of THEMES) {
 			for (const surface of [
-				'--theme-elevation-0',
-				'--theme-elevation-50',
-				'--theme-elevation-100',
+				'var(--color-bg)',
+				'var(--color-bg-secondary)',
+				'var(--color-bg-elevated)',
 			]) {
-				const ratio = contrast(text, rgbOf(palette[theme], surface))
-				expect(ratio, `${theme} on ${surface}`).toBeGreaterThanOrEqual(4.5)
+				expect(ratioOn(theme, muted, surface), `${theme} on ${surface}`).toBeGreaterThanOrEqual(4.5)
 			}
 		}
 	})
 })
 
 describe('bar labels', () => {
-	it('read at 4.5:1 or better on a soft bar, a solid one and a hovered solid one, in both themes', () => {
-		const palette = payloadPalette()
-		const solid = rgbOf(palette.light, '--color-success-600')
-		const white: [number, number, number] = [255, 255, 255]
-		const hovered: [number, number, number] = [
-			Math.min(255, solid[0] * 1.12),
-			Math.min(255, solid[1] * 1.12),
-			Math.min(255, solid[2] * 1.12),
-		]
-		expect(declarationsOf(':root')['--analytics-bar-fill']).toMatch(/^var\(--color-success-600,/)
-		expect(declarationsOf('.analytics-bars__row:hover .analytics-bars__track::before').filter).toBe(
-			'brightness(1.12)'
+	it('read at 4.5:1 or better on a soft bar, a hovered soft one, a solid one and a hovered solid one, in both themes', () => {
+		const root = declarationsOf(':root')
+		const hover = declarationsOf('.analytics-bars__row:hover .analytics-bars__track::before')
+		expect(hover.filter).toBe('brightness(0.9)')
+		const soft =
+			declarationsOf('.analytics-bars--soft .analytics-bars__track::before').background ?? ''
+		const track = declarationsOf('.analytics-bars--soft .analytics-bars__track').background ?? ''
+		const softHover = declarationsOf(
+			'.analytics-bars--soft .analytics-bars__row:hover .analytics-bars__track::before'
 		)
-		expect(contrast(white, solid)).toBeGreaterThanOrEqual(4.5)
-		expect(contrast(white, hovered)).toBeGreaterThanOrEqual(4.5)
-		for (const theme of ['light', 'dark'] as const) {
-			const track = rgbOf(palette[theme], '--theme-elevation-100')
-			const soft = mix(rgbOf(palette[theme], '--theme-success-500'), track, 0.25)
-			const label = rgbOf(palette[theme], '--theme-elevation-800')
-			expect(contrast(label, soft), `soft ${theme}`).toBeGreaterThanOrEqual(4.5)
-			expect(contrast(label, track), `track ${theme}`).toBeGreaterThanOrEqual(4.5)
+		expect(softHover.filter).toBe('none')
+		const label = root['--analytics-bar-label'] ?? ''
+		for (const theme of THEMES) {
+			const palette = payloadPalette()[theme]
+			const fill = colorOf(palette, root['--analytics-bar-fill'] ?? '')
+			const onFill = colorOf(palette, root['--analytics-bar-label-on-fill'] ?? '')
+			const darker: Rgba = [fill[0] * 0.9, fill[1] * 0.9, fill[2] * 0.9, 1]
+			expect(contrast(onFill, fill), `solid ${theme}`).toBeGreaterThanOrEqual(4.5)
+			expect(contrast(onFill, darker), `hovered ${theme}`).toBeGreaterThanOrEqual(4.5)
+			expect(ratioOn(theme, label, soft), `soft ${theme}`).toBeGreaterThanOrEqual(4.5)
+			expect(
+				ratioOn(theme, label, softHover.background ?? ''),
+				`soft hovered ${theme}`
+			).toBeGreaterThanOrEqual(4.5)
+			expect(ratioOn(theme, label, track), `track ${theme}`).toBeGreaterThanOrEqual(4.5)
 		}
 	})
 })
 
 describe('the delta pills', () => {
-	// Payload's own Pill styles (elements/Pill/index.scss), which the up and down tokens restate.
-	const PILLS = {
-		up: ['--theme-success-800', '--theme-success-150'],
-		down: ['--theme-error-800', '--theme-error-150'],
-		none: ['--theme-elevation-800', '--theme-elevation-100'],
-	} as const
-
-	it('take their colors from the Pill styles, the unchanged one untouched', () => {
+	it("sit on Payload's success and error pill fills, the unchanged one untouched", () => {
 		const root = declarationsOf(':root')
-		expect(root['--analytics-delta-up-fg']).toMatch(/^var\(--theme-success-800,/)
-		expect(root['--analytics-delta-up-bg']).toMatch(/^var\(--theme-success-150,/)
-		expect(root['--analytics-delta-down-fg']).toMatch(/^var\(--theme-error-800,/)
-		expect(root['--analytics-delta-down-bg']).toMatch(/^var\(--theme-error-150,/)
+		expect(root['--analytics-delta-up-bg']).toMatch(/^var\(--color-bg-selected,/)
+		expect(root['--analytics-delta-down-bg']).toMatch(/^var\(--color-bg-danger-tertiary,/)
+		expect(root['--analytics-delta-up-fg']).toMatch(/^color-mix\(in srgb, var\(--color-text-brand,/)
+		expect(root['--analytics-delta-down-fg']).toMatch(
+			/^color-mix\(in srgb, var\(--color-text-danger,/
+		)
 		expect(declarationsOf('.analytics-delta__change--none')).toEqual({})
 	})
 
 	it('read at 4.5:1 or better in the light theme and the dark one', () => {
-		const palette = payloadPalette()
-		for (const theme of ['light', 'dark'] as const) {
-			for (const [tone, [fg, bg]] of Object.entries(PILLS)) {
-				const ratio = contrast(rgbOf(palette[theme], fg), rgbOf(palette[theme], bg))
-				expect(ratio, `${tone} ${theme}`).toBeGreaterThanOrEqual(4.5)
+		const root = declarationsOf(':root')
+		const pills = {
+			up: [root['--analytics-delta-up-fg'], root['--analytics-delta-up-bg']],
+			down: [root['--analytics-delta-down-fg'], root['--analytics-delta-down-bg']],
+			// Payload's own light-gray pill.
+			none: ['var(--color-text)', 'var(--color-bg-secondary)'],
+		}
+		for (const theme of THEMES) {
+			for (const [tone, [fg = '', bg = '']] of Object.entries(pills)) {
+				expect(ratioOn(theme, fg, bg), `${tone} ${theme}`).toBeGreaterThanOrEqual(4.5)
 			}
 		}
 	})
