@@ -281,6 +281,7 @@
 		"undo-redo-use-undo-redo-hook",
 		"webhooks-initial-beta",
 		"webhooks-locales",
+		"webhooks-multi-tenant",
 		"webhooks-previous-data-transform",
 		"webhooks-redeliver-endpoint",
 		"webhooks-standard-webhooks-signing"
