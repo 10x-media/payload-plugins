@@ -31,7 +31,7 @@ declare module 'payload' {
 export const AUTOMATIONS_CUSTOM_KEY = '@10x-media/automations' as const
 
 /**
- * Automations engine for Payload v3. Runs last (`order: 100`) so sibling plugins
+ * Automations engine for Payload. Runs last (`order: 100`) so sibling plugins
  * have already pushed their contributions into `options.triggers`. For Phase 0
  * this only records the resolved trigger list on `config.custom`; the engine
  * itself is built in a later phase.
@@ -39,7 +39,7 @@ export const AUTOMATIONS_CUSTOM_KEY = '@10x-media/automations' as const
 export const automations = definePlugin<AutomationsPluginOptions>({
 	slug: '@10x-media/automations',
 	order: 100,
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config, options = {} }): Config => {
 		if (options.disabled === true) {
 			return config
 		}
