@@ -9,6 +9,7 @@ import { en } from '@payloadcms/translations/languages/en'
 import { uk } from '@payloadcms/translations/languages/uk'
 import { buildConfig } from 'payload'
 import { folderPicker } from '../src/index'
+import { folders } from './collections/folders'
 import { posts } from './collections/posts'
 import { attachments, curated, files, media } from './collections/uploads'
 import { users } from './collections/users'
@@ -41,14 +42,13 @@ export default buildConfig({
 	db,
 	collections: [
 		users,
+		folders,
 		media(dirname),
 		files(dirname),
 		attachments(dirname),
 		curated(dirname),
 		posts,
 	],
-	// The plugin is a no-op without this; `payload-folders` is created by Payload itself.
-	folders: { browseByFolder: true },
 	i18n: { supportedLanguages: { de, en, uk } },
 	editor: lexicalEditor(),
 	plugins: [folderPicker({})],

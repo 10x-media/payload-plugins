@@ -1,16 +1,12 @@
 import type { Payload } from 'payload'
-import type { FolderInterface } from '../payload-types'
+import type { Folder } from '../payload-types'
 
 const DEV_EMAIL = 'dev@10xmedia.de'
 const DEV_PASSWORD = 'password'
 
-/**
- * Derived from the generated types rather than Payload's wide `CollectionSlug`: `folderType`
- * only accepts collections that actually declare `folders: true`, and a folder id is whatever
- * the configured adapter produces. Both narrow further whenever the dev config changes.
- */
-type FolderedCollection = NonNullable<FolderInterface['folderType']>[number]
-type FolderId = FolderInterface['id']
+/** The upload collections that carry the `folders` hierarchy's `_h_folders` field. */
+type FolderedCollection = 'curated' | 'files' | 'media'
+type FolderId = Folder['id']
 
 /**
  * SVG rather than a raster fixture: the picker only needs distinguishable thumbnails, and a text
@@ -39,8 +35,9 @@ const createFolder = async (
 	{ collections, name, parent }: FolderArgs
 ): Promise<FolderId> => {
 	const doc = await payload.create({
-		collection: 'payload-folders',
-		data: { folder: parent ?? null, folderType: collections, name },
+		overrideAccess: true,
+		collection: 'folders',
+		data: { _h_folders: parent ?? null, hierarchyType: collections, name },
 	})
 	return doc.id
 }
@@ -57,8 +54,9 @@ const upload = async (
 	{ collection, color, folder, name }: UploadArgs
 ): Promise<void> => {
 	await payload.create({
+		overrideAccess: true,
 		collection,
-		data: { folder },
+		data: { _h_folders: folder },
 		file: svgFile(name, color),
 	})
 }
@@ -72,6 +70,7 @@ const uploadUnfiled = async (
 	{ collection, color, name }: { collection: 'attachments' | 'media'; color: string; name: string }
 ): Promise<void> => {
 	await payload.create({
+		overrideAccess: true,
 		collection,
 		data: {},
 		file: svgFile(name, color),
@@ -106,16 +105,17 @@ export const seedDev = (payload: Payload): Promise<void> => {
 }
 
 const runSeed = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ collection: 'users', overrideAccess: true })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const mediaCount = await payload.count({ collection: 'media' })
+	const mediaCount = await payload.count({ collection: 'media', overrideAccess: true })
 	if (mediaCount.totalDocs === 0) {
 		const brand = await createFolder(payload, { collections: ['media'], name: 'Brand' })
 		const marketing = await createFolder(payload, { collections: ['media'], name: 'Marketing' })
@@ -148,7 +148,7 @@ const runSeed = async (payload: Payload): Promise<void> => {
 		payload.logger.info('Seeded media: Brand, Marketing/Hero images, Marketing/Team')
 	}
 
-	const filesCount = await payload.count({ collection: 'files' })
+	const filesCount = await payload.count({ collection: 'files', overrideAccess: true })
 	if (filesCount.totalDocs === 0) {
 		const documents = await createFolder(payload, { collections: ['files'], name: 'Documents' })
 		await upload(payload, {
@@ -166,7 +166,7 @@ const runSeed = async (payload: Payload): Promise<void> => {
 		payload.logger.info('Seeded files: Documents')
 	}
 
-	const curatedCount = await payload.count({ collection: 'curated' })
+	const curatedCount = await payload.count({ collection: 'curated', overrideAccess: true })
 	if (curatedCount.totalDocs === 0) {
 		const picks = await createFolder(payload, { collections: ['curated'], name: 'Editor picks' })
 		await upload(payload, {
@@ -178,7 +178,7 @@ const runSeed = async (payload: Payload): Promise<void> => {
 		payload.logger.info('Seeded curated: Editor picks')
 	}
 
-	const attachmentsCount = await payload.count({ collection: 'attachments' })
+	const attachmentsCount = await payload.count({ collection: 'attachments', overrideAccess: true })
 	if (attachmentsCount.totalDocs === 0) {
 		// Folders are off for this collection, so these stay flat on purpose.
 		await uploadUnfiled(payload, { collection: 'attachments', color: '#0f766e', name: 'contract' })
@@ -186,9 +186,13 @@ const runSeed = async (payload: Payload): Promise<void> => {
 		payload.logger.info('Seeded attachments (control collection, no folders)')
 	}
 
-	const postCount = await payload.count({ collection: 'posts' })
+	const postCount = await payload.count({ collection: 'posts', overrideAccess: true })
 	if (postCount.totalDocs === 0) {
-		await payload.create({ collection: 'posts', data: { title: 'Picker showcase' } })
+		await payload.create({
+			collection: 'posts',
+			overrideAccess: true,
+			data: { title: 'Picker showcase' },
+		})
 		payload.logger.info('Seeded posts: Picker showcase')
 	}
 }

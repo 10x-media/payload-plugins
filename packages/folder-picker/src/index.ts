@@ -24,15 +24,16 @@ declare module 'payload' {
 }
 
 /**
- * Folder Picker plugin for Payload v3. Swaps the list view of every folder-enabled
- * collection so the list drawer browses folders instead of a flat list. Payload
- * resolves that one component for both the collection route and the drawer, so upload
- * fields, relationship fields and the lexical upload node are covered without patching
- * a single field. Authored with `definePlugin` so sibling plugins can detect it by slug.
+ * Folder Picker plugin for Payload 4. Swaps the list view of every collection that files
+ * into a folder collection, so the list drawer can browse folders instead of a flat list.
+ * Payload resolves that one component for both the collection route and the drawer, so
+ * upload fields, relationship fields and the lexical upload node are covered without
+ * patching a single field. Authored with `definePlugin` so sibling plugins can detect it
+ * by slug.
  */
 export const folderPicker = definePlugin<FolderPickerPluginOptions>({
 	slug: '@10x-media/folder-picker',
-	plugin: ({ config, plugins: _plugins, ...options }): Config => {
+	plugin: ({ config, options = {} }): Config => {
 		if (options.disabled === true) {
 			return config
 		}

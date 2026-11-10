@@ -1,5 +1,6 @@
 import { LLMInstructionsMenuItem as LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { NullField as NullField_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
+import { HierarchyTypeFieldServer as HierarchyTypeFieldServer_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { HierarchyButton as HierarchyButton_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
 import { FolderListView as FolderListView_37fad527a4c15e13c1589721e1e582c3 } from '@10x-media/folder-picker/client'
 import { CuratedListView as CuratedListView_2fbb81555e3f62c815d3ca564e11c0cd } from '../../../../dev/components/CuratedListView'
@@ -45,6 +46,7 @@ import { UploadDropzoneCollectionsField as UploadDropzoneCollectionsField_3817bf
 export const importMap = {
   "@payloadcms/ui#LLMInstructionsMenuItem": LLMInstructionsMenuItem_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui#NullField": NullField_3817bf644402e67bfe6577f60ef982de,
+  "@payloadcms/ui/rsc#HierarchyTypeFieldServer": HierarchyTypeFieldServer_ab83ff7e88da8d3530831f296ec4756a,
   "@payloadcms/ui/rsc#HierarchyButton": HierarchyButton_ab83ff7e88da8d3530831f296ec4756a,
   "@10x-media/folder-picker/client#FolderListView": FolderListView_37fad527a4c15e13c1589721e1e582c3,
   "/components/CuratedListView#CuratedListView": CuratedListView_2fbb81555e3f62c815d3ca564e11c0cd,
