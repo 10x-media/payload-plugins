@@ -193,6 +193,8 @@ describe('redeliverDelivery', () => {
 		expect(payload.jobs.queue as ReturnType<typeof vi.fn>).toHaveBeenCalledWith({
 			task: WEBHOOK_DELIVER_TASK,
 			input: { deliveryId: 'del-2' },
+			// The caller's access was settled before the replay; `jobs.access.queue` is not theirs.
+			overrideAccess: true,
 			queue: deps.queue,
 			// The caller's request, so the job shares the transaction the new row was created in.
 			req,
