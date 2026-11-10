@@ -40,7 +40,6 @@ pnpm test:container [name]
 pnpm test:e2e <name>
 E2E_DBS=postgres pnpm test:e2e analytics   # analytics e2e on some databases (default: mongo postgres sqlite)
 E2E_FRAMEWORK=tanstack pnpm test:e2e <name>  # the same suite on the TanStack Start dev app's build (srvx)
-pnpm test:upgrade analytics                # upgrade 1.0.0-beta.11 installs (UPGRADE_DBS, UPGRADE_VARIANTS select)
 
 # Docs showcase clips (needs `pnpm dev <name>` already running)
 pnpm videos <name>
@@ -75,13 +74,10 @@ Postgres and SQLite push their schema in development. `TENANCY=on` switches to t
 | Int (matrix) | Cross-DB: Mongo in-memory + Postgres container (+ SQLite file for `analytics`, twice: the native engine on worker threads, then on the main thread with `ANALYTICS_SQLITE_THREAD=main`) | Yes | `pnpm test:matrix [name]` |
 | Int (container) | Both DBs containerized | Yes | `pnpm test:container [name]` |
 | E2E | Production build + Playwright + docker compose | Yes | `pnpm test:e2e <name>` |
-| Upgrade (`analytics`) | A 1.0.0-beta.11 install upgraded the way the upgrading page says | Yes | `pnpm test:upgrade analytics` |
 
 There is no in-process Postgres option. Postgres tiers always use a real Docker container (`postgres:16` via testcontainers). SQLite needs no Docker: each boot opens its own libsql file in a temp directory.
 
 The analytics e2e suite builds the dev app once and runs it on every database in `E2E_DBS` (default `mongo postgres sqlite`), each in both tenancy modes, then once more with `ANALYTICS_SLOW_SOURCE_MS=10000`, where the in-memory source answers 10 s late and is the default, for the checks that an edit view and the dashboard never wait on a source. Its lifecycle checks (a tab covered by another, a page left, a prerendered page) drive a Chromium the suite starts itself in the new headless mode, since Chromium refuses to prerender for a page a DevTools client is attached to and Playwright's focus emulation keeps every page it drives visible.
-
-The upgrade test (`packages/analytics/scripts/upgrade.sh`) checks the `@10x-media/analytics@1.0.0-beta.11` tag out into a temporary worktree and, for each install shape in `UPGRADE_VARIANTS` (`tasks`: retention, warming and sync; `none`; `sync` alone, whose task enum lacks the retired tasks; `scoped`: multi-tenant, each tenant given a `native` provider document), migrates a fresh database with that release and ingests through its endpoint, then upgrades on this tree: `migrate:create` answering "create" to every prompt, the upgrading page's edits applied by `tests/upgrade/editMigration.ts` (which fails when a statement the page names is missing), `migrate`, `migrate:status` all run, `migrate:create --skip-empty` creating nothing, and reads through the new endpoints. MongoDB takes the `drop-legacy-mongo` predefined migration instead. It removes the worktree, its migrations and its containers on exit, however it ends. It installs that release's dependencies, so it needs the npm registry or a pnpm store that already holds them.
 
 A separate workflow (`.github/workflows/payload-latest.yml`) runs the analytics unit tests and its Mongo int lane against the newest Payload 3.x every week and on demand.
 
@@ -90,7 +86,7 @@ A separate workflow (`.github/workflows/payload-latest.yml`) runs the analytics 
 Everything is safe to run in parallel across multiple git worktrees, with no per-worktree setup:
 
 - **Tests** (unit, int, matrix, container) bind ephemeral ports: testcontainers let the OS assign a free host port per container, and in-memory Mongo picks a random port. Each worktree has its own `node_modules`, and the turbo cache is content-hashed, so concurrent runs never collide.
-- **e2e self-isolates.** `scripts/e2e.sh` derives both its `COMPOSE_PROJECT_NAME` and its host ports (Mongo/Postgres/Next) from the worktree, so two worktrees can run e2e at once untouched. Pin them with `MONGO_E2E_PORT` / `PG_E2E_PORT` / `E2E_NEXT_PORT` if you ever need fixed ports (`E2E_NEXT_PORT` is the app's port on either framework). The analytics upgrade test takes a compose project and ports of its own the same way (`MONGO_UPGRADE_PORT` / `PG_UPGRADE_PORT`), so it can run beside an e2e run of the same worktree.
+- **e2e self-isolates.** `scripts/e2e.sh` derives both its `COMPOSE_PROJECT_NAME` and its host ports (Mongo/Postgres/Next) from the worktree, so two worktrees can run e2e at once untouched. Pin them with `MONGO_E2E_PORT` / `PG_E2E_PORT` / `E2E_NEXT_PORT` if you ever need fixed ports (`E2E_NEXT_PORT` is the app's port on either framework).
 - **Dev server.** `pnpm dev <name>` defaults to port 3000 (`${PORT:-3000}`); set `PORT` to run a second dev server from another worktree.
 
 ## Writing tests
@@ -186,8 +182,7 @@ Examples: `feat(jobs): add stuck-job sweeper`, `fix(harness): close the pg pool 
    those to the packages your change reaches through the dependency graph, so a pull request touching
    one plugin does not run the other ten. E2E runs for each plugin whose package or dev app your
    change reaches, analytics as one job per database; apply the `no_e2e` label to skip it (it takes
-   effect on the next push). A change reaching analytics also runs its upgrade test, which `no_e2e`
-   does not skip. Changes to
+   effect on the next push). Changes to
    shared config, the root manifest, the `pnpm-workspace.yaml` catalog, `.github/`, or `scripts/`
    fall back to the whole workspace, and so does a manual `workflow_dispatch` run when you want the
    full suite on demand.

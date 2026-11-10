@@ -50,7 +50,6 @@ pnpm test:container [name]              # both DBs via testcontainers (Mongo con
 pnpm test:e2e <name>                    # docker compose + build + Playwright
 E2E_DBS=postgres pnpm test:e2e analytics  # analytics e2e on some databases (default: mongo postgres sqlite)
 E2E_FRAMEWORK=tanstack pnpm test:e2e <name>  # the same suite on the TanStack Start dev app's build (srvx)
-pnpm test:upgrade analytics             # upgrade beta.11 installs per the upgrading page (UPGRADE_DBS, UPGRADE_VARIANTS select)
 
 # Docs showcase clips (clipwright; needs `pnpm dev <name>` running on :3000)
 pnpm videos <name>                      # render packages/<name>/videos/*.video.ts
@@ -108,9 +107,8 @@ Modeled after Payload's own monorepo test pattern: Mongo runs in-memory via `mon
 | Int (matrix) | Cross-DB run for the same suite (Mongo in-memory + Postgres in container; analytics adds SQLite twice, engine on worker threads and on the main thread) | `pnpm test:matrix [name]` |
 | Int (full container) | Both DBs containerized (max prod parity) | `pnpm test:container [name]` |
 | E2E | Production build + Playwright + docker compose; analytics runs every database in `E2E_DBS`, both tenancy modes and a slow-source pass | `pnpm test:e2e <name>` |
-| Upgrade (analytics) | 1.0.0-beta.11 installs (all tasks, no task, sync alone, multi-tenant), from a temporary worktree of its tag, upgraded per the upgrading page on each database in `UPGRADE_DBS` | `pnpm test:upgrade analytics` |
 
-Postgres-touching tiers (matrix, container, e2e, upgrade) require Docker locally and on CI. This mirrors Payload's own monorepo test pattern (Mongo in-memory, Postgres in real Docker).
+Postgres-touching tiers (matrix, container, e2e) require Docker locally and on CI. This mirrors Payload's own monorepo test pattern (Mongo in-memory, Postgres in real Docker).
 
 Analytics' `test` script runs `test:clock` first: its unit suite again at 00:05 UTC on 2026-11-02 in `America/Adak`, about 30 seconds, so a test that leans on the real clock or zone fails every run. `pnpm test analytics <file>` still pays for that pass; `pnpm test:unit analytics` and the int lanes skip it. Its vitest config caps a Mongo lane at 3 workers and a Postgres lane at 4, runs a SQLite lane in forked workers with unhandled errors failing the run (a vitest worker thread ended mid-statement aborts the whole run inside libsql), and lets each boot's native engine go idle before the harness destroys it (`onRelease` from `@10x-media/payload-test-harness`).
 
@@ -142,7 +140,7 @@ Scoping is by **package graph**, never by directory. A change to `jobs` also sel
 
 `e2e` reuses the same scope step in its own `e2e-scope` job, which turns `turbo ls` into a matrix with one `pnpm test:e2e <plugin>` leg per plugin, except that a plugin listed in the job's `E2E_DATABASES` (analytics) gets one leg per database, passed as `E2E_DBS`, and a plugin listed in `E2E_FRAMEWORKS` (the ones ported to Payload 4) gets one leg per framework, passed as `E2E_FRAMEWORK`: `next` serves the Next dev app's production build, `tanstack` the TanStack Start dev app's (`vite build`, served by `srvx`, as in Payload's `blank-tanstack` template). Add a plugin to `E2E_FRAMEWORKS` as part of its port, after its `playwright.config.ts` and `scripts/e2e.sh` take the `E2E_FRAMEWORK` switch from the template. A plugin is picked when it *or one of its dev apps* is affected, because the dev app is what Playwright drives and it can import other plugins: a `fields` change selects `admin-wiki-dev` rather than `admin-wiki`, and still runs admin-wiki's e2e. It runs on pull requests and `workflow_dispatch`, not on pushes to `main`, and the `no_e2e` label opts a pull request out of these legs. Labels are read from the triggering event, so adding one takes effect on the next push, the same as `no-release`.
 
-`analytics-upgrade` (`pnpm test:upgrade analytics`, every database) runs on pull requests and `workflow_dispatch` too. It has its own scope step and runs the test only when `turbo ls` with that flag still lists `@10x-media/analytics`, so the fallback always runs it; its full-history checkout also brings the `@10x-media/analytics@1.0.0-beta.11` tag it checks out. `no_e2e` does not skip it: it drives no browser, and it is the only check of the upgrading page's migration edits.
+`main` also carries `analytics-upgrade` (`pnpm test:upgrade analytics`), which upgrades 1.0.0-beta.11 installs per the upgrading page. This branch dropped it: beta.11 is a Payload 3 release and cannot upgrade onto Payload 4, so the v3-to-v4 upgrading page is verified by hand.
 
 **What forces the whole workspace**, and this is the part to keep intact when editing any of it:
 

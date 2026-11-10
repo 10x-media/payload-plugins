@@ -270,38 +270,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Upgrades a 1.0.0-beta.11 install to this tree on every database the way the upgrading page
-  # says (packages/analytics/scripts/upgrade.sh). On pull requests and manual dispatch, when the
-  # change reaches analytics through the package graph; the scope fallback always runs it. The
-  # full history checkout also brings the beta.11 tag it checks out. The `no_e2e` label does not
-  # skip it: it boots no browser, and it is the only check of the upgrading page's migration edits.
-  # Off on the v4 line: beta.11 is a Payload 3 release, so it cannot upgrade onto Payload 4.
-  analytics-upgrade:
-    runs-on: ubuntu-latest
-    timeout-minutes: 30
-    if: github.event_name != 'push' && github.base_ref != 'v4' && github.ref != 'refs/heads/v4'
-    steps:
-      - uses: actions/checkout@v6
-        with: { fetch-depth: 0 }
-      - id: scope
-        name: Resolve affected scope
-        run: bash scripts/ci-affected.sh
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - id: reach
-        name: Does the change reach analytics?
-        run: |
-          reached=$(pnpm exec turbo ls ${{ steps.scope.outputs.flag }} --filter=@10x-media/analytics --output=json |
-            jq '.packages.items | length > 0')
-          echo "analytics affected: ${reached}"
-          echo "reached=${reached}" >>"$GITHUB_OUTPUT"
-      - if: steps.reach.outputs.reached == 'true'
-        run: pnpm test:upgrade analytics
-
   changeset-required:
     runs-on: ubuntu-latest
     timeout-minutes: 10

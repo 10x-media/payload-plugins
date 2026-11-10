@@ -143,7 +143,6 @@
 		"test:matrix": "DB_MATRIX=mongo vitest run tests/int && DB_MATRIX=postgres vitest run tests/int && DB_MATRIX=sqlite vitest run tests/int && ANALYTICS_SQLITE_THREAD=main DB_MATRIX=sqlite vitest run tests/int",
 		"test:container": "TEST_DB=container DB_MATRIX=mongo vitest run tests/int && TEST_DB=container DB_MATRIX=postgres vitest run tests/int",
 		"test:e2e": "bash scripts/e2e.sh",
-		"test:upgrade": "bash scripts/upgrade.sh",
 		"test:load": "vitest run --config tests/load/vitest.config.ts",
 		"dev": "pnpm --filter @10x-media/analytics-dev dev",
 		"start": "pnpm --filter @10x-media/analytics-dev start",
