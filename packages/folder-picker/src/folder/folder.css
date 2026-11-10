@@ -40,6 +40,16 @@
 	display: none;
 }
 
+/* A picker picks: the selection keeps its count and Clear All, but not the view's bulk Edit,
+   Publish, Delete and Move, which manage the library rather than choose from it (Delete would
+   remove documents other fields still reference). `HierarchyListView` does not forward
+   `disableBulkDelete` / `disableBulkEdit` to its header, and Move has no switch, so the second
+   action group and the dash before it are hidden. */
+.folder-picker .list-selection > .list-selection__actions:nth-of-type(2),
+.folder-picker .list-selection > span:nth-of-type(3) {
+	display: none;
+}
+
 /* Hidden rather than removed: the confirm button portals into the same actions row. */
 .folder-picker .hierarchy-list-header .default-list-view-tabs {
 	display: none;
