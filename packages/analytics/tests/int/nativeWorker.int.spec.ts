@@ -139,7 +139,8 @@ describeForDb('native maintenance on a jobs worker', {}, (db) => {
 		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
 		const next = await openRuns()
 		expect(next).toHaveLength(1)
-		expect(next[0]?.id).not.toEqual(queued?.id)
+		// Not by id: SQLite hands the deleted run's rowid to the next one.
+		expect(next[0]).not.toHaveProperty('processingToken', 'killed-run')
 	})
 
 	it(`records a server event on the worker that the web instance reads on ${db}`, async () => {
