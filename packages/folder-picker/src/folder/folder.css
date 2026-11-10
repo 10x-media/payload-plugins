@@ -19,10 +19,11 @@
 	display: none;
 }
 
-/* Payload's hierarchy header, restyled as the drawer header it stands in for. Its own
-   All / By tabs push the collection route, and the bar above already switches. */
+/* Payload's hierarchy header, on the same lines as the list tab's header: title at the drawer
+   header's inset, everything below it at the controls' inset. Its own All / By tabs push the
+   collection route, and the bar above already switches. */
 .folder-picker .hierarchy-list-header {
-	padding: var(--spacer-2-5) var(--spacer-3);
+	padding: var(--spacer-2-5) var(--spacer-3) var(--spacer-2-5) var(--spacer-2);
 }
 
 /* Hidden rather than removed: the confirm button portals into the same actions row. */
@@ -44,8 +45,13 @@
 	line-height: var(--text-body-medium-bold-line-height);
 }
 
-.folder-picker .hierarchy-list__controls,
-.folder-picker .hierarchy-tables {
+/* The tables run edge to edge with full-width rules, as the list tab's table does; the section
+   headings move in to the checkbox column, where the list tab's first column starts. */
+.folder-picker .hierarchy-list__controls {
+	padding-inline: var(--spacer-3);
+}
+
+.folder-picker .table-section__header-inner {
 	padding-inline: var(--spacer-3);
 }
 
