@@ -25,6 +25,7 @@ export const OfferCard = async () => {
 		where: { tenant: { equals: tenant.id } },
 		limit: 1,
 		depth: 0,
+		overrideAccess: true,
 	})
 	const offer = offers.docs[0]
 	if (!offer) {

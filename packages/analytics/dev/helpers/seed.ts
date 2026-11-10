@@ -55,19 +55,22 @@ type SeededTenants = Record<TenantKey, Tenant>
  * from before tenants had a timezone is given its zone, and nothing else is touched.
  */
 const seedTenants = async (payload: Payload): Promise<SeededTenants> => {
-	const tenantCount = await payload.count({ collection: 'tenants' })
+	const tenantCount = await payload.count({ overrideAccess: true, collection: 'tenants' })
 	if (tenantCount.totalDocs === 0) {
 		for (const tenant of SEED_TENANTS) {
-			await payload.create({ collection: 'tenants', data: { ...tenant } })
+			await payload.create({ overrideAccess: true, collection: 'tenants', data: { ...tenant } })
 		}
 		payload.logger.info(`Seeded tenants: ${SEED_TENANTS.map((t) => t.slug).join(', ')}`)
 	}
-	const found = (await payload.find({ collection: 'tenants', pagination: false })).docs
+	const found = (
+		await payload.find({ overrideAccess: true, collection: 'tenants', pagination: false })
+	).docs
 	for (const tenant of SEED_TENANTS) {
 		const doc = found.find((t) => t.slug === tenant.slug)
 		if (doc && !doc.timezone) {
 			doc.timezone = tenant.timezone
 			await payload.update({
+				overrideAccess: true,
 				collection: 'tenants',
 				id: doc.id,
 				data: { timezone: tenant.timezone },
@@ -90,11 +93,13 @@ const seedTenantUsers = async (payload: Payload, tenants: SeededTenants): Promis
 	]
 	for (const { email, tenant } of assignments) {
 		const existing = await payload.count({
+			overrideAccess: true,
 			collection: 'users',
 			where: { email: { equals: email } },
 		})
 		if (existing.totalDocs === 0) {
 			await payload.create({
+				overrideAccess: true,
 				collection: 'users',
 				data: { email, password: DEV_PASSWORD, tenants: [{ tenant }] },
 			})
@@ -129,12 +134,13 @@ const seedTenantProviders = async (
 	tenants: SeededTenants,
 	platformAdmin: User
 ): Promise<void> => {
-	const count = await payload.count({ collection: 'analytics-providers' })
+	const count = await payload.count({ overrideAccess: true, collection: 'analytics-providers' })
 	if (count.totalDocs > 0) {
 		return
 	}
 	for (const entry of SEED_PROVIDERS) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'analytics-providers',
 			data: {
 				name: entry.name,
@@ -165,6 +171,7 @@ const seedRetiredProvider = async (payload: Payload): Promise<void> => {
 		return
 	}
 	const { totalDocs } = await payload.count({
+		overrideAccess: true,
 		collection: 'analytics-providers',
 		where: { name: { equals: RETIRED_PROVIDER_NAME } },
 	})
@@ -202,10 +209,11 @@ const seedTenantOffers = async (
 	tenants: SeededTenants,
 	platformAdmin: User
 ): Promise<Partial<Record<TenantKey, string>>> => {
-	const count = await payload.count({ collection: 'offers' })
+	const count = await payload.count({ overrideAccess: true, collection: 'offers' })
 	if (count.totalDocs === 0) {
 		for (const entry of SEED_OFFERS) {
 			await payload.create({
+				overrideAccess: true,
 				collection: 'offers',
 				data: {
 					title: entry.title,
@@ -220,6 +228,7 @@ const seedTenantOffers = async (
 	}
 	const signedRefOf = async (tenant: Tenant): Promise<string | undefined> => {
 		const { docs } = await payload.find({
+			overrideAccess: true,
 			collection: 'offers',
 			where: { tenant: { equals: tenant.id } },
 			limit: 1,
@@ -292,6 +301,7 @@ const seedGoalPage = async (
 ): Promise<void> => {
 	const { platformAdmin, scope } = opts
 	const existingGoal = await payload.count({
+		overrideAccess: true,
 		collection: GOALS_SLUG,
 		where: { slug: { equals: entry.goal.slug } },
 	})
@@ -314,11 +324,13 @@ const seedGoalPage = async (
 	}
 
 	const existingPage = await payload.count({
+		overrideAccess: true,
 		collection: 'pages',
 		where: { slug: { equals: entry.page.slug } },
 	})
 	if (existingPage.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'pages',
 			data: {
 				title: entry.page.title,
@@ -437,6 +449,7 @@ export const seedDev = async (
 
 	const existingDevAdmin = (
 		await payload.find({
+			overrideAccess: true,
 			collection: 'users',
 			where: { email: { equals: DEV_ADMIN_EMAIL } },
 			limit: 1,
@@ -445,6 +458,7 @@ export const seedDev = async (
 	const platformAdmin =
 		existingDevAdmin ??
 		(await payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: DEV_ADMIN_EMAIL, password: DEV_PASSWORD },
 		}))
@@ -452,10 +466,14 @@ export const seedDev = async (
 		payload.logger.info(`Seeded dev admin: ${DEV_ADMIN_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const pageCount = await payload.count({ collection: 'pages' })
+	const pageCount = await payload.count({ overrideAccess: true, collection: 'pages' })
 	if (pageCount.totalDocs === 0) {
 		for (const page of SEED_PAGES) {
-			await payload.create({ collection: 'pages', data: { ...page, createdAt: seededCreatedAt() } })
+			await payload.create({
+				overrideAccess: true,
+				collection: 'pages',
+				data: { ...page, createdAt: seededCreatedAt() },
+			})
 		}
 		payload.logger.info(`Seeded ${SEED_PAGES.length} pages matching the traffic paths`)
 	}
@@ -483,7 +501,7 @@ export const seedDev = async (
 		`Seeded ${traffic.hits} analytics hits in ${traffic.storeMs} ms and counted ${traffic.days} day${traffic.days === 1 ? '' : 's'} in ${traffic.countMs} ms`
 	)
 
-	const dailyCount = await payload.count({ collection: 'analytics-daily' })
+	const dailyCount = await payload.count({ overrideAccess: true, collection: 'analytics-daily' })
 	if (dailyCount.totalDocs === 0) {
 		const task = syncTask({
 			schedule: DEFAULT_JOBS.sync,

@@ -126,8 +126,8 @@ const offers: CollectionConfig = {
 
 /** Every tenant, which the warm and sync jobs cover beside the install-wide scope. */
 export const tenancyScopes: ScopeListResolver = async ({ payload }) =>
-	(await payload.find({ collection: 'tenants', pagination: false })).docs.map((doc) =>
-		String(doc.id)
+	(await payload.find({ collection: 'tenants', pagination: false, overrideAccess: true })).docs.map(
+		(doc) => String(doc.id)
 	)
 
 /** Names the resolved scope in the view's caption; `access.crossScope` alone gates reads. */
