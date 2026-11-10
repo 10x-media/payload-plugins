@@ -62,7 +62,7 @@ export const isMongoStateModel = (value: unknown): value is MongoStateModel =>
 const CHUNK = 500
 
 /** Answer the document as it is after the update, as a plain object. */
-const AFTER = { lean: true, new: true }
+const AFTER = { lean: true, returnDocument: 'after' }
 
 /** A lease free for `owner` at `now`: never taken, expired, or `owner`'s own. */
 const leaseFree = (now: Date, owner: string): object => ({

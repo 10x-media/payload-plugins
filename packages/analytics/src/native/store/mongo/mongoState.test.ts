@@ -55,7 +55,7 @@ describe('mongoStateStore leases', () => {
 						$set: { leaseOwner: 'run-1', leaseUntil: new Date('2026-10-06T12:10:00.000Z') },
 						$setOnInsert: { kind: 'lease', scope: '' },
 					},
-					{ lean: true, new: true, upsert: true },
+					{ lean: true, returnDocument: 'after', upsert: true },
 				],
 			},
 		])
@@ -73,7 +73,7 @@ describe('mongoStateStore leases', () => {
 		await expect(
 			mongoStateStore(() => model, { now: () => NOW }).claim('day:a:20261005', 'run-1', MINUTE)
 		).resolves.toBe(false)
-		expect(calls[0]?.args[2]).toEqual({ lean: true, new: true })
+		expect(calls[0]?.args[2]).toEqual({ lean: true, returnDocument: 'after' })
 	})
 
 	it('completes only on the lease its owner still holds, and clears it', async () => {
@@ -156,7 +156,7 @@ describe('mongoStateStore leases', () => {
 				args: [
 					{ _id: 'day:a:20261005', leaseOwner: 'run-1' },
 					{ $set: { leaseUntil: new Date(NOW.getTime() + MINUTE) } },
-					{ lean: true, new: true },
+					{ lean: true, returnDocument: 'after' },
 				],
 			},
 		])
