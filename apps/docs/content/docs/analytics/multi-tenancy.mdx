@@ -514,8 +514,8 @@ The host owns which tenant a request is for. Whatever selector it already has (t
 
 What the view does have is a caption or one select:
 
-- **The Site select** offers the reader's own site and **All sites**, first in the toolbar. It is drawn only for a reader whose own scope is a tenant and who passes `access.crossScope.aggregate`. **All sites** writes `scope=*:<tenant>`, the aggregate marker tagged with the tenant it was chosen from; the reader's own site writes no scope at all. The site is listed under its `scope.label` name; without it the scope id stands.
-- **The caption** reads `Showing: <tenant>` under the title for every other viewer on a scoped install, with the same name, and `Showing: All sites` for a reader who may aggregate and has no tenant selected. Where the Site select is drawn it already names the site, so the caption is left out.
+- **The Site menu** offers the reader's own site and **All sites**, first in the toolbar. It is drawn only for a reader whose own scope is a tenant and who passes `access.crossScope.aggregate`. **All sites** writes `scope=*:<tenant>`, the aggregate marker tagged with the tenant it was chosen from; the reader's own site writes no scope at all. The site is listed under its `scope.label` name; without it the scope id stands.
+- **The caption** reads `Showing: <tenant>` under the title for every other viewer on a scoped install, with the same name, and `Showing: All sites` for a reader who may aggregate and has no tenant selected. Where the Site menu is drawn it already names the site, so the caption is left out.
 - **No site selected.** A reader whose request resolves no tenant and who may not read across tenants (a tenant admin signed in without picking one) is asked to choose a site: the view, the widgets and the document panel read **Choose a site to see its numbers.**
 
 ```ts

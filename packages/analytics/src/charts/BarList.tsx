@@ -26,8 +26,8 @@ export interface BarListProps {
 	 */
 	onSelect?: (index: number) => void
 	/**
-	 * `solid` (default) fills the bar in the chart color, the label light over it and dark past it;
-	 * `soft` pales the fill and keeps the label dark, for a denser list.
+	 * `soft` (default) is the built-in widgets' look: a pale fill with a dark label. `solid` fills the
+	 * bar in the chart color, the label light over it and dark past it, to set one list apart.
 	 */
 	fill?: 'solid' | 'soft'
 	/** The list's accessible name. */
@@ -48,7 +48,7 @@ export function BarList({
 	data,
 	emptyLabel,
 	onSelect,
-	fill = 'solid',
+	fill = 'soft',
 	label,
 	headers,
 }: BarListProps) {

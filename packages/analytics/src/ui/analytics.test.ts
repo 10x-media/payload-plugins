@@ -28,6 +28,36 @@ const stylesheetImports = (): Array<{ from: string; target: string }> =>
 
 const withoutComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, '')
 
+/** Every innermost rule's selector and raw body. */
+const rawRules = (): Array<{ selector: string; body: string }> =>
+	[...withoutComments(analyticsCss()).matchAll(/([^{}]+)\{([^{}]*)\}/g)].map((match) => ({
+		selector: (match[1] ?? '').trim().replace(/\s+/g, ' '),
+		body: match[2] ?? '',
+	}))
+
+/** The blocks `BarList` and `TrendChart` draw with, the only ones a page outside the admin shows. */
+const OUTSIDE_BLOCKS = new Set(['chart', 'bars', 'table', 'sr-only'])
+
+/** Whether one of a rule's selectors styles only what `BarList` or `TrendChart` draws. */
+const readOutside = (selector: string): boolean =>
+	selector
+		.replace(/:(where|is)\(/g, '')
+		.split(',')
+		.some((part) => {
+			const blocks = [...part.matchAll(/\.analytics-([a-z]+(?:-only)?)/g)].map((m) => m[1] ?? '')
+			return blocks.length > 0 && blocks.every((block) => OUTSIDE_BLOCKS.has(block))
+		})
+
+/** The stylesheet's own tokens those rules read. */
+const tokensReadOutside = (): Set<string> =>
+	new Set(
+		rawRules()
+			.filter(({ selector }) => readOutside(selector))
+			.flatMap(({ body }) =>
+				[...body.matchAll(/var\((--analytics-[\w-]+)/g)].map((m) => m[1] ?? '')
+			)
+	)
+
 describe('the package stylesheet', () => {
 	it('declares Payload layer order first and puts every rule in the payload layer', () => {
 		const css = withoutComments(analyticsCss()).trim()
@@ -47,8 +77,9 @@ describe('the package stylesheet', () => {
 		expect(closedAt).toBe(rest.length - 1)
 	})
 
-	it('defines every documented token on :root, on Payload 4 variables with a fallback', () => {
+	it('defines every documented token on :root as a Payload 4 variable, with a fallback where BarList or TrendChart reads it', () => {
 		const root = declarationsOf(':root')
+		const outside = tokensReadOutside()
 		for (const token of [
 			'--analytics-chart-1',
 			'--analytics-chart-comparison',
@@ -58,6 +89,7 @@ describe('the package stylesheet', () => {
 			'--analytics-card-padding',
 			'--analytics-text-muted',
 			'--analytics-bar-fill',
+			'--analytics-bar-fill-hover',
 			'--analytics-bar-label',
 			'--analytics-bar-label-on-fill',
 			'--analytics-delta-up-fg',
@@ -65,8 +97,37 @@ describe('the package stylesheet', () => {
 			'--analytics-delta-down-fg',
 			'--analytics-delta-down-bg',
 		]) {
-			expect(root[token], token).toMatch(/var\(--(color|radius|spacer)-[\w-]+, [^)]+\)/)
+			expect(root[token], token).toMatch(
+				outside.has(token)
+					? /^var\(--(color|radius|spacer)-[\w-]+, [^)]+\)$/
+					: /^var\(--(color|radius|spacer)-[\w-]+\)$/
+			)
 		}
+		expect([...outside].filter((token) => token.startsWith('--analytics-delta-'))).toEqual([])
+		expect([...outside].filter((token) => token.startsWith('--analytics-card-'))).toEqual([])
+	})
+
+	// Outside the admin none of Payload's variables is defined, and inside it a fallback never applies.
+	it('names a fallback for a Payload variable where BarList or TrendChart reads it, and nowhere else', () => {
+		const missing: string[] = []
+		const needless: string[] = []
+		for (const { selector, body } of rawRules()) {
+			if (selector === ':root') {
+				continue
+			}
+			const bare = [...body.matchAll(/var\((--(?!analytics-)[\w-]+)\)/g)].map((m) => m[1])
+			const fallback = [...body.matchAll(/var\((--(?!analytics-)[\w-]+),/g)].map((m) => m[1])
+			if (readOutside(selector) && bare.length > 0) {
+				missing.push(`${selector}: ${bare.join(' ')}`)
+			}
+			// The table skeletons spell their sizes the way the table rules do, fallbacks and all, so a
+			// test can tell them equal.
+			if (!readOutside(selector) && !/skeleton-table/.test(selector) && fallback.length > 0) {
+				needless.push(`${selector}: ${fallback.join(' ')}`)
+			}
+		}
+		expect(missing).toEqual([])
+		expect(needless).toEqual([])
 	})
 
 	// Payload 4 retired the v3 theme variables; one left behind resolves to nothing.
@@ -165,18 +226,35 @@ const payloadVariables = (): Set<string> => {
 	)
 }
 
-type Theme = 'light' | 'dark'
+type Theme = 'light' | 'dark' | 'light, enhanced contrast' | 'dark, enhanced contrast'
 
-/** Payload's palette, light and dark: the raw ramp, then the theme tokens built on it. */
+/**
+ * Payload's palette in each theme, plain and in its enhanced contrast mode: the raw ramp, then the
+ * theme tokens built on it, then the contrast mode's overrides.
+ */
 const payloadPalette = (): Record<Theme, Map<string, string>> => {
 	const ramp = declarationsIn(readFileSync(join(payloadCssDir(), 'design-tokens.css'), 'utf8'))
 	const colors = readFileSync(join(payloadCssDir(), 'colors.css'), 'utf8')
 	const darkAt = colors.indexOf("[data-theme='dark'] {")
 	const enhancedAt = colors.indexOf('html[data-enhanced-contrast]')
+	const enhancedLightAt = colors.indexOf("html[data-enhanced-contrast] [data-theme='light']")
+	const enhancedDarkAt = colors.indexOf("html[data-enhanced-contrast][data-theme='dark']")
 	const light = new Map([...ramp, ...declarationsIn(colors.slice(0, darkAt))])
+	const dark = new Map([...light, ...declarationsIn(colors.slice(darkAt, enhancedAt))])
+	const enhanced = declarationsIn(colors.slice(enhancedAt, enhancedLightAt))
 	return {
 		light,
-		dark: new Map([...light, ...declarationsIn(colors.slice(darkAt, enhancedAt))]),
+		dark,
+		'light, enhanced contrast': new Map([
+			...light,
+			...enhanced,
+			...declarationsIn(colors.slice(enhancedLightAt, enhancedDarkAt)),
+		]),
+		'dark, enhanced contrast': new Map([
+			...dark,
+			...enhanced,
+			...declarationsIn(colors.slice(enhancedDarkAt)),
+		]),
 	}
 }
 
@@ -275,10 +353,13 @@ const cssRules = (): Array<{ selector: string; declarations: Map<string, string>
 
 const THEMES = ['light', 'dark'] as const
 
+/** Payload's enhanced contrast mode, in which its own text reaches 4.5:1. */
+const ENHANCED = ['light, enhanced contrast', 'dark, enhanced contrast'] as const
+
 describe('muted text', () => {
-	it('is one token, secondary text pulled toward the body text as the activity widget does', () => {
+	it("is one token, Payload's secondary text as it is", () => {
 		expect(declarationsOf(':root')['--analytics-text-muted']).toBe(
-			'color-mix(in srgb, var(--color-text-secondary, #808080) 75%, var(--color-text, #1a1a1a))'
+			'var(--color-text-secondary, #808080)'
 		)
 		const fainter = cssRules().flatMap(({ selector, declarations }) => {
 			const color = declarations.get('color') ?? ''
@@ -305,9 +386,9 @@ describe('muted text', () => {
 		expect(dimmed).toEqual([])
 	})
 
-	it('reads at 4.5:1 or better on a card, a hovered or pressed card and a tooltip, in both themes', () => {
+	it('reads at 4.5:1 or better on a card, a hovered or pressed card and a tooltip, in the enhanced contrast mode', () => {
 		const muted = declarationsOf(':root')['--analytics-text-muted'] ?? ''
-		for (const theme of THEMES) {
+		for (const theme of ENHANCED) {
 			for (const surface of [
 				'var(--color-bg)',
 				'var(--color-bg-secondary)',
@@ -320,25 +401,44 @@ describe('muted text', () => {
 })
 
 describe('bar labels', () => {
-	it('read at 4.5:1 or better on a soft bar, a hovered soft one, a solid one and a hovered solid one, in both themes', () => {
+	it("fill a solid bar like Payload's primary button, hover included", () => {
 		const root = declarationsOf(':root')
-		const hover = declarationsOf('.analytics-bars__row:hover .analytics-bars__track::before')
-		expect(hover.filter).toBe('brightness(0.9)')
+		expect(root['--analytics-bar-fill']).toMatch(/^var\(--color-bg-brand,/)
+		expect(root['--analytics-bar-fill-hover']).toMatch(/^var\(--color-bg-brand-hover,/)
+		expect(root['--analytics-bar-label-on-fill']).toMatch(/^var\(--color-text-onbrand,/)
+		expect(
+			declarationsOf('.analytics-bars__row:hover .analytics-bars__track::before').background
+		).toBe('var(--analytics-bar-fill-hover)')
+	})
+
+	// The light label on the brand fill reads as Payload's own primary button does: under 4.5:1 in the
+	// plain themes, at 4.5:1 or better in the enhanced contrast mode Payload offers for that.
+	it('read at 4.5:1 or better on a solid bar, hovered or not, in the enhanced contrast mode', () => {
+		const root = declarationsOf(':root')
+		for (const theme of ENHANCED) {
+			const palette = payloadPalette()[theme]
+			const onFill = colorOf(palette, root['--analytics-bar-label-on-fill'] ?? '')
+			for (const fill of ['--analytics-bar-fill', '--analytics-bar-fill-hover']) {
+				expect(
+					contrast(onFill, colorOf(palette, root[fill] ?? '')),
+					`${fill} ${theme}`
+				).toBeGreaterThanOrEqual(4.5)
+			}
+		}
+	})
+
+	it('read at 4.5:1 or better on a soft bar, hovered or not, and on its track, in both themes', () => {
+		const root = declarationsOf(':root')
 		const soft =
 			declarationsOf('.analytics-bars--soft .analytics-bars__track::before').background ?? ''
-		const track = declarationsOf('.analytics-bars--soft .analytics-bars__track').background ?? ''
+		const track = declarationsOf('.analytics-bars__track').background ?? ''
 		const softHover = declarationsOf(
 			'.analytics-bars--soft .analytics-bars__row:hover .analytics-bars__track::before'
 		)
-		expect(softHover.filter).toBe('none')
+		expect(soft).toMatch(/^var\(--color-bg-brand-tertiary,/)
+		expect(softHover.background).toMatch(/^var\(--color-bg-brand-tertiary-hover,/)
 		const label = root['--analytics-bar-label'] ?? ''
 		for (const theme of THEMES) {
-			const palette = payloadPalette()[theme]
-			const fill = colorOf(palette, root['--analytics-bar-fill'] ?? '')
-			const onFill = colorOf(palette, root['--analytics-bar-label-on-fill'] ?? '')
-			const darker: Rgba = [fill[0] * 0.9, fill[1] * 0.9, fill[2] * 0.9, 1]
-			expect(contrast(onFill, fill), `solid ${theme}`).toBeGreaterThanOrEqual(4.5)
-			expect(contrast(onFill, darker), `hovered ${theme}`).toBeGreaterThanOrEqual(4.5)
 			expect(ratioOn(theme, label, soft), `soft ${theme}`).toBeGreaterThanOrEqual(4.5)
 			expect(
 				ratioOn(theme, label, softHover.background ?? ''),
@@ -350,18 +450,21 @@ describe('bar labels', () => {
 })
 
 describe('the delta pills', () => {
-	it("sit on Payload's success and error pill fills, the unchanged one untouched", () => {
+	it("are Payload's success and error pills as they are, the unchanged one untouched", () => {
 		const root = declarationsOf(':root')
-		expect(root['--analytics-delta-up-bg']).toMatch(/^var\(--color-bg-selected,/)
-		expect(root['--analytics-delta-down-bg']).toMatch(/^var\(--color-bg-danger-tertiary,/)
-		expect(root['--analytics-delta-up-fg']).toMatch(/^color-mix\(in srgb, var\(--color-text-brand,/)
-		expect(root['--analytics-delta-down-fg']).toMatch(
-			/^color-mix\(in srgb, var\(--color-text-danger,/
-		)
+		expect(root['--analytics-delta-up-fg']).toBe('var(--color-text-brand)')
+		expect(root['--analytics-delta-up-bg']).toBe('var(--color-bg-selected)')
+		expect(root['--analytics-delta-down-fg']).toBe('var(--color-text-danger)')
+		expect(root['--analytics-delta-down-bg']).toBe('var(--color-bg-danger-tertiary)')
 		expect(declarationsOf('.analytics-delta__change--none')).toEqual({})
 	})
 
-	it('read at 4.5:1 or better in the light theme and the dark one', () => {
+	// Payload's dark success pill keeps its pale text on its selected fill in the enhanced contrast
+	// mode too, under 4.5:1. The pill is Payload's, so it reads as Payload's does; once Payload
+	// darkens it, this pair leaves the list and the test says so.
+	const PAYLOAD_SHORTFALLS = ['up dark, enhanced contrast']
+
+	it("read at 4.5:1 or better in the enhanced contrast mode, as far as Payload's own pills do", () => {
 		const root = declarationsOf(':root')
 		const pills = {
 			up: [root['--analytics-delta-up-fg'], root['--analytics-delta-up-bg']],
@@ -369,9 +472,15 @@ describe('the delta pills', () => {
 			// Payload's own light-gray pill.
 			none: ['var(--color-text)', 'var(--color-bg-secondary)'],
 		}
-		for (const theme of THEMES) {
+		for (const theme of ENHANCED) {
 			for (const [tone, [fg = '', bg = '']] of Object.entries(pills)) {
-				expect(ratioOn(theme, fg, bg), `${tone} ${theme}`).toBeGreaterThanOrEqual(4.5)
+				const pair = `${tone} ${theme}`
+				const ratio = ratioOn(theme, fg, bg)
+				if (PAYLOAD_SHORTFALLS.includes(pair)) {
+					expect(ratio, pair).toBeLessThan(4.5)
+				} else {
+					expect(ratio, pair).toBeGreaterThanOrEqual(4.5)
+				}
 			}
 		}
 	})

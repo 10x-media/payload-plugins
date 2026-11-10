@@ -7,7 +7,7 @@ import AnalyticsGoalsWidget from './AnalyticsGoalsWidget'
 import { readForWidgetGoals, type WidgetGoalsResult } from './readForWidgetGoals'
 import type { GoalsWidgetData } from './types'
 import type { WidgetView } from './viewLink'
-import { hrefIn } from './widgetTestKit'
+import { captionT, hrefIn } from './widgetTestKit'
 
 vi.mock('./readForWidgetGoals', () => ({ readForWidgetGoals: vi.fn() }))
 
@@ -29,7 +29,7 @@ const result = (over: Partial<WidgetGoalsResult> = {}): WidgetGoalsResult => ({
 const req = (): PayloadRequest =>
 	({
 		payload: { config: { routes: { admin: '/admin' } } } as unknown as PayloadRequest['payload'],
-		i18n: { t: (key: string) => key, language: 'en' },
+		i18n: { t: captionT, language: 'en' },
 	}) as unknown as PayloadRequest
 
 const render = async (widgetData: GoalsWidgetData = {}, view?: WidgetView): Promise<string> =>
@@ -142,7 +142,7 @@ describe('AnalyticsGoalsWidget', () => {
 	})
 
 	// A narrow card has no room to say it on every row; each pill still says it in its name.
-	it('says what the deltas compare against once, under the table, not on each row', async () => {
+	it('says what the deltas compare against once, in the caption beside the window', async () => {
 		vi.mocked(readForWidgetGoals).mockResolvedValue(
 			result({
 				rows: [
@@ -152,9 +152,11 @@ describe('AnalyticsGoalsWidget', () => {
 			})
 		)
 		const html = await render({ compare: true })
-		expect(html.split('>analytics:comparisonVsPrevious<').length - 1).toBe(1)
 		expect(html.split('role="img"').length - 1).toBe(2)
-		expect(html).toMatch(/<\/table><\/div><span class="analytics-delta__caption">/)
+		expect(html).toMatch(
+			/class="analytics-widget__caption"[^>]*>[^<]*analytics:comparisonVsPrevious</
+		)
+		expect(html).not.toContain('analytics-delta__caption')
 	})
 
 	// A phone leaves a goal's name a narrow column: cut short there, it would name no goal at all.

@@ -4,44 +4,31 @@
  * Every rule sits in Payload's `payload` layer: it outranks Payload's own `payload-default`
  * styles and loses to any unlayered rule in the host's admin CSS, whatever the specificity.
  *
- * Sizes come from Payload's tokens (`--spacer-*`, `--text-*`, `--radius-*`, `--field-*`). The
- * rules `BarList` and `TrendChart` read also carry a px fallback, since outside the admin none of
- * those tokens is defined.
+ * Sizes come from Payload's tokens (`--spacer-*`, `--text-*`, `--radius-*`, `--field-*`), colors
+ * from its palette as it is, contrast included: its enhanced contrast mode is what brings text to
+ * 4.5:1, here as on its own buttons and pills. The rules and tokens `BarList` and `TrendChart` read
+ * also name a fallback, a pixel size or a neutral color, since outside the admin none of Payload's
+ * tokens is defined; the admin-only ones name none.
  */
 @layer payload {
 	:root {
 		--analytics-chart-1: var(--color-bg-brand, #0d99ff);
 		--analytics-chart-comparison: var(--color-icon-secondary, #808080);
-		--analytics-card-bg: var(--color-bg, #ffffff);
-		--analytics-card-border: var(--color-border, #e6e6e6);
-		--analytics-card-radius: var(--radius-large, 13px);
-		--analytics-card-padding: var(--spacer-2-5, 12px);
-		/*
-		 * Payload's secondary text pulled a quarter toward the body text, as its own activity widget
-		 * does: the plain token reads under 4.5:1 on white.
-		 */
-		--analytics-text-muted: color-mix(
-			in srgb,
-			var(--color-text-secondary, #808080) 75%,
-			var(--color-text, #1a1a1a)
-		);
-		/* One fill in both themes, dark enough for the light label on it. */
-		--analytics-bar-fill: var(--color-bg-brand-secondary, #007be5);
+		--analytics-card-bg: var(--color-bg);
+		--analytics-card-border: var(--color-border);
+		--analytics-card-radius: var(--radius-large);
+		--analytics-card-padding: var(--spacer-2-5);
+		--analytics-text-muted: var(--color-text-secondary, #808080);
+		/* The brand fill of the charts and of Payload's primary button, with its light label. */
+		--analytics-bar-fill: var(--color-bg-brand, #0d99ff);
+		--analytics-bar-fill-hover: var(--color-bg-brand-hover, #007be5);
 		--analytics-bar-label: var(--color-text, #1a1a1a);
 		--analytics-bar-label-on-fill: var(--color-text-onbrand, #ffffff);
-		/* Payload's own success and error pills, their text pulled toward the body text the same way. */
-		--analytics-delta-up-fg: color-mix(
-			in srgb,
-			var(--color-text-brand, #007be5) 75%,
-			var(--color-text, #1a1a1a)
-		);
-		--analytics-delta-up-bg: var(--color-bg-selected, #e5f4ff);
-		--analytics-delta-down-fg: color-mix(
-			in srgb,
-			var(--color-text-danger, #dc3412) 75%,
-			var(--color-text, #1a1a1a)
-		);
-		--analytics-delta-down-bg: var(--color-bg-danger-tertiary, #ffe2e0);
+		/* Payload's own success and error pills. */
+		--analytics-delta-up-fg: var(--color-text-brand);
+		--analytics-delta-up-bg: var(--color-bg-selected);
+		--analytics-delta-down-fg: var(--color-text-danger);
+		--analytics-delta-down-bg: var(--color-bg-danger-tertiary);
 	}
 
 	.analytics-sr-only {
@@ -70,8 +57,8 @@
 	/* Drawn inside: a pill's label clips what overflows it, and the tabs sit close together. */
 	.analytics-view__chip-remove:focus-visible,
 	.analytics-view__tab:focus-visible {
-		outline: var(--accessibility-outline, 1px solid currentColor);
-		outline-offset: var(--accessibility-outline-inset, -1px);
+		outline: var(--accessibility-outline);
+		outline-offset: var(--accessibility-outline-inset);
 	}
 
 	/* A small section label, as Payload sets its command palette's group labels. */
@@ -94,7 +81,7 @@
 		box-sizing: border-box;
 		padding: var(--analytics-card-padding);
 		background: var(--analytics-card-bg);
-		border: var(--stroke-width-small, 1px) solid var(--analytics-card-border);
+		border: var(--stroke-width-small) solid var(--analytics-card-border);
 		border-radius: var(--analytics-card-radius);
 	}
 
@@ -222,8 +209,8 @@
 	}
 
 	.analytics-widget__note {
-		font-size: var(--text-body-small-font-size);
-		line-height: var(--text-body-small-line-height);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
@@ -288,7 +275,7 @@
 
 	/* Each row a bar track and the gap under it. */
 	.analytics-widget__loading--breakdown .analytics-widget__shimmer {
-		min-height: calc(var(--analytics-rows, 5) * (var(--spacer-5) + var(--spacer-1)));
+		min-height: calc(var(--analytics-rows, 5) * (var(--control-height) + var(--spacer-1-5)));
 	}
 
 	/* A head row over the goals, each row as tall as a table row with its delta. */
@@ -456,8 +443,8 @@
 	}
 
 	.analytics-delta__caption {
-		font-size: var(--text-body-small-font-size);
-		line-height: var(--text-body-small-line-height);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
@@ -494,15 +481,9 @@
 		color: var(--analytics-text-muted);
 	}
 
+	/* Payload's pill as it is, as wide as its word in a field Payload lays out as a column. */
 	.analytics-empty-state--new {
-		--pill-padding-block: 0;
-		--pill-padding-inline-start: var(--spacer-2);
-		--pill-padding-inline-end: var(--spacer-2);
-		font-size: var(--text-body-small-bold-font-size);
-		font-weight: var(--text-body-small-bold-font-weight);
-		line-height: var(--text-body-small-bold-line-height);
-		letter-spacing: 0.03em;
-		border-radius: var(--radius-full);
+		align-self: flex-start;
 	}
 
 	.analytics-flag {
@@ -721,7 +702,7 @@
 		transform: none;
 	}
 
-	/* Payload's tooltip surface and shadow. */
+	/* Payload's popover, as its menus and the rich text link editor draw one: the dark menu surface in either theme. */
 	.analytics-chart__tooltip {
 		--analytics-tip-x: -50%;
 		--analytics-tip-y: calc(-100% - 10px);
@@ -729,16 +710,18 @@
 		inset-block-start: var(--analytics-y, 0);
 		inset-inline-start: var(--analytics-x, 0);
 		z-index: 10;
-		padding-block: var(--spacer-1-5, 6px);
-		padding-inline: var(--spacer-2, 8px);
+		padding-block: var(--spacer-2, 8px);
+		padding-inline: var(--spacer-2-5, 12px);
 		font-size: var(--text-body-medium-font-size, 12px);
+		font-weight: var(--text-body-medium-font-weight, 400);
 		line-height: var(--text-body-medium-line-height, 16px);
+		letter-spacing: var(--text-letter-spacing, normal);
 		white-space: nowrap;
 		pointer-events: none;
-		background: var(--color-bg-elevated, #ffffff);
-		border: var(--stroke-width-small, 1px) solid var(--color-border, #e6e6e6);
-		border-radius: var(--radius-medium, 5px);
-		box-shadow: var(--elevation-300-tooltip, 0 4px 16px rgb(0 0 0 / 18%));
+		color: var(--color-text-ontooltip, rgb(255 255 255 / 90%));
+		background: var(--color-bg-menu, #1e1e1e);
+		border-radius: var(--radius-large, 13px);
+		box-shadow: var(--elevation-400-menu-panel, 0 10px 16px rgb(0 0 0 / 8%));
 		transform: translate(var(--analytics-tip-x), var(--analytics-tip-y));
 		animation: analytics-fade 0.12s ease-out;
 	}
@@ -778,24 +761,21 @@
 		--analytics-tip-x: -50%;
 	}
 
-	.analytics-chart__tooltip-label {
-		margin-block-end: calc(var(--spacer-1, 4px) / 2);
-		font-weight: var(--text-body-medium-bold-font-weight, 550);
-		color: var(--analytics-text-muted);
+	/* The secondary text the rich text link editor sets on the same surface. */
+	.analytics-chart__tooltip-label,
+	.analytics-chart__tooltip-comparison {
+		color: var(--color-text-onbrand-secondary, rgb(255 255 255 / 80%));
 	}
 
 	.analytics-chart__tooltip-value {
 		font-weight: var(--text-body-medium-bold-font-weight, 550);
 		font-variant-numeric: tabular-nums;
-		color: var(--color-text, #1a1a1a);
 	}
 
 	.analytics-chart__tooltip-comparison {
 		display: flex;
 		gap: var(--spacer-2, 8px);
 		justify-content: space-between;
-		margin-block-start: calc(var(--spacer-1, 4px) / 2);
-		color: var(--analytics-text-muted);
 	}
 
 	.analytics-chart__tooltip-previous {
@@ -826,7 +806,7 @@
 	}
 
 	.analytics-table.analytics-bars tbody :is(th, td) {
-		padding-block: calc(var(--spacer-1, 4px) / 2);
+		padding-block: calc(var(--spacer-1-5, 6px) / 2);
 		border: 0;
 	}
 
@@ -851,14 +831,15 @@
 		padding-inline: 0;
 	}
 
-	/* As tall as a Payload input, the row a list of them reads at. */
+	/* As tall as a Payload control, the row its menus list at. */
 	.analytics-bars__track {
 		position: relative;
 		display: block;
 		box-sizing: border-box;
 		width: 100%;
-		height: var(--spacer-5, 32px);
+		height: var(--control-height, 24px);
 		overflow: hidden;
+		background: var(--color-bg-secondary, #f5f5f5);
 		border-radius: var(--radius-medium, 5px);
 	}
 
@@ -870,12 +851,12 @@
 		content: "";
 		background: var(--analytics-bar-fill);
 		border-radius: inherit;
-		transition: filter 0.1s ease;
+		transition: background-color 0.1s ease;
 	}
 
-	/* Darker, never lighter, so the light label on it keeps its contrast. */
+	/* Payload's hover step for the fill, as on its primary button. */
 	.analytics-bars__row:hover .analytics-bars__track::before {
-		filter: brightness(0.9);
+		background: var(--analytics-bar-fill-hover);
 	}
 
 	/*
@@ -889,7 +870,7 @@
 		padding-inline: var(--spacer-2, 8px);
 		overflow: hidden;
 		font-size: var(--text-body-medium-font-size, 12px);
-		line-height: var(--spacer-5, 32px);
+		line-height: var(--control-height, 24px);
 		color: transparent;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -941,18 +922,12 @@
 		margin-inline-end: var(--spacer-1-5, 6px);
 	}
 
-	.analytics-bars--soft .analytics-bars__track {
-		background: var(--color-bg-secondary, #f5f5f5);
-	}
-
 	.analytics-bars--soft .analytics-bars__track::before {
-		background: var(--color-bg-brand-tertiary, #bde3ff);
+		background: var(--color-bg-brand-tertiary, #e5f4ff);
 	}
 
-	/* A soft bar takes Payload's own hover step, where a darkened pale fill turns gray. */
 	.analytics-bars--soft .analytics-bars__row:hover .analytics-bars__track::before {
-		background: var(--color-bg-brand-tertiary-hover, #80caff);
-		filter: none;
+		background: var(--color-bg-brand-tertiary-hover, #bde3ff);
 	}
 
 	.analytics-bars--soft .analytics-bars__label {
@@ -974,6 +949,22 @@
 		flex-direction: column;
 		gap: var(--spacer-4);
 		padding-block-end: var(--spacer-4);
+	}
+
+	/* Payload's list header: edge to edge across the gutter, ruled off under the title. */
+	.analytics-view__header {
+		display: flex;
+		flex-direction: column;
+		gap: var(--spacer-1);
+		padding-block: var(--spacer-2) var(--spacer-3);
+		padding-inline: var(--gutter-h);
+		margin-inline: calc(-1 * var(--gutter-h));
+		border-block-end: var(--stroke-width-small) solid var(--color-border);
+	}
+
+	/* The controls bar meets the header's rule, as Payload's list controls do. */
+	.analytics-view__header + .analytics-view__toolbar {
+		margin-block-start: calc(-1 * var(--spacer-4));
 	}
 
 	/* Payload's list view title. */
@@ -1008,11 +999,6 @@
 		min-width: 160px;
 	}
 
-	/* Room for two localized dates and Payload's calendar icon, never wider than a phone's row. */
-	.analytics-view__control--dates {
-		min-width: min(312px, 100%);
-	}
-
 	.analytics-view__control .field-type {
 		margin-block-end: 0;
 	}
@@ -1038,19 +1024,25 @@
 		color: var(--field-color-label);
 	}
 
-	.analytics-view__toggle {
+	/*
+	 * Payload's list controls bar, edge to edge and ruled off under the header: what is shown on
+	 * the start side, what changes it on the end.
+	 */
+	.analytics-view__bar {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--spacer-2);
 		align-items: center;
-		height: var(--field-min-height-large);
-		margin: 0;
+		justify-content: space-between;
+		padding-block: var(--spacer-2-5);
+		padding-inline: var(--gutter-h);
+		margin-inline: calc(-1 * var(--gutter-h));
+		border-block: var(--stroke-width-small) solid var(--color-border);
 	}
 
-	/* Wide enough for the pending label in every locale, so the row never moves mid-refresh. */
-	.analytics-view__refresh {
-		align-items: center;
-		justify-content: center;
-		min-width: 136px;
-		height: var(--field-min-height-large);
-		margin: 0;
+	/* Under the header, whose rule is already the bar's top edge. */
+	.analytics-view__header + .analytics-view__toolbar .analytics-view__bar {
+		border-block-start: 0;
 	}
 
 	.analytics-view__captions {
@@ -1058,10 +1050,39 @@
 		flex-wrap: wrap;
 		gap: var(--spacer-2);
 		align-items: center;
-		margin-inline-start: auto;
 		font-size: var(--text-body-medium-font-size);
 		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
+	}
+
+	.analytics-view__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--spacer-2);
+		align-items: center;
+		margin-inline-start: auto;
+	}
+
+	/* Room for two localized dates and Payload's calendar icon, never wider than a phone's row. */
+	.analytics-view__dates {
+		width: min(280px, 100%);
+		margin-block-end: 0;
+	}
+
+	@keyframes analytics-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.analytics-view__refresh--pending .btn__icon {
+		animation: analytics-spin 0.8s linear infinite;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.analytics-view__refresh--pending .btn__icon {
+			animation: none;
+		}
 	}
 
 	.analytics-view__chips {
@@ -1071,14 +1092,40 @@
 		align-items: center;
 	}
 
+	/* The remove button hugs the pill's end, as in Payload's own removable values. */
+	.analytics-view__chip {
+		--pill-padding-inline-end: var(--spacer-1);
+	}
+
+	/* Payload's pill sets its content inline; the text and the remove button centre on one row. */
+	.analytics-view__chip .pill__label {
+		display: inline-flex;
+		gap: var(--spacer-1);
+		align-items: center;
+	}
+
+	.analytics-view__chip-text {
+		white-space: nowrap;
+	}
+
+	/* A flag the height of the text's capitals, centred on its line rather than above it. */
+	.analytics-view__chip-text .analytics-flag {
+		width: 16px;
+		height: 12px;
+		margin-inline: calc(var(--spacer-1) / 2);
+		vertical-align: -2px;
+	}
+
+	/* Payload's removable value: a square the icon's size, the secondary icon color. */
 	.analytics-view__chip-remove {
 		display: inline-flex;
+		flex-shrink: 0;
 		align-items: center;
 		justify-content: center;
+		width: var(--spacer-3);
+		height: var(--spacer-3);
 		padding: 0;
-		margin-inline-start: calc(var(--spacer-1) / 2);
-		vertical-align: middle;
-		color: inherit;
+		color: var(--color-icon-secondary);
 		cursor: pointer;
 		background: none;
 		border: 0;
@@ -1086,12 +1133,8 @@
 	}
 
 	.analytics-view__chip-remove:hover {
+		color: var(--color-text);
 		background: var(--color-bg-secondary-hover);
-	}
-
-	.analytics-view__chip-remove .icon {
-		width: var(--spacer-3);
-		height: var(--spacer-3);
 	}
 
 	/*
@@ -1234,8 +1277,8 @@
 	/* A ranked table: its head row, then a track per row at the rows' pitch. */
 	.analytics-view__skeleton-table {
 		--analytics-skeleton-head: calc(1lh + var(--spacer-1, 4px));
-		--analytics-skeleton-row: var(--spacer-5, 32px);
-		--analytics-skeleton-gap: calc(2 * calc(var(--spacer-1, 4px) / 2));
+		--analytics-skeleton-row: var(--control-height, 24px);
+		--analytics-skeleton-gap: calc(2 * calc(var(--spacer-1-5, 6px) / 2));
 		display: flex;
 		flex-direction: column;
 		gap: var(--analytics-skeleton-gap);
@@ -1383,10 +1426,6 @@
 			justify-content: flex-start;
 		}
 
-		.analytics-view__captions {
-			margin-inline-start: 0;
-		}
-
 		.analytics-view__control {
 			flex: 1 1 100%;
 		}
@@ -1472,20 +1511,34 @@
 	}
 
 	.analytics-panel__notice {
-		font-size: var(--text-body-small-font-size);
-		line-height: var(--text-body-small-line-height);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
+	/*
+	 * Payload 4 makes every field a column; the stat lays its numbers out in a row instead, from
+	 * the start edge, with the window and any notice on lines of their own under them.
+	 */
 	.analytics-stat {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--spacer-3);
-		align-items: flex-end;
+		flex-flow: row wrap;
+		gap: var(--spacer-2) var(--spacer-4);
+		align-items: flex-start;
 	}
 
 	.analytics-stat__caption {
 		width: 100%;
+		color: var(--field-color-description);
+	}
+
+	/* Each number under a label set as Payload sets a field's, the window as its description. */
+	.analytics-stat .analytics-metric__label {
+		font-size: var(--text-body-medium-font-size);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		line-height: var(--text-body-medium-line-height);
+		letter-spacing: var(--field-label-letter-spacing);
+		text-transform: none;
+		color: var(--field-color-label);
 	}
 
 	/* Payload's own group label in a select menu. */
@@ -1606,9 +1659,9 @@
 
 	.analytics-panel__skeleton-notice {
 		width: 40%;
-		height: var(--text-body-small-font-size);
-		margin-block: calc((1lh - var(--text-body-small-font-size)) / 2);
-		font-size: var(--text-body-small-font-size);
-		line-height: var(--text-body-small-line-height);
+		height: var(--text-body-medium-font-size);
+		margin-block: calc((1lh - var(--text-body-medium-font-size)) / 2);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 	}
 }

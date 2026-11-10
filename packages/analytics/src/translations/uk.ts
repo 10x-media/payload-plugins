@@ -94,6 +94,7 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.widgetFilterValueTooLong]: 'Не більше 256 символів.',
 	[keys.widgetFilterCaption]: 'де {{dimension}} {{operator}} {{value}}',
 	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
+	[keys.widgetCaptionWithComparison]: '{{window}} {{comparison}}',
 	[keys.filterOperatorEq]: 'дорівнює',
 	[keys.filterOperatorContains]: 'містить',
 	[keys.filterOperatorMatches]: 'відповідає шаблону',

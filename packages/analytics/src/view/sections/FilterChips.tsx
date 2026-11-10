@@ -51,22 +51,26 @@ export function FilterChip({ filter, shown, countryFlags, onRemove }: FilterChip
 	const flag =
 		countryFlags !== false && filter.dimension === 'country' ? countryCode(filter.value) : null
 	return (
-		<Pill size="medium">
-			{before}
-			{flag === null ? null : (
-				<>
-					<RowFlag code={flag} flags={countryFlags} />{' '}
-				</>
-			)}
-			<bdi>{shown}</bdi>
-			{after}
+		<Pill className="analytics-view__chip" size="medium">
+			{/* One run of text, so the words keep the spaces the language puts between them and the
+			    flag sits on their line. */}
+			<span className="analytics-view__chip-text">
+				{before}
+				{flag === null ? null : (
+					<>
+						<RowFlag code={flag} flags={countryFlags} />{' '}
+					</>
+				)}
+				<bdi>{shown}</bdi>
+				{after}
+			</span>
 			<button
 				aria-label={t(keys.viewFilterRemove, { filter: named })}
 				className="analytics-view__chip-remove"
 				onClick={onRemove}
 				type="button"
 			>
-				<XIcon />
+				<XIcon size={16} />
 			</button>
 		</Pill>
 	)

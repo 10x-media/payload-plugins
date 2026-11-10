@@ -97,6 +97,7 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.widgetFilterValueTooLong]: 'Не более 256 символов.',
 	[keys.widgetFilterCaption]: 'где {{dimension}} {{operator}} {{value}}',
 	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
+	[keys.widgetCaptionWithComparison]: '{{window}} {{comparison}}',
 	[keys.filterOperatorEq]: 'равно',
 	[keys.filterOperatorContains]: 'содержит',
 	[keys.filterOperatorMatches]: 'соответствует шаблону',

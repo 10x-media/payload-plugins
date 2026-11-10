@@ -93,6 +93,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.widgetFilterValueTooLong]: 'Keep the value to 256 characters or fewer.',
 	[keys.widgetFilterCaption]: 'where {{dimension}} {{operator}} {{value}}',
 	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
+	[keys.widgetCaptionWithComparison]: '{{window}} {{comparison}}',
 	[keys.filterOperatorEq]: 'is',
 	[keys.filterOperatorContains]: 'contains',
 	[keys.filterOperatorMatches]: 'matches pattern',

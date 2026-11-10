@@ -54,7 +54,7 @@ export const isNewDocumentAnalytics = (
 }
 
 /**
- * Muted "New" pill for a new document, else the message inline. Hook-free so the server stat and
+ * Payload's own light-gray pill reading "New" for a new document, else the message inline. Hook-free so the server stat and
  * client panel render it alike; `analytics-empty-state` classes are stable styling hooks.
  */
 export function AnalyticsEmptyState({ isNew, children }: { isNew: boolean; children: ReactNode }) {
@@ -63,7 +63,6 @@ export function AnalyticsEmptyState({ isNew, children }: { isNew: boolean; child
 			<Pill
 				className="analytics-empty-state analytics-empty-state--new"
 				pillStyle="light-gray"
-				rounded
 				size="medium"
 			>
 				{children}

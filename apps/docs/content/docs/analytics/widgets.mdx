@@ -151,7 +151,7 @@ Every widget reads the plugin's one stylesheet, in Payload's `payload` CSS layer
 | Column | Notes |
 |---|---|
 | Goal | The name from your config or the goals collection, resolved for the request's own scope. A slug no configured goal claims renders as the slug. |
-| Conversions | Completions in the window, with a period-over-period delta beside them when comparison is on. |
+| Conversions | Completions in the window, with a period-over-period delta beside them when comparison is on. The header says what the deltas compare against once, after the window (**Last 30 days vs. previous period**), rather than on every row. |
 | Revenue | Summed completion values, written in the source's own currency or the [reporting currency](/analytics/revenue#one-reporting-currency-per-tenant), and as a plain number when neither is known. Omitted as a column when the source serves no revenue; a row the source cannot fill shows a dash. |
 | Conversion rate | The goal's visitors over the window's site visitors. Omitted as a column when the source serves no visitors. |
 
@@ -329,6 +329,8 @@ A row's `label` is what the built-in widgets show for it, in the reader's admin 
 A `BarList` row with `selectable: false` renders inert even when `onSelect` is set, which is how the view keeps a row with no value from building a filter the endpoint would reject.
 
 `BarList` draws a table: each row's label is its row header, the bar that label cell's background, and with `onSelect` the label is a button. Give it `label` to name the table and `headers` (`{ label, value }`, plus `secondary`, `tertiary` and `quaternary` for the extra columns) to name its columns for assistive tech; the header row stays out of sight, as on the built-in cards. Without `headers` it draws no header row at all.
+
+It draws the built-in cards' bars by default: a pale fill on a gray track, the label in the body color. `fill="solid"` fills the bar in the chart color with a light label over it, to set one list apart; the track stays the same.
 
 Run `payload generate:importmap` after registering. The widget appears only when a config adapter satisfies its `requires` gate. Unlike the built-ins, a widget of your own is held to the config adapters on an install running provider documents too. The gate takes each source's [metric reach](/analytics/reference/adapter-contract#the-capabilities-model) into account: `requires: { metrics: ['bounceRate'], dimensions: ['goal'] }` passes only a source that reads bounce rate per goal, and `path: true` says the widget reads one page, which a metric read only per page needs.
 
