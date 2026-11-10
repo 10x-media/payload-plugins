@@ -77,17 +77,39 @@ const CollectionSelect: React.FC = () => {
 }
 
 /**
- * The trail the route view writes into the admin step nav, which a drawer must leave alone.
- * The last crumb is the current folder and is not a link, as in Payload's.
+ * Renders `children` into a part of the view's header. What goes there has to render inside the
+ * view's providers (the selection lives in its `DocumentSelectionProvider`), and the `Description`
+ * slot is the only one inside them, so it mounts there and portals out.
+ */
+const HeaderPortal: React.FC<{ readonly children: React.ReactNode; readonly into: string }> = ({
+	children,
+	into,
+}) => {
+	const anchor = React.useRef<HTMLSpanElement>(null)
+	const [target, setTarget] = React.useState<Element | null>(null)
+
+	React.useLayoutEffect(() => {
+		setTarget(anchor.current?.closest('.hierarchy-list-header')?.querySelector(into) ?? null)
+	}, [into])
+
+	return (
+		<span hidden ref={anchor}>
+			{target ? createPortal(children, target) : null}
+		</span>
+	)
+}
+
+/**
+ * The drawer's title: where the list tab says "Media", this says where the folder tab is, root to
+ * current folder. The route view keeps the trail in the admin step nav, which a drawer must leave
+ * alone, and titles itself with the current folder; one line does both here. The last crumb is the
+ * current folder and is not a link, as in Payload's.
  */
 const Trail: React.FC<{
 	readonly breadcrumbs: HierarchyViewData['breadcrumbs']
 	readonly onOpen: (id: null | number | string) => void
 	readonly rootLabel: string
 }> = ({ breadcrumbs, onOpen, rootLabel }) => {
-	if (breadcrumbs.length === 0) {
-		return null
-	}
 	const crumbs = [{ id: null, title: rootLabel }, ...breadcrumbs]
 	return (
 		<nav aria-label={rootLabel} className={`${baseClass}__trail`}>
@@ -121,46 +143,32 @@ const Trail: React.FC<{
 }
 
 /**
- * Hands the ticked documents to the field. It has to render inside the view's
- * `DocumentSelectionProvider`, and the `Description` slot is the only one there, so it mounts there
- * and portals into the header's actions, where Payload's drawer header puts its own confirm button
- * (and where the view's route-bound All / By tabs are hidden). Like that button it exists for
- * `hasMany` fields only; a single field picks with a click on the row.
+ * Hands the ticked documents to the field, from the header's actions, where Payload's drawer header
+ * puts its own confirm button. Like that button it exists for `hasMany` fields only; a single field
+ * picks with a click on the row.
  */
 const ConfirmSelection: React.FC<{ readonly collectionSlug: string }> = ({ collectionSlug }) => {
 	const { getSelectionsForActions } = useDocumentSelection()
 	const { onBulkSelect } = useListDrawerContext()
 	const { t } = useTranslation()
-	const anchor = React.useRef<HTMLSpanElement>(null)
-	const [target, setTarget] = React.useState<Element | null>(null)
 	const ids = getSelectionsForActions()[collectionSlug]?.ids ?? []
-
-	React.useLayoutEffect(() => {
-		setTarget(
-			anchor.current?.closest('.hierarchy-list-header')?.querySelector('.list-header__actions') ??
-				null
-		)
-	}, [])
 
 	if (!onBulkSelect) {
 		return null
 	}
-	const button = (
-		<Button
-			buttonStyle="primary"
-			className={`${baseClass}__confirm`}
-			disabled={ids.length === 0}
-			margin={false}
-			onClick={() => onBulkSelect(new Map(ids.map((id) => [id, true])))}
-			size="medium"
-		>
-			{t('general:confirm')}
-		</Button>
-	)
 	return (
-		<span hidden ref={anchor}>
-			{target ? createPortal(button, target) : null}
-		</span>
+		<HeaderPortal into=".list-header__actions">
+			<Button
+				buttonStyle="primary"
+				className={`${baseClass}__confirm`}
+				disabled={ids.length === 0}
+				margin={false}
+				onClick={() => onBulkSelect(new Map(ids.map((id) => [id, true])))}
+				size="medium"
+			>
+				{t('general:confirm')}
+			</Button>
+		</HeaderPortal>
 	)
 }
 
@@ -341,20 +349,21 @@ export const HierarchyBrowser: React.FC<{
 			parent && state.parentId !== null
 				? {
 						id: state.parentId,
-						hasUpdatePermission: Boolean(folderPermissions?.update),
+						// No edit gear beside the title: the drawer picks, it does not manage folders.
+						hasUpdatePermission: false,
 						title: String(parent[hierarchy.useAsTitle] ?? state.parentId),
 					}
 				: undefined,
 		Description: (
 			<div className={`${baseClass}__subheader`}>
-				<div className={`${baseClass}__subheader-start`}>
+				<HeaderPortal into=".list-header__title-and-actions">
 					<Trail
 						breadcrumbs={data.breadcrumbs}
 						onOpen={(parentId) => onStateChange({ ...state, parentId, search: '' })}
 						rootLabel={getTranslation(folderConfig?.labels?.plural ?? hierarchy.slug, i18n)}
 					/>
-					<CollectionSelect />
-				</div>
+				</HeaderPortal>
+				<CollectionSelect />
 				{enableRowSelections ? <ConfirmSelection collectionSlug={collectionSlug} /> : null}
 			</div>
 		),

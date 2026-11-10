@@ -73,7 +73,8 @@ const listTab = (drawer: Locator): Locator => drawer.locator('#folder-picker-tab
 /**
  * Switches to the folder tab and starts at the root. The drawer keeps its tab and folder across a
  * close and reopen, so a second trip opens where the first one left off. The browser only mounts
- * once its data is in, so the trail is settled by the time it is visible.
+ * once its data is in, so the trail is settled by the time it is visible. At the root the trail is
+ * the root crumb alone, with no link back.
  */
 const showFolders = async (drawer: Locator): Promise<void> => {
 	const tab = byFolderTab(drawer)
@@ -81,10 +82,10 @@ const showFolders = async (drawer: Locator): Promise<void> => {
 		await tab.click()
 	}
 	await expect(drawer.locator(SELECTORS.folderBrowser)).toBeVisible()
-	const trail = drawer.locator(SELECTORS.trail)
-	if ((await trail.count()) > 0) {
-		await trail.locator('button').first().click()
-		await expect(trail).toHaveCount(0)
+	const up = drawer.locator(`${SELECTORS.trail} button`)
+	if ((await up.count()) > 0) {
+		await up.first().click()
+		await expect(up).toHaveCount(0)
 	}
 }
 
@@ -276,7 +277,7 @@ test.describe('folder picker', () => {
 		// The switch remounts the drawer's view, which must not drop the caller back on the list
 		// tab, and must not leave a trail into a folder the new collection has no part in.
 		await expect(byFolderTab(drawer)).toHaveClass(/--active/)
-		await expect(drawer.locator(SELECTORS.trail)).toHaveCount(0)
+		await expect(drawer.locator(`${SELECTORS.trail} button`)).toHaveCount(0)
 		await expect(row(drawer, FIXTURES.filesFolder)).toBeVisible()
 		await expect(
 			drawer.locator(SELECTORS.row).filter({ hasText: FIXTURES.parentFolder })

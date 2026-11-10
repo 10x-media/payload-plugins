@@ -33,10 +33,22 @@
 	min-height: var(--spacer-4);
 }
 
-/* At the root there is no trail, and a drawer for one collection has no collection select: the
-   sub-header would only add its top padding under the title. */
-.folder-picker
-.hierarchy-list__sub-header:not(:has(.folder-picker__trail, .list-drawer__select-collection-wrap)) {
+/* The trail portals into the title row and the confirm into the actions, so in a drawer for one
+   collection (no collection select) the sub-header would only add its top padding under the title. */
+.folder-picker .hierarchy-list__sub-header:not(:has(.list-drawer__select-collection-wrap)) {
+	display: none;
+}
+
+/* With the collection select it stays, at the list tab's distance below the title (its own top
+   padding would push the select 12px lower than on the list tab). */
+.folder-picker .hierarchy-list__sub-header {
+	padding-top: 0;
+}
+
+/* The trail is the title: Payload's title (the current folder, which the trail ends on) and its
+   empty title actions make way for it. */
+.folder-picker .hierarchy-list-header .list-header__title,
+.folder-picker .hierarchy-list-header .list-header__title-actions {
 	display: none;
 }
 
@@ -62,13 +74,6 @@
 	display: none;
 }
 
-.folder-picker .hierarchy-list-header .list-header__title {
-	font-size: var(--text-body-medium-bold-font-size);
-	font-weight: var(--text-body-medium-bold-font-weight);
-	letter-spacing: var(--text-body-medium-bold-letter-spacing);
-	line-height: var(--text-body-medium-bold-line-height);
-}
-
 /* The tables run edge to edge with full-width rules, as the list tab's table does; the section
    headings move in to the checkbox column, where the list tab's first column starts. */
 .folder-picker .hierarchy-list__controls {
@@ -79,27 +84,18 @@
 	padding-inline: var(--spacer-3);
 }
 
-.folder-picker__subheader {
-	align-items: flex-end;
-	display: flex;
-	gap: var(--spacer-2);
-	justify-content: space-between;
-}
-
-.folder-picker__subheader-start {
-	display: flex;
-	flex: 1 0 0;
-	flex-direction: column;
-	min-width: 0;
-}
-
-/* The route view keeps this trail in the step nav; same separator and colors as there. */
+/* Set like the list tab's title; the ancestors read as the step nav does, in the secondary color. */
 .folder-picker__trail {
 	align-items: center;
 	color: var(--color-text-secondary);
 	display: flex;
 	flex-wrap: wrap;
+	font-size: var(--text-body-medium-bold-font-size);
+	font-weight: var(--text-body-medium-bold-font-weight);
 	gap: var(--spacer-1);
+	letter-spacing: var(--text-body-medium-bold-letter-spacing);
+	line-height: var(--text-body-medium-bold-line-height);
+	min-width: 0;
 }
 
 .folder-picker__trail-link {
