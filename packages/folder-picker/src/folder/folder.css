@@ -26,6 +26,20 @@
 	padding: var(--spacer-2-5) var(--spacer-3) var(--spacer-2-5) var(--spacer-2);
 }
 
+/* The list tab's title row is as tall as its Create New button; this one has no button (Create
+   New sits in the controls row), so it takes the same height to keep the title on the same line. */
+.folder-picker .hierarchy-list-header .list-header__title-and-actions {
+	align-items: center;
+	min-height: var(--spacer-4);
+}
+
+/* At the root there is no trail, and a drawer for one collection has no collection select: the
+   sub-header would only add its top padding under the title. */
+.folder-picker
+.hierarchy-list__sub-header:not(:has(.folder-picker__trail, .list-drawer__select-collection-wrap)) {
+	display: none;
+}
+
 /* Hidden rather than removed: the confirm button portals into the same actions row. */
 .folder-picker .hierarchy-list-header .default-list-view-tabs {
 	display: none;
