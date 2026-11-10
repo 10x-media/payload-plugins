@@ -5,7 +5,7 @@
  *
  * Cacheable, dependency-aware tasks (build, lint, typecheck, test*) run through
  * turbo so they gain caching and dependency-aware ordering. Interactive or
- * side-effecting tasks (dev, start, generate*, migrate*, test:e2e, lint:fix) run
+ * side-effecting tasks (dev, start, generate*, migrate*, test:e2e, test:upgrade, lint:fix) run
  * through pnpm filters.
  *
  * A target can be a plugin under `packages/` (e.g. automations) or an app
@@ -58,6 +58,7 @@ const REQUIRE_TARGET = new Set([
 	...PLUGIN_ONLY_TASKS,
 	...Object.keys(TANSTACK_TASKS),
 	'test:e2e',
+	'test:upgrade',
 	'videos',
 ])
 const TURBO_TASKS = new Set([
