@@ -17,7 +17,7 @@ vi.mock('../plugin/encrypted', () => ({
 
 vi.mock('payload', async (importOriginal) => ({
 	...(await importOriginal<typeof import('payload')>()),
-	createLocalReq: async () => ({}),
+	createPayloadRequest: async () => ({}),
 }))
 
 const AT = '2026-10-07T12:00:00.000Z'

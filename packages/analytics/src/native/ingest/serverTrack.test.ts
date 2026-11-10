@@ -499,7 +499,7 @@ describe('makeServerTrack resolvers', () => {
 	})
 
 	it('leaves the caller’s request untouched', async () => {
-		// createLocalReq mutates what it is handed; a caller's req must not come back
+		// createPayloadRequest mutates what it is handed; a caller's req must not come back
 		// carrying payload, i18n or a data loader it never had.
 		const req = { headers: new Headers() } as unknown as PayloadRequest
 		const before = Object.keys(req)

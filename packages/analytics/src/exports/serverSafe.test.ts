@@ -115,7 +115,7 @@ describe('the root entry', () => {
 		expect(modules.size).toBeGreaterThan(50)
 		const offenders = [...packages]
 			.filter(([specifier]) => UI_PACKAGE.test(specifier) || STYLESHEET.test(specifier))
-			.map(([specifier, file]) => `${file}: ${specifier}`)
+			.map(([specifier, file]) => `${file.replaceAll('\\', '/')}: ${specifier}`)
 		const components = [...modules]
 			.filter((file) => file.endsWith('.tsx'))
 			.map((file) => relative(SRC, file))
@@ -137,13 +137,14 @@ describe('the root entry', () => {
 		).toEqual([])
 	})
 
-	it('keeps Payload out of what /next loads up front, so a next.config can import it', () => {
-		const statically = reachableFrom(join(SRC, 'exports', 'next.ts'), false)
-		expect(
-			[...statically.packages.keys()].filter((specifier) => /^payload(\/|$)/.test(specifier))
-		).toEqual([])
-		const lazily = reachableFrom(join(SRC, 'exports', 'next.ts'))
-		expect([...lazily.packages.keys()]).toContain('payload')
+	it('keeps /routes free of React, the admin UI and stylesheets, as a server route loads it', () => {
+		const { modules, packages } = reachableFrom(join(SRC, 'exports', 'routes.ts'))
+		const offenders = [...packages]
+			.filter(([specifier]) => UI_PACKAGE.test(specifier) || STYLESHEET.test(specifier))
+			.map(([specifier, file]) => `${file.replaceAll('\\', '/')}: ${specifier}`)
+		// Loaded lazily, and only where NEXT_RUNTIME says Next is serving the request.
+		expect(offenders).toEqual(['plugin/keepAlive.ts: next/server'])
+		expect([...modules].filter((file) => file.endsWith('.tsx'))).toEqual([])
 	})
 
 	it('is walked deeply enough to see what /rsc loads', () => {

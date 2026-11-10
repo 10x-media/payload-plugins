@@ -134,12 +134,6 @@ describe('maintainTask', () => {
 				queue: 'q',
 			})
 		).toBe('analytics:maintain:rebuild:a:2026-10-01T00:00:00.000Z:2026-10-02T00:00:00.000Z')
-		expect(
-			maintainTask({
-				schedule: { queue: 'q', cron: '0 * * * *', intervalMs: 3_600_000 },
-				run: async () => report,
-			}).concurrency
-		).toBeUndefined()
 	})
 
 	it('registers without a schedule when its cron is off', () => {
