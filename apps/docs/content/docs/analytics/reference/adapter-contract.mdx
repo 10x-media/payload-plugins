@@ -168,7 +168,7 @@ Implement `AnalyticsAdapter` from `@10x-media/analytics/types`: an `id`, a `labe
 | `items` | The collections bound as content items, and whether items count per page. |
 | `routes` | The plugin's mounts under `routes.api` (`ingest`, `proxy`, `config` and the rest, under [`routes.base`](/analytics/reference/endpoints#where-the-endpoints-answer)), so an endpoint an adapter registers can sit beside them. |
 | `sdks` | The packages the host passed as [`sdks`](/analytics/providers#ga4), for an adapter that would otherwise load one by name and miss it in a standalone build. |
-| `jobs`, `jobsConcurrency` | The queue and schedule of a task the adapter registers, or `false` when the install registers none; and whether a task may carry a concurrency key. |
+| `jobs` | The queue and schedule of a task the adapter registers, or `false` when the install registers none. |
 | `notice(message)` | Says something at init, once the instance can log. |
 
 `registerSchema` receives an `AdapterSchemaContext`, `{ jobs, notice? }`.

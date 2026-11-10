@@ -42,7 +42,6 @@ export interface AdapterRegisterContext {
         pages: boolean;
     };
     jobs?: AdapterJobs;
-    jobsConcurrency?: boolean;
     notice?: (message: string) => void;
     resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>;
     resolveScope: (req: PayloadRequest) => Promise<string | null>;
@@ -233,24 +232,6 @@ export type BrowserAmounts = 'none' | 'fixed' | 'trust';
 
 // @public (undocumented)
 export type CaptureClientKind = 'native' | 'posthog' | 'plausible' | 'umami' | 'ga4';
-
-// @public
-export interface CaptureRewrite {
-    // (undocumented)
-    destination: string;
-    // (undocumented)
-    source: string;
-}
-
-// @public
-export interface CaptureRewriteMount {
-    // (undocumented)
-    adapter: AnalyticsAdapter;
-    path: string;
-}
-
-// @public @deprecated (undocumented)
-export const captureRewrites: (_mounts: CaptureRewriteMount[]) => CaptureRewrite[];
 
 // @public
 export const captureRoute: (options: CaptureRouteOptions) => ((request: Request) => Promise<Response>);
@@ -481,24 +462,6 @@ export type MetricValues = Partial<Record<MetricKey, MetricValue>>;
 
 // @public
 export type OrderSignatureMode = 'required' | 'optional';
-
-// @public (undocumented)
-export type PosthogProxyRegion = 'eu' | 'us';
-
-// @public
-export type PosthogProxyRewrite = {
-    source: string;
-    destination: string;
-};
-
-// @public @deprecated (undocumented)
-export const posthogProxyRewrites: (_options?: PosthogProxyRewritesOptions) => PosthogProxyRewrite[];
-
-// @public (undocumented)
-export type PosthogProxyRewritesOptions = {
-    path?: string; /** PostHog Cloud region. Default 'eu'. */
-    region?: PosthogProxyRegion;
-};
 
 // @public
 export interface ProxyDescriptor {

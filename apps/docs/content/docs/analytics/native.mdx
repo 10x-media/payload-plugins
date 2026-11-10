@@ -568,7 +568,7 @@ Registering a task turns Payload's jobs on, which adds the `payload-jobs` collec
 
 Every run takes a lease in `analytics-state` before it works: `analytics-maintain` one per run (`lease:maintain`, which it renews while it works, so a day that takes longer to count than the lease lasts never lets a second run in) and one per day it counts, `analytics-sync` and `analytics-warm` one each, `lease:analytics-sync` and `lease:analytics-warm`, which the run renews every 40 seconds while it works. A second run that finds the lease taken does nothing and says so in its output (`ran: false`), so two workers, or a worker and a web process, never do the same work twice. Each lease is renewed every third of its length while its run works. A run that was killed stops renewing, and its lease lets the next run in when it runs out: within two minutes for sync and warming (four on Cloudflare D1, where a lease is held one two-minute slot at a time and a run always holds the next slot too), within 14 minutes for a maintenance run the job runner made (its four minutes plus a day's lease), about 10 for one ingest started, and within 10 for the day it was counting. An install with sync or warming but no `native()` registers `analytics-state` for these leases, renamed and reshaped through `jobs.state` (see [Renaming the plugin's collections](/analytics/reference/options#renaming-the-plugins-collections)).
 
-On a host that turned on Payload's `jobs.enableConcurrencyControl`, each task also carries Payload's concurrency key `analytics:<task>`: one run of it at a time. A newly queued run waits for the one before it rather than replacing it: Payload's `supersedes` would delete every unfinished job under the key, failed ones included, and with them the record of a run that was marked stopped. The schedule queues no second run while one waits anyway. A rebuild queued on `analytics-maintain` keys on its own window, so it never waits behind a scheduled run's key. Payload refuses a concurrency key without that setting, so the plugin sets none then; the leases hold either way.
+Each task also carries Payload's concurrency key `analytics:<task>`: one run of it at a time. A newly queued run waits for the one before it rather than replacing it: Payload's `supersedes` would delete every unfinished job under the key, failed ones included. The schedule queues no second run while one waits anyway. A rebuild queued on `analytics-maintain` keys on its own window, so it never waits behind a scheduled run's key.
 
 Runs record the time in `analytics-state` as the task's heartbeat, `heartbeat:<task>`: every run of `analytics-maintain` the job runner makes, even one that found the lease taken or ran out of time (a run ingest started records none), and every run of `analytics-sync` or `analytics-warm` that held the lease, finished or not. The native engine reads `analytics-maintain`'s to decide whether requests do its work. With `sync` on and `jobs` not `false`, every instance serving reads checks `analytics-sync`'s at most every ten minutes and warns once when it is older than two intervals, since nothing else does a sync's work; an unscheduled sync (`cron: false`) is not checked.
 
@@ -592,7 +592,7 @@ const payload = await getPayload({ config, disableOnInit: true })
 
 setInterval(async () => {
   await payload.jobs.handleSchedules({ queue: 'analytics' })
-  await payload.jobs.run({ queue: 'analytics' })
+  await payload.jobs.run({ overrideAccess: true, queue: 'analytics' })
 }, 60_000)
 ```
 
@@ -614,20 +614,20 @@ A scheduler that calls less often than every 15 minutes runs the task as often a
 
 The same runner runs `analytics-sync` and `analytics-warm` when they are registered, on `jobs.queue` unless their own entries name another queue, so one worker covers all three.
 
-Payload queues a scheduled task only while no run of it is waiting or processing, and never runs a job again that a killed process left `processing` (a deploy, a timeout). Left alone, that one job would stop every later run. Before it is scheduled, each task marks such a job on its schedule's queue failed once it has gone 14 minutes without an update while `processing`, longer than any run lasts (its four minutes and the 10-minute lease on the day it was counting, or the read still out when its time ran out), and only while no run holds the task's lease: a run renewing it is alive however old its job. The next run is then queued as usual.
+Payload queues a scheduled task only while no run of it is waiting or processing. A run holds its job through Payload's processing lease (`jobs.processingLease`, 20 minutes by default), which the runner renews while the run works; a job a killed process left behind (a deploy, a timeout) is picked up again once its lease runs out, and the plugin's own leases keep that second run from repeating work the first one finished.
 
 ### Who may run jobs
 
-Registering a task turns Payload's jobs on for the whole app, and Payload lets any signed-in user use them unless the config says otherwise: a customer signed in through a second auth collection could queue `analytics-maintain` over and over, push a waiting run's `waitUntil` into the next century so maintenance never runs again, or, on Payload before 3.89, read and change every job of every plugin. So once the plugin registers a task, every job control your Payload config left unset admits users of the admin collection (`admin.user`) only:
+Registering a task turns Payload's jobs on for the whole app. Payload 4 admits only users of the admin collection (`admin.user`) to every job control your config leaves unset, so a customer signed in through a second auth collection cannot queue `analytics-maintain` or touch a waiting run:
 
 | Control | What it gates |
 |---|---|
 | `jobs.access.run` | the `/api/payload-jobs/run` and `/api/payload-jobs/handle-schedules` endpoints |
 | `jobs.access.queue`, `jobs.access.cancel` | `payload.jobs.queue()` and `payload.jobs.cancel()` called with `overrideAccess: false` |
-| the `payload-jobs` collection's `create`, `read`, `update` and `delete` | its REST and GraphQL API, and Local API calls with `overrideAccess: false` (Payload 3.89 and later deny them all anyway) |
+| the `payload-jobs` collection's `create`, `read`, `update` and `delete` | its REST and GraphQL API, and Local API calls with `overrideAccess: false` (denied for everyone unless `jobs.jobsCollectionOverrides` grants them) |
 | the `payload-jobs-stats` global's `read` and `update` | where Payload records when each scheduled task was last queued |
 
-A control you set is never changed: the collection's access is composed over your own `jobs.jobsCollectionOverrides`, and an operation it sets keeps your function. Nothing in Payload's config reaches the stats global, so the plugin narrows it at init on top of what it allows, never wider. The boot says once which controls it restricted. Payload's own runners (`autoRun`, `payload jobs:run`, `payload.jobs.run()` from a worker) skip these checks, so they keep running every task.
+Payload's own runners (`autoRun`, `payload jobs:run`) skip these checks, so they keep running every task. A `payload.jobs.run()` of your own, on a worker, passes `overrideAccess: true` to do the same; without it Payload 4 checks `jobs.access.run` against the request's user, and a call with no user is refused.
 
 To choose otherwise, set them in your Payload config:
 

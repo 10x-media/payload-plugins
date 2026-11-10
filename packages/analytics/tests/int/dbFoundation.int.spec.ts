@@ -5,7 +5,7 @@ import {
 	type SupportedDb,
 } from '@10x-media/payload-test-harness'
 import type { MongooseAdapter } from '@payloadcms/db-mongodb'
-import { type CollectionConfig, createLocalReq, type Payload } from 'payload'
+import { type CollectionConfig, createPayloadRequest, type Payload } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { captureRequest } from '../../src/capture/captureRequest'
 import { isUniqueViolation } from '../../src/db/errors'
@@ -88,9 +88,9 @@ describeForDb('analytics database foundation', {}, (db) => {
 
 	it('recognizes a unique refusal raised through the Local API', async () => {
 		const { payload } = booted
-		await payload.create({ collection: PROBES, data: { key: 'local-api' } })
+		await payload.create({ overrideAccess: true, collection: PROBES, data: { key: 'local-api' } })
 		const failure = await failureOf(
-			payload.create({ collection: PROBES, data: { key: 'local-api' } })
+			payload.create({ overrideAccess: true, collection: PROBES, data: { key: 'local-api' } })
 		)
 		expect(failure).toBeInstanceOf(Error)
 		expect(isUniqueViolation(failure, payload)).toBe(true)
@@ -114,23 +114,34 @@ describeForDb('analytics database foundation', {}, (db) => {
 
 	it('tells a unique refusal from any other failed write', async () => {
 		const { payload } = booted
-		const missingKey = await failureOf(payload.create({ collection: PROBES, data: { note: 'x' } }))
+		const missingKey = await failureOf(
+			payload.create({ overrideAccess: true, collection: PROBES, data: { note: 'x' } })
+		)
 		expect(missingKey).toBeInstanceOf(Error)
 		expect(isUniqueViolation(missingKey, payload)).toBe(false)
 	})
 
 	it("answers a capture request's depth read without the signed-in user's cached documents", async () => {
 		const { payload } = booted
-		const secret = await payload.create({ collection: SECRETS, data: { title: 'staff only' } })
+		const secret = await payload.create({
+			overrideAccess: true,
+			collection: SECRETS,
+			data: { title: 'staff only' },
+		})
 		const page = await payload.create({
+			overrideAccess: true,
 			collection: PROBES,
 			data: { key: 'capture-page', secret: secret.id },
 		})
 		const admin = await payload.create({
+			overrideAccess: true,
 			collection: USERS,
 			data: { email: 'depth-admin@example.test', password: 'depth-admin-pw' },
 		})
-		const req = await createLocalReq({ user: { ...admin, collection: USERS } }, payload)
+		const req = await createPayloadRequest({
+			payload: payload,
+			user: { ...admin, collection: USERS },
+		})
 		const read = (as: typeof req) =>
 			payload.findByID({
 				collection: PROBES,

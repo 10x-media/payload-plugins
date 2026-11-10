@@ -3,24 +3,32 @@
 /*
  * Every rule sits in Payload's `payload` layer: it outranks Payload's own `payload-default`
  * styles and loses to any unlayered rule in the host's admin CSS, whatever the specificity.
+ *
+ * Sizes come from Payload's tokens (`--spacer-*`, `--text-*`, `--radius-*`, `--field-*`), colors
+ * from its palette as it is, contrast included: its enhanced contrast mode is what brings text to
+ * 4.5:1, here as on its own buttons and pills. The rules and tokens `BarList` and `TrendChart` read
+ * also name a fallback, a pixel size or a neutral color, since outside the admin none of Payload's
+ * tokens is defined; the admin-only ones name none.
  */
 @layer payload {
 	:root {
-		--analytics-chart-1: var(--theme-success-500, #1587ba);
-		--analytics-chart-comparison: var(--theme-elevation-500, #808080);
-		--analytics-card-bg: var(--theme-elevation-50, #f5f5f5);
-		--analytics-card-border: var(--theme-border-color, var(--theme-elevation-150, #dddddd));
-		--analytics-card-radius: var(--style-radius-m, 4px);
-		--analytics-card-padding: calc(var(--base, 20px) * 0.8);
-		--analytics-text-muted: var(--theme-elevation-600, #656565);
-		/* The base palette rather than a theme step, so light text on it reads in either theme. */
-		--analytics-bar-fill: var(--color-success-600, #0b6e99);
-		--analytics-bar-label: var(--theme-elevation-800, #333333);
-		--analytics-bar-label-on-fill: var(--color-base-0, #ffffff);
-		--analytics-delta-up-fg: var(--theme-success-800, #0a3d55);
-		--analytics-delta-up-bg: var(--theme-success-150, #d7eef8);
-		--analytics-delta-down-fg: var(--theme-error-800, #6b1f1d);
-		--analytics-delta-down-bg: var(--theme-error-150, #fbe4e3);
+		--analytics-chart-1: var(--color-bg-brand, #0d99ff);
+		--analytics-chart-comparison: var(--color-icon-secondary, #808080);
+		--analytics-card-bg: var(--color-bg);
+		--analytics-card-border: var(--color-border);
+		--analytics-card-radius: var(--radius-large);
+		--analytics-card-padding: var(--spacer-2-5);
+		--analytics-text-muted: var(--color-text-secondary, #808080);
+		/* The brand fill of the charts and of Payload's primary button, with its light label. */
+		--analytics-bar-fill: var(--color-bg-brand, #0d99ff);
+		--analytics-bar-fill-hover: var(--color-bg-brand-hover, #007be5);
+		--analytics-bar-label: var(--color-text, #1a1a1a);
+		--analytics-bar-label-on-fill: var(--color-text-onbrand, #ffffff);
+		/* Payload's own success and error pills. */
+		--analytics-delta-up-fg: var(--color-text-brand);
+		--analytics-delta-up-bg: var(--color-bg-selected);
+		--analytics-delta-down-fg: var(--color-text-danger);
+		--analytics-delta-down-bg: var(--color-bg-danger-tertiary);
 	}
 
 	.analytics-sr-only {
@@ -42,17 +50,18 @@
 	.analytics-table__filter:focus-visible,
 	.analytics-chart__plot:focus-visible,
 	.analytics-view__chips > .analytics-view__label:focus-visible {
-		outline: var(--accessibility-outline, 2px solid var(--theme-elevation-800));
-		outline-offset: 2px;
+		outline: var(--accessibility-outline, 1px solid currentColor);
+		outline-offset: var(--accessibility-outline-offset, 1px);
 	}
 
-	/* Drawn inside: a pill's label clips what overflows it, and the tabs sit close on the head's rule. */
+	/* Drawn inside: a pill's label clips what overflows it, and the tabs sit close together. */
 	.analytics-view__chip-remove:focus-visible,
 	.analytics-view__tab:focus-visible {
-		outline: var(--accessibility-outline, 2px solid var(--theme-elevation-800));
-		outline-offset: -2px;
+		outline: var(--accessibility-outline);
+		outline-offset: var(--accessibility-outline-inset);
 	}
 
+	/* A small section label, as Payload sets its command palette's group labels. */
 	:where(
 		.analytics-widget__title,
 		.analytics-view__label,
@@ -60,9 +69,10 @@
 		.analytics-metric__label,
 		.analytics-table thead th
 	) {
-		font-size: 0.6875rem;
-		font-weight: 600;
-		letter-spacing: 0.04em;
+		font-size: var(--text-body-small-bold-font-size, 10px);
+		font-weight: var(--text-body-small-bold-font-weight, 550);
+		line-height: var(--text-body-small-bold-line-height, 14px);
+		letter-spacing: 0.06em;
 		text-transform: uppercase;
 		color: var(--analytics-text-muted);
 	}
@@ -71,53 +81,53 @@
 		box-sizing: border-box;
 		padding: var(--analytics-card-padding);
 		background: var(--analytics-card-bg);
-		border: 1px solid var(--analytics-card-border);
+		border: var(--stroke-width-small) solid var(--analytics-card-border);
 		border-radius: var(--analytics-card-radius);
-	}
-
-	.analytics-card .shimmer-effect {
-		--shine-bg: var(--theme-elevation-100);
-		--shine-fg: var(--theme-elevation-150);
 	}
 
 	.analytics-metric {
 		display: flex;
 		flex-direction: column;
-		gap: 0.375rem;
+		gap: var(--spacer-1);
 		min-width: 0;
 	}
 
 	/* A label that wraps (a long translation, a summed count) keeps the numbers of a row in line. */
 	.analytics-metric__value {
 		margin-block-start: auto;
-		font-size: 1.5rem;
-		font-weight: 700;
-		line-height: 1.1;
+		font-size: var(--text-heading-large-font-size);
+		font-weight: var(--text-heading-large-font-weight);
+		line-height: var(--text-heading-large-line-height);
+		letter-spacing: var(--text-heading-large-letter-spacing);
 		font-variant-numeric: tabular-nums;
-		color: var(--theme-elevation-800);
+		color: var(--color-text);
 	}
 
+	/* Pressable like Payload's own clickable card. */
 	.analytics-metric--action {
 		font: inherit;
 		color: inherit;
 		text-align: start;
 		cursor: pointer;
-		transition: border-color 100ms cubic-bezier(0, 0.2, 0.2, 1);
 	}
 
 	.analytics-metric--action:hover {
-		border-color: var(--theme-elevation-250);
+		background: var(--color-bg-secondary);
+	}
+
+	.analytics-metric--action:active {
+		background: var(--color-bg-secondary-pressed);
 	}
 
 	.analytics-metric--action[aria-pressed="true"] {
-		background: var(--theme-elevation-100);
-		border-color: var(--theme-elevation-600);
+		background: var(--color-bg-secondary);
+		border-color: var(--color-border-strong);
 	}
 
 	.analytics-widget {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 		height: 100%;
 		min-width: 0;
 	}
@@ -130,7 +140,7 @@
 		display: flex;
 		align-items: baseline;
 		justify-content: space-between;
-		column-gap: 0.75rem;
+		column-gap: var(--spacer-2-5);
 	}
 
 	.analytics-widget__title {
@@ -139,7 +149,6 @@
 		margin: 0;
 		overflow: hidden;
 		font-family: inherit;
-		line-height: inherit;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
@@ -150,7 +159,8 @@
 		max-width: 60%;
 		margin-inline-start: auto;
 		overflow: hidden;
-		font-size: 0.75rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 		text-align: end;
 		text-overflow: ellipsis;
@@ -161,20 +171,22 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: baseline;
-		column-gap: 0.625rem;
-		row-gap: 0.25rem;
+		column-gap: var(--spacer-2);
+		row-gap: var(--spacer-1);
 	}
 
 	.analytics-widget__value {
-		font-size: 1.75rem;
-		font-weight: 700;
-		line-height: 1.1;
+		font-size: var(--text-heading-xl-font-size);
+		font-weight: var(--text-heading-xl-font-weight);
+		line-height: var(--text-heading-xl-line-height);
+		letter-spacing: var(--text-heading-xl-letter-spacing);
 		font-variant-numeric: tabular-nums;
-		color: var(--theme-elevation-800);
+		color: var(--color-text);
 	}
 
 	.analytics-widget__value-caption {
-		font-size: 0.75rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
@@ -190,13 +202,15 @@
 		flex: 1 1 auto;
 		align-items: center;
 		justify-content: center;
-		font-size: 0.8125rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 		text-align: center;
 	}
 
 	.analytics-widget__note {
-		font-size: 0.6875rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
@@ -207,11 +221,16 @@
 	}
 
 	.analytics-widget__link {
-		font-size: 0.75rem;
-		font-weight: 500;
+		font-size: var(--text-body-medium-font-size);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 		text-decoration: underline;
 		text-underline-offset: 2px;
+	}
+
+	.analytics-widget__link:hover {
+		color: var(--color-text);
 	}
 
 	/* Holds the footer's line while the card loads, so the finished card is no taller. */
@@ -227,23 +246,23 @@
 		display: flex;
 		flex: 1 1 auto;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 	}
 
 	.analytics-widget__shimmer-value {
 		flex: none;
 		width: 45%;
-		height: calc(1.75rem * 1.1);
+		height: var(--text-heading-xl-line-height);
 	}
 
 	.analytics-widget__loading--realtime .analytics-widget__shimmer-value {
-		height: calc(1.75rem * 1.1 + 3px);
+		height: calc(var(--text-heading-xl-line-height) + 3px);
 	}
 
 	.analytics-widget__shimmer {
 		flex: 1 1 auto;
 		width: 100%;
-		min-height: 2.5rem;
+		min-height: var(--spacer-6);
 	}
 
 	.analytics-widget__loading--trend .analytics-widget__shimmer {
@@ -254,13 +273,14 @@
 		min-height: 100px;
 	}
 
+	/* Each row a bar track and the gap under it. */
 	.analytics-widget__loading--breakdown .analytics-widget__shimmer {
-		min-height: calc(var(--analytics-rows, 5) * 2.2rem);
+		min-height: calc(var(--analytics-rows, 5) * (var(--control-height) + var(--spacer-1-5)));
 	}
 
 	/* A head row over the goals, each row as tall as a table row with its delta. */
 	.analytics-widget__loading--goals .analytics-widget__shimmer {
-		min-height: calc((var(--analytics-rows, 5) + 1) * 2.35rem);
+		min-height: calc((var(--analytics-rows, 5) + 1) * var(--spacer-5));
 	}
 
 	/* A narrow card scrolls its own table sideways rather than pushing the page wider. */
@@ -271,8 +291,9 @@
 
 	.analytics-table {
 		width: 100%;
-		font-size: 0.8125rem;
-		color: var(--theme-elevation-800);
+		font-size: var(--text-body-medium-font-size, 12px);
+		line-height: var(--text-body-medium-line-height, 16px);
+		color: var(--color-text, #1a1a1a);
 		border-collapse: collapse;
 	}
 
@@ -281,17 +302,17 @@
 	}
 
 	.analytics-table thead th {
-		padding-block: 0.25rem 0.375rem;
-		padding-inline: 0.5rem;
+		padding-block: var(--spacer-1, 4px);
+		padding-inline: var(--spacer-2, 8px);
 		white-space: nowrap;
-		border-block-end: 1px solid var(--theme-elevation-150);
+		border-block-end: var(--stroke-width-small, 1px) solid var(--color-border, #e6e6e6);
 	}
 
 	.analytics-table tbody :is(th, td) {
-		padding-block: 0.375rem;
-		padding-inline: 0.5rem;
+		padding-block: var(--spacer-1-5, 6px);
+		padding-inline: var(--spacer-2, 8px);
 		font-variant-numeric: tabular-nums;
-		border-block-end: 1px solid var(--theme-elevation-100);
+		border-block-end: var(--stroke-width-small, 1px) solid var(--color-border, #e6e6e6);
 	}
 
 	.analytics-table tbody th {
@@ -328,14 +349,14 @@
 
 	.analytics-table__value {
 		display: inline-flex;
-		gap: 0.5rem;
+		gap: var(--spacer-2, 8px);
 		align-items: center;
 		justify-content: flex-end;
 	}
 
 	.analytics-table__sort {
 		display: inline-flex;
-		gap: 0.25rem;
+		gap: var(--spacer-1, 4px);
 		align-items: center;
 		padding: 0;
 		margin: 0;
@@ -350,7 +371,7 @@
 
 	.analytics-table__sort:hover,
 	[aria-sort] > .analytics-table__sort {
-		color: var(--theme-elevation-800);
+		color: var(--color-text, #1a1a1a);
 	}
 
 	.analytics-table__sort-arrow {
@@ -380,25 +401,26 @@
 	.analytics-delta {
 		display: inline-flex;
 		flex-wrap: wrap;
-		gap: 0.125rem 0.375rem;
+		gap: calc(var(--spacer-1) / 2) var(--spacer-1-5);
 		/* Not `baseline`: the value's flex box would take its baseline from the arrow glyph. */
 		align-items: center;
-		font-size: 0.75rem;
-		line-height: 1.25;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 	}
 
+	/* Payload's medium pill, tighter, so it sits beside a number without crowding it. */
 	.analytics-delta__change {
-		padding-block: 0;
-		padding-inline: 0.375rem;
-		font-size: inherit;
-		font-weight: 600;
-		line-height: 1.125rem;
-		border-radius: var(--style-radius-s, 3px);
+		--pill-padding-block: 0;
+		--pill-padding-inline-start: var(--spacer-1-5);
+		--pill-padding-inline-end: var(--spacer-1-5);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		line-height: var(--text-body-medium-line-height);
+		border-radius: var(--radius-medium);
 	}
 
 	.analytics-delta__change .pill__label {
 		display: inline-flex;
-		gap: 0.25rem;
+		gap: var(--spacer-1);
 		align-items: center;
 	}
 
@@ -421,35 +443,37 @@
 	}
 
 	.analytics-delta__caption {
-		font-size: 0.6875rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
 	.analytics-live {
 		display: inline-flex;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 		align-items: center;
 		/* As tall as a Payload select, so a toolbar aligned to the boxes' bottom edge centers it on them. */
-		min-height: 40px;
-		font-size: 0.8125rem;
+		min-height: var(--field-min-height-large);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
 	.analytics-live__dot {
 		flex: none;
-		width: 0.5rem;
-		height: 0.5rem;
-		background: var(--theme-success-500);
-		border-radius: 50%;
+		width: var(--spacer-2);
+		height: var(--spacer-2);
+		background: var(--color-bg-success);
+		border-radius: var(--radius-full);
 	}
 
 	.analytics-live__dot--paused {
-		background: var(--theme-elevation-300);
+		background: var(--color-icon-disabled);
 	}
 
 	.analytics-live__count {
-		font-weight: 600;
-		color: var(--theme-elevation-800);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		color: var(--color-text);
 	}
 
 	/* The "New" pill keeps the colors of Payload's own light-gray pill. */
@@ -457,14 +481,9 @@
 		color: var(--analytics-text-muted);
 	}
 
+	/* Payload's pill as it is, as wide as its word in a field Payload lays out as a column. */
 	.analytics-empty-state--new {
-		padding-block: 0.125rem;
-		padding-inline: 0.5rem;
-		font-size: 0.6875rem;
-		font-weight: 600;
-		line-height: 1.4;
-		letter-spacing: 0.03em;
-		border-radius: 999px;
+		align-self: flex-start;
 	}
 
 	.analytics-flag {
@@ -505,29 +524,30 @@
 	.analytics-chart__legend {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.75rem;
+		gap: var(--spacer-2-5, 12px);
 		align-items: center;
-		margin-block-end: 0.35rem;
-		font-size: 0.6875rem;
+		margin-block-end: var(--spacer-1, 4px);
+		font-size: var(--text-body-small-font-size, 10px);
+		line-height: var(--text-body-small-line-height, 14px);
 		color: var(--analytics-text-muted);
 	}
 
 	.analytics-chart__legend-item {
 		display: inline-flex;
-		gap: 0.35rem;
+		gap: var(--spacer-1, 4px);
 		align-items: center;
 	}
 
 	.analytics-chart__legend-swatch {
-		width: 0.75rem;
-		height: 0.125rem;
+		width: 12px;
+		height: 2px;
 		background: var(--analytics-chart-1);
 		border-radius: 999px;
 	}
 
 	/* Dashed like its line, so the two series differ by more than their hue. */
 	.analytics-chart__legend-swatch--comparison {
-		width: 0.875rem;
+		width: 14px;
 		background: repeating-linear-gradient(
 			to right,
 			var(--analytics-chart-comparison) 0 4px,
@@ -565,7 +585,7 @@
 	}
 
 	.analytics-chart__grid {
-		stroke: var(--theme-elevation-150, #dddddd);
+		stroke: var(--color-border, #e6e6e6);
 		stroke-width: 1;
 		vector-effect: non-scaling-stroke;
 	}
@@ -615,7 +635,7 @@
 		height: 7px;
 		margin-block-start: -3.5px;
 		margin-inline-start: -3.5px;
-		background: var(--theme-elevation-0, #ffffff);
+		background: var(--color-bg, #ffffff);
 		border: 2px solid var(--analytics-chart-1);
 	}
 
@@ -630,7 +650,7 @@
 	.analytics-chart__cursor {
 		inset-block: 0;
 		inset-inline-start: var(--analytics-x, 0);
-		border-inline-start: 1px dashed var(--theme-elevation-300, #b3b3b3);
+		border-inline-start: 1px dashed var(--color-border-strong, #b3b3b3);
 	}
 
 	.analytics-chart__active {
@@ -639,7 +659,7 @@
 		margin-block-start: -4.5px;
 		margin-inline-start: -4.5px;
 		background: var(--analytics-chart-1);
-		border: 2px solid var(--theme-elevation-0, #ffffff);
+		border: 2px solid var(--color-bg, #ffffff);
 	}
 
 	.analytics-chart__active--comparison {
@@ -655,7 +675,7 @@
 		inset-block-end: 0;
 		inset-inline: 8px;
 		height: 18px;
-		font-size: 0.6875rem;
+		font-size: var(--text-body-small-font-size, 10px);
 		line-height: 1;
 		color: var(--analytics-text-muted);
 		white-space: nowrap;
@@ -682,6 +702,7 @@
 		transform: none;
 	}
 
+	/* Payload's popover, as its menus and the rich text link editor draw one: the dark menu surface in either theme. */
 	.analytics-chart__tooltip {
 		--analytics-tip-x: -50%;
 		--analytics-tip-y: calc(-100% - 10px);
@@ -689,15 +710,18 @@
 		inset-block-start: var(--analytics-y, 0);
 		inset-inline-start: var(--analytics-x, 0);
 		z-index: 10;
-		padding-block: 0.4rem;
-		padding-inline: 0.6rem;
-		font-size: 0.75rem;
+		padding-block: var(--spacer-2, 8px);
+		padding-inline: var(--spacer-2-5, 12px);
+		font-size: var(--text-body-medium-font-size, 12px);
+		font-weight: var(--text-body-medium-font-weight, 400);
+		line-height: var(--text-body-medium-line-height, 16px);
+		letter-spacing: var(--text-letter-spacing, normal);
 		white-space: nowrap;
 		pointer-events: none;
-		background: var(--theme-elevation-0, #ffffff);
-		border: 1px solid var(--theme-elevation-150, #dddddd);
-		border-radius: var(--style-radius-m, 6px);
-		box-shadow: 0 4px 16px rgb(0 0 0 / 18%);
+		color: var(--color-text-ontooltip, rgb(255 255 255 / 90%));
+		background: var(--color-bg-menu, #1e1e1e);
+		border-radius: var(--radius-large, 13px);
+		box-shadow: var(--elevation-400-menu-panel, 0 10px 16px rgb(0 0 0 / 8%));
 		transform: translate(var(--analytics-tip-x), var(--analytics-tip-y));
 		animation: analytics-fade 0.12s ease-out;
 	}
@@ -737,28 +761,25 @@
 		--analytics-tip-x: -50%;
 	}
 
-	.analytics-chart__tooltip-label {
-		margin-block-end: 0.15rem;
-		font-weight: 600;
-		color: var(--analytics-text-muted);
+	/* The secondary text the rich text link editor sets on the same surface. */
+	.analytics-chart__tooltip-label,
+	.analytics-chart__tooltip-comparison {
+		color: var(--color-text-onbrand-secondary, rgb(255 255 255 / 80%));
 	}
 
 	.analytics-chart__tooltip-value {
-		font-weight: 700;
+		font-weight: var(--text-body-medium-bold-font-weight, 550);
 		font-variant-numeric: tabular-nums;
-		color: var(--theme-elevation-800, #333333);
 	}
 
 	.analytics-chart__tooltip-comparison {
 		display: flex;
-		gap: 0.5rem;
+		gap: var(--spacer-2, 8px);
 		justify-content: space-between;
-		margin-block-start: 0.2rem;
-		color: var(--analytics-text-muted);
 	}
 
 	.analytics-chart__tooltip-previous {
-		font-weight: 600;
+		font-weight: var(--text-body-medium-bold-font-weight, 550);
 		font-variant-numeric: tabular-nums;
 	}
 
@@ -780,17 +801,17 @@
 
 	/* A ranked table whose label cells carry each row's share as a bar. */
 	.analytics-table.analytics-bars thead th {
-		padding-block: 0 0.35rem;
+		padding-block: 0 var(--spacer-1, 4px);
 		border: 0;
 	}
 
 	.analytics-table.analytics-bars tbody :is(th, td) {
-		padding-block: 0.175rem;
+		padding-block: calc(var(--spacer-1-5, 6px) / 2);
 		border: 0;
 	}
 
 	.analytics-table.analytics-bars :is(td, thead th:not(:first-child)) {
-		padding-inline-start: 0.6rem;
+		padding-inline-start: var(--spacer-2, 8px);
 	}
 
 	.analytics-table.analytics-bars td {
@@ -799,8 +820,8 @@
 	}
 
 	.analytics-table.analytics-bars td.analytics-bars__value {
-		font-weight: 600;
-		color: var(--theme-elevation-800, #333333);
+		font-weight: var(--text-body-medium-bold-font-weight, 550);
+		color: var(--color-text, #1a1a1a);
 	}
 
 	/* The label column takes what the numbers leave and cuts a long label short. */
@@ -810,14 +831,16 @@
 		padding-inline: 0;
 	}
 
+	/* As tall as a Payload control, the row its menus list at. */
 	.analytics-bars__track {
 		position: relative;
 		display: block;
 		box-sizing: border-box;
 		width: 100%;
-		height: 1.85rem;
+		height: var(--control-height, 24px);
 		overflow: hidden;
-		border-radius: var(--style-radius-s, 4px);
+		background: var(--color-bg-secondary, #f5f5f5);
+		border-radius: var(--radius-medium, 5px);
 	}
 
 	.analytics-bars__track::before {
@@ -828,11 +851,12 @@
 		content: "";
 		background: var(--analytics-bar-fill);
 		border-radius: inherit;
-		transition: filter 0.1s ease;
+		transition: background-color 0.1s ease;
 	}
 
+	/* Payload's hover step for the fill, as on its primary button. */
 	.analytics-bars__row:hover .analytics-bars__track::before {
-		filter: brightness(1.12);
+		background: var(--analytics-bar-fill-hover);
 	}
 
 	/*
@@ -843,10 +867,10 @@
 		position: relative;
 		display: block;
 		padding-block: 0;
-		padding-inline: 0.6rem;
+		padding-inline: var(--spacer-2, 8px);
 		overflow: hidden;
-		font-size: 0.8125rem;
-		line-height: 1.85rem;
+		font-size: var(--text-body-medium-font-size, 12px);
+		line-height: var(--control-height, 24px);
 		color: transparent;
 		text-overflow: ellipsis;
 		white-space: nowrap;
@@ -890,20 +914,20 @@
 
 		.analytics-bars__track::before {
 			background: none;
-			border-block-end: 0.25rem solid CanvasText;
+			border-block-end: 4px solid CanvasText;
 		}
 	}
 
 	.analytics-bars__decoration {
-		margin-inline-end: 0.4rem;
-	}
-
-	.analytics-bars--soft .analytics-bars__track {
-		background: var(--theme-elevation-100, #ebebeb);
+		margin-inline-end: var(--spacer-1-5, 6px);
 	}
 
 	.analytics-bars--soft .analytics-bars__track::before {
-		background: color-mix(in srgb, var(--analytics-chart-1) 25%, transparent);
+		background: var(--color-bg-brand-tertiary, #e5f4ff);
+	}
+
+	.analytics-bars--soft .analytics-bars__row:hover .analytics-bars__track::before {
+		background: var(--color-bg-brand-tertiary-hover, #bde3ff);
 	}
 
 	.analytics-bars--soft .analytics-bars__label {
@@ -916,48 +940,63 @@
 	}
 
 	.analytics-bars__empty {
-		font-size: 0.8125rem;
+		font-size: var(--text-body-medium-font-size, 12px);
 		color: var(--analytics-text-muted);
 	}
 
 	.analytics-view {
 		display: flex;
 		flex-direction: column;
-		gap: 1.25rem;
-		padding-block-end: 1.5rem;
+		gap: var(--spacer-4);
+		padding-block-end: var(--spacer-4);
 	}
 
+	/* Payload's list header: edge to edge across the gutter, ruled off under the title. */
+	.analytics-view__header {
+		display: flex;
+		flex-direction: column;
+		gap: var(--spacer-1);
+		padding-block: var(--spacer-2) var(--spacer-3);
+		padding-inline: var(--gutter-h);
+		margin-inline: calc(-1 * var(--gutter-h));
+		border-block-end: var(--stroke-width-small) solid var(--color-border);
+	}
+
+	/* The controls bar meets the header's rule, as Payload's list controls do. */
+	.analytics-view__header + .analytics-view__toolbar {
+		margin-block-start: calc(-1 * var(--spacer-4));
+	}
+
+	/* Payload's list view title. */
 	.analytics-view__title {
 		margin: 0;
+		font-size: var(--text-heading-xl-font-size);
+		font-weight: var(--text-heading-xl-font-weight);
+		line-height: var(--text-heading-xl-line-height);
+		letter-spacing: var(--text-heading-xl-letter-spacing);
 	}
 
 	/* A panel's title, a heading for navigation that keeps the small label look. */
 	.analytics-view__heading {
 		margin: 0;
 		font-family: inherit;
-		line-height: inherit;
 	}
 
 	.analytics-view__toolbar {
 		display: flex;
 		flex-direction: column;
-		gap: 0.75rem;
+		gap: var(--spacer-2-5);
 	}
 
 	.analytics-view__controls {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.75rem;
+		gap: var(--spacer-2-5);
 		align-items: flex-end;
 	}
 
 	.analytics-view__control {
-		min-width: 10rem;
-	}
-
-	/* Room for two localized dates and Payload's calendar icon, never wider than a phone's row. */
-	.analytics-view__control--dates {
-		min-width: min(19.5rem, 100%);
+		min-width: 160px;
 	}
 
 	.analytics-view__control .field-type {
@@ -976,61 +1015,126 @@
 		white-space: nowrap;
 	}
 
+	/* Payload's field label. */
 	.analytics-view__field-label {
 		display: block;
-		margin-block-end: 0.35rem;
-		font-size: 0.8125rem;
-		color: var(--theme-elevation-600);
+		margin-block-end: var(--spacer-2);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
+		color: var(--field-color-label);
 	}
 
-	.analytics-view__toggle {
+	/*
+	 * Payload's list controls bar, edge to edge and ruled off under the header: what is shown on
+	 * the start side, what changes it on the end.
+	 */
+	.analytics-view__bar {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--spacer-2);
 		align-items: center;
-		height: 40px;
-		margin: 0;
+		justify-content: space-between;
+		padding-block: var(--spacer-2-5);
+		padding-inline: var(--gutter-h);
+		margin-inline: calc(-1 * var(--gutter-h));
+		border-block: var(--stroke-width-small) solid var(--color-border);
 	}
 
-	/* Wide enough for the pending label in every locale, so the row never moves mid-refresh. */
-	.analytics-view__refresh {
-		align-items: center;
-		justify-content: center;
-		min-width: 10.5rem;
-		height: 40px;
-		margin: 0;
+	/* Under the header, whose rule is already the bar's top edge. */
+	.analytics-view__header + .analytics-view__toolbar .analytics-view__bar {
+		border-block-start: 0;
 	}
 
 	.analytics-view__captions {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
+		align-items: center;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-view__actions {
+		display: flex;
+		flex-wrap: wrap;
+		gap: var(--spacer-2);
 		align-items: center;
 		margin-inline-start: auto;
-		font-size: 0.8125rem;
-		color: var(--analytics-text-muted);
+	}
+
+	/* Room for two localized dates and Payload's calendar icon, never wider than a phone's row. */
+	.analytics-view__dates {
+		width: min(280px, 100%);
+		margin-block-end: 0;
+	}
+
+	@keyframes analytics-spin {
+		to {
+			transform: rotate(360deg);
+		}
+	}
+
+	.analytics-view__refresh--pending .btn__icon {
+		animation: analytics-spin 0.8s linear infinite;
+	}
+
+	@media (prefers-reduced-motion: reduce) {
+		.analytics-view__refresh--pending .btn__icon {
+			animation: none;
+		}
 	}
 
 	.analytics-view__chips {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.4rem;
+		gap: var(--spacer-1-5);
 		align-items: center;
 	}
 
+	/* The remove button hugs the pill's end, as in Payload's own removable values. */
+	.analytics-view__chip {
+		--pill-padding-inline-end: var(--spacer-1);
+	}
+
+	/* Payload's pill sets its content inline; the text and the remove button centre on one row. */
+	.analytics-view__chip .pill__label {
+		display: inline-flex;
+		gap: var(--spacer-1);
+		align-items: center;
+	}
+
+	.analytics-view__chip-text {
+		white-space: nowrap;
+	}
+
+	/* A flag the height of the text's capitals, centred on its line rather than above it. */
+	.analytics-view__chip-text .analytics-flag {
+		width: 16px;
+		height: 12px;
+		margin-inline: calc(var(--spacer-1) / 2);
+		vertical-align: -2px;
+	}
+
+	/* Payload's removable value: a square the icon's size, the secondary icon color. */
 	.analytics-view__chip-remove {
 		display: inline-flex;
+		flex-shrink: 0;
 		align-items: center;
 		justify-content: center;
+		width: var(--spacer-3);
+		height: var(--spacer-3);
 		padding: 0;
-		margin-inline-start: 0.15rem;
-		vertical-align: middle;
-		color: inherit;
+		color: var(--color-icon-secondary);
 		cursor: pointer;
 		background: none;
 		border: 0;
+		border-radius: var(--radius-small);
 	}
 
-	.analytics-view__chip-remove .icon {
-		width: 1rem;
-		height: 1rem;
+	.analytics-view__chip-remove:hover {
+		color: var(--color-text);
+		background: var(--color-bg-secondary-hover);
 	}
 
 	/*
@@ -1041,9 +1145,9 @@
 		display: grid;
 		grid-template-columns: repeat(
 				auto-fit,
-				minmax(min(100%, max(12.5rem, calc((100% - 4 * 0.75rem) / 5))), 1fr)
+				minmax(min(100%, max(160px, calc((100% - 4 * var(--spacer-2-5)) / 5))), 1fr)
 			);
-		gap: 0.75rem;
+		gap: var(--spacer-2-5);
 	}
 
 	.analytics-view__card {
@@ -1051,25 +1155,26 @@
 	}
 
 	.analytics-view__card .analytics-metric__value {
-		font-size: min(1.5rem, 13cqi);
+		font-size: min(var(--text-heading-large-font-size), 13cqi);
 		overflow-wrap: anywhere;
 	}
 
 	.analytics-view__panel {
 		display: flex;
 		flex-direction: column;
-		gap: 0.625rem;
+		gap: var(--spacer-2-5);
 	}
 
 	.analytics-view__error {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 		align-items: flex-start;
 	}
 
 	.analytics-view__caption {
-		font-size: 0.75rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
@@ -1082,10 +1187,9 @@
 	.analytics-view__breakdown-head {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.5rem 0.75rem;
+		gap: var(--spacer-2) var(--spacer-2-5);
 		align-items: center;
 		justify-content: space-between;
-		border-block-end: 1px solid var(--theme-elevation-150);
 	}
 
 	.analytics-view__section[aria-busy="true"] {
@@ -1096,34 +1200,39 @@
 	.analytics-view__tabs {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.25rem;
+		gap: var(--spacer-1);
 	}
 
+	/* The tabs of Payload's own activity widget. */
 	.analytics-view__tab {
-		height: 40px;
+		min-height: var(--spacer-4);
 		padding-block: 0;
-		padding-inline: 0.75rem;
+		padding-inline: var(--spacer-2);
 		font: inherit;
-		font-size: 0.8125rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
+		white-space: nowrap;
 		cursor: pointer;
-		background: none;
+		background: transparent;
 		border: 0;
-		border-block-end: 2px solid transparent;
+		border-radius: var(--radius-medium);
 	}
 
 	.analytics-view__tab:hover {
-		color: var(--theme-elevation-800);
+		color: var(--color-text);
+		background: var(--color-bg-hover);
 	}
 
 	.analytics-view__tab[aria-selected="true"] {
-		color: var(--theme-elevation-800);
-		border-block-end-color: var(--theme-elevation-800);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		color: var(--color-text);
+		background: var(--color-bg-secondary);
 	}
 
 	/* The breakdown's number columns keep their widths as rows come and go. */
 	.analytics-view__col--value {
-		width: 5.5rem;
+		width: 88px;
 	}
 
 	:is(
@@ -1131,7 +1240,7 @@
 		.analytics-view__col--tertiary,
 		.analytics-view__col--quaternary
 	) {
-		width: 4.5rem;
+		width: 72px;
 	}
 
 	/*
@@ -1139,37 +1248,37 @@
 	 * moves nothing: `1lh` is the inherited line box a label or a cell sits in.
 	 */
 	.analytics-view__skeleton {
-		border-radius: var(--style-radius-s, 3px);
+		border-radius: var(--radius-medium);
 	}
 
 	.analytics-view__skeleton--label {
 		width: 50%;
-		height: 0.6875rem;
-		margin-block: calc((1lh - 0.6875rem) / 2);
+		height: var(--text-body-small-bold-font-size);
+		margin-block: calc((1lh - var(--text-body-small-bold-font-size)) / 2);
 	}
 
 	/* The card is a size container, so the number's own `13cqi` cap reads the same width. */
 	.analytics-view__skeleton--value {
 		width: 40%;
-		height: calc(min(1.5rem, 13cqi) * 1.1);
+		height: var(--text-heading-large-line-height);
 		margin-block-start: auto;
 	}
 
 	.analytics-view__skeleton--delta {
 		width: 35%;
-		height: 1.125rem;
+		height: var(--text-body-medium-line-height);
 	}
 
 	.analytics-view__skeleton--chart {
-		height: var(--analytics-chart-height, 10rem);
-		border-radius: var(--style-radius-m, 6px);
+		height: var(--analytics-chart-height, 160px);
+		border-radius: var(--radius-medium);
 	}
 
 	/* A ranked table: its head row, then a track per row at the rows' pitch. */
 	.analytics-view__skeleton-table {
-		--analytics-skeleton-head: calc(1lh + 0.35rem);
-		--analytics-skeleton-row: 1.85rem;
-		--analytics-skeleton-gap: 0.35rem;
+		--analytics-skeleton-head: calc(1lh + var(--spacer-1, 4px));
+		--analytics-skeleton-row: var(--control-height, 24px);
+		--analytics-skeleton-gap: calc(2 * calc(var(--spacer-1-5, 6px) / 2));
 		display: flex;
 		flex-direction: column;
 		gap: var(--analytics-skeleton-gap);
@@ -1183,23 +1292,30 @@
 
 	/* A plain table: head and rows each a line, their padding and a 1px rule. */
 	.analytics-view__skeleton-table--table {
-		--analytics-skeleton-head: calc(1lh + 0.625rem + 1px);
-		--analytics-skeleton-row: 0.8125rem;
-		--analytics-skeleton-gap: calc(1lh + 0.75rem + 1px - 0.8125rem);
+		--analytics-skeleton-head: calc(1lh + 2 * var(--spacer-1, 4px) + 1px);
+		--analytics-skeleton-row: var(--text-body-medium-font-size);
+		--analytics-skeleton-gap: calc(
+			1lh +
+			2 *
+			var(--spacer-1-5, 6px) +
+			1px -
+			var(--text-body-medium-font-size)
+		);
 	}
 
 	.analytics-view__empty {
-		font-size: 0.8125rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
 	.analytics-view__no-sources {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 		align-items: flex-start;
-		padding-block: 2rem;
-		padding-inline: 1rem;
+		padding-block: var(--spacer-5);
+		padding-inline: var(--spacer-3);
 	}
 
 	.analytics-view__exclusion > .btn {
@@ -1208,8 +1324,9 @@
 	}
 
 	.analytics-view__exclusion-text {
-		font-size: 0.8125rem;
-		color: var(--theme-elevation-600);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
+		color: var(--analytics-text-muted);
 	}
 
 	.analytics-view__exclusion-sites {
@@ -1218,25 +1335,25 @@
 		padding: 0;
 		margin: 0;
 		list-style: none;
-		border-block: 1px solid var(--theme-elevation-100);
+		border-block: var(--stroke-width-small) solid var(--color-border);
 	}
 
 	.analytics-view__exclusion-site {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr) auto;
-		gap: 0.5rem 1rem;
+		gap: var(--spacer-2) var(--spacer-3);
 		align-items: center;
-		padding-block: 0.625rem;
+		padding-block: var(--spacer-2);
 	}
 
 	.analytics-view__exclusion-site + .analytics-view__exclusion-site {
-		border-block-start: 1px solid var(--theme-elevation-100);
+		border-block-start: var(--stroke-width-small) solid var(--color-border);
 	}
 
 	.analytics-view__exclusion-name {
 		overflow: hidden;
-		font-weight: 600;
-		color: var(--theme-elevation-800);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		color: var(--color-text);
 		text-overflow: ellipsis;
 		white-space: nowrap;
 	}
@@ -1244,7 +1361,7 @@
 	.analytics-view__exclusion-actions {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.75rem;
+		gap: var(--spacer-2-5);
 		align-items: center;
 		justify-content: flex-end;
 	}
@@ -1254,19 +1371,20 @@
 	}
 
 	.analytics-view__exclusion-alt {
-		font-size: 0.8125rem;
-		color: var(--theme-elevation-650);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
+		color: var(--analytics-text-muted);
 		text-decoration: underline;
 		text-underline-offset: 2px;
 	}
 
 	.analytics-view__exclusion-alt:hover {
-		color: var(--theme-elevation-800);
+		color: var(--color-text);
 	}
 
 	.analytics-view__exclusion-link {
 		display: flex;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 		align-items: stretch;
 	}
 
@@ -1275,24 +1393,28 @@
 		margin: 0;
 	}
 
-	/* Stretched to the Copy button beside it, so both are one height at any size. */
+	/* Payload's input chrome, stretched to the Copy button beside it so both are one height. */
 	.analytics-view__exclusion-input {
 		box-sizing: border-box;
 		flex: 1;
 		min-width: 0;
 		padding-block: 0;
-		padding-inline: 0.625rem;
-		font-family: var(--font-mono, monospace);
-		font-size: 0.8125rem;
-		color: var(--theme-elevation-800);
-		background: var(--theme-input-bg);
-		border: 1px solid var(--theme-elevation-150);
-		border-radius: var(--style-radius-s, 3px);
+		padding-inline: var(--field-padding-inline);
+		font-family: var(--font-mono);
+		font-size: var(--text-mono-small-font-size);
+		color: var(--field-color-text);
+		background: var(--field-color-bg);
+		border: var(--stroke-width-small) solid var(--field-color-border);
+		border-radius: var(--field-border-radius);
+	}
+
+	.analytics-view__exclusion-input:hover {
+		border-color: var(--field-color-border-hover);
 	}
 
 	.analytics-view__exclusion-input:focus {
 		outline: 0;
-		border-color: var(--theme-elevation-400);
+		border-color: var(--field-color-border-focus);
 	}
 
 	@media (max-width: 768px) {
@@ -1304,10 +1426,6 @@
 			justify-content: flex-start;
 		}
 
-		.analytics-view__captions {
-			margin-inline-start: 0;
-		}
-
 		.analytics-view__control {
 			flex: 1 1 100%;
 		}
@@ -1316,14 +1434,14 @@
 	.analytics-panel {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: var(--spacer-3);
 	}
 
 	.analytics-panel__toolbar,
 	.analytics-panel__controls {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 0.75rem;
+		gap: var(--spacer-2-5);
 		align-items: flex-end;
 	}
 
@@ -1333,8 +1451,8 @@
 	}
 
 	.analytics-panel__control {
-		flex: 0 1 14rem;
-		min-width: min(11rem, 100%);
+		flex: 0 1 224px;
+		min-width: min(176px, 100%);
 	}
 
 	.analytics-panel__live {
@@ -1352,69 +1470,86 @@
 	.analytics-panel__content {
 		display: flex;
 		flex-direction: column;
-		gap: 1rem;
+		gap: var(--spacer-3);
 	}
 
 	.analytics-panel__empty {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 		color: var(--analytics-text-muted);
 	}
 
 	.analytics-panel__cards {
 		display: flex;
 		flex-wrap: wrap;
-		gap: 1.5rem;
+		gap: var(--spacer-4);
 	}
 
 	.analytics-panel__card {
-		min-width: 7rem;
+		min-width: 112px;
 	}
 
 	.analytics-panel__lists {
 		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(min(14rem, 100%), 1fr));
-		gap: 1.5rem;
+		grid-template-columns: repeat(auto-fit, minmax(min(224px, 100%), 1fr));
+		gap: var(--spacer-4);
 	}
 
 	.analytics-panel__list {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 		min-width: 0;
 	}
 
 	:where(.analytics-panel__caption, .analytics-stat__caption) {
-		font-size: 0.75rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
 	.analytics-panel__notice {
-		font-size: 0.6875rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
+	/*
+	 * Payload 4 makes every field a column; the stat lays its numbers out in a row instead, from
+	 * the start edge, with the window and any notice on lines of their own under them.
+	 */
 	.analytics-stat {
-		display: flex;
-		flex-wrap: wrap;
-		gap: var(--base, 1rem);
-		align-items: flex-end;
+		flex-flow: row wrap;
+		gap: var(--spacer-2) var(--spacer-4);
+		align-items: flex-start;
 	}
 
 	.analytics-stat__caption {
 		width: 100%;
+		color: var(--field-color-description);
 	}
 
+	/* Each number under a label set as Payload sets a field's, the window as its description. */
+	.analytics-stat .analytics-metric__label {
+		font-size: var(--text-body-medium-font-size);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		line-height: var(--text-body-medium-line-height);
+		letter-spacing: var(--field-label-letter-spacing);
+		text-transform: none;
+		color: var(--field-color-label);
+	}
+
+	/* Payload's own group label in a select menu. */
 	.analytics-goal-select .rs__group-heading {
-		padding-block: calc(var(--base) * 0.5) calc(var(--base) * 0.25);
-		padding-inline: calc(var(--base) * 0.75);
+		padding-block: var(--spacer-2) var(--spacer-1);
+		padding-inline: var(--spacer-2-5);
 		margin: 0;
-		font-size: 0.6875rem;
-		font-weight: 600;
-		line-height: 1.4;
-		letter-spacing: 0.04em;
+		font-size: var(--text-body-small-bold-font-size);
+		font-weight: var(--text-body-small-bold-font-weight);
+		line-height: var(--text-body-small-bold-line-height);
+		letter-spacing: 0.06em;
 		color: var(--analytics-text-muted);
 		text-transform: uppercase;
 		cursor: default;
@@ -1423,7 +1558,7 @@
 	/* The halves and the gap match Payload's own two-field row, so the amount lines up above. */
 	.analytics-goal-amount__row {
 		display: flex;
-		gap: calc(var(--base) * 0.5);
+		gap: var(--spacer-3);
 		align-items: flex-start;
 	}
 
@@ -1436,47 +1571,43 @@
 	 * Payload hides the month title for its dropdowns, which only the first month of two draws:
 	 * the second shows its title instead, in the row the first one's dropdowns take.
 	 */
-	.analytics-date-range .react-datepicker__month-container
+	.analytics-range-calendar .react-datepicker__month-container
 		~ .react-datepicker__month-container
 		.react-datepicker__current-month {
-		display: block;
-		padding-block: 10px;
-		padding-inline: 0;
-		font-size: 1rem;
-		font-weight: 500;
-		line-height: 17px;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		min-height: calc(var(--spacer-4) + var(--spacer-2) * 2);
+		margin: 0;
+		font-size: var(--text-body-medium-bold-font-size);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		line-height: var(--text-body-medium-bold-line-height);
 	}
 
-	.analytics-date-range
+	.analytics-range-calendar
 		.react-datepicker__month-container
 		~ .react-datepicker__month-container
 		.react-datepicker__header__dropdown {
 		display: none;
 	}
 
-	.analytics-date-range
-		.react-datepicker__day--in-selecting-range:not(.react-datepicker__day--selecting-range-start) {
-		background-color: var(--theme-elevation-100);
-	}
-
-	.analytics-date-range
-		:is(
-			.react-datepicker__day--range-start,
-			.react-datepicker__day--range-end,
-			.react-datepicker__day--selecting-range-start,
-			.react-datepicker__month-text--range-start,
-			.react-datepicker__month-text--range-end
-		) {
-		font-weight: 700;
-		color: var(--theme-elevation-0);
-		background-color: var(--theme-elevation-800);
+	/*
+	 * The days a pick in progress would span: Payload lays its light selected fill over the strong
+	 * one but keeps the strong one's light text, so the text goes back to the body color.
+	 */
+	.analytics-range-calendar
+	.react-datepicker__day--in-selecting-range:not(
+		.react-datepicker__day--in-range,
+		.react-datepicker__day--selecting-range-start
+	) {
+		color: var(--color-text);
 	}
 
 	/* A read's state in place of its numbers, with its retry under the message. */
 	.analytics-state {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 		align-items: center;
 	}
 
@@ -1485,14 +1616,15 @@
 	}
 
 	.analytics-state__after {
-		font-size: 0.75rem;
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 		color: var(--analytics-text-muted);
 	}
 
 	.analytics-panel__state {
 		display: flex;
 		flex-direction: column;
-		gap: 0.5rem;
+		gap: var(--spacer-2);
 		align-items: flex-start;
 	}
 
@@ -1504,30 +1636,32 @@
 	.analytics-panel__skeleton-rows {
 		display: flex;
 		flex-direction: column;
-		gap: 0.35rem;
-		padding-block-end: 0.35rem;
+		gap: var(--spacer-1);
+		padding-block-end: var(--spacer-1);
 	}
 
 	.analytics-panel__skeleton-rows > .analytics-view__skeleton {
-		height: 1.85rem;
+		height: var(--spacer-5);
 	}
 
 	.analytics-panel__skeleton-caption {
-		width: 6rem;
-		height: 0.75rem;
-		margin-block: calc((1lh - 0.75rem) / 2);
-		font-size: 0.75rem;
+		width: 96px;
+		height: var(--text-body-medium-font-size);
+		margin-block: calc((1lh - var(--text-body-medium-font-size)) / 2);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 	}
 
 	/* A loaded card is as wide as its label and number with their delta beside it. */
 	.analytics-panel__card--skeleton {
-		width: 10rem;
+		width: 160px;
 	}
 
 	.analytics-panel__skeleton-notice {
 		width: 40%;
-		height: 0.6875rem;
-		margin-block: calc((1lh - 0.6875rem) / 2);
-		font-size: 0.6875rem;
+		height: var(--text-body-medium-font-size);
+		margin-block: calc((1lh - var(--text-body-medium-font-size)) / 2);
+		font-size: var(--text-body-medium-font-size);
+		line-height: var(--text-body-medium-line-height);
 	}
 }

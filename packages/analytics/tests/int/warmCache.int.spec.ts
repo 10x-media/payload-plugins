@@ -128,6 +128,7 @@ describeForDb('analytics warm task', {}, (db) => {
 		)
 		expect(view.status).toBe(200)
 		const page = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'pages' as never,
 			data: { slug: 'pricing' } as never,
 		})

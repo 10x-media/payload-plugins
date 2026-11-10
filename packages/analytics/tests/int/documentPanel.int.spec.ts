@@ -49,6 +49,7 @@ describeForDb('document analytics endpoint', {}, (db) => {
 			],
 		})
 		const page = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'pages' as never,
 			data: { title: 'About', slug: 'about' } as never,
 		})

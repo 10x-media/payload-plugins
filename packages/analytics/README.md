@@ -3,7 +3,9 @@
 # @10x-media/analytics
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/analytics` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/analytics` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/analytics).
+> **This is the Payload v4 branch.** It targets Payload `4.0.0-beta` on Next.js and TanStack Start and is released under the `alpha` tag (`pnpm add @10x-media/analytics@alpha`). The Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/analytics) and is released as `beta`.
+>
+> Found a problem with the v4 version? Please [open an issue](https://github.com/10x-media/payload-plugins/issues/new?labels=v4) with the **`v4`** label.
 
 Analytics for Payload v3 behind one adapter contract: a self-hosted native engine that stores hits in your own database, or GA4, Plausible, Umami and PostHog, read through an analytics view, dashboard widgets and per-document stat fields. Every surface hides what the active source cannot answer.
 

@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, Endpoint, Payload, PayloadRequest } from 'payload'
+import type { CollectionConfig, Endpoint, Payload, PayloadRequest, User } from 'payload'
 import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { GOALS_SLUG } from '../../src/goals/collection'
@@ -38,7 +38,11 @@ describeForDb('analytics goals collection: unscoped', {}, (db) => {
 	let range: { start: Date; end: Date }
 
 	const create = (data: Record<string, unknown>) =>
-		booted.payload.create({ collection: GOALS_SLUG as never, data: data as never })
+		booted.payload.create({
+			overrideAccess: true,
+			collection: GOALS_SLUG as never,
+			data: data as never,
+		})
 
 	const byGoal = async (): Promise<Record<string, { conversions: number; revenue: number }>> => {
 		const result = await adapter.query(
@@ -115,6 +119,7 @@ describeForDb('analytics goals collection: unscoped', {}, (db) => {
 		await ingestInto(booted.payload, { type: 'event', name: 'trial_started', path: '/trial' })
 		expect((await byGoal()).trial).toEqual({ conversions: 1, revenue: 0 })
 		await booted.payload.update({
+			overrideAccess: true,
 			collection: GOALS_SLUG as never,
 			id: (doc as { id: string | number }).id,
 			data: { enabled: false } as never,
@@ -177,9 +182,13 @@ const emailOf = (req: { user?: unknown }): string => (req.user as { email?: stri
 
 const login = async (payload: Payload, email: string) => {
 	const password = 'test-pass-1234'
-	await payload.create({ collection: 'access-users', data: { email, password } })
+	await payload.create({
+		collection: 'access-users',
+		data: { email, password },
+		overrideAccess: true,
+	})
 	const result = await payload.login({ collection: 'access-users', data: { email, password } })
-	return result.user
+	return { ...result.user, collection: 'access-users' } as User
 }
 
 describeForDb('analytics goals collection: scoped', {}, (db) => {
@@ -388,6 +397,7 @@ describeForDb('analytics goals collection: tracker config', {}, (db) => {
 			}),
 		})
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: GOALS_SLUG as never,
 			data: {
 				name: 'Newsletter (tenant A)',
@@ -399,6 +409,7 @@ describeForDb('analytics goals collection: tracker config', {}, (db) => {
 			} as never,
 		})
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: GOALS_SLUG as never,
 			data: {
 				name: 'B only',

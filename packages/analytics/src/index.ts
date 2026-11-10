@@ -23,7 +23,6 @@ import { expectedCollections } from './plugin/collectionChecks'
 import { createRuntimeFactory } from './plugin/createRuntime'
 import { makeDocumentHandler } from './plugin/documentEndpoint'
 import { makeFlagsHandler } from './plugin/flagsEndpoint'
-import { restrictJobControls } from './plugin/jobsAccess'
 import {
 	addStateCollection,
 	type CollectionContext,
@@ -78,7 +77,7 @@ const addEndpoints = (config: Config, ...endpoints: Endpoint[]): void => {
 
 export const analytics = definePlugin<AnalyticsPluginOptions>({
 	slug: '@10x-media/analytics',
-	plugin: async ({ config, plugins: _plugins, ...options }): Promise<Config> => {
+	plugin: async ({ config, options }): Promise<Config> => {
 		const disabled = options.disabled === true
 		// Switched off, nothing reads through the adapters: they are only asked for their schema.
 		const resolved = resolveOptions(options, { requireAdapters: !disabled })
@@ -123,8 +122,6 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		// widget and endpoint gates that otherwise follow the config adapters' capabilities.
 		const providersEnabled =
 			resolved.providers.collection.enabled || Boolean(resolved.providers.resolve)
-		// Read before the adapters register: only a host that turned it on may carry concurrency keys.
-		const jobsConcurrency = config.jobs?.enableConcurrencyControl === true
 		registerTranslations(config, options.translations)
 		fillUnbundledLanguages(config)
 		const registry = createRegistry(resolved.adapters, resolved.defaultAdapter)
@@ -216,7 +213,6 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 				routes,
 				sdks: resolved.sdks,
 				jobs: resolved.jobs,
-				jobsConcurrency,
 				notice: context.notice,
 			})
 		}
@@ -301,7 +297,6 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 					schedule: jobs.warm,
 					windowHours: resolved.cache.warm.windowHours,
 					maxReads: resolved.cache.warm.maxReads,
-					concurrency: jobsConcurrency,
 				})
 			)
 		}
@@ -316,7 +311,6 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 						collectionSlug: resolved.sync.collection.slug,
 						adapterIds: resolved.sync.adapters,
 						scopes: resolved.scope.list,
-						concurrency: jobsConcurrency,
 					})
 				)
 			}
@@ -326,7 +320,6 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			config.collections = [...(config.collections ?? []), cache]
 		}
 		addStateCollection(config, resolved, context)
-		restrictJobControls(config)
 		// Hidden per config rather than per process, so two instances answer for themselves; a later
 		// plugin's fields (form-builder's action blocks) take their factory's own `revenue` option.
 		applyConfigRevenueVisibility(config, money)

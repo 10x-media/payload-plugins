@@ -136,19 +136,19 @@ export function ViewRoot({ children, ...props }: ViewRootProps) {
 	const refresh = useRefresh(props.endpoints.refresh, queries, tick)
 
 	// Names the scope the render resolved, never what the address asked for. Where the toolbar
-	// draws the Site select, that already says it.
+	// draws the Site menu, that already says it.
 	const scopes = props.scopes
 	// The site's name isolated, so a Latin name keeps its place in a right-to-left caption.
 	const scopeCaption = scopes
 		? t(keys.viewScopeShowing, { site: isolate(scopeLabel(scopes, t(keys.viewScopeAll))) })
 		: null
 	const heading = (withCaption: boolean) => (
-		<>
+		<header className="analytics-view__header">
 			<h1 className="analytics-view__title">{t(keys.viewTitle)}</h1>
 			{scopeCaption === null || !withCaption ? null : (
 				<span className="analytics-view__caption">{scopeCaption}</span>
 			)}
-		</>
+		</header>
 	)
 
 	// Staff leave their own browsers out before the first visit counts, so it is offered even

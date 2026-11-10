@@ -149,6 +149,7 @@ describeForDb('engine hit store', {}, (db) => {
 	const stored = async (): Promise<Array<Record<string, unknown>>> =>
 		(
 			await first.payload.find({
+				overrideAccess: true,
 				collection: HITS_SLUG,
 				pagination: false,
 				sort: 'id',

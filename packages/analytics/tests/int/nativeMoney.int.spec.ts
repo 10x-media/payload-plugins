@@ -462,6 +462,7 @@ describeForDb('analytics money and order privacy', {}, (db) => {
 		}
 		expect(hits.filter((hit) => hit.path === '/orders')).toHaveLength(2)
 		const totals = await booted.payload.find({
+			overrideAccess: true,
 			collection: AGGREGATES_SLUG as never,
 			pagination: false,
 			depth: 0,

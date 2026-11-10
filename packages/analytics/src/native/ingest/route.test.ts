@@ -8,7 +8,7 @@ const instance = vi.hoisted(() => ({ current: undefined as unknown }))
 vi.mock('payload', async (actual) => ({
 	...(await actual<typeof import('payload')>()),
 	getPayload: async () => instance.current,
-	createLocalReq: async ({ req }: { req: Request }) => req as unknown as PayloadRequest,
+	createPayloadRequest: async ({ req }: { req: Request }) => req as unknown as PayloadRequest,
 }))
 
 const { answerPreflight, receiveBeacon } = await import('./route')

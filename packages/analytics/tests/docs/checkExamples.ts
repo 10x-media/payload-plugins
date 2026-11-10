@@ -41,7 +41,7 @@ const ENTRY_ORDER: ReadonlyArray<[report: string, specifier: string]> = [
 	['adapters-posthog', '@10x-media/analytics/adapters/posthog'],
 	['i18n', '@10x-media/analytics/i18n'],
 	['geo', '@10x-media/analytics/geo'],
-	['next', '@10x-media/analytics/next'],
+	['routes', '@10x-media/analytics/routes'],
 	['migrations', '@10x-media/analytics/migrations'],
 	['testing', '@10x-media/analytics/testing'],
 ]

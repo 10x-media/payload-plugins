@@ -1,7 +1,6 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import type { AnalyticsRow } from '../core/contract'
-import { TASK_DEAD_AFTER_MS } from '../maintenance/taskSchedule'
 import {
 	matchesAdapterFilter,
 	rotateScopes,
@@ -177,27 +176,5 @@ describe('syncTask', () => {
 				collectionSlug: 'analytics-daily',
 			}).schedule
 		).toBeUndefined()
-	})
-
-	it('marks its own killed runs failed once their budget and a margin passed, before Payload schedules another', async () => {
-		const task = syncTask({ schedule, lookbackDays: 3, collectionSlug: 'analytics-daily' })
-		const hook = task.schedule?.[0]?.hooks?.beforeSchedule
-		const updateJobs = vi.fn(async () => null)
-		const decision = { input: {}, shouldSchedule: true }
-		const payload = { collections: {}, db: { updateJobs } } as unknown as Payload
-		const before = Date.now()
-		const answer = await hook?.({
-			defaultBeforeSchedule: async () => decision,
-			jobStats: {},
-			queueable: { scheduleConfig: { cron: '0 */6 * * *', queue: 'analytics' } },
-			req: { payload } as PayloadRequest,
-		} as never)
-		expect(answer).toBe(decision)
-		const [update] = updateJobs.mock.calls[0] as unknown as [
-			{ where: { and: Array<Record<string, Record<string, unknown>>> } },
-		]
-		expect(update.where.and).toContainEqual({ taskSlug: { equals: 'analytics-sync' } })
-		const cutoff = update.where.and.find((each) => 'updatedAt' in each)?.updatedAt?.less_than
-		expect(Date.parse(String(cutoff))).toBeLessThanOrEqual(before - TASK_DEAD_AFTER_MS + 1000)
 	})
 })

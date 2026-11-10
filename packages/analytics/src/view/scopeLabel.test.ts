@@ -34,7 +34,7 @@ describe('scopeLabel', () => {
 })
 
 describe('canToggleAggregate', () => {
-	it('offers the Site select only to a reader with a tenant of their own to leave', () => {
+	it('offers the Site menu only to a reader with a tenant of their own to leave', () => {
 		expect(canToggleAggregate(scopes())).toBe(true)
 		// Still drawn while aggregating, so the reader can pick their own site again.
 		expect(canToggleAggregate(scopes({ current: '*' }))).toBe(true)

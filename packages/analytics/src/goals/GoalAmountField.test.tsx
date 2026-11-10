@@ -30,6 +30,24 @@ vi.mock('@payloadcms/ui', async () => {
 			showError ? <span data-testid={`error-${path}`} /> : null,
 		FieldLabel: ({ label }: { label?: string }) => <span data-testid="label">{label ?? ''}</span>,
 		fieldBaseClass: 'field-type',
+		InputStepper: ({
+			disabled,
+			onDecrement,
+			onIncrement,
+		}: {
+			disabled?: boolean
+			onDecrement: () => void
+			onIncrement: () => void
+		}) => (
+			<>
+				<button disabled={disabled} onClick={onIncrement} type="button">
+					up
+				</button>
+				<button disabled={disabled} onClick={onDecrement} type="button">
+					down
+				</button>
+			</>
+		),
 		ReactSelect: selectMocks.ReactSelect,
 		RenderCustomComponent: ({
 			CustomComponent,
@@ -122,6 +140,29 @@ describe('GoalAmountField', () => {
 		expect(mocks.setValue).toHaveBeenCalledWith('value.fixed', null, undefined)
 		fireEvent.change(currencySelect(), { target: { value: 'EUR' } })
 		expect(mocks.setValue).toHaveBeenCalledWith('currency', 'EUR', undefined)
+	})
+
+	it("sits in Payload's own input group, and steps from zero when empty, never below the minimum", () => {
+		withFields({ 'value.fixed': { value: 2 } })
+		render(
+			<GoalAmountField
+				{...props({
+					field: { ...props().field, admin: { step: 5 } } as GoalAmountFieldProps['field'],
+				})}
+			/>
+		)
+		expect(amountInput().className).toBe('form-input')
+		expect(amountInput().parentElement?.className).toBe('form-input-group')
+		fireEvent.click(screen.getByRole('button', { name: 'up' }))
+		expect(mocks.setValue).toHaveBeenLastCalledWith('value.fixed', 7, undefined)
+		fireEvent.click(screen.getByRole('button', { name: 'down' }))
+		expect(mocks.setValue).toHaveBeenLastCalledWith('value.fixed', 0, undefined)
+		cleanup()
+		mocks.setValue.mockClear()
+		withFields({})
+		render(<GoalAmountField {...props()} />)
+		fireEvent.click(screen.getByRole('button', { name: 'up' }))
+		expect(mocks.setValue).toHaveBeenLastCalledWith('value.fixed', 1, undefined)
 	})
 
 	it('reads a sibling currency inside an action block', () => {

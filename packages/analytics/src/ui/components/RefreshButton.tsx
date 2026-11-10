@@ -1,11 +1,10 @@
 'use client'
 
-import { Button } from '@payloadcms/ui'
-import { useRouter } from 'next/navigation'
+import { Button, useRouter } from '@payloadcms/ui'
 import { useTransition } from 'react'
 
 /**
- * Tries a server-rendered read again: Next renders the page's server components anew, so a
+ * Tries a server-rendered read again: the router renders the page's server components anew, so a
  * widget or stat field whose source was busy reads it once more.
  */
 export function RefreshButton({ label }: { label: string }) {
@@ -17,7 +16,7 @@ export function RefreshButton({ label }: { label: string }) {
 			disabled={pending}
 			margin={false}
 			onClick={() => startTransition(() => router.refresh())}
-			size="small"
+			size="medium"
 		>
 			{label}
 		</Button>

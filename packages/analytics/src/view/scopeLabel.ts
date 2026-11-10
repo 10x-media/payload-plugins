@@ -15,7 +15,7 @@ export const scopeLabel = (scopes: ViewScopes, allLabel: string): string =>
 	isAllScopes(scopes.current) ? allLabel : (scopes.ownLabel ?? scopes.current)
 
 /**
- * Whether the view offers the Site select: it needs the reader's own tenant to pick beside every
+ * Whether the view offers the Site menu: it needs the reader's own tenant to pick beside every
  * site, and a platform reader resolving no tenant already reads everything.
  */
 export const canToggleAggregate = (scopes: ViewScopes): boolean =>

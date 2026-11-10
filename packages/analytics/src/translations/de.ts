@@ -95,6 +95,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.widgetFilterValueTooLong]: 'Höchstens 256 Zeichen.',
 	[keys.widgetFilterCaption]: 'Filter: {{dimension}} {{operator}} {{value}}',
 	[keys.widgetCaptionWithFilter]: '{{window}}, {{filter}}',
+	[keys.widgetCaptionWithComparison]: '{{window}} {{comparison}}',
 	[keys.filterOperatorEq]: 'ist',
 	[keys.filterOperatorContains]: 'enthält',
 	[keys.filterOperatorMatches]: 'entspricht Muster',

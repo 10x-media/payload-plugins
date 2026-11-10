@@ -1,6 +1,6 @@
 import { cleanup, render } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { declarationsOf } from '../testing/stylesheet'
+import { analyticsCss, declarationsOf } from '../testing/stylesheet'
 import { WidgetBody, WidgetCard, WidgetEmpty, WidgetNote, WidgetValue } from './WidgetCard'
 
 afterEach(() => {
@@ -42,10 +42,9 @@ describe('WidgetCard', () => {
 		const { getByRole } = render(<WidgetCard caption="Last 30 days" title="Pageviews" />)
 		const heading = getByRole('heading', { level: 2, name: 'Pageviews' })
 		expect(heading.className).toBe('analytics-widget__title')
-		expect(declarationsOf('.analytics-widget__title')).toMatchObject({
-			margin: '0',
-			'line-height': 'inherit',
-		})
+		expect(declarationsOf('.analytics-widget__title')).toMatchObject({ margin: '0' })
+		expect(declarationsOf('.analytics-widget__title')).not.toHaveProperty('font-size')
+		expect(analyticsCss()).toMatch(/:where\(\s*\.analytics-widget__title,/)
 	})
 
 	it('puts the title and the window on one header line', () => {

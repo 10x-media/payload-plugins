@@ -1,4 +1,4 @@
-import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import { createPayloadRequest, type Payload, type PayloadRequest } from 'payload'
 import { isRecord } from '../core/values'
 import { apiPath } from '../plugin/apiPath'
 import { ANALYTICS_CONFIG_KEY, analyticsRoutes } from '../plugin/routes'
@@ -50,8 +50,8 @@ export const getTrackerConfig = async (
 	const headers = args?.headers ?? new Headers()
 	// Payload derives `req.host` from the URL, and hostname scoping needs the header's.
 	const host = headers.get('host')
-	// A fresh literal per call: `createLocalReq` mutates the request it is given.
-	const req = await createLocalReq({ req: { headers, ...(host ? { host } : {}) } }, payload)
+	// A fresh literal per call: `createPayloadRequest` mutates the request it is given.
+	const req = await createPayloadRequest({ payload, req: { headers, ...(host ? { host } : {}) } })
 	const draft = args?.draft ?? draftModeCookie(headers)
 	const source = payload.config.custom?.[ANALYTICS_CONFIG_KEY]
 	return isTrackerConfigSource(source)

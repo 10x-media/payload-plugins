@@ -92,6 +92,10 @@ describe('RangePicker', () => {
 			previousYearAriaLabel: keys.dateRangePreviousYear,
 			nextYearAriaLabel: keys.dateRangeNextYear,
 		})
+		// Payload draws a chevron in each button; a text label would replace it.
+		for (const label of ['previousMonth', 'nextMonth', 'previousYear', 'nextYear']) {
+			expect(lastProps().overrides).not.toHaveProperty(`${label}ButtonLabel`)
+		}
 	})
 
 	// react-datepicker reads "Choose", "Not available", "Month" and "Week" before each date.
@@ -108,12 +112,14 @@ describe('RangePicker', () => {
 		expect(dialog.className).toBe('react-datepicker')
 	})
 
+	// Payload's own handler would read the pair as one date, so react-datepicker's reaches the plugin.
 	it('hands both ends of a pick back, the second still open mid-pick', () => {
 		const onChange = vi.fn()
 		render(<RangePicker end={null} onChange={onChange} start={null} />)
-		lastProps().onChange?.([start, null])
-		lastProps().onChange?.([start, end])
-		lastProps().onChange?.(null)
+		const picked = lastProps().overrides?.onChange as (picked: unknown) => void
+		picked([start, null])
+		picked([start, end])
+		picked(null)
 		expect(onChange.mock.calls).toEqual([
 			[start, null],
 			[start, end],

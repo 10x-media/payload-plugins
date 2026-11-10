@@ -121,6 +121,7 @@ describeForDb('task state through the database API, as on Cloudflare D1', {}, (d
 		expect(await state?.lastBeat(TASK_SLUGS.sync)).toBeInstanceOf(Date)
 		expect(await state?.cursor(REKEY_CURSOR)).toBe('done')
 		const { docs } = await first.payload.find({
+			overrideAccess: true,
 			collection: 'analytics-daily' as never,
 			where: { source: { equals: 'plausible' } },
 		})

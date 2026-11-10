@@ -5,7 +5,7 @@ import {
 	installTestClock,
 	type TestClock,
 } from '@10x-media/payload-test-harness'
-import { createLocalReq, type Payload } from 'payload'
+import { createPayloadRequest, type Payload } from 'payload'
 import { afterAll, afterEach, beforeAll, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter, AnalyticsQuery } from '../../src/core/contract'
 import { analytics } from '../../src/index'
@@ -235,7 +235,7 @@ describeForDb('analytics read cache', {}, (db) => {
 		if (typeof handler !== 'function') {
 			throw new Error('analytics-maintain has no handler')
 		}
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		const result = await handler({ input: {}, req } as unknown as Parameters<typeof handler>[0])
 		expect((result as { output: { sweptCache: number } }).output.sweptCache).toBe(4)
 		expect(await rows(booted.payload)).toHaveLength(0)

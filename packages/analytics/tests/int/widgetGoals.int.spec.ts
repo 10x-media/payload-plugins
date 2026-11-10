@@ -128,6 +128,7 @@ describeForDb('goals widget read: unscoped native install', {}, (db) => {
 			}),
 		})
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: GOALS_SLUG as never,
 			data: {
 				name: 'Demo requested',

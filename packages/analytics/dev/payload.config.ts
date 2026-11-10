@@ -66,6 +66,7 @@ const users: CollectionConfig = {
 const pages: CollectionConfig = {
 	slug: 'pages',
 	admin: { useAsTitle: 'title' },
+	access: { read: () => true },
 	fields: [
 		analyticsStat({ metric: 'pageviews', position: 'sidebar' }),
 		{

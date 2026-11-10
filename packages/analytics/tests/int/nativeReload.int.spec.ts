@@ -29,6 +29,9 @@ describeForDb('the native engine across a dev reload', { dbs: ['mongo'] }, (db) 
 	it(`tracks, reads and keeps its state rows after a reload of the same config, on ${db}`, async () => {
 		await trackServerEvent(booted.payload, { type: 'pageview', path: '/before', hostname: HOST })
 		const engine = nativeOf(booted.payload).engine
+		// Let the maintenance that tracking started end first: a reload closes the connection under
+		// a run still going, which then cannot release its lease and holds it until it lapses.
+		await engine.idle()
 		await reload(booted.payload.config, booted.payload, true)
 		expect(nativeOf(booted.payload).engine).toBe(engine)
 		await trackServerEvent(booted.payload, { type: 'pageview', path: '/after', hostname: HOST })

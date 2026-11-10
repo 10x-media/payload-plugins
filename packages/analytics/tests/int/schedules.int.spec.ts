@@ -8,10 +8,7 @@ import {
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { TASK_SLUGS } from '../../src/core/jobs'
 import { analytics } from '../../src/index'
-import { stateLease, TASK_LEASE_MS } from '../../src/maintenance/lease'
-import { TASK_DEAD_AFTER_MS } from '../../src/maintenance/taskSchedule'
 import { native } from '../../src/native/nativeAdapter'
-import { MAINTAIN_DEAD_AFTER_MS } from '../../src/native/tasks/maintainTask'
 import { settleRetiredRuntimes } from '../../src/plugin/runtime'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 
@@ -19,16 +16,15 @@ const NOW = new Date('2026-10-07T12:00:00.000Z')
 const MINUTE = 60_000
 const QUEUE = 'analytics'
 
-/** Each task, how long its run may sit processing, and whether a live run holds a lease for it. */
 const TASKS = [
-	{ slug: TASK_SLUGS.maintain, deadAfterMs: MAINTAIN_DEAD_AFTER_MS, leased: false },
-	{ slug: TASK_SLUGS.sync, deadAfterMs: TASK_DEAD_AFTER_MS, leased: true },
-	{ slug: TASK_SLUGS.warm, deadAfterMs: TASK_DEAD_AFTER_MS, leased: true },
+	{ slug: TASK_SLUGS.maintain },
+	{ slug: TASK_SLUGS.sync },
+	{ slug: TASK_SLUGS.warm },
 ] as const
 
 /**
- * Payload's own `payload.jobs.handleSchedules`, not a copy: the plugin's guard ends in Payload's
- * `defaultBeforeSchedule`, which refuses while a scheduled run is queued or processing unerrored.
+ * Payload's own `payload.jobs.handleSchedules`: its `defaultBeforeSchedule` refuses while a
+ * scheduled run is queued or processing unerrored, and a killed run's lapsed lease changes nothing.
  */
 describeForDb("analytics tasks under Payload's schedule handling", {}, (db) => {
 	let clock: TestClock
@@ -58,6 +54,7 @@ describeForDb("analytics tasks under Payload's schedule handling", {}, (db) => {
 	const openRuns = async (task: string) =>
 		(
 			await booted.payload.find({
+				overrideAccess: true,
 				collection: 'payload-jobs',
 				where: {
 					and: [
@@ -85,49 +82,25 @@ describeForDb("analytics tasks under Payload's schedule handling", {}, (db) => {
 
 	it.each(
 		TASKS
-	)(`lets the next $slug through once its run has been processing too long on ${db}`, async ({
+	)(`keeps a killed $slug run as the one open run, for the runner to pick up again, on ${db}`, async ({
 		slug,
-		deadAfterMs,
-		leased,
 	}) => {
 		const { payload } = booted
 		const [queued] = await openRuns(slug)
 		expect(queued).toBeDefined()
-		const markProcessing = (minutesAgo: number) =>
-			payload.db.updateJobs({
-				id: queued?.id ?? '',
-				data: {
-					processing: true,
-					updatedAt: new Date(NOW.getTime() - minutesAgo * MINUTE).toISOString(),
-				},
-				returning: false,
-			})
-		const stillProcessing = [expect.objectContaining({ id: queued?.id, processing: true })]
-		// Within what a live run can take: left alone, and nothing new is queued.
-		await markProcessing(deadAfterMs / MINUTE - 1)
-		await payload.jobs.handleSchedules({ queue: QUEUE })
-		expect(await openRuns(slug)).toEqual(stillProcessing)
-		await markProcessing(deadAfterMs / MINUTE + 1)
-		if (leased) {
-			// A run holding the task's lease is alive, however old its job looks.
-			const lease = stateLease(payload, slug, TASK_LEASE_MS)
-			expect(await lease?.claim()).toBe(true)
-			await payload.jobs.handleSchedules({ queue: QUEUE })
-			expect(await openRuns(slug)).toEqual(stillProcessing)
-			await lease?.release()
-		}
-		// Past it with nobody holding it: failed, and the next run is queued, once.
-		await payload.jobs.handleSchedules({ queue: QUEUE })
-		await payload.jobs.handleSchedules({ queue: QUEUE })
-		const stuck = await payload.findByID({
-			collection: 'payload-jobs',
+		// A run that was claimed and then killed: its lease lapsed an hour ago.
+		await payload.db.updateJobs({
 			id: queued?.id ?? '',
-			depth: 0,
+			data: {
+				processingUntil: new Date(NOW.getTime() - 60 * MINUTE).toISOString(),
+				processingToken: 'killed-run',
+			},
+			returning: false,
 		})
-		expect(stuck).toMatchObject({ processing: false, hasError: true })
-		const next = await openRuns(slug)
-		expect(next).toHaveLength(1)
-		expect(next[0]?.id).not.toEqual(queued?.id)
-		expect(next[0]?.processing).toBe(false)
+		await payload.jobs.handleSchedules({ queue: QUEUE })
+		await payload.jobs.handleSchedules({ queue: QUEUE })
+		const open = await openRuns(slug)
+		expect(open).toHaveLength(1)
+		expect(open[0]?.id).toEqual(queued?.id)
 	})
 })

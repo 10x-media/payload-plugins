@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
+import type { CollectionConfig, Payload, PayloadRequest, User } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { resolveSlotAdapterFor } from '../../src/capture/slots'
 import { analytics } from '../../src/index'
@@ -14,7 +14,7 @@ const accessUsers: CollectionConfig = {
 	fields: [{ name: 'role', type: 'text' }],
 }
 
-type User = { email?: string; role?: string } | null
+type AccessUser = { email?: string; role?: string } | null
 
 const SCOPE_BY_EMAIL: Record<string, string | null> = {
 	'editor-a@t.dev': 'tenant-a',
@@ -28,16 +28,20 @@ const ROOT = 'root@t.dev'
 const scope = {
 	member: () => true,
 	resolve: ({ req }: { req: PayloadRequest }) =>
-		SCOPE_BY_EMAIL[(req.user as User)?.email ?? ''] ?? null,
+		SCOPE_BY_EMAIL[(req.user as AccessUser)?.email ?? ''] ?? null,
 }
 
-const isRoot = ({ req }: { req: PayloadRequest }) => (req.user as User)?.email === ROOT
+const isRoot = ({ req }: { req: PayloadRequest }) => (req.user as AccessUser)?.email === ROOT
 
 const login = async (payload: Payload, email: string, role = 'editor') => {
 	const password = 'test-pass-1234'
-	await payload.create({ collection: 'access-users', data: { email, password, role } as never })
+	await payload.create({
+		collection: 'access-users',
+		data: { email, password, role } as never,
+		overrideAccess: true,
+	})
 	const result = await payload.login({ collection: 'access-users', data: { email, password } })
-	return result.user
+	return { ...result.user, collection: 'access-users' } as User
 }
 
 const runtimeOf = (payload: Payload): AnalyticsRuntime => {
@@ -140,12 +144,12 @@ describeForDb('analytics provider documents: only available ones are sources', {
 		const offered =
 			field?.type === 'select'
 				? (
-						field.filterOptions?.({
+						(field.filterOptions?.({
 							data: {},
 							options: field.options,
 							req: {} as never,
 							siblingData: {},
-						}) ?? field.options
+						} as never) as typeof field.options | undefined) ?? field.options
 					).map((o) => (typeof o === 'string' ? o : o.value))
 				: []
 		expect(offered).toEqual(['plausible', 'umami', 'ga4', 'posthog'])
@@ -179,7 +183,8 @@ describeForDb('analytics provider documents: default for this site', {}, (db) =>
 				access: { crossScope: isRoot },
 				providers: {
 					collection: {
-						defaultAccess: ({ req }) => isRoot({ req }) || (req.user as User)?.role === 'admin',
+						defaultAccess: ({ req }) =>
+							isRoot({ req }) || (req.user as AccessUser)?.role === 'admin',
 					},
 				},
 			}),
@@ -193,7 +198,7 @@ describeForDb('analytics provider documents: default for this site', {}, (db) =>
 		await booted.stop()
 	})
 
-	const create = (data: Record<string, unknown>, user: unknown) =>
+	const create = (data: Record<string, unknown>, user: User) =>
 		booted.payload.create({
 			collection: PROVIDERS_SLUG as never,
 			data: data as never,
@@ -201,7 +206,7 @@ describeForDb('analytics provider documents: default for this site', {}, (db) =>
 			overrideAccess: false,
 		}) as unknown as Promise<ProviderRow>
 
-	const update = (id: ProviderRow['id'], data: Record<string, unknown>, user: unknown) =>
+	const update = (id: ProviderRow['id'], data: Record<string, unknown>, user: User) =>
 		booted.payload.update({
 			collection: PROVIDERS_SLUG as never,
 			id,
@@ -298,7 +303,7 @@ describeForDb('analytics provider documents: default access when unset', {}, (db
 			overrideAccess: false,
 		})) as unknown as ProviderRow
 		expect(doc.isDefault).toBe(true)
-		const change = (isDefault: boolean, user: unknown) =>
+		const change = (isDefault: boolean, user: User) =>
 			booted.payload.update({
 				collection: PROVIDERS_SLUG as never,
 				id: doc.id,

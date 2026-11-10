@@ -137,6 +137,7 @@ describeForDb('analytics native orders', {}, (db) => {
 			collections: [{ slug: 'offers', fields: [{ name: 'title', type: 'text' }] }],
 		})
 		const offer = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'offers' as never,
 			data: { title: 'Annual plan' } as never,
 		})

@@ -95,10 +95,10 @@ export function SectionError({ error = UNKNOWN, onRetry }: SectionErrorProps) {
 	const { message, retry, retryAfter } = wordingOf(error)
 	return (
 		<div className="analytics-view__error">
-			<Banner type="error">{t(message)}</Banner>
+			<Banner type="danger">{t(message)}</Banner>
 			<RetryAfter className="analytics-view__caption" seconds={retryAfter} />
 			{retry ? (
-				<Button buttonStyle="secondary" onClick={onRetry} size="small">
+				<Button buttonStyle="secondary" onClick={onRetry} size="medium">
 					{t(keys.viewRetry)}
 				</Button>
 			) : null}

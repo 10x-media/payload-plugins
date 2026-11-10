@@ -24,19 +24,21 @@ Every admin surface the plugin draws (the analytics view, the widgets, the displ
 
 ### Tokens
 
-The tokens are custom properties on `:root`, each built on Payload's theme variables, so light and dark mode follow the admin's theme:
+The tokens are custom properties on `:root`, each built on Payload's own design tokens, so light and dark mode follow the admin's theme. Each also names a plain fallback for a page outside the admin:
 
 | Token | Default | What it styles |
 |---|---|---|
-| `--analytics-chart-1` | `--theme-success-500` | Trend lines and areas, solid bars, the realtime sparkline |
-| `--analytics-chart-comparison` | `--theme-elevation-500` | The previous-period line and its legend swatch |
-| `--analytics-card-bg`, `--analytics-card-border` | `--theme-elevation-50`, `--theme-border-color` | Widget cards and the view's cards and panels |
-| `--analytics-card-radius`, `--analytics-card-padding` | `--style-radius-m`, `0.8` of `--base` | The same cards |
-| `--analytics-bar-fill` | `--color-success-600`, from the base palette so light text reads on it in either theme | A solid bar |
-| `--analytics-bar-label-on-fill`, `--analytics-bar-label` | `--color-base-0` (white), `--theme-elevation-800` | A bar's label where it sits on the bar, and past the bar's end |
-| `--analytics-delta-up-fg`, `--analytics-delta-up-bg` | `--theme-success-800` on `--theme-success-150` | A period-over-period change for the better (for bounce rate, a fall) |
-| `--analytics-delta-down-fg`, `--analytics-delta-down-bg` | `--theme-error-800` on `--theme-error-150` | A change for the worse |
-| `--analytics-text-muted` | `--theme-elevation-600` | Captions, notes and other muted text |
+| `--analytics-chart-1` | `--color-bg-brand` | Trend lines and areas, the realtime sparkline |
+| `--analytics-chart-comparison` | `--color-icon-secondary` | The previous-period line and its legend swatch |
+| `--analytics-card-bg`, `--analytics-card-border` | `--color-bg`, `--color-border` | Widget cards and the view's cards and panels, as Payload draws its own cards |
+| `--analytics-card-radius`, `--analytics-card-padding` | `--radius-large`, `--spacer-2-5` | The same cards |
+| `--analytics-bar-fill`, `--analytics-bar-fill-hover` | `--color-bg-brand`, `--color-bg-brand-hover`, the fill of Payload's primary button | A solid bar, and its row under the pointer |
+| `--analytics-bar-label-on-fill`, `--analytics-bar-label` | `--color-text-onbrand`, `--color-text` | A bar's label where it sits on the bar, and past the bar's end |
+| `--analytics-delta-up-fg`, `--analytics-delta-up-bg` | `--color-text-brand` on `--color-bg-selected`, Payload's success pill | A period-over-period change for the better (for bounce rate, a fall) |
+| `--analytics-delta-down-fg`, `--analytics-delta-down-bg` | `--color-text-danger` on `--color-bg-danger-tertiary`, Payload's error pill | A change for the worse |
+| `--analytics-text-muted` | `--color-text-secondary` | Captions, notes and other muted text |
+
+The colors are Payload's as they are, so the analytics surfaces read as Payload's own: muted text is its secondary text, the delta pills its success and error pills, a solid bar its primary button's fill with the same light label. Their contrast is Payload's too: in its enhanced contrast mode the text reaches 4.5:1, except on the dark success pill, which Payload leaves pale. To go further, set the tokens above. Every bar sits on a `--color-bg-secondary` track. A soft bar (`analytics-bars--soft`, what every built-in list and `BarList` draw by default) is `--color-bg-brand-tertiary` with the body text on it. Sizes come from Payload's spacing, type and radius tokens (`--spacer-*`, `--text-*`, `--radius-*`, `--field-*`) rather than `rem`.
 
 ### Classes
 
@@ -46,7 +48,7 @@ The stylesheet places everything with logical properties (`margin-inline`, `inse
 
 ### Outside the admin
 
-`BarList` and `TrendChart` from `@10x-media/analytics/client` import the stylesheet as well. Drawn outside the admin, where Payload's theme variables are absent, they fall back to neutral colors; where your bundler does not follow a package's stylesheet imports, import `@10x-media/analytics/styles.css` yourself. The package declares `"sideEffects": ["*.css"]`, so a production build keeps those imports.
+`BarList` and `TrendChart` from `@10x-media/analytics/client` import the stylesheet as well. Drawn outside the admin, where Payload's tokens are absent, they fall back to neutral colors and pixel sizes (only the tokens and rules these two read carry a fallback; the admin-only ones do not); where your bundler does not follow a package's stylesheet imports, import `@10x-media/analytics/styles.css` yourself. The package declares `"sideEffects": ["*.css"]`, so a production build keeps those imports.
 
 ## A built-in widget
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { usePathname, useRouter, useSearchParams } from 'next/navigation'
+import { usePathname, useRouter, useSearchParams } from '@payloadcms/ui'
 import { useCallback } from 'react'
 import { serializeViewState, type ViewDefaults, type ViewState } from './state'
 
@@ -58,13 +58,17 @@ export const useViewUrl = ({
 			// Router patches history in its own effect, after this view's on first render; written
 			// earlier, the entry loses router state and `useSearchParams` never hears of it.
 			const timer = setTimeout(() => {
-				window.history.replaceState(null, '', target)
+				if (router.replaceState) {
+					router.replaceState(target)
+				} else {
+					window.history.replaceState(null, '', target)
+				}
 			}, 0)
 			return () => {
 				clearTimeout(timer)
 			}
 		},
-		[current, pathname]
+		[current, pathname, router]
 	)
 
 	return { search, push, replace }

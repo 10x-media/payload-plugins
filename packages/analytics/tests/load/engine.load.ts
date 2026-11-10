@@ -12,8 +12,8 @@ import { createSqlExecutor } from '../../src/native/store/sql/executor'
 import { compile, raw } from '../../src/native/store/sql/fragment'
 import type { HitRow } from '../../src/native/store/types'
 import { MAINTAIN_TASK_SLUG } from '../../src/native/tasks/maintainTask'
-import { ingestRoute } from '../../src/next/ingestRoute'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
+import { ingestRoute } from '../../src/routes/ingestRoute'
 import { addCalendarDays, calendarDayOf, calendarDayStart } from '../../src/timeframe/calendar'
 import { nativeOf } from '../int/nativeHelpers'
 import { type Beacon, beacons, DEFAULT_SITE, dayHits, type SyntheticSite } from './generator'
@@ -351,7 +351,11 @@ describeForDb('native engine under load', {}, (db) => {
 				const writing = (async () => {
 					while (counting) {
 						const begun = performance.now()
-						await booted.payload.create({ collection: NOTES.slug, data: { title: 'during' } })
+						await booted.payload.create({
+							overrideAccess: true,
+							collection: NOTES.slug,
+							data: { title: 'during' },
+						})
 						writes.push(performance.now() - begun)
 						await new Promise((resolve) => setTimeout(resolve, 20))
 					}

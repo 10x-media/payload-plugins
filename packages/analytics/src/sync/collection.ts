@@ -64,6 +64,9 @@ export const syncCollection = (slug: string, args: SyncCollectionArgs): Collecti
 		useAsTitle: 'source',
 		defaultColumns: ['source', 'date', 'pageviews', 'visitors'],
 	},
+	// Written by the sync task alone: no history and no author to keep.
+	versions: false,
+	authorship: false,
 	access: {
 		read: syncReadAccess(args),
 		create: () => false,

@@ -1,6 +1,6 @@
 import {
 	type Config,
-	createLocalReq,
+	createPayloadRequest,
 	type Payload,
 	type PayloadHandler,
 	type PayloadRequest,
@@ -211,7 +211,7 @@ export interface NativeAdapter extends AnalyticsAdapter {
 	flush(payload: Payload): Promise<void>
 	/**
 	 * Takes one beacon as the ingest endpoint does, for a request built outside Payload's own
-	 * routing: what `ingestRoute` from `@10x-media/analytics/next` calls.
+	 * routing: what `ingestRoute` from `@10x-media/analytics/routes` calls.
 	 */
 	receive(req: PayloadRequest): Promise<Response>
 	/** Counts a stretch of one instance's days again, as `rebuildDays` asks. */
@@ -366,8 +366,6 @@ interface Registration {
 	revenue?: AdapterRegisterContext['revenue']
 	/** The maintenance task's queue and schedule, or false when the install registers none. */
 	jobs: AdapterJobs
-	/** Whether the task may carry a concurrency key: the host's `jobs.enableConcurrencyControl`. */
-	jobsConcurrency: boolean
 }
 
 export function native(options: NativeOptions = {}): NativeAdapter {
@@ -431,7 +429,6 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 			...(context?.items && context.items.collections.size > 0 ? { items: context.items } : {}),
 			...(context?.revenue ? { revenue: context.revenue } : {}),
 			jobs: context?.jobs ?? DEFAULT_JOBS,
-			jobsConcurrency: context?.jobsConcurrency === true,
 		}
 	}
 
@@ -506,7 +503,7 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 		capabilities = declared
 		// A request of its own per call: one kept would hold its dataloader's documents and its
 		// context for the life of the process.
-		const localRequest = (): Promise<PayloadRequest> => createLocalReq({}, payload)
+		const localRequest = (): Promise<PayloadRequest> => createPayloadRequest({ payload })
 		const zoneOf = built.resolvers.timezone
 		const currencyOf = built.resolvers.currency
 		const engine = createEngine({
@@ -712,7 +709,6 @@ export function native(options: NativeOptions = {}): NativeAdapter {
 					maintainTask({
 						schedule: jobs.maintain,
 						run: maintainOnTask,
-						concurrency: registration.jobsConcurrency,
 					})
 				)
 			}

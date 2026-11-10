@@ -88,7 +88,6 @@ describe('GoalsPanel empty states', () => {
 })
 
 describe('GoalsPanel before the first answer', () => {
-	const rem = (value: string | undefined): number => Number.parseFloat(value ?? '')
 	const placeholderRows = (goals: ViewGoal[]): number =>
 		render(
 			<GoalsPanel
@@ -110,15 +109,11 @@ describe('GoalsPanel before the first answer', () => {
 
 	it('spaces its rows at the pitch of a plain table, under a head as tall as its own', () => {
 		const plain = declarationsOf('.analytics-view__skeleton-table--table')
-		const [top, bottom] = (declarationsOf('.analytics-table thead th')['padding-block'] ?? '')
-			.split(' ')
-			.map(rem)
-		expect(plain['--analytics-skeleton-head']).toBe(
-			`calc(1lh + ${(top ?? 0) + (bottom ?? 0)}rem + 1px)`
-		)
-		const cell = rem(declarationsOf('.analytics-table tbody :is(th, td)')['padding-block'])
+		const head = declarationsOf('.analytics-table thead th')['padding-block']
+		expect(plain['--analytics-skeleton-head']).toBe(`calc(1lh + 2 * ${head} + 1px)`)
+		const cell = declarationsOf('.analytics-table tbody :is(th, td)')['padding-block']
 		expect(plain['--analytics-skeleton-gap']).toBe(
-			`calc(1lh + ${2 * cell}rem + 1px - ${plain['--analytics-skeleton-row']})`
+			`calc(1lh + 2 * ${cell} + 1px - ${plain['--analytics-skeleton-row']})`
 		)
 	})
 })

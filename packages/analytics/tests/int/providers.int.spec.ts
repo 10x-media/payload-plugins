@@ -85,8 +85,8 @@ describeForDb('analytics providers collection', {}, (db) => {
 		expect(read.posthog?.apiKey).toBeUndefined()
 
 		const { withRawEncrypted } = await import('@10x-media/fields/encrypted')
-		const { createLocalReq } = await import('payload')
-		const req = await createLocalReq({}, booted.payload)
+		const { createPayloadRequest } = await import('payload')
+		const req = await createPayloadRequest({ payload: booted.payload })
 		const raw = (await withRawEncrypted(req, () =>
 			booted.payload.findByID({
 				collection: SLUG as never,
@@ -186,8 +186,8 @@ describeForDb('analytics providers collection', {}, (db) => {
 		const poisonedId = (poisoned as { id: string | number }).id
 
 		const { withRawEncrypted } = await import('@10x-media/fields/encrypted')
-		const { createLocalReq } = await import('payload')
-		const req = await createLocalReq({}, booted.payload)
+		const { createPayloadRequest } = await import('payload')
+		const req = await createPayloadRequest({ payload: booted.payload })
 		const raw = (await withRawEncrypted(req, () =>
 			booted.payload.findByID({
 				collection: SLUG as never,

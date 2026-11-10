@@ -324,10 +324,11 @@ const ANALYTICS: EntryPointsPage = {
 			what: 'The [geo resolvers](/analytics/geo#custom-pipelines) for a pipeline of your own.',
 		},
 		{
-			report: 'next',
-			specifier: '@10x-media/analytics/next',
-			where: 'Your Next.js route handlers. It loads Payload only when a route handler first runs.',
-			what: "`captureRoute`, which relays a vendor through a [route handler of your own](/analytics/proxy#a-route-handler-of-your-own) by the first-party proxy's rules, and `ingestRoute` and `ingestPreflight` for [beacons in a route of your own](/analytics/capture#taking-beacons-in-a-route-of-your-own). `captureRewrites` and `posthogProxyRewrites` stay exported, deprecated, and throw when called: a Next rewrite forwards the visitor's cookies to the vendor.",
+			report: 'routes',
+			specifier: '@10x-media/analytics/routes',
+			where:
+				'Route handlers of your own: Next.js route handlers and TanStack Start server routes. It loads Payload only when a handler first runs.',
+			what: "`captureRoute`, which relays a vendor through a [route handler of your own](/analytics/proxy#a-route-handler-of-your-own) by the first-party proxy's rules, and `ingestRoute` and `ingestPreflight` for [beacons in a route of your own](/analytics/capture#taking-beacons-in-a-route-of-your-own). Each is a plain `(request: Request) => Promise<Response>`.",
 		},
 		{
 			report: 'migrations',

@@ -1,7 +1,7 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import {
 	type CollectionConfig,
-	createLocalReq,
+	createPayloadRequest,
 	Forbidden,
 	handleEndpoints,
 	type Payload,
@@ -10,7 +10,8 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { TASK_SLUGS } from '../../src/core/jobs'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
-import { JOB_STATS_GLOBAL } from '../../src/plugin/jobsAccess'
+
+const JOB_STATS_GLOBAL = 'payload-jobs-stats'
 
 /** The admin collection: the first one with auth, so `admin.user` names it. */
 const users: CollectionConfig = { slug: 'users', auth: true, fields: [] }
@@ -24,7 +25,11 @@ const PASSWORD = 'test-pass-1234'
 const QUEUE = 'jobs-access-spec'
 
 const login = async (payload: Payload, collection: 'users' | 'customers', email: string) => {
-	const user = await payload.create({ collection, data: { email, password: PASSWORD } })
+	const user = await payload.create({
+		overrideAccess: true,
+		collection,
+		data: { email, password: PASSWORD },
+	})
 	const { token } = await payload.login({ collection, data: { email, password: PASSWORD } })
 	return { user, token }
 }
@@ -44,7 +49,12 @@ describeForDb('Payload job controls once the plugin turns jobs on', {}, (db) => 
 		const { payload } = booted
 		admin = await login(payload, 'users', `admin-${db}@jobs.test`)
 		customer = await login(payload, 'customers', `shopper-${db}@jobs.test`)
-		const job = await payload.jobs.queue({ task: TASK_SLUGS.maintain, input: {}, queue: QUEUE })
+		const job = await payload.jobs.queue({
+			overrideAccess: true,
+			task: TASK_SLUGS.maintain,
+			input: {},
+			queue: QUEUE,
+		})
 		jobId = job.id
 	}, 240_000)
 
@@ -93,17 +103,23 @@ describeForDb('Payload job controls once the plugin turns jobs on', {}, (db) => 
 		]) {
 			expect((await call(path, token)).status, path).toBe(401)
 		}
-		const job = await booted.payload.findByID({ collection: 'payload-jobs', id: jobId })
+		const job = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'payload-jobs',
+			id: jobId,
+		})
 		expect(job.waitUntil ?? null).toBeNull()
-		expect(await booted.payload.count({ collection: 'payload-jobs' })).toEqual({ totalDocs: 1 })
+		expect(
+			await booted.payload.count({ overrideAccess: true, collection: 'payload-jobs' })
+		).toEqual({ totalDocs: 1 })
 	})
 
 	it(`refuses that user payload.jobs.queue and cancel without overrideAccess on ${db}`, async () => {
 		const { payload } = booted
-		const req = await createLocalReq(
-			{ user: { ...customer.user, collection: 'customers' } },
-			payload
-		)
+		const req = await createPayloadRequest({
+			payload: payload,
+			user: { ...customer.user, collection: 'customers' },
+		})
 		await expect(
 			payload.jobs.queue({
 				task: TASK_SLUGS.maintain,
@@ -120,15 +136,16 @@ describeForDb('Payload job controls once the plugin turns jobs on', {}, (db) => 
 
 	it(`admits a user of the admin collection to the same controls on ${db}`, async () => {
 		const token = admin.token
+		// Payload 4 closes the payload-jobs collection API to everyone, the admin collection included.
 		const created = await call('/payload-jobs', token, {
 			method: 'POST',
 			body: { taskSlug: TASK_SLUGS.maintain, input: {}, queue: QUEUE },
 		})
-		expect(created.status).toBe(201)
-		expect((await call('/payload-jobs', token)).status).toBe(200)
-		expect((await call(`/payload-jobs/${jobId}`, token)).status).toBe(200)
+		expect(created.status).toBe(403)
+		expect((await call('/payload-jobs', token)).status).toBe(403)
+		expect((await call(`/payload-jobs/${jobId}`, token)).status).toBe(403)
 		const patched = await call(`/payload-jobs/${jobId}`, token, { method: 'PATCH', body: later })
-		expect(patched.status).toBe(200)
+		expect(patched.status).toBe(403)
 		expect((await call(`/globals/${JOB_STATS_GLOBAL}`, token)).status).toBe(200)
 		const stats = await call(`/globals/${JOB_STATS_GLOBAL}`, token, { method: 'POST', body: {} })
 		expect(stats.status).toBe(200)
@@ -137,7 +154,10 @@ describeForDb('Payload job controls once the plugin turns jobs on', {}, (db) => 
 		const run = await call(`/payload-jobs/run?queue=${QUEUE}&disableScheduling=true`, token)
 		expect(run.status).toBe(200)
 		const { payload } = booted
-		const req = await createLocalReq({ user: { ...admin.user, collection: 'users' } }, payload)
+		const req = await createPayloadRequest({
+			payload: payload,
+			user: { ...admin.user, collection: 'users' },
+		})
 		const queued = await payload.jobs.queue({
 			task: TASK_SLUGS.maintain,
 			input: {},

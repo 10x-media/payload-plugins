@@ -112,10 +112,18 @@ async function GoalsWidgetBody(props: AnalyticsWidgetProps) {
 		(row) => computeDelta(row.conversions, row.previousConversions) !== null
 	)
 	const currency = result.currency ?? reporting
+	const caption = windowCaption(window, locale, t)
 	return (
 		<WidgetCard
 			className={CLASS_NAME}
-			caption={windowCaption(window, locale, t)}
+			caption={
+				showsDelta
+					? t(keys.widgetCaptionWithComparison, {
+							window: caption,
+							comparison: t(keys.comparisonVsPrevious),
+						})
+					: caption
+			}
 			link={link}
 			title={title}
 		>
@@ -156,9 +164,6 @@ async function GoalsWidgetBody(props: AnalyticsWidgetProps) {
 							],
 						}))}
 					/>
-					{showsDelta ? (
-						<span className="analytics-delta__caption">{t(keys.comparisonVsPrevious)}</span>
-					) : null}
 				</WidgetBody>
 			)}
 			<WidgetNote>{notice}</WidgetNote>

@@ -1,7 +1,7 @@
 import { createServer, type ServerResponse } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq, type Endpoint, type PayloadRequest, type TypedUser } from 'payload'
+import { createPayloadRequest, type Endpoint, type PayloadRequest, type User } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
@@ -146,19 +146,17 @@ describeForDb('analytics lanes: tenants, budgets, stale serving and failures', {
 		if (!endpoint || typeof endpoint.handler !== 'function') {
 			throw new Error('query endpoint not registered')
 		}
-		const req: PayloadRequest = await createLocalReq(
-			{
-				req: {
-					url: `http://localhost/api${routes.query}?source=${sources.get(tenant)}&metrics=pageviews&path=${encodeURIComponent(path)}&${RANGE}`,
-					headers: new Headers({ 'x-tenant': tenant }),
-				},
-				user: {
-					id: 'reader',
-					collection: booted.payload.config.admin.user,
-				} as unknown as TypedUser,
+		const req: PayloadRequest = await createPayloadRequest({
+			payload: booted.payload,
+			req: {
+				url: `http://localhost/api${routes.query}?source=${sources.get(tenant)}&metrics=pageviews&path=${encodeURIComponent(path)}&${RANGE}`,
+				headers: new Headers({ 'x-tenant': tenant }),
 			},
-			booted.payload
-		)
+			user: {
+				id: 'reader',
+				collection: booted.payload.config.admin.user,
+			} as unknown as User,
+		})
 		return endpoint.handler(req)
 	}
 

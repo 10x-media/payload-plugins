@@ -97,6 +97,7 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.widgetFilterValueTooLong]: 'Máximo 256 caracteres.',
 	[keys.widgetFilterCaption]: 'donde {{dimension}} {{operator}} {{value}}',
 	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
+	[keys.widgetCaptionWithComparison]: '{{window}} {{comparison}}',
 	[keys.filterOperatorEq]: 'es',
 	[keys.filterOperatorContains]: 'contiene',
 	[keys.filterOperatorMatches]: 'coincide con el patrón',

@@ -31,21 +31,6 @@ const navigate = (search: string): void => {
 	}
 }
 
-vi.mock('next/navigation', async () => {
-	const { useSyncExternalStore } = await import('react')
-	const subscribe = (listener: () => void) => {
-		mocks.listeners.add(listener)
-		return () => {
-			mocks.listeners.delete(listener)
-		}
-	}
-	return {
-		usePathname: () => '/admin/analytics',
-		useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
-		useSearchParams: () => new URLSearchParams(useSyncExternalStore(subscribe, () => mocks.search)),
-	}
-})
-
 vi.mock('../query/fetchQuery', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('../query/fetchQuery')>()
 	return { ...actual, fetchQuery: mocks.fetchQueryMock, refreshCache: mocks.refreshCacheMock }
@@ -53,6 +38,22 @@ vi.mock('../query/fetchQuery', async (importOriginal) => {
 
 vi.mock('@payloadcms/ui', async () => ({
 	...(await import('../testing/selectMocks')).selectMocks,
+	...(await import('../testing/menuMocks')).menuMocks,
+	...(await (async () => {
+		const { useSyncExternalStore } = await import('react')
+		const subscribe = (listener: () => void) => {
+			mocks.listeners.add(listener)
+			return () => {
+				mocks.listeners.delete(listener)
+			}
+		}
+		return {
+			usePathname: () => '/admin/analytics',
+			useRouter: () => ({ push: mocks.push, replace: mocks.replace }),
+			useSearchParams: () =>
+				new URLSearchParams(useSyncExternalStore(subscribe, () => mocks.search)),
+		}
+	})()),
 	Banner: ({ children }: { children?: ReactNode }) => <div role="alert">{children}</div>,
 	DatePicker: ({
 		onChange,
@@ -85,13 +86,15 @@ vi.mock('@payloadcms/ui', async () => ({
 		onClick,
 		disabled,
 		extraButtonProps,
+		'aria-label': ariaLabel,
 	}: {
 		children?: ReactNode
 		onClick?: () => void
 		disabled?: boolean
 		extraButtonProps?: Record<string, unknown>
+		'aria-label'?: string
 	}) => (
-		<button disabled={disabled} onClick={onClick} {...extraButtonProps}>
+		<button aria-label={ariaLabel} disabled={disabled} onClick={onClick} {...extraButtonProps}>
 			{children}
 		</button>
 	),
@@ -106,8 +109,16 @@ vi.mock('@payloadcms/ui', async () => ({
 		t: (key: string, vars?: Record<string, string>) =>
 			vars ? `${key} ${JSON.stringify(vars)}` : key,
 	}),
+	RefreshIcon: () => <span aria-hidden="true" />,
 	XIcon: () => <span aria-hidden="true" />,
 }))
+
+/** Picks an option of a toolbar menu, which the mock keeps open. */
+const pick = (menu: string, option: string): void => {
+	fireEvent.click(
+		within(screen.getByRole('group', { name: menu })).getByRole('menuitemradio', { name: option })
+	)
+}
 
 /** The window the toolbar names, as the language writes a span of days. */
 const daysCaption = (): string | null | undefined =>
@@ -564,18 +575,18 @@ describe('AnalyticsViewClient site', () => {
 	const alpha = { current: 'alpha', own: 'alpha', ownLabel: 'Alpha', canAggregate: true }
 	const caption = (): Element | null => document.querySelector('.analytics-view__title + span')
 
-	// The select names the site the numbers belong to, so a caption beside the title would
+	// The menu names the site the numbers belong to, so a caption beside the title would
 	// say the same thing twice.
-	it('drops the Showing caption where the Site select says it', async () => {
+	it('drops the Showing caption where the Site menu says it', async () => {
 		await renderView({ scopes: alpha })
-		expect(screen.getByLabelText(keys.viewScopeSite)).toBeDefined()
+		expect(screen.getByRole('group', { name: keys.viewScopeSite })).toBeDefined()
 		expect(screen.queryByText(new RegExp(keys.viewScopeShowing))).toBeNull()
 		expect(caption()).toBeNull()
 	})
 
-	it('keeps the caption for a reader the select is not drawn for', async () => {
+	it('keeps the caption for a reader the menu is not drawn for', async () => {
 		await renderView({ scopes: { ...alpha, canAggregate: false } })
-		expect(screen.queryByLabelText(keys.viewScopeSite)).toBeNull()
+		expect(screen.queryByRole('group', { name: keys.viewScopeSite })).toBeNull()
 		expect(caption()?.textContent).toBe(
 			`${keys.viewScopeShowing} ${JSON.stringify({ site: '⁨Alpha⁩' })}`
 		)
@@ -583,7 +594,7 @@ describe('AnalyticsViewClient site', () => {
 
 	it('writes All sites to the URL tagged with the tenant it was picked from', async () => {
 		await renderView({ scopes: alpha })
-		fireEvent.change(screen.getByLabelText(keys.viewScopeSite), { target: { value: '*' } })
+		pick(keys.viewScopeSite, keys.viewScopeAll)
 		expect(mocks.push).toHaveBeenCalledWith('/admin/analytics?scope=*%3Aalpha', {
 			scroll: false,
 		})
@@ -592,14 +603,14 @@ describe('AnalyticsViewClient site', () => {
 	it('writes nothing for the tenant itself, leaving the URL bare', async () => {
 		mocks.search = 'scope=*%3Aalpha'
 		await renderView({ scopes: { ...alpha, current: '*' }, scopeParam: '*:alpha' })
-		fireEvent.change(screen.getByLabelText(keys.viewScopeSite), { target: { value: 'alpha' } })
+		pick(keys.viewScopeSite, 'Alpha')
 		expect(mocks.push).toHaveBeenCalledWith('/admin/analytics', { scroll: false })
 	})
 
 	// The scope is the one thing the server resolves, so it is the one step through the router.
 	it('changes the scope through the router and nothing else through it', async () => {
 		await renderView({ scopes: alpha })
-		fireEvent.change(screen.getByLabelText(keys.viewScopeSite), { target: { value: '*' } })
+		pick(keys.viewScopeSite, keys.viewScopeAll)
 		expect(mocks.push).toHaveBeenCalledTimes(1)
 		expect(window.history.pushState).not.toHaveBeenCalled()
 		const cards = within(screen.getByRole('group', { name: keys.viewOverview }))
@@ -655,9 +666,7 @@ describe('AnalyticsViewClient source switch', () => {
 					fail = reject
 				})
 		)
-		fireEvent.change(screen.getByLabelText(keys.viewSourceLabel), {
-			target: { value: 'plausible' },
-		})
+		pick(keys.viewSourceLabel, 'Beta Plausible')
 		expect(pushed()).toEqual(['/admin/analytics?source=plausible'])
 		mocks.search = 'source=plausible'
 		rerender(<AnalyticsViewClient {...props(twoSources())} />)

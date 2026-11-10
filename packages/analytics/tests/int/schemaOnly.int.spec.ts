@@ -105,7 +105,9 @@ const tablesOf = (payload: Payload): unknown => {
 const countsOf = async (payload: Payload): Promise<Record<string, number>> => {
 	const counts: Record<string, number> = {}
 	for (const slug of PLUGIN_SLUGS) {
-		counts[slug] = (await payload.count({ collection: slug as never })).totalDocs
+		counts[slug] = (
+			await payload.count({ overrideAccess: true, collection: slug as never })
+		).totalDocs
 	}
 	return counts
 }
@@ -153,10 +155,12 @@ describeForDb('analytics disabled: true keeps the schema', {}, (db) => {
 		}
 		const { payload } = running
 		await payload.create({
+			overrideAccess: true,
 			collection: PROVIDERS_SLUG as never,
 			data: { name: 'site', provider: 'native', enabled: true } as never,
 		})
 		await payload.create({
+			overrideAccess: true,
 			collection: GOALS_SLUG as never,
 			data: { name: 'Signup', slug: 'signup', match: { kind: 'goal' } } as never,
 		})

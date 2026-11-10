@@ -58,8 +58,8 @@ export interface DataTableProps {
 	columns: DataTableColumn[]
 	rows: DataTableRow[]
 	/**
-	 * Draws each row's share as a bar behind its label: `solid` in the chart color, `soft` paled with a
-	 * dark label. Left out, the table is a plain one.
+	 * Draws each row's share as a bar on a track behind its label: `soft` paled with a dark label,
+	 * `solid` in the chart color. Left out, the table is a plain one.
 	 */
 	bars?: 'solid' | 'soft'
 	/**

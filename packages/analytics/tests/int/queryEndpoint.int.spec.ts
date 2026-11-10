@@ -24,7 +24,11 @@ const accessUsers: CollectionConfig = { slug: 'access-users', auth: true, fields
 
 const login = async (payload: Payload, email: string) => {
 	const password = 'test-pass-1234'
-	await payload.create({ collection: 'access-users', data: { email, password } })
+	await payload.create({
+		overrideAccess: true,
+		collection: 'access-users',
+		data: { email, password },
+	})
 	const result = await payload.login({ collection: 'access-users', data: { email, password } })
 	return result
 }

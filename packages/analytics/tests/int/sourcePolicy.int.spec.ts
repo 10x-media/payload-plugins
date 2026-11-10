@@ -51,7 +51,11 @@ const sharedAdapter = (asked: Array<string | undefined>): AnalyticsAdapter => {
 }
 
 const login = async (payload: Payload, email: string, data: Record<string, unknown>) => {
-	await payload.create({ collection: 'users', data: { email, password: PASSWORD, ...data } })
+	await payload.create({
+		overrideAccess: true,
+		collection: 'users',
+		data: { email, password: PASSWORD, ...data },
+	})
 	return (await payload.login({ collection: 'users', data: { email, password: PASSWORD } })).user
 }
 
@@ -90,6 +94,7 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 			})
 			alpha = await login(booted.payload, 'alpha@t.dev', { tenant: 'alpha' })
 			const page = await booted.payload.create({
+				overrideAccess: true,
 				collection: 'pages' as never,
 				data: { slug: 'about', tenant: 'beta' } as never,
 			})

@@ -1,32 +1,12 @@
-import { createRequire } from 'node:module'
-import { dirname, join } from 'node:path'
 import { RenderServerComponent } from '@payloadcms/ui/elements/RenderServerComponent'
+import { NestProviders } from '@payloadcms/ui/layouts/NestProviders'
 import type { Config, ImportMap } from 'payload'
-import { createElement, type ReactNode } from 'react'
+import { type ComponentProps, createElement, type ReactNode } from 'react'
 import { renderToString } from 'react-dom/server'
 import { describe, expect, it } from 'vitest'
 import { goalField } from '../goals/goalField'
 import { analytics } from '../index'
 import { memoryAdapter } from '../testing/memoryAdapter'
-
-type NestProvidersComponent = (args: {
-	children?: ReactNode
-	importMap: ImportMap
-	providers: NonNullable<NonNullable<Config['admin']>['components']>['providers']
-	serverProps: object
-}) => ReactNode
-
-/**
- * Payload's own `NestProviders`, which renders nothing under a provider its import map lacks. Not a
- * public export, so it is loaded from the installed package.
- */
-const loadNestProviders = async (): Promise<NestProvidersComponent> => {
-	const layouts = createRequire(import.meta.url).resolve('@payloadcms/next/layouts')
-	const loaded: { NestProviders: NestProvidersComponent } = await import(
-		join(dirname(layouts), '..', 'layouts', 'Root', 'NestProviders.js')
-	)
-	return loaded.NestProviders
-}
 
 const HOST_PROVIDER = '/components/HostProvider#HostProvider'
 
@@ -53,15 +33,15 @@ const analyticsPaths = (config: Config): string[] => [
 describe('an admin whose import map predates the plugin', () => {
 	it('still renders its root: the plugin wraps nothing around the admin', async () => {
 		const config = await plugin()(hostConfig())
-		const NestProviders = await loadNestProviders()
 		const html = renderToString(
 			createElement(
 				NestProviders,
 				{
 					importMap: staleImportMap,
 					providers: config.admin?.components?.providers ?? [],
+					// The host's providers here read none of them.
 					serverProps: {},
-				},
+				} as ComponentProps<typeof NestProviders>,
 				createElement('main', { id: 'admin-root' }, 'Dashboard')
 			)
 		)

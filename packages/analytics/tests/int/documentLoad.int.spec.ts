@@ -5,7 +5,7 @@ import {
 	installTestClock,
 } from '@10x-media/payload-test-harness'
 import { buildFormState } from '@payloadcms/ui/utilities/buildFormState'
-import { createLocalReq } from 'payload'
+import { createPayloadRequest } from 'payload'
 import { isValidElement, type ReactNode } from 'react'
 import { afterAll, beforeAll, expect, it, onTestFinished, vi } from 'vitest'
 import { AnalyticsPanelField } from '../../src/fields/AnalyticsPanelField'
@@ -61,12 +61,14 @@ describeForDb('analytics panel on document load', {}, (db) => {
 			[STAT_FIELD_COMPONENT]: AnalyticsStatField,
 		})
 		const page = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'pages' as never,
 			data: { slug: 'about' } as never,
 		})
 		pageId = String((page as { id: string | number }).id)
 		pageCreatedAt = new Date((page as { createdAt?: string }).createdAt ?? '').toISOString()
 		user = (await booted.payload.create({
+			overrideAccess: true,
 			collection: booted.payload.config.admin.user as never,
 			data: { email: `reader-${db}@t.dev`, password: 'test-password' } as never,
 		})) as unknown as Record<string, unknown> & { id: string | number }
@@ -79,11 +81,15 @@ describeForDb('analytics panel on document load', {}, (db) => {
 
 	/** Builds the edit view's form state as Payload does on load, then renders the panel in it. */
 	const loadDocument = async (): Promise<Record<string, unknown>> => {
-		const req = await createLocalReq(
-			{ user: { ...user, collection: booted.payload.config.admin.user } as never },
-			booted.payload
-		)
-		const doc = await booted.payload.findByID({ collection: 'pages' as never, id: pageId })
+		const req = await createPayloadRequest({
+			payload: booted.payload,
+			user: { ...user, collection: booted.payload.config.admin.user } as never,
+		})
+		const doc = await booted.payload.findByID({
+			overrideAccess: true,
+			collection: 'pages' as never,
+			id: pageId,
+		})
 		const { state } = await buildFormState({
 			id: pageId,
 			collectionSlug: 'pages',

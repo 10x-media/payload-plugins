@@ -1,4 +1,4 @@
-import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import { createPayloadRequest, type Payload, type PayloadRequest } from 'payload'
 import { captureRequest } from '../../capture/captureRequest'
 import { warnUntrustedForwarding } from '../../capture/requestTrust'
 import { gateHoldsAdapter } from '../../capture/slots'
@@ -244,14 +244,14 @@ export const makeServerTrack =
 			const scope = await resolveScope(event, opts, resolvers)
 			// Refused before anything is written: a day whose raw hits may be pruned is never counted.
 			const placed = await target.engine?.serverHitDay(scope ?? '', now)
-			// createLocalReq mutates its request, so a caller's req never reaches it: resolvers see it
+			// createPayloadRequest mutates its request, so a caller's req never reaches it: resolvers see it
 			// as a capture does, without the user or cookies, and a fresh one is built only on demand.
 			let local: PayloadRequest | undefined
 			const requestFor = async (): Promise<PayloadRequest> => {
 				if (opts?.req) {
 					return captureRequest(opts.req)
 				}
-				local ??= await createLocalReq({}, payload)
+				local ??= await createPayloadRequest({ payload })
 				return local
 			}
 			const salt = await saltForHit(

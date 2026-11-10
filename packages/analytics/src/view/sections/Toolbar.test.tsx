@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react'
 import type { ReactNode } from 'react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SerializedCapabilities } from '../../core/capabilities'
@@ -16,7 +16,7 @@ import type { ViewScopes } from '../viewProps'
 import { Toolbar } from './Toolbar'
 
 vi.mock('@payloadcms/ui', async () => ({
-	...(await import('../../testing/selectMocks')).selectMocks,
+	...(await import('../../testing/menuMocks')).menuMocks,
 	Banner: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
 	DatePicker: ({
 		onChange,
@@ -50,13 +50,23 @@ vi.mock('@payloadcms/ui', async () => ({
 		onClick,
 		disabled,
 		extraButtonProps,
+		selected,
+		'aria-label': ariaLabel,
 	}: {
 		children?: ReactNode
 		onClick?: () => void
 		disabled?: boolean
 		extraButtonProps?: Record<string, unknown>
+		selected?: boolean
+		'aria-label'?: string
 	}) => (
-		<button disabled={disabled} onClick={onClick} {...extraButtonProps}>
+		<button
+			aria-label={ariaLabel}
+			data-selected={selected}
+			disabled={disabled}
+			onClick={onClick}
+			{...extraButtonProps}
+		>
 			{children}
 		</button>
 	),
@@ -71,6 +81,7 @@ vi.mock('@payloadcms/ui', async () => ({
 		t: (key: string, vars?: Record<string, string>) =>
 			vars ? `${key} ${JSON.stringify(vars)}` : key,
 	}),
+	RefreshIcon: () => <span aria-hidden="true" />,
 	XIcon: () => <span aria-hidden="true" />,
 }))
 
@@ -161,8 +172,20 @@ const inView = (overrides: ToolbarOverrides = {}) => {
 
 const renderToolbar = (overrides: ToolbarOverrides = {}) => render(inView(overrides))
 
-const rangeSelect = (): HTMLSelectElement =>
-	screen.getByLabelText(keys.widgetFieldRange) as HTMLSelectElement
+/** A choice menu by what it chooses; the mock keeps it open. */
+const menu = (label: string): HTMLElement => screen.getByRole('group', { name: label })
+
+/** Each option of a menu, and whether it is the picked one. */
+const choices = (label: string): Array<[string, boolean]> =>
+	within(menu(label))
+		.getAllByRole('menuitemradio')
+		.map((item) => [item.textContent ?? '', item.getAttribute('aria-checked') === 'true'])
+
+const pick = (label: string, option: string): void => {
+	fireEvent.click(within(menu(label)).getByRole('menuitemradio', { name: option }))
+}
+
+const rangeOptions = (): string[] => choices(keys.widgetFieldRange).map(([text]) => text)
 
 const datesInput = (): HTMLInputElement => screen.getByLabelText(keys.viewDates) as HTMLInputElement
 
@@ -177,35 +200,31 @@ describe('Toolbar site select', () => {
 		ownLabel: 'Alpha',
 		canAggregate: true,
 	}
-	const siteSelect = (): HTMLSelectElement =>
-		screen.getByLabelText(keys.viewScopeSite) as HTMLSelectElement
-	const controlLabels = (container: HTMLElement): Array<string | null> =>
-		[...container.querySelectorAll<HTMLSelectElement>('.analytics-view__controls select')].map(
-			(select) => select.labels?.[0]?.textContent ?? null
+	const menuLabels = (container: HTMLElement): Array<string | null> =>
+		[...container.querySelectorAll('.analytics-view__actions fieldset')].map((group) =>
+			group.getAttribute('aria-label')
 		)
 
-	it('is a select named Site, first in the toolbar, offering the tenant and every site', () => {
+	it('is a menu named Site, first in the toolbar, offering the tenant and every site', () => {
 		const { container } = renderToolbar({
 			scopes: alpha,
 			sources: [source('native', nativeCaps), source('plausible', nativeCaps)],
 		})
-		expect(controlLabels(container)).toEqual([
+		expect(menuLabels(container)).toEqual([
 			keys.viewScopeSite,
 			keys.viewSourceLabel,
 			keys.widgetFieldRange,
 		])
-		expect([...siteSelect().options].map((option) => [option.value, option.text])).toEqual([
-			['alpha', 'Alpha'],
-			['*', keys.viewScopeAll],
+		expect(choices(keys.viewScopeSite)).toEqual([
+			['Alpha', true],
+			[keys.viewScopeAll, false],
 		])
-		expect(siteSelect().value).toBe('alpha')
-		expect(screen.queryByRole('button', { name: keys.viewScopeAll })).toBeNull()
 	})
 
 	it('writes the tagged aggregate token for All sites, and nothing for the tenant', () => {
 		const onChange = vi.fn()
 		renderToolbar({ onChange, scopes: alpha })
-		fireEvent.change(siteSelect(), { target: { value: '*' } })
+		pick(keys.viewScopeSite, keys.viewScopeAll)
 		expect(onChange).toHaveBeenLastCalledWith(expect.objectContaining({ scope: '*:alpha' }))
 		cleanup()
 		const back = vi.fn()
@@ -214,48 +233,47 @@ describe('Toolbar site select', () => {
 			scopes: { ...alpha, current: '*' },
 			state: { ...baseState, scope: '*:alpha' },
 		})
-		expect(siteSelect().value).toBe('*')
-		fireEvent.change(siteSelect(), { target: { value: 'alpha' } })
+		expect(choices(keys.viewScopeSite)[1]).toEqual([keys.viewScopeAll, true])
+		pick(keys.viewScopeSite, 'Alpha')
 		expect(back).toHaveBeenLastCalledWith(expect.objectContaining({ scope: undefined }))
 	})
 
 	it('falls back to the scope id where the host names no label', () => {
 		renderToolbar({ scopes: { current: 'alpha', own: 'alpha', canAggregate: true } })
-		expect(siteSelect().options[0]?.text).toBe('alpha')
+		expect(choices(keys.viewScopeSite)[0]?.[0]).toBe('alpha')
 	})
 
 	it('is not drawn for a reader who may not read across sites, or who has no site', () => {
 		renderToolbar({ scopes: { ...alpha, canAggregate: false } })
-		expect(screen.queryByLabelText(keys.viewScopeSite)).toBeNull()
+		expect(screen.queryByRole('group', { name: keys.viewScopeSite })).toBeNull()
 		cleanup()
 		renderToolbar({ scopes: { current: '', own: '', canAggregate: true } })
-		expect(screen.queryByLabelText(keys.viewScopeSite)).toBeNull()
+		expect(screen.queryByRole('group', { name: keys.viewScopeSite })).toBeNull()
 	})
 })
 
 describe('Toolbar controls', () => {
-	it('offers no source select when the scope reads a single source', () => {
+	it('offers no source menu when the scope reads a single source', () => {
 		renderToolbar()
-		expect(screen.queryByLabelText(keys.viewSourceLabel)).toBeNull()
+		expect(screen.queryByRole('group', { name: keys.viewSourceLabel })).toBeNull()
 	})
 
-	it('offers the source select once a scope reads more than one', () => {
+	it('offers the source menu once a scope reads more than one', () => {
 		const onChange = vi.fn()
 		renderToolbar({
 			onChange,
 			sources: [source('native', nativeCaps), source('plausible', nativeCaps)],
 		})
-		const select = screen.getByLabelText(keys.viewSourceLabel)
-		fireEvent.change(select, { target: { value: 'plausible' } })
+		pick(keys.viewSourceLabel, 'plausible')
 		expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ source: 'plausible' }))
 	})
 
 	it('hides the presets the source cannot look back over', () => {
 		renderToolbar({ caps: narrowCaps })
-		const offered = [...rangeSelect().options].map((option) => option.value)
-		expect(offered).toContain('last90days')
-		expect(offered).not.toContain('lastYear')
-		expect(offered).toContain('custom')
+		const offered = rangeOptions()
+		expect(offered).toContain(TIMEFRAME_KEYS.last90days)
+		expect(offered).not.toContain(TIMEFRAME_KEYS.lastYear)
+		expect(offered).toContain(keys.widgetTimeframeCustom)
 	})
 
 	it('hides the comparison toggle when the source cannot compare', () => {
@@ -263,11 +281,12 @@ describe('Toolbar controls', () => {
 		expect(screen.queryByText(keys.viewCompare)).toBeNull()
 	})
 
-	it('toggles the comparison and reports it pressed', () => {
+	it('toggles the comparison and reports it pressed, selected as an open list control is', () => {
 		const onChange = vi.fn()
 		renderToolbar({ onChange, state: { ...baseState, compare: true } })
 		const toggle = screen.getByText(keys.viewCompare)
 		expect(toggle.getAttribute('aria-pressed')).toBe('true')
+		expect(toggle.getAttribute('data-selected')).toBe('true')
 		fireEvent.click(toggle)
 		expect(onChange).toHaveBeenCalledWith(expect.objectContaining({ compare: false }))
 	})
@@ -285,7 +304,7 @@ describe('Toolbar controls', () => {
 	it('carries the resolved days into a switch to a custom range', () => {
 		const onChange = vi.fn()
 		renderToolbar({ onChange })
-		fireEvent.change(rangeSelect(), { target: { value: 'custom' } })
+		pick(keys.widgetFieldRange, keys.widgetTimeframeCustom)
 		expect(onChange).toHaveBeenCalledWith(
 			expect.objectContaining({ range: 'custom', from: '2026-08-16', to: '2026-09-14' })
 		)
@@ -340,9 +359,8 @@ describe('Toolbar controls', () => {
 
 	it('labels the presets with their translated names', () => {
 		renderToolbar()
-		expect([...rangeSelect().options].map((option) => option.label)).toContain(
-			TIMEFRAME_KEYS.last7days
-		)
+		expect(rangeOptions()).toContain(TIMEFRAME_KEYS.last7days)
+		expect(choices(keys.widgetFieldRange)).toContainEqual([TIMEFRAME_KEYS.last30days, true])
 	})
 
 	it('badges a cached read and notes a clamped window', () => {

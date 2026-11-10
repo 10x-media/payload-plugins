@@ -1,34 +1,14 @@
 import type { PayloadRequest, TaskConfig } from 'payload'
 import { type ScheduledTask, TASK_SLUGS } from '../../core/jobs'
 import { isRecord } from '../../core/values'
-import { leaseHeld } from '../../maintenance/lease'
-import {
-	type BeforeSchedule,
-	concurrencyFor,
-	scheduleFor,
-	stuckJobGuard,
-} from '../../maintenance/taskSchedule'
+import { concurrencyFor, scheduleFor } from '../../maintenance/taskSchedule'
 import type { MaintainReport } from '../engine/maintenance'
 import { checkRebuildInput, type RebuildDaysInput } from '../engine/rebuild'
-import { DAY_LEASE_MS, MAINTAIN_LEASE_NAME } from '../store/state'
 
 export const MAINTAIN_TASK_SLUG = TASK_SLUGS.maintain
 
 /** How long one run of the task works before it leaves the rest to the next. */
 export const MAINTAIN_TASK_BUDGET_MS = 240_000
-
-/** A run still processing this long after its last update was killed: no live run lasts longer. */
-export const MAINTAIN_DEAD_AFTER_MS = MAINTAIN_TASK_BUDGET_MS + DAY_LEASE_MS
-
-/**
- * Marks a killed run failed, then Payload's own rule: no second run while one is queued or
- * processing. A run renewing the maintenance lease is alive however long its job has run.
- */
-export const beforeMaintainSchedule: BeforeSchedule = stuckJobGuard({
-	slug: MAINTAIN_TASK_SLUG,
-	deadAfterMs: MAINTAIN_DEAD_AFTER_MS,
-	alive: (req) => leaseHeld(req.payload, MAINTAIN_LEASE_NAME),
-})
 
 /**
  * The task's input when queued by hand: a stretch of days to count again. A job's input is stored
@@ -112,12 +92,10 @@ const maintainKey = (input: unknown): string => {
 export const maintainTask = (args: {
 	schedule: ScheduledTask
 	run: (req: PayloadRequest, input: { rebuild?: RebuildDaysInput }) => Promise<MaintainTaskOutput>
-	/** Host's `jobs.enableConcurrencyControl`, without which Payload refuses a concurrency key. */
-	concurrency?: boolean
 }): TaskConfig<{ input: MaintainTaskInput; output: MaintainTaskOutput }> => ({
 	slug: MAINTAIN_TASK_SLUG,
 	retries: 0,
 	handler: async ({ input, req }) => ({ output: await args.run(req, parseMaintainInput(input)) }),
-	...scheduleFor(args.schedule, beforeMaintainSchedule),
-	...concurrencyFor('maintain', args.concurrency === true, maintainKey),
+	...scheduleFor(args.schedule),
+	...concurrencyFor('maintain', maintainKey),
 })

@@ -126,7 +126,7 @@ describe('warmTask', () => {
 		vi.useRealTimers()
 	})
 
-	it('is analytics-warm, on its queue, behind the stuck-job guard', () => {
+	it('is analytics-warm, on its queue, one run at a time', () => {
 		const task = warmTask({
 			schedule: { queue: 'analytics', cron: '*/30 * * * *', intervalMs: 30 * 60_000 },
 			windowHours: 24,
@@ -135,28 +135,7 @@ describe('warmTask', () => {
 		expect(task.slug).toBe(WARM_TASK_SLUG)
 		expect(task.slug).toBe('analytics-warm')
 		expect(task.schedule).toMatchObject([{ cron: '*/30 * * * *', queue: 'analytics' }])
-		expect(task.concurrency).toBeUndefined()
-	})
-
-	it('marks its own killed runs failed, unless a live run holds its lease', async () => {
-		const hook = warmTask({
-			schedule: { queue: 'analytics', cron: '*/30 * * * *', intervalMs: 30 * 60_000 },
-			windowHours: 24,
-			maxReads: 200,
-		}).schedule?.[0]?.hooks?.beforeSchedule
-		const updateJobs = vi.fn(async () => null)
-		const payload = { collections: {}, db: { updateJobs } } as unknown as Payload
-		await hook?.({
-			defaultBeforeSchedule: async () => ({ input: {}, shouldSchedule: true }),
-			jobStats: {},
-			queueable: { scheduleConfig: { cron: '*/30 * * * *', queue: 'analytics' } },
-			req: { payload } as PayloadRequest,
-		} as never)
-		const [update] = updateJobs.mock.calls[0] as unknown as [
-			{ where: { and: Array<Record<string, Record<string, unknown>>> } },
-		]
-		expect(update.where.and).toContainEqual({ taskSlug: { equals: 'analytics-warm' } })
-		expect(update.where.and).toContainEqual({ queue: { equals: 'analytics' } })
+		expect(task.concurrency).toMatchObject({ exclusive: true, supersedes: false })
 	})
 
 	it('asks the store for four times maxReads of the last windowHours’ reads, to pick from', async () => {

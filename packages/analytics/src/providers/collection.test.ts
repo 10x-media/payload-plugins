@@ -629,12 +629,12 @@ describe('servable provider types', () => {
 		expect(select.values).toEqual([...PROVIDER_IDS])
 	})
 
-	it('refuses a save of a type the install cannot serve by name, and checks the rest as a select', () => {
+	it('refuses a save of a type the install cannot serve by name, and checks the rest as a select', async () => {
 		const { check } = providerSelect(analyticsProviderFields({ types: ['plausible', 'umami'] }))
-		expect(check('native')).toBe(keys.providerErrorTypeUnserved)
-		expect(check('ga4')).toBe(keys.providerErrorTypeUnserved)
-		expect(check('umami')).toBe(true)
-		expect(check(undefined)).not.toBe(true)
+		expect(await check('native')).toBe(keys.providerErrorTypeUnserved)
+		expect(await check('ga4')).toBe(keys.providerErrorTypeUnserved)
+		expect(await check('umami')).toBe(true)
+		expect(await check(undefined)).not.toBe(true)
 	})
 
 	it('checks analyticsProviderFields({ types }) like the plugin option', () => {

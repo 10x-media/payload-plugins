@@ -12,15 +12,15 @@ afterEach(() => {
 })
 
 describe('BarList fill', () => {
-	it('draws the solid in-bar look by default, as the widgets ship it', () => {
+	it('draws the soft look by default, as the built-in widgets, the view and the panel do', () => {
 		const { container } = render(<BarList data={data} emptyLabel="empty" />)
-		expect(container.querySelector('.analytics-bars')).not.toBeNull()
-		expect(container.querySelector('.analytics-bars--soft')).toBeNull()
+		expect(container.querySelector('.analytics-bars.analytics-bars--soft')).not.toBeNull()
 	})
 
-	it('draws the soft look on request, for a list that can hold a zero-value row', () => {
-		const { container } = render(<BarList data={data} emptyLabel="empty" fill="soft" />)
-		expect(container.querySelector('.analytics-bars--soft')).not.toBeNull()
+	it('draws the solid look on request', () => {
+		const { container } = render(<BarList data={data} emptyLabel="empty" fill="solid" />)
+		expect(container.querySelector('.analytics-bars')).not.toBeNull()
+		expect(container.querySelector('.analytics-bars--soft')).toBeNull()
 	})
 
 	it('gives the secondary column a cell in every row, beside the value', () => {

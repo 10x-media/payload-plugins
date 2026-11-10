@@ -214,8 +214,8 @@ export function ExcludeBrowser({ endpoint }: ExcludeBrowserProps) {
 			{state.kind === 'ready' ? links(state.link) : null}
 			{state.kind === 'failed' ? (
 				<>
-					<Banner type="error">{t(keys.viewExclusionFailed)}</Banner>
-					<Button buttonStyle="secondary" onClick={load} size="small">
+					<Banner type="danger">{t(keys.viewExclusionFailed)}</Banner>
+					<Button buttonStyle="secondary" onClick={load} size="medium">
 						{t(keys.viewRetry)}
 					</Button>
 				</>

@@ -73,18 +73,6 @@ describe('analytics factory', () => {
 			'analytics-daily',
 			'analytics-cache',
 		])
-		expect(out.jobs?.access).toEqual({ run: isAdminUser, queue: isAdminUser, cancel: isAdminUser })
-	})
-	it('restricts the job controls the host left unset once a task turns jobs on, and no others', async () => {
-		const run = () => true
-		const out = (await analytics({ adapters: [native()], capture: { gate: 'off' } })({
-			...fakeConfig(),
-			jobs: { access: { run } },
-		})) as Config
-		expect(out.jobs?.access).toEqual({ run, queue: isAdminUser, cancel: isAdminUser })
-		expect(typeof out.jobs?.jobsCollectionOverrides).toBe('function')
-		const vendorOnly = (await analytics({ adapters: [memoryAdapter()] })(fakeConfig())) as Config
-		expect(vendorOnly.jobs).toBeUndefined()
 	})
 	it('refuses a renamed option even while disabled', async () => {
 		const options = { disabled: true, adapters: [], scopeResolver: () => null }
@@ -153,18 +141,16 @@ describe('analytics factory', () => {
 			['analytics-warm', 'analytics', '*/30 * * * *'],
 			['analytics-sync', undefined, undefined],
 		])
-		// Payload refuses a concurrency key unless the host turned concurrency control on.
-		expect((all.jobs?.tasks ?? []).some((task) => task.concurrency)).toBe(false)
 		expect(slugsOf(await configOf({ jobs: false }))).toEqual([])
 	})
 
-	it('keys each task’s runs for Payload’s concurrency control where the host turned it on', async () => {
+	it('keys each task’s runs for Payload’s concurrency control', async () => {
 		const out = (await analytics({
 			adapters: [native(), memoryAdapter()],
 			capture: { gate: 'off' },
 			sync: true,
 			cache: { warm: true },
-		})({ ...fakeConfig(), jobs: { enableConcurrencyControl: true } })) as Config
+		})(fakeConfig())) as Config
 		const keys = (out.jobs?.tasks ?? []).map((task) => {
 			const concurrency = task.concurrency
 			return typeof concurrency === 'object'
@@ -344,7 +330,6 @@ describe('analytics boot', () => {
 			const { warn } = await boot(loud)
 			expect(warn).toHaveBeenCalledWith(expect.stringMatching(/revenue is off/))
 			expect(warn).toHaveBeenCalledWith(expect.stringMatching(/can be spoofed/))
-			expect(warn).toHaveBeenCalledWith(expect.stringMatching(/job controls/))
 		} finally {
 			vi.unstubAllEnvs()
 		}

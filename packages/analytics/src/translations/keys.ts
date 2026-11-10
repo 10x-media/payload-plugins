@@ -94,6 +94,7 @@ export const keys = {
 	widgetFilterValueTooLong: 'analytics:widgetFilterValueTooLong',
 	widgetFilterCaption: 'analytics:widgetFilterCaption',
 	widgetCaptionWithFilter: 'analytics:widgetCaptionWithFilter',
+	widgetCaptionWithComparison: 'analytics:widgetCaptionWithComparison',
 	filterOperatorEq: 'analytics:filterOperatorEq',
 	filterOperatorContains: 'analytics:filterOperatorContains',
 	filterOperatorMatches: 'analytics:filterOperatorMatches',

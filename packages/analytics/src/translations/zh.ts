@@ -91,6 +91,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.widgetFilterValueTooLong]: '最多 256 个字符。',
 	[keys.widgetFilterCaption]: '其中 {{dimension}} {{operator}} {{value}}',
 	[keys.widgetCaptionWithFilter]: '{{window}}{{filter}}',
+	[keys.widgetCaptionWithComparison]: '{{window}}{{comparison}}',
 	[keys.filterOperatorEq]: '等于',
 	[keys.filterOperatorContains]: '包含',
 	[keys.filterOperatorMatches]: '匹配模式',

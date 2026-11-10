@@ -100,7 +100,7 @@ export function WidgetShimmer({
 			<Card className={`analytics-widget ${loadingClass(className)}`}>
 				<div className="analytics-widget__header">
 					<h2 className="analytics-widget__title analytics-sr-only">{title}</h2>
-					<ShimmerEffect height="1rem" width="40%" />
+					<ShimmerEffect height="var(--text-body-small-bold-line-height)" width="40%" />
 				</div>
 				{loading}
 			</Card>

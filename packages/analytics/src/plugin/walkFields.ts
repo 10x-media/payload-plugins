@@ -10,11 +10,13 @@ const children = (field: Field): Field[] => {
 			out.push(...tab.fields)
 		}
 	}
-	// `blockReferences` names blocks defined elsewhere in the config, and those are walked
-	// where they are defined rather than once per field that names them.
+	// A slug names a block of `config.blocks`, which is walked where it is defined rather than
+	// once per field that names it.
 	if ('blocks' in field && Array.isArray(field.blocks)) {
 		for (const block of field.blocks) {
-			out.push(...block.fields)
+			if (typeof block !== 'string') {
+				out.push(...block.fields)
+			}
 		}
 	}
 	return out

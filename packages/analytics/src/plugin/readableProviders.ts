@@ -38,7 +38,7 @@ const findReadable = async (
 		})
 		return docs
 	}
-	const verdict = await collection.sourceAccess({ req })
+	const verdict = await collection.sourceAccess({ req, slug: collection.slug })
 	if (verdict === false) {
 		return []
 	}

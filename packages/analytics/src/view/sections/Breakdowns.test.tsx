@@ -601,7 +601,6 @@ describe('Breakdowns names and ids', () => {
 })
 
 describe('Breakdowns before the first answer', () => {
-	const rem = (value: string | undefined): number => Number.parseFloat(value ?? '')
 	const placeholderRows = (limit: ViewLimit): number =>
 		renderBreakdowns({
 			limit,
@@ -623,8 +622,10 @@ describe('Breakdowns before the first answer', () => {
 			declarationsOf('.analytics-bars__track').height
 		)
 		const cell = declarationsOf('.analytics-table.analytics-bars tbody :is(th, td)')
-		expect(rem(skeleton['--analytics-skeleton-gap'])).toBeCloseTo(2 * rem(cell['padding-block']))
+		expect(skeleton['--analytics-skeleton-gap']).toBe(`calc(2 * ${cell['padding-block']})`)
 		const head = declarationsOf('.analytics-table.analytics-bars thead th')['padding-block']
-		expect(skeleton['--analytics-skeleton-head']).toBe(`calc(1lh + ${head?.split(' ')[1]})`)
+		expect(skeleton['--analytics-skeleton-head']).toBe(
+			`calc(1lh + ${head?.replace(/^\S+\s+/, '')})`
+		)
 	})
 })

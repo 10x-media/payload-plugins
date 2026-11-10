@@ -8,7 +8,7 @@ import { routePaths } from '../plugin/routes'
 import { AGGREGATES_SLUG, HITS_SLUG, STATE_SLUG, STORE_SLUGS } from './collections/slugs'
 import { nativeInstanceOf } from './engine/instance'
 import { isNativeAdapter, type NativeOptions, native } from './nativeAdapter'
-import { beforeMaintainSchedule, MAINTAIN_TASK_SLUG } from './tasks/maintainTask'
+import { MAINTAIN_TASK_SLUG } from './tasks/maintainTask'
 
 const registerContext: AdapterRegisterContext = {
 	scoped: false,
@@ -246,17 +246,7 @@ describe('native registration', () => {
 			'post /_x/e',
 		])
 		expect(config.jobs?.tasks?.map((task) => [task.slug, task.schedule, task.retries])).toEqual([
-			[
-				MAINTAIN_TASK_SLUG,
-				[
-					{
-						cron: '*/15 * * * *',
-						queue: 'default',
-						hooks: { beforeSchedule: beforeMaintainSchedule },
-					},
-				],
-				0,
-			],
+			[MAINTAIN_TASK_SLUG, [{ cron: '*/15 * * * *', queue: 'default' }], 0],
 		])
 		expect(config.onInit).toBeUndefined()
 	})

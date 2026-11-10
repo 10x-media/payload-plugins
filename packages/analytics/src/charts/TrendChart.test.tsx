@@ -576,7 +576,7 @@ describe('TrendChart comparison look', () => {
 	it('dashes the comparison line and its legend swatch', () => {
 		expect(declarationsOf('.analytics-chart__comparison')['stroke-dasharray']).toBe('4 3')
 		expect(analyticsCss()).toContain(
-			'.analytics-chart__legend-swatch--comparison {\n\t\twidth: 0.875rem;\n\t\tbackground: repeating-linear-gradient('
+			'.analytics-chart__legend-swatch--comparison {\n\t\twidth: 14px;\n\t\tbackground: repeating-linear-gradient('
 		)
 	})
 })
@@ -614,6 +614,15 @@ describe('TrendChart readout placement', () => {
 				'--analytics-tip-x'
 			]
 		).toBe('100%')
+	})
+
+	// Payload's popover: the dark menu surface in either theme, as its menus and link editor.
+	it('draws the readout as Payload draws a popover', () => {
+		const tip = declarationsOf('.analytics-chart__tooltip')
+		expect(tip.background).toBe('var(--color-bg-menu, #1e1e1e)')
+		expect(tip['border-radius']).toBe('var(--radius-large, 13px)')
+		expect(tip['box-shadow']).toBe('var(--elevation-400-menu-panel, 0 10px 16px rgb(0 0 0 / 8%))')
+		expect(tip.border).toBeUndefined()
 	})
 })
 

@@ -35,7 +35,7 @@ export interface ViewGoal {
 
 /**
  * Which scope the view reads; scoped installs only. The host owns the scope and the view only
- * toggles aggregation, so `own` sits beside `current` for the Site select to switch back to.
+ * toggles aggregation, so `own` sits beside `current` for the Site menu to switch back to.
  *
  * @beta
  */
@@ -46,7 +46,7 @@ export interface ViewScopes {
 	own: string
 	/** What `scope.label` calls `own`, when it names it. */
 	ownLabel?: string
-	/** `access.crossScope.aggregate` for this request; gates the Site select. */
+	/** `access.crossScope.aggregate` for this request; gates the Site menu. */
 	canAggregate: boolean
 }
 
@@ -90,7 +90,7 @@ export interface AnalyticsViewClientProps {
 	 * `router.refresh()` keeps client state, and two tenants' reads can be identical strings.
 	 */
 	scopeKey: string
-	/** Scope caption and Site select; absent on an unscoped install. */
+	/** Scope caption and Site menu; absent on an unscoped install. */
 	scopes?: ViewScopes
 	/**
 	 * The `scope` the URL may keep: the aggregate token this request honoured, else absent. The
@@ -137,7 +137,7 @@ const resolveGoalsList = async (
 const emptySources = (): SourcesResponse => ({ defaultId: null, sources: [] })
 
 /**
- * Caption scope and Site select state. `own` resolves apart from `current` so the select keeps
+ * Caption scope and Site menu state. `own` resolves apart from `current` so the menu keeps
  * naming the reader's own tenant while reads aggregate.
  */
 const resolveScopes = async (args: {

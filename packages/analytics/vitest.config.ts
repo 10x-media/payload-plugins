@@ -71,6 +71,10 @@ export default mergeConfig(
 						// jsdom actually run it. No test loads a remote resource (`resources` stays
 						// off), so only plugin-authored inline code ever executes.
 						environmentOptions: { jsdom: { runScripts: 'dangerously' } },
+						// Node 25 and later define a localStorage of their own, an empty shell without
+						// --localstorage-file, which vitest keeps over jsdom's. The flag (named so on Node 24
+						// too) leaves the window jsdom's.
+						execArgv: ['--no-experimental-webstorage'],
 						include: JSDOM_TESTS,
 						exclude: ['node_modules', 'dist', '.next'],
 					},

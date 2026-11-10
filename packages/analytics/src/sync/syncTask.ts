@@ -14,19 +14,12 @@ import { isUniqueViolation } from '../db/errors'
 import { DETACHED } from '../db/openTransaction'
 import {
 	type LeaseHold,
-	leaseHeld,
 	stateLease,
 	stateStoreOf,
 	TASK_LEASE_MS,
 	underLease,
 } from '../maintenance/lease'
-import {
-	concurrencyFor,
-	scheduleFor,
-	stuckJobGuard,
-	TASK_BUDGET_MS,
-	TASK_DEAD_AFTER_MS,
-} from '../maintenance/taskSchedule'
+import { concurrencyFor, scheduleFor, TASK_BUDGET_MS } from '../maintenance/taskSchedule'
 import { type AnalyticsRuntime, getRuntime } from '../plugin/runtime'
 import { DAY_MS } from '../timeframe/tz'
 import { METRIC_FIELDS, type SyncMetric } from './collection'
@@ -49,8 +42,6 @@ export interface SyncTaskOptions {
 	adapterIds?: string[]
 	/** Tenant scopes to fan out over, beside the install-wide scope every run covers. */
 	scopes?: ScopeListResolver
-	/** The host's `jobs.enableConcurrencyControl`; Payload refuses a concurrency key without it. */
-	concurrency?: boolean
 	/** How long one run works before it leaves the rest to the next; {@link TASK_BUDGET_MS}. */
 	budgetMs?: number
 	/** Milliseconds the budget is spent in; `monotonicMs` unless a test hands one in. */
@@ -356,13 +347,6 @@ export const syncTask = (
 			)
 		return { output: outcome.value }
 	},
-	...scheduleFor(
-		opts.schedule,
-		stuckJobGuard({
-			slug: SYNC_TASK_SLUG,
-			deadAfterMs: TASK_DEAD_AFTER_MS,
-			alive: (req) => leaseHeld(req.payload, SYNC_TASK_SLUG),
-		})
-	),
-	...concurrencyFor('sync', opts.concurrency === true),
+	...scheduleFor(opts.schedule),
+	...concurrencyFor('sync'),
 })

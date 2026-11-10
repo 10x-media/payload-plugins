@@ -21,6 +21,7 @@ export const hrefIn = (html: string): string | undefined =>
 const CAPTION_TEMPLATES: Record<string, string> = {
 	[keys.widgetFilterCaption]: en[keys.widgetFilterCaption],
 	[keys.widgetCaptionWithFilter]: en[keys.widgetCaptionWithFilter],
+	[keys.widgetCaptionWithComparison]: en[keys.widgetCaptionWithComparison],
 }
 
 /**

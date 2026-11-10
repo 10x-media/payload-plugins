@@ -25,9 +25,9 @@ import { Tab } from 'payload';
 import { TabsField } from 'payload';
 import { TextareaField } from 'payload';
 import { TextField } from 'payload';
-import { TypedUser } from 'payload';
 import { UIField } from 'payload';
 import { UnnamedTab } from 'payload';
+import { User } from 'payload';
 import { Widget } from 'payload';
 import { WidgetInstance } from 'payload';
 import { WidgetWidth } from 'payload';
@@ -70,7 +70,6 @@ export interface AdapterRegisterContext {
         pages: boolean;
     };
     jobs?: AdapterJobs;
-    jobsConcurrency?: boolean;
     notice?: (message: string) => void;
     resolveGoals: (req: PayloadRequest, scope?: string | null) => Promise<Goal[]>;
     resolveScope: (req: PayloadRequest) => Promise<string | null>;
@@ -1325,6 +1324,7 @@ export const keys: {
     readonly widgetFilterValueTooLong: "analytics:widgetFilterValueTooLong";
     readonly widgetFilterCaption: "analytics:widgetFilterCaption";
     readonly widgetCaptionWithFilter: "analytics:widgetCaptionWithFilter";
+    readonly widgetCaptionWithComparison: "analytics:widgetCaptionWithComparison";
     readonly filterOperatorEq: "analytics:filterOperatorEq";
     readonly filterOperatorContains: "analytics:filterOperatorContains";
     readonly filterOperatorMatches: "analytics:filterOperatorMatches";
@@ -2431,7 +2431,7 @@ export const tenantMembership: (options?: TenantMembershipOptions) => ScopeMembe
 export interface TenantMembershipOptions {
     tenantsArrayFieldName?: string;
     tenantsArrayTenantFieldName?: string;
-    userHasAccessToAllTenants?: (user: TypedUser) => boolean;
+    userHasAccessToAllTenants?: (user: User) => boolean;
 }
 
 // @public (undocumented)

@@ -70,7 +70,7 @@ export function RealtimeStrip({ endpoint, sourceId, locale, timezone, scope }: R
 			<div className="analytics-state analytics-state--start" role="status">
 				<span className="analytics-view__empty">{t(keys.viewErrorBusy)}</span>
 				<RetryAfter className="analytics-state__after" seconds={busy.retryAfter} />
-				<Button buttonStyle="secondary" margin={false} onClick={retry} size="small">
+				<Button buttonStyle="secondary" margin={false} onClick={retry} size="medium">
 					{t(keys.viewRetry)}
 				</Button>
 			</div>

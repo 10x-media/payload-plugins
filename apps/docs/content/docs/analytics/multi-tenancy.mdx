@@ -137,7 +137,7 @@ A resolver that throws fails closed the same way everywhere: reads degrade to un
 | `collections.<slug>.scopeField` | The field a bound collection's documents carry their tenant in: `'tenant'` unless set, the field `plugin-multi-tenant` adds. The boot fails when a bound collection has no field of that name; `false` reads the request's own scope instead. See [Whose numbers a document shows](/analytics/display-fields#whose-numbers-a-document-shows). |
 | `posthog({ scopeProperty })` | Lets one PostHog project serve per-scope reads by filtering on an event property. |
 | `capture.slots` | Which adapter captures for the platform (`global`) and for the request's tenant (`tenant`). See [Capture slots per tenant](#capture-slots-per-tenant). |
-| `captureRoute()` | Not a plugin option: a route handler from `@10x-media/analytics/next` that relays one adapter's vendor tracker, when you would rather serve the platform's first-party proxy from a route of your own than through the runtime one. See [A route handler of your own](/analytics/proxy#a-route-handler-of-your-own). |
+| `captureRoute()` | Not a plugin option: a route handler from `@10x-media/analytics/routes` that relays one adapter's vendor tracker, when you would rather serve the platform's first-party proxy from a route of your own than through the runtime one. See [A route handler of your own](/analytics/proxy#a-route-handler-of-your-own). |
 | `reportingTimezone` | Aligns daily boundaries to a timezone, per install or per tenant. See [Reporting timezone](/analytics/timezone). |
 
 The options that only mean something on a scoped install fail the boot without `scope.resolve`: `scope.list`, `scope.label`, `scope.member`, `sources`, `defaultSource`, `access.crossScope`, an adapter id in `capture.slots.tenant`, `capture.paths.tenant`, a `collections.<slug>.scopeField` other than `false`, and `goals.collection.scopeField` or `providers.collection.scopeField` when set at all. `scope.resolve` in turn fails the boot without `scope.member`.
@@ -227,7 +227,7 @@ The platform (host) project captures events from **all** tenant pages through th
 
 ```ts title="app/ph/[...path]/route.ts"
 import { posthog } from '@10x-media/analytics/adapters/posthog'
-import { captureRoute } from '@10x-media/analytics/next'
+import { captureRoute } from '@10x-media/analytics/routes'
 
 const relay = captureRoute({
   path: '/ph',
@@ -514,8 +514,8 @@ The host owns which tenant a request is for. Whatever selector it already has (t
 
 What the view does have is a caption or one select:
 
-- **The Site select** offers the reader's own site and **All sites**, first in the toolbar. It is drawn only for a reader whose own scope is a tenant and who passes `access.crossScope.aggregate`. **All sites** writes `scope=*:<tenant>`, the aggregate marker tagged with the tenant it was chosen from; the reader's own site writes no scope at all. The site is listed under its `scope.label` name; without it the scope id stands.
-- **The caption** reads `Showing: <tenant>` under the title for every other viewer on a scoped install, with the same name, and `Showing: All sites` for a reader who may aggregate and has no tenant selected. Where the Site select is drawn it already names the site, so the caption is left out.
+- **The Site menu** offers the reader's own site and **All sites**, first in the toolbar. It is drawn only for a reader whose own scope is a tenant and who passes `access.crossScope.aggregate`. **All sites** writes `scope=*:<tenant>`, the aggregate marker tagged with the tenant it was chosen from; the reader's own site writes no scope at all. The site is listed under its `scope.label` name; without it the scope id stands.
+- **The caption** reads `Showing: <tenant>` under the title for every other viewer on a scoped install, with the same name, and `Showing: All sites` for a reader who may aggregate and has no tenant selected. Where the Site menu is drawn it already names the site, so the caption is left out.
 - **No site selected.** A reader whose request resolves no tenant and who may not read across tenants (a tenant admin signed in without picking one) is asked to choose a site: the view, the widgets and the document panel read **Choose a site to see its numbers.**
 
 ```ts

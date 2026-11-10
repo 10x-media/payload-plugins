@@ -103,13 +103,20 @@ describeForDb('analytics sync and warm on job workers', {}, (db) => {
 		).toBe('ok')
 		const queued = []
 		for (const task of [TASK_SLUGS.sync, TASK_SLUGS.warm]) {
-			queued.push([task, (await payload.jobs.queue({ task, queue: 'analytics', input: {} })).id])
+			queued.push([
+				task,
+				(await payload.jobs.queue({ overrideAccess: true, task, queue: 'analytics', input: {} }))
+					.id,
+			])
 		}
-		const run = await payload.jobs.run({ queue: 'analytics' })
+		const run = await payload.jobs.run({ overrideAccess: true, queue: 'analytics' })
 		for (const [task, id] of queued) {
 			expect(run.jobStatus?.[String(id)]?.status, String(task)).toBe('success')
 		}
-		const { totalDocs } = await payload.count({ collection: 'analytics-daily' as never })
+		const { totalDocs } = await payload.count({
+			overrideAccess: true,
+			collection: 'analytics-daily' as never,
+		})
 		expect(totalDocs).toBe(2)
 		const state = stateStoreOf(payload)
 		expect(await state?.lastBeat(TASK_SLUGS.sync)).toBeInstanceOf(Date)
@@ -152,6 +159,7 @@ describeForDb('analytics sync and warm on job workers', {}, (db) => {
 			)
 		)
 		const { docs } = await first.payload.find({
+			overrideAccess: true,
 			collection: 'analytics-daily' as never,
 			where: { source: { equals: 'race' } },
 		})
@@ -159,6 +167,7 @@ describeForDb('analytics sync and warm on job workers', {}, (db) => {
 		expect([1, 2, 3, 4, 5, 6]).toContain((docs[0] as { pageviews?: number }).pageviews)
 		await upsertSyncRow(first.payload, 'analytics-daily', row(9))
 		const again = await first.payload.find({
+			overrideAccess: true,
 			collection: 'analytics-daily' as never,
 			where: { source: { equals: 'race' } },
 		})
@@ -190,7 +199,8 @@ describeForDb('analytics sync and warm on job workers', {}, (db) => {
 
 	it(`syncs again without adding a row for a day it already wrote on ${db}`, async () => {
 		const count = async () =>
-			(await first.payload.count({ collection: 'analytics-daily' as never })).totalDocs
+			(await first.payload.count({ overrideAccess: true, collection: 'analytics-daily' as never }))
+				.totalDocs
 		const before = await count()
 		expect(outputOf(await sync({ req: jobReq(first.payload) }))).toMatchObject({ ran: true })
 		expect(await count()).toBe(before)
@@ -238,6 +248,7 @@ describeForDb('analytics sync and warm on job workers', {}, (db) => {
 		})
 		expect(await state?.cursor(REKEY_CURSOR)).toBe('done')
 		const { docs } = await first.payload.find({
+			overrideAccess: true,
 			collection: 'analytics-daily' as never,
 			where: { date: { equals: day.toISOString() } },
 			sort: 'source',
@@ -266,6 +277,7 @@ describeForDb('analytics sync and warm on job workers', {}, (db) => {
 		})
 		await sync({ req: jobReq(first.payload) })
 		const umamiRow = await first.payload.find({
+			overrideAccess: true,
 			collection: 'analytics-daily' as never,
 			where: { and: [{ date: { equals: day.toISOString() } }, { source: { equals: 'umami' } }] },
 		})

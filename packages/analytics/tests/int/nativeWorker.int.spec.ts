@@ -9,7 +9,7 @@ import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { trackServerEvent } from '../../src/native/ingest/serverTrack'
 import { native } from '../../src/native/nativeAdapter'
-import { MAINTAIN_DEAD_AFTER_MS, MAINTAIN_TASK_SLUG } from '../../src/native/tasks/maintainTask'
+import { MAINTAIN_TASK_SLUG } from '../../src/native/tasks/maintainTask'
 import { addCalendarDays, type CalendarDay, calendarDayStart } from '../../src/timeframe/calendar'
 import { nativeOf, pageviewHit } from './nativeHelpers'
 
@@ -69,11 +69,12 @@ describeForDb('native maintenance on a jobs worker', {}, (db) => {
 
 	it(`counts the closed days when a worker booted without onInit runs the job on ${db}`, async () => {
 		const job = await worker.payload.jobs.queue({
+			overrideAccess: true,
 			task: MAINTAIN_TASK_SLUG,
 			input: {},
 			queue: 'analytics',
 		})
-		const run = await worker.payload.jobs.run({ queue: 'analytics' })
+		const run = await worker.payload.jobs.run({ overrideAccess: true, queue: 'analytics' })
 		expect(run.jobStatus?.[String(job.id)]?.status).toBe('success')
 		const markers = await nativeOf(web.payload).state.markers('', DAYS[0] ?? 0, TODAY)
 		expect(markers.map((marker) => [marker.day, marker.status])).toEqual([
@@ -94,8 +95,9 @@ describeForDb('native maintenance on a jobs worker', {}, (db) => {
 		expect(read.meta.partial).toBeUndefined()
 	})
 
-	const openRuns = async (): Promise<Array<{ id: string | number; processing?: boolean }>> => {
+	const openRuns = async (): Promise<Array<{ id: string | number }>> => {
 		const { docs } = await worker.payload.find({
+			overrideAccess: true,
 			collection: 'payload-jobs',
 			where: {
 				and: [
@@ -115,38 +117,30 @@ describeForDb('native maintenance on a jobs worker', {}, (db) => {
 		expect(await openRuns()).toHaveLength(1)
 	})
 
-	it(`schedules again once a run killed mid-way has been processing too long on ${db}`, async () => {
+	it(`runs a maintenance run killed mid-way again once its lease lapsed on ${db}`, async () => {
 		const [queued] = await openRuns()
 		expect(queued).toBeDefined()
-		const markProcessing = (minutesAgo: number) =>
-			worker.payload.db.updateJobs({
-				id: queued?.id ?? '',
-				data: {
-					processing: true,
-					updatedAt: new Date(NOW.getTime() - minutesAgo * MINUTE).toISOString(),
-				},
-				returning: false,
-			})
-		// Still within what a live run can take: left alone, and nothing new is queued.
-		await markProcessing(MAINTAIN_DEAD_AFTER_MS / MINUTE - 1)
-		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
-		expect(await openRuns()).toEqual([
-			expect.objectContaining({ id: queued?.id, processing: true }),
-		])
-		// Past it: the run was killed, so it is failed and the next one is queued, once.
-		await markProcessing(MAINTAIN_DEAD_AFTER_MS / MINUTE + 1)
-		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
-		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
-		const stuck = await worker.payload.findByID({
-			collection: 'payload-jobs',
+		await worker.payload.db.updateJobs({
 			id: queued?.id ?? '',
-			depth: 0,
+			// A run that started was due. Payload dates a scheduled run's waitUntil off the real
+			// clock, not the test's, so put it behind NOW as well.
+			data: {
+				processingUntil: new Date(NOW.getTime() - 60 * MINUTE).toISOString(),
+				processingToken: 'killed-run',
+				waitUntil: new Date(NOW.getTime() - 90 * MINUTE).toISOString(),
+			},
+			returning: false,
 		})
-		expect(stuck).toMatchObject({ processing: false, hasError: true })
+		// No second run is scheduled beside it: the killed one is still the open run.
+		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
+		expect(await openRuns()).toEqual([expect.objectContaining({ id: queued?.id })])
+		await worker.payload.jobs.run({ queue: 'analytics', overrideAccess: true })
+		expect(await openRuns()).toEqual([])
+		await worker.payload.jobs.handleSchedules({ queue: 'analytics' })
 		const next = await openRuns()
 		expect(next).toHaveLength(1)
-		expect(next[0]?.id).not.toEqual(queued?.id)
-		expect(next[0]?.processing).toBe(false)
+		// Not by id: SQLite hands the deleted run's rowid to the next one.
+		expect(next[0]).not.toHaveProperty('processingToken', 'killed-run')
 	})
 
 	it(`records a server event on the worker that the web instance reads on ${db}`, async () => {

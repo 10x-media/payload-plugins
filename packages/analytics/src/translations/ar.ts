@@ -93,6 +93,7 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.widgetFilterValueTooLong]: '256 حرفًا كحد أقصى.',
 	[keys.widgetFilterCaption]: 'حيث قيمة {{dimension}} {{operator}} {{value}}',
 	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
+	[keys.widgetCaptionWithComparison]: '{{window}} {{comparison}}',
 	[keys.filterOperatorEq]: 'تساوي',
 	[keys.filterOperatorContains]: 'تحتوي على',
 	[keys.filterOperatorMatches]: 'تطابق النمط',

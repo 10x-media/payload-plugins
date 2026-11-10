@@ -1,5 +1,5 @@
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import type { PayloadRequest, TypedUser } from 'payload'
+import type { PayloadRequest, User } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
@@ -12,7 +12,7 @@ const routes = routePaths(DEFAULT_ROUTE_BASE)
 
 type ErrorBody = { error: { code: string; param?: string } }
 
-const userOf = (id: string): TypedUser => ({ id, collection: 'users' }) as unknown as TypedUser
+const userOf = (id: string): User => ({ id, collection: 'users' }) as unknown as User
 
 const get = (booted: BootedPayload, call: { path: string; who: string; query: string }) =>
 	callEndpoint(booted.payload, { path: call.path, query: call.query, user: userOf(call.who) })
@@ -141,6 +141,7 @@ describeForDb('analytics read bounds: ranges, sync rows and named scopes', {}, (
 			],
 		})
 		const page = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'pages' as never,
 			data: { title: 'About', slug: 'about' } as never,
 		})

@@ -40,7 +40,6 @@ import { createMemo } from '../surfacing/memo'
 import { collectingPageData } from './buildPhase'
 import { type ExpectedCollection, recheckCollections } from './collectionChecks'
 import { loadEncrypted } from './encrypted'
-import { narrowStatsGlobal } from './jobsAccess'
 import { createKeepAlive } from './keepAlive'
 import { isProductionBuild } from './peers'
 import { assertRoutesReachable } from './routeChecks'
@@ -257,7 +256,6 @@ export const createRuntimeFactory = (
 		}
 		assertRoutesReachable(resolved.routes.base, payload.config)
 		recheckCollections(payload.config.collections ?? [], args.collections, payload.db?.name)
-		narrowStatsGlobal(payload)
 		rechecked.add(payload.config)
 	}
 	return {

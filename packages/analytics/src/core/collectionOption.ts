@@ -85,6 +85,7 @@ const COLLECTION_ACCESS_KEYS = keysOf<NonNullable<CollectionConfig['access']>>({
 	readVersions: true,
 	unlock: true,
 	update: true,
+	validate: true,
 })
 
 /** `access` on one of the plugin's collections: a Payload access function per operation. */

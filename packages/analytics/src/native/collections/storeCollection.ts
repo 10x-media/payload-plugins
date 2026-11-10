@@ -4,7 +4,7 @@ const nobody = (): boolean => false
 
 /**
  * A collection only the engine writes, keyed by a text id it picks rather than a sequence: no
- * access, REST, GraphQL, admin view, timestamps or document locking for anyone.
+ * access, REST, GraphQL, admin view, timestamps, versions, authorship or document locking for anyone.
  */
 export const storeCollection = (args: {
 	slug: string
@@ -17,6 +17,8 @@ export const storeCollection = (args: {
 	endpoints: false,
 	graphQL: false,
 	timestamps: false,
+	versions: false,
+	authorship: false,
 	lockDocuments: false,
 	fields: [{ name: 'id', type: 'text' }, ...args.fields],
 	indexes: args.indexes,

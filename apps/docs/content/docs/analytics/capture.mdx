@@ -111,7 +111,7 @@ analytics({
 
 `false` disables a slot outright: nothing fills it, its proxy mount 404s (bodyless, like every [proxy](/analytics/proxy) refusal, which is the one answer the plugin sends with no [error envelope](/analytics/reference/endpoints#errors)), and the tracker config omits it. An unknown `global` id throws at config time; a `tenant` id may also name a runtime provider instance, so it is resolved per request instead.
 
-`capture.paths` moves a slot's mount off the runtime proxy, for installs relaying the vendor from a route handler of their own with [`captureRoute`](/analytics/proxy#a-route-handler-of-your-own). Pass the path the route is mounted at, without the Next `basePath`: Next serves the route under the base path, and the tracker config puts it in front of every path it hands out, the runtime proxy's and the ingest path included. Next rewrites are not offered: `captureRewrites` and `posthogProxyRewrites` [throw](/analytics/proxy#next-rewrites), since a rewrite forwards the visitor's cookies to the vendor.
+`capture.paths` moves a slot's mount off the runtime proxy, for installs relaying the vendor from a route handler of their own with [`captureRoute`](/analytics/proxy#a-route-handler-of-your-own). Pass the path the route is mounted at, without the Next `basePath`: Next serves the route under the base path, and the tracker config puts it in front of every path it hands out, the runtime proxy's and the ingest path included. Rewrites are not offered, since a rewrite forwards the visitor's cookies to the vendor ([Not a rewrite](/analytics/proxy#not-a-rewrite)).
 
 ### Two PostHog projects on one page
 
@@ -436,13 +436,27 @@ The tracker still sends `hostname`, and native ingest still ignores it: the stor
 
 ## Taking beacons in a route of your own
 
-Payload's REST routing signs every request in before its handler runs, so each beacon to the [ingest endpoint](/analytics/native#the-ingest-endpoint) pays for auth strategies a visitor never needs. `ingestRoute` from `@10x-media/analytics/next` takes the same beacons in a Next.js route handler of your own, outside that routing:
+Payload's REST routing signs every request in before its handler runs, so each beacon to the [ingest endpoint](/analytics/native#the-ingest-endpoint) pays for auth strategies a visitor never needs. `ingestRoute` from `@10x-media/analytics/routes` takes the same beacons in a route handler of your own, outside that routing. It returns a plain `(request: Request) => Promise<Response>`; on Next.js:
 
 ```ts title="app/(analytics)/api/collect/route.ts"
 import config from '@payload-config'
-import { ingestRoute } from '@10x-media/analytics/next'
+import { ingestRoute } from '@10x-media/analytics/routes'
 
 export const POST = ingestRoute(config)
+```
+
+On TanStack Start, in a server route:
+
+```ts title="src/routes/api/collect.ts"
+import config from '@payload-config'
+import { ingestRoute } from '@10x-media/analytics/routes'
+import { createFileRoute } from '@tanstack/react-router'
+
+const receive = ingestRoute(config)
+
+export const Route = createFileRoute('/api/collect')({
+  server: { handlers: { POST: ({ request }) => receive(request) } },
+})
 ```
 
 ```ts title="payload.config.ts"
@@ -463,7 +477,7 @@ A page on another site that [`capture.allowedOrigins`](#beacons-from-other-sites
 
 ```ts title="app/(analytics)/api/collect/route.ts"
 import config from '@payload-config'
-import { ingestPreflight, ingestRoute } from '@10x-media/analytics/next'
+import { ingestPreflight, ingestRoute } from '@10x-media/analytics/routes'
 
 export const POST = ingestRoute(config)
 export const OPTIONS = ingestPreflight(config)

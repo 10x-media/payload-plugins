@@ -11,8 +11,8 @@ import type { Goal } from '../../src/goals/types'
 import { analytics } from '../../src/index'
 import { signItemRef } from '../../src/native/ingest/itemSignature'
 import { native } from '../../src/native/nativeAdapter'
-import { ingestRoute } from '../../src/next/ingestRoute'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
+import { ingestRoute } from '../../src/routes/ingestRoute'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { type StoredHit, storedHits } from './nativeHelpers'
 
@@ -141,6 +141,7 @@ describeForDb('ingestRoute', {}, (db) => {
 
 	it(`keeps a signed item ref and drops an unsigned one, as the endpoint does, on ${db}`, async () => {
 		const offer = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'offers',
 			data: { title: 'Spring sale' },
 		})

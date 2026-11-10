@@ -17,7 +17,7 @@ const configGoals: Goal[] = [
 
 const login = async (payload: Payload, email: string) => {
 	const password = 'test-pass-1234'
-	await payload.create({ collection: 'viewers', data: { email, password } })
+	await payload.create({ overrideAccess: true, collection: 'viewers', data: { email, password } })
 	const { user } = await payload.login({ collection: 'viewers', data: { email, password } })
 	return user
 }
@@ -71,6 +71,7 @@ describeForDb('analytics view props: unscoped install', {}, (db) => {
 
 	it('lists a collection goal alongside the config goals', async () => {
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: GOALS_SLUG as never,
 			data: { name: 'Demo booked', slug: 'book-demo', match: { kind: 'goal' } } as never,
 		})

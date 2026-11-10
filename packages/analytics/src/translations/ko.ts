@@ -93,6 +93,7 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.widgetFilterValueTooLong]: '최대 256자입니다.',
 	[keys.widgetFilterCaption]: '조건: {{dimension}} {{operator}} {{value}}',
 	[keys.widgetCaptionWithFilter]: '{{window}} {{filter}}',
+	[keys.widgetCaptionWithComparison]: '{{window}} {{comparison}}',
 	[keys.filterOperatorEq]: '같음',
 	[keys.filterOperatorContains]: '포함',
 	[keys.filterOperatorMatches]: '패턴 일치',

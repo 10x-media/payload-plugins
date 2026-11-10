@@ -54,7 +54,7 @@ export interface AnalyticsPanelFieldProps {
  * @internal
  */
 export const AnalyticsPanelField = (props: AnalyticsPanelFieldProps) => (
-	<Suspense fallback={<FieldShimmer height="15rem" />}>
+	<Suspense fallback={<FieldShimmer height="240px" />}>
 		<WithScopeToken req={props.req}>
 			<PanelFieldBody {...props} />
 		</WithScopeToken>
