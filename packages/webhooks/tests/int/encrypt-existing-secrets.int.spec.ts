@@ -4,6 +4,7 @@ import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { SECRET_PREFIX } from '../../src/constants'
 import { encryptExistingSecrets, webhooks } from '../../src/index'
+import { LOCAL_SINK } from './localSink'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -43,7 +44,10 @@ describe('encryptExistingSecrets', () => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db: 'mongo',
 			collections: [posts],
 		})

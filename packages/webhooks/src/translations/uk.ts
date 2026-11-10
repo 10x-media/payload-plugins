@@ -10,6 +10,10 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.fieldUrl]: 'URL ендпоінта',
 	[keys.urlInvalid]: 'Вкажіть абсолютний URL з http:// або https://.',
 	[keys.urlHostNotAllowed]: 'Цей хост не входить до списку дозволених хостів для вебхуків.',
+	[keys.urlNotHttps]:
+		'Введіть URL з https://. Незашифрований http:// не дозволено для кінцевих точок вебхуків.',
+	[keys.urlPrivateAddress]:
+		'Ця адреса приватна, локальна або недоступна з інтернету, тому надсилати на неї вебхуки не можна.',
 	[keys.fieldEnabled]: 'Увімкнено',
 	[keys.fieldEvents]: 'Події',
 	[keys.fieldSecret]: 'Секрет для підпису',
