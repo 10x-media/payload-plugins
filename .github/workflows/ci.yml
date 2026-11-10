@@ -207,7 +207,7 @@ jobs:
     env:
       E2E_DATABASES: '{"analytics": ["mongo", "postgres", "sqlite"]}'
       # Plugins ported to Payload 4 run their suite on both frameworks; the rest stay on Next only.
-      E2E_FRAMEWORKS: '{"admin-wiki": ["next", "tanstack"], "audit-logs": ["next", "tanstack"], "content-lock": ["next", "tanstack"], "conversations": ["next", "tanstack"], "dedupe": ["next", "tanstack"], "document-preview": ["next", "tanstack"], "dual-session": ["next", "tanstack"], "fields": ["next", "tanstack"], "folder-picker": ["next", "tanstack"], "form-builder": ["next", "tanstack"], "form-variants": ["next", "tanstack"], "impersonation": ["next", "tanstack"], "jobs": ["next", "tanstack"], "settings-overlay": ["next", "tanstack"], "undo-redo": ["next", "tanstack"], "webhooks": ["next", "tanstack"]}'
+      E2E_FRAMEWORKS: '{"admin-wiki": ["next", "tanstack"], "audit-logs": ["next", "tanstack"], "automations": ["next", "tanstack"], "content-lock": ["next", "tanstack"], "conversations": ["next", "tanstack"], "dedupe": ["next", "tanstack"], "document-preview": ["next", "tanstack"], "dual-session": ["next", "tanstack"], "fields": ["next", "tanstack"], "folder-picker": ["next", "tanstack"], "form-builder": ["next", "tanstack"], "form-variants": ["next", "tanstack"], "impersonation": ["next", "tanstack"], "jobs": ["next", "tanstack"], "settings-overlay": ["next", "tanstack"], "undo-redo": ["next", "tanstack"], "webhooks": ["next", "tanstack"]}'
     outputs:
       plugins: ${{ steps.plugins.outputs.plugins }}
       legs: ${{ steps.plugins.outputs.legs }}
@@ -239,7 +239,10 @@ jobs:
     needs: e2e-scope
     if: needs.e2e-scope.outputs.plugins != '[]'
     name: e2e (${{ matrix.plugin }}${{ matrix.dbs && format(', {0}', matrix.dbs) || '' }}${{ matrix.framework && format(', {0}', matrix.framework) || '' }})
-    runs-on: ubuntu-latest
+    # Pinned: on ubuntu-latest (26.04) `playwright install --with-deps chromium` refuses to
+    # install ("Playwright does not support chromium on ubuntu26.04-x64"). Back to latest once
+    # the catalog's Playwright supports it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
