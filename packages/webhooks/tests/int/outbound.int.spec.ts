@@ -3,6 +3,7 @@ import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness
 import type { CollectionConfig } from 'payload'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { webhooks } from '../../src/index'
+import { LOCAL_SINK } from './localSink'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -43,7 +44,10 @@ afterAll(async () => {
 
 const boot = (delivery: 'inline' | 'queue', retries = 4): Promise<BootedPayload> =>
 	bootPayload({
-		plugin: webhooks({ collections: { posts: true }, delivery: { mode: delivery, retries } }),
+		plugin: webhooks({
+			collections: { posts: true },
+			delivery: { mode: delivery, retries, ...LOCAL_SINK },
+		}),
 		db: 'mongo',
 		collections: [posts],
 	})
@@ -149,7 +153,7 @@ describe('outbound delivery (queued)', () => {
 		})
 		expect(pending.docs[0]?.status).toBe('pending')
 
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 		expect(hits.length).toBe(1)
 		const done = await booted.payload.find({
 			collection: 'webhook-deliveries',
@@ -181,7 +185,7 @@ describe('outbound delivery failure (queued, retries=0)', () => {
 			data: { title: 'Fail' },
 			overrideAccess: true,
 		})
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 		const done = await booted.payload.find({
 			collection: 'webhook-deliveries',
 			overrideAccess: true,

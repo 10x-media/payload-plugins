@@ -1,15 +1,26 @@
-import { expect, test } from '@playwright/test'
+import { expect, type Page, test } from '@playwright/test'
 
 const EMAIL = 'dev@10xmedia.de'
 const PASSWORD = 'password'
 
-const login = async (page: import('@playwright/test').Page) => {
-	await page.goto('/admin/login')
-	await page.fill('#field-email', EMAIL)
-	await page.fill('#field-password', PASSWORD)
-	await page.click('button[type="submit"]')
-	await page.waitForURL('**/admin')
+/**
+ * Signs in over REST, which sets the auth cookie in the browser context. The login form has a
+ * "Show password" button now, so a label match on the password field is ambiguous.
+ */
+const login = async (page: Page) => {
+	const res = await page.request.post('/api/users/login', {
+		data: { email: EMAIL, password: PASSWORD },
+	})
+	expect(res.ok()).toBe(true)
 }
+
+/**
+ * Payload 4 keeps closed dialogs mounted, and this page holds several, so the open one is the
+ * visible one. Its confirm button is `DialogConfirm`'s.
+ */
+const openDialog = (page: Page) => page.locator('dialog:visible .dialog')
+const confirmDialog = (page: Page) =>
+	openDialog(page).locator('[data-dialog-action="confirm"]').click()
 
 test('admin panel loads with webhooks plugin enabled', async ({ page }) => {
 	const response = await page.goto('/admin')
@@ -49,7 +60,7 @@ test('redeliver confirms first, then creates a second delivery', async ({ page }
 	await page.waitForURL('**/admin/collections/webhook-deliveries/**')
 	await page.getByRole('button', { name: 'Redeliver' }).click()
 	await expect(page.getByText('Send this payload again?')).toBeVisible()
-	await page.locator('#confirm-action').click()
+	await confirmDialog(page)
 	// The dev app delivers inline, so the replay has already been sent by the time it answers.
 	await expect(page.getByText('Redelivered')).toBeVisible()
 	await page.goto('/admin/collections/webhook-deliveries')
@@ -77,11 +88,11 @@ test('rotating a secret confirms first, then reveals the new secret in a dialog'
 	await expect(page.getByText('Rotate signing secret')).toBeVisible()
 
 	// Cancelling must leave the secret alone.
-	await page.getByRole('button', { name: 'Cancel' }).click()
+	await openDialog(page).getByRole('button', { name: 'Cancel' }).click()
 	await expect(page.getByText('New signing secret')).toBeHidden()
 
 	await page.getByRole('button', { name: 'Rotate secret' }).click()
-	await page.locator('#confirm-action').click()
+	await confirmDialog(page)
 
 	await expect(page.getByText('New signing secret')).toBeVisible({ timeout: 15_000 })
 	const revealed = page.locator('#field-webhooksRotatedSecret')
@@ -98,7 +109,7 @@ test('rotating a secret confirms first, then reveals the new secret in a dialog'
 	await expect(revealed).toHaveValue(/^whsec_/)
 
 	// The copy action lives inside the input, over its trailing edge.
-	const copy = page.getByRole('button', { name: 'Copy' })
+	const copy = openDialog(page).getByRole('button', { name: 'Copy' })
 	await expect(copy).toBeVisible()
 	const field = await revealed.boundingBox()
 	const button = await copy.boundingBox()
@@ -109,7 +120,7 @@ test('rotating a secret confirms first, then reveals the new secret in a dialog'
 	expect(button.x).toBeGreaterThan(field.x)
 	await copy.click()
 
-	await page.getByRole('button', { name: "I've saved it" }).click()
+	await openDialog(page).getByRole('button', { name: "I've saved it" }).click()
 	await expect(page.getByText('New signing secret')).toBeHidden()
 
 	// The rotation landed: the grace window is now shown on the document.

@@ -1,0 +1,37 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x.
+---
+
+`@10x-media/webhooks` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin's options, endpoints, signing and stored data are unchanged, so most installs only follow the checklist.
+
+## Checklist
+
+1. Upgrade `@10x-media/webhooks` and `@10x-media/fields` with Payload: the peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.6`. `next` is no longer a peer, and the admin runs on Next.js and on TanStack Start alike.
+2. On Postgres or SQLite, create and run a migration: `pnpm payload migrate:create` then `pnpm payload migrate`. Payload 4 adds `createdBy` and `updatedBy` to every collection, the subscriptions included (see [Authorship](#authorship)).
+3. Regenerate the import map (`pnpm payload generate:importmap`) and your types (`pnpm payload generate:types`).
+4. Pass `overrideAccess: true` to your own Local API calls on the plugin's collections and to `payload.jobs.run()` where they run without a user (see [Local API access](#local-api-access)).
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## Authorship
+
+Payload 4 stamps `createdBy` and `updatedBy` on every document whose collection does not opt out. Subscriptions keep them, so the record shows who created it and who last changed it. Existing rows have no `createdBy`, and get an `updatedBy` on their next save. The delivery log opts out (`authorship: false`): only the delivery path writes it, so there is no one to credit.
+
+Neither collection keeps versions. Payload 4 turns versions on by default; the plugin sets `versions: false` on both, as they had none on Payload 3, and a subscription's history would hold a copy of every sealed secret it ever had.
+
+## Local API access
+
+Payload 4 applies access control in the Local API by default (`overrideAccess` is `false`). The plugin's own reads and writes already pass `overrideAccess: true` where they act for the system, and queue their delivery jobs the same way, so a document written by someone who may not queue jobs still emits its webhooks.
+
+Your own code follows the new default:
+
+- `payload.find({ collection: 'webhook-deliveries' })` or `'webhook-subscriptions'` without a user returns `Forbidden`. Pass `overrideAccess: true`, or the `user` or `req` you act for.
+- `payload.jobs.run()` checks `jobs.access.run`. A worker, a cron route or a test that drains queued deliveries without a user passes `payload.jobs.run({ overrideAccess: true })`.
+- `owner.resolve` and `owner.canActAs` receive Payload 4's `User` type; `TypedUser` is gone from `payload`.
+
+## The admin
+
+- **Rotate secret** and **Redeliver** are secondary buttons beside Save.
+- The dialog that reveals a rotated secret is Payload 4's dialog. It still closes only through **I've saved it**: Escape and a click outside do nothing.
+- Delivery status pills use Payload 4's colors. Delivered stays green; Payload 4's own success pill is blue, so the plugin keeps green through a class of its own (`webhooks-pill--success`).

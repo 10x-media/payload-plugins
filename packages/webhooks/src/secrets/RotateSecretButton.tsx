@@ -4,16 +4,20 @@ import {
 	Button,
 	ConfirmationModal,
 	CopyIcon,
-	Modal,
+	DialogBody,
+	DialogConfirm,
+	DialogFooter,
+	DialogHeader,
+	DialogModal,
 	TextInput,
 	toast,
 	useConfig,
 	useDocumentInfo,
 	useDrawerSlug,
 	useModal,
+	useRouter,
 } from '@payloadcms/ui'
-import { useRouter } from 'next/navigation'
-import { type RefObject, useEffect, useRef, useState } from 'react'
+import { type RefObject, useRef, useState } from 'react'
 
 import type { TranslationKey } from '../translations/keys'
 import { keys } from '../translations/keys'
@@ -31,13 +35,6 @@ const FAILURE_BY_STATUS: Record<number, TranslationKey> = {
 	409: keys.rotateSecretConflict,
 }
 
-/**
- * Payload's own confirmation-modal chrome, reused so both dialogs are themed, dark-mode aware,
- * and sized like every other modal in the admin. The stylesheet ships with `ConfirmationModal`,
- * which is imported above.
- */
-const MODAL_CLASS = 'confirmation-modal'
-
 /** Names the input and its label; `TextInput` derives the input's id from it. */
 const SECRET_PATH = 'webhooksRotatedSecret'
 
@@ -49,31 +46,12 @@ export const RotateSecretButton = () => {
 	const { id, collectionSlug, docPermissions } = useDocumentInfo()
 	const { config } = useConfig()
 	const { t } = useTranslation()
-	const { closeModal, openModal } = useModal()
+	const { openModal } = useModal()
 	const router = useRouter()
 	const confirmSlug = useDrawerSlug('webhooks-rotate-confirm')
 	const revealSlug = useDrawerSlug('webhooks-rotate-reveal')
 	const [secret, setSecret] = useState<string | null>(null)
 	const secretRef = useRef<HTMLInputElement>(null)
-
-	/**
-	 * The modal provider closes the latest modal on Escape and offers no way to opt one out, which
-	 * here would discard the only copy of the new secret without the acknowledgement. While a secret
-	 * is on screen the key is stopped on its way down, before the provider's document listener.
-	 */
-	const revealing = secret !== null
-	useEffect(() => {
-		if (!revealing) {
-			return
-		}
-		const swallowEscape = (event: KeyboardEvent) => {
-			if (event.key === 'Escape') {
-				event.stopPropagation()
-			}
-		}
-		window.addEventListener('keydown', swallowEscape, true)
-		return () => window.removeEventListener('keydown', swallowEscape, true)
-	}, [revealing])
 
 	// The server returns 403 for a user the collection's update access denies, but the affordance
 	// should not be there in the first place.
@@ -130,16 +108,16 @@ export const RotateSecretButton = () => {
 		toast.error(t(keys.rotateSecretCopyFailed))
 	}
 
+	/** `DialogConfirm` closes the dialog itself once this returns. */
 	const acknowledge = () => {
 		setSecret(null)
-		closeModal(revealSlug)
 		toast.success(t(keys.rotateSecretDone))
 	}
 
 	return (
 		<>
 			<Button
-				buttonStyle="subtle"
+				buttonStyle="secondary"
 				margin={false}
 				onClick={() => openModal(confirmSlug)}
 				size="medium"
@@ -154,44 +132,51 @@ export const RotateSecretButton = () => {
 				modalSlug={confirmSlug}
 				onConfirm={rotate}
 			/>
-			<Modal className={MODAL_CLASS} closeOnBlur={false} slug={revealSlug}>
-				<div className={`${MODAL_CLASS}__wrapper`}>
-					<div className={`${MODAL_CLASS}__content`}>
-						<h1>{t(keys.rotateSecretRevealTitle)}</h1>
-						<p>{t(keys.rotateSecretRevealBody)}</p>
-						<TextInput
-							AfterInput={
-								<button
-									aria-label={t(keys.rotateSecretCopy)}
-									className="webhooks-reveal__copy"
-									onClick={copy}
-									title={t(keys.rotateSecretCopy)}
-									type="button"
-								>
-									<CopyIcon />
-								</button>
-							}
-							className="webhooks-reveal__field"
-							// Payload types the prop as a non-null ref, which no `useRef(null)` satisfies
-							// under React 19's types; the ref is only read after mount.
-							inputRef={secretRef as RefObject<HTMLInputElement>}
-							label={t(keys.fieldSecret)}
-							// `readOnly` on TextInput renders the input `disabled`, and a disabled input's
-							// text cannot be selected, which would take the manual-copy fallback away. The
-							// DOM attribute goes on directly instead: not editable, still selectable.
-							htmlAttributes={{ readOnly: true } as { autoComplete?: string }}
-							onChange={() => undefined}
-							path={SECRET_PATH}
-							value={secret ?? ''}
-						/>
-					</div>
-					<div className={`${MODAL_CLASS}__controls`}>
-						<Button onClick={acknowledge} size="large" type="button">
-							{t(keys.rotateSecretAcknowledge)}
-						</Button>
-					</div>
-				</div>
-			</Modal>
+			{/*
+			 * Escape and a click outside would discard the only copy of the new secret without the
+			 * acknowledgement, so the dialog closes through its one button only and has no close icon.
+			 */}
+			<DialogModal
+				className="webhooks-reveal"
+				closeOnBlur={false}
+				closeOnEsc={false}
+				role="alertdialog"
+				size="medium"
+				slug={revealSlug}
+			>
+				<DialogHeader title={t(keys.rotateSecretRevealTitle)} />
+				<DialogBody>
+					<p className="webhooks-reveal__body">{t(keys.rotateSecretRevealBody)}</p>
+					<TextInput
+						AfterInput={
+							<button
+								aria-label={t(keys.rotateSecretCopy)}
+								className="webhooks-reveal__copy"
+								onClick={copy}
+								title={t(keys.rotateSecretCopy)}
+								type="button"
+							>
+								<CopyIcon size={24} />
+							</button>
+						}
+						className="webhooks-reveal__field"
+						// Payload types the prop as a non-null ref, which no `useRef(null)` satisfies
+						// under React 19's types; the ref is only read after mount.
+						inputRef={secretRef as RefObject<HTMLInputElement>}
+						label={t(keys.fieldSecret)}
+						// `readOnly` on TextInput renders the input `disabled`, and a disabled input's
+						// text cannot be selected, which would take the manual-copy fallback away. The
+						// DOM attribute goes on directly instead: not editable, still selectable.
+						htmlAttributes={{ readOnly: true }}
+						onChange={() => undefined}
+						path={SECRET_PATH}
+						value={secret ?? ''}
+					/>
+				</DialogBody>
+				<DialogFooter>
+					<DialogConfirm label={t(keys.rotateSecretAcknowledge)} onClick={acknowledge} />
+				</DialogFooter>
+			</DialogModal>
 		</>
 	)
 }

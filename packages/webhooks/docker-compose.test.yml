@@ -4,7 +4,7 @@ services:
     image: mongo:8.2.12
     command: ['mongod', '--replSet', 'rs0', '--bind_ip_all']
     ports:
-      - '37017:27017'
+      - '${MONGO_E2E_PORT:-37017}:27017'
     healthcheck:
       test: |
         mongosh --quiet --eval '
@@ -26,7 +26,7 @@ services:
       POSTGRES_PASSWORD: e2e
       POSTGRES_DB: webhooks_e2e
     ports:
-      - '35432:5432'
+      - '${PG_E2E_PORT:-35432}:5432'
     healthcheck:
       test: ['CMD', 'pg_isready', '-U', 'e2e', '-d', 'webhooks_e2e']
       interval: 2s

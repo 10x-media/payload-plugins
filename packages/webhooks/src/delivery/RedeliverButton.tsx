@@ -58,7 +58,7 @@ export const RedeliverButton = () => {
 	return (
 		<>
 			<Button
-				buttonStyle="subtle"
+				buttonStyle="secondary"
 				margin={false}
 				onClick={() => openModal(confirmSlug)}
 				size="medium"

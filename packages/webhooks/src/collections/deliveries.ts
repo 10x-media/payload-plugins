@@ -1,4 +1,4 @@
-import type { CollectionConfig } from 'payload'
+import type { CollectionConfig, Field } from 'payload'
 
 import { ADMIN_GROUP } from '../constants'
 import { keys } from '../translations/keys'
@@ -11,6 +11,8 @@ const STATUS_CELL = '@10x-media/webhooks/client#DeliveryStatusCell'
 export const buildDeliveriesCollection = (args: {
 	slug: string
 	hidden: boolean
+	/** Add the owner columns. Only when `owner` is configured. */
+	ownerStamp: boolean
 }): CollectionConfig => ({
 	slug: args.slug,
 	labels: {
@@ -24,6 +26,10 @@ export const buildDeliveriesCollection = (args: {
 		hidden: args.hidden,
 	},
 	access: { read: adminUser, create: () => false, update: () => false, delete: adminUser },
+	// Only the delivery path writes this log, so neither authorship nor a version history means
+	// anything here, and both would cost every delivery an extra write.
+	authorship: false,
+	versions: false,
 	fields: [
 		{ name: 'subscriptionId', type: 'text', index: true },
 		/**
@@ -50,5 +56,17 @@ export const buildDeliveriesCollection = (args: {
 		{ name: 'durationMs', type: 'number' },
 		{ name: 'jobId', type: 'text' },
 		{ name: 'payload', type: 'json' },
+		// Present only when `owner` is configured, so an install that does not use ownership gets no
+		// new columns. Text rather than a relationship: the owner can live in any auth collection.
+		// `documentId` is the document the event is about, which a queued attempt or a replay
+		// re-reads as the owner under enforceOwnerAccess; the body cannot be relied on for it,
+		// since `transform` may reshape it.
+		...(args.ownerStamp
+			? ([
+					{ name: 'ownerId', type: 'text', index: true, admin: { readOnly: true } },
+					{ name: 'ownerCollection', type: 'text', admin: { readOnly: true } },
+					{ name: 'documentId', type: 'text', admin: { readOnly: true } },
+				] satisfies Field[])
+			: []),
 	],
 })

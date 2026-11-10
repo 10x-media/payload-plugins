@@ -4,6 +4,8 @@ import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness
 import type { CollectionConfig, PayloadRequest } from 'payload'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { pruneDeliveries, webhooks } from '../../src/index'
+import { LOCAL_SINK } from './localSink'
+import { operatorFor } from './operator'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 const articles: CollectionConfig = {
@@ -119,7 +121,7 @@ describe('dispatch hardening', () => {
 					notes: true,
 				},
 				// The sink is the only host on the list, which every other case here relies on.
-				delivery: { mode: 'inline', retries: 0, allowedHosts: ['127.0.0.1'] },
+				delivery: { mode: 'inline', retries: 0, allowedHosts: ['127.0.0.1'], ...LOCAL_SINK },
 			}),
 			db: 'mongo',
 			collections: [posts, articles, fragile, notes],
@@ -193,7 +195,7 @@ describe('dispatch hardening', () => {
 				data: {},
 				draft: true,
 				overrideAccess: true,
-				user: { id: 'u1', collection: 'users' } as never,
+				user: await operatorFor(booted.payload),
 			})
 			expect(hits).toHaveLength(0)
 
@@ -474,7 +476,7 @@ describe('dispatch hardening', () => {
 					context: {},
 					payload: booted.payload,
 					routeParams: { id: args.id },
-					user: { collection: 'users', id: 'u1' },
+					user: await operatorFor(booted.payload),
 				} as never)
 				return res.status
 			} finally {

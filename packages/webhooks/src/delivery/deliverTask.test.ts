@@ -1,6 +1,7 @@
 import type { Payload, PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
 import { buildDeliverTask } from './deliverTask'
+import { transport } from './destination'
 
 const deps = {
 	deliveriesSlug: 'webhook-deliveries',
@@ -8,6 +9,7 @@ const deps = {
 	codeSubscriptions: [],
 	timeoutMs: 5000,
 	retries: 3,
+	urlPolicy: { allowHttp: true, allowPrivateAddresses: true },
 }
 
 const delivery = {
@@ -26,8 +28,14 @@ const makeReq = (subscriptionRow: Record<string, unknown> | null) => {
 			updates.push(args.data)
 			return Promise.resolve({})
 		}),
+		config: {},
 	} as unknown as Payload
-	const req = { payload, context: {} } as unknown as PayloadRequest
+	// The task reads the subscription on a request it builds from this one, which needs i18n.
+	const req = {
+		payload,
+		context: {},
+		i18n: { t: (key: string) => key },
+	} as unknown as PayloadRequest
 	return { req, updates }
 }
 
@@ -45,7 +53,7 @@ describe('buildDeliverTask', () => {
 			events: ['posts.updated'],
 			enabled: false,
 		})
-		const fetchSpy = vi.spyOn(globalThis, 'fetch')
+		const fetchSpy = vi.spyOn(transport, 'fetch')
 
 		const task = buildDeliverTask(deps)
 		await (task.handler as Handler)({

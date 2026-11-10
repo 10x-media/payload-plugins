@@ -5,6 +5,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { GENERATED_SECRET_KEY, SECRET_HINT_SUFFIX, SECRET_PREFIX } from '../../src/constants'
 import { webhooks } from '../../src/index'
 import { generateSecret } from '../../src/secrets/format'
+import { LOCAL_SINK } from './localSink'
+import { operatorFor } from './operator'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -47,7 +49,10 @@ describe('webhook secrets are encrypted at rest', () => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db: 'mongo',
 			collections: [posts],
 		})
@@ -183,7 +188,7 @@ describe('webhook secrets are encrypted at rest', () => {
 			data: { name: 'mid-rotation copy 2' },
 			id: String(created.id),
 			overrideAccess: false,
-			user: { id: 'someone', collection: 'users' } as never,
+			user: await operatorFor(booted.payload),
 		})
 		const rawUnprivileged = await rawDocument(booted, 'mid-rotation copy 2')
 		expect(rawUnprivileged.previousSecret ?? null).toBeNull()
@@ -242,7 +247,7 @@ describe('webhook secrets are encrypted at rest', () => {
 			id: String(created.id),
 			data: { name: 'lapsed-unprivileged renamed' },
 			overrideAccess: false,
-			user: { id: 'someone', collection: 'users' } as never,
+			user: await operatorFor(booted.payload),
 		})
 
 		const raw = await rawDocument(booted, 'lapsed-unprivileged renamed')
@@ -261,7 +266,7 @@ describe('webhook secrets are encrypted at rest', () => {
 			collection: 'webhook-subscriptions',
 			data: { name: 'hint-guard', url: 'https://example.test', events: [], secret: supplied },
 			overrideAccess: false,
-			user: { id: 'someone', collection: 'users' } as never,
+			user: await operatorFor(booted.payload),
 		})
 		const hint = String((await rawDocument(booted, 'hint-guard')).secret_hint)
 		expect(hint.endsWith(supplied.slice(-SECRET_HINT_SUFFIX))).toBe(true)
@@ -271,7 +276,7 @@ describe('webhook secrets are encrypted at rest', () => {
 			id: String(created.id),
 			data: { secret_hint: 'spoofed' } as never,
 			overrideAccess: false,
-			user: { id: 'someone', collection: 'users' } as never,
+			user: await operatorFor(booted.payload),
 		})
 		expect((await rawDocument(booted, 'hint-guard')).secret_hint).toBe(hint)
 	})
@@ -281,7 +286,10 @@ describe('webhook secrets are encrypted at rest', () => {
 		const plaintext = String(created[GENERATED_SECRET_KEY])
 
 		const restarted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db: 'mongo',
 			collections: [posts],
 			attachTo: booted,
@@ -316,7 +324,7 @@ describe('secretEncryption.keys', () => {
 		bootPayload({
 			plugin: webhooks({
 				collections: { posts: true },
-				delivery: { mode: 'inline', retries: 0 },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
 				secretEncryption: { keys: { active, keys } },
 			}),
 			db: 'mongo',
@@ -328,7 +336,7 @@ describe('secretEncryption.keys', () => {
 		booted = await bootPayload({
 			plugin: webhooks({
 				collections: { posts: true },
-				delivery: { mode: 'inline', retries: 0 },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
 				secretEncryption: {
 					keys: { active: 'k1', keys: { k1: 'k1-key-material-32-bytes-long!!' } },
 				},
@@ -383,7 +391,7 @@ describe('secretEncryption.keys', () => {
 			bootPayload({
 				plugin: webhooks({
 					collections: { posts: true },
-					delivery: { mode: 'inline', retries: 0 },
+					delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
 					secretEncryption: {
 						keys: {
 							active: 'k1',

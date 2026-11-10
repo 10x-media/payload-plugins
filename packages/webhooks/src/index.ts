@@ -10,7 +10,13 @@ export { pruneDeliveries } from './delivery/prune'
 export type {
 	CollectionOverride,
 	FieldsOverride,
+	OwnerUser,
 	SecretEncryptionOptions,
+	SubscriptionFilter,
+	SubscriptionOwner,
+	SubscriptionOwnership,
+	SubscriptionScope,
+	WebhookSubscriptionInfo,
 	WebhooksPluginOptions,
 } from './options'
 export type {
@@ -32,7 +38,7 @@ declare module 'payload' {
 export const WEBHOOK_TRIGGER_SLUG = 'webhook' as const
 
 /**
- * Webhooks plugin for Payload v3. Runs before automations (`order: 10`) so it can
+ * Webhooks plugin for Payload. Runs before automations (`order: 10`) so it can
  * push its `webhook` trigger into automations when present, and builds outbound
  * delivery: opt-in collections emit signed HTTP POSTs to subscribed endpoints,
  * delivered via native Payload jobs or bounded-await inline.
@@ -40,7 +46,7 @@ export const WEBHOOK_TRIGGER_SLUG = 'webhook' as const
 export const webhooks = definePlugin<WebhooksPluginOptions>({
 	slug: '@10x-media/webhooks',
 	order: 10,
-	plugin: ({ config, plugins, ...options }): Config => {
+	plugin: ({ config, options = {}, plugins }): Config => {
 		if (options.disabled === true) {
 			return config
 		}

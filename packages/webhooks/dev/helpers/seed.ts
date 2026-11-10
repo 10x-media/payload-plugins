@@ -10,16 +10,17 @@ const DEV_PASSWORD = 'password'
 export const DEV_SINK_SECRET = 'whsec_d2ViaG9va3MtZGV2LXNpbmstbm90LWEtc2VjcmV0'
 
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ collection: 'users', overrideAccess: true })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
+			overrideAccess: true,
 		})
 		payload.logger.info(`Seeded dev admin: ${DEV_EMAIL} / ${DEV_PASSWORD}`)
 	}
 
-	const subs = await payload.count({ collection: 'webhook-subscriptions' })
+	const subs = await payload.count({ collection: 'webhook-subscriptions', overrideAccess: true })
 	if (subs.totalDocs === 0) {
 		const serverURL = payload.config.serverURL || 'http://localhost:3000'
 		await payload.create({

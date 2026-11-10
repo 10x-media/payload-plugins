@@ -1,0 +1,4 @@
+.pill.webhooks-pill--success {
+	background: var(--color-bg-success-tertiary);
+	color: var(--color-text-success);
+}

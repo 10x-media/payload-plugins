@@ -8,6 +8,7 @@ import { GENERATED_SECRET_KEY } from '../../src/constants'
 import { webhooks } from '../../src/index'
 import { generateSecret } from '../../src/secrets/format'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
+import { LOCAL_SINK } from './localSink'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -97,7 +98,10 @@ describe('interoperability with the standardwebhooks verifier', () => {
 		}
 		sinkUrl = `http://127.0.0.1:${addr.port}`
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db: 'mongo',
 			collections: [posts],
 		})
