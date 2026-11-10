@@ -12,7 +12,7 @@ import { native } from '@10x-media/analytics/adapters/native'
 import { fields } from '@10x-media/fields'
 import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
 import { getTenantFromCookie } from '@payloadcms/plugin-multi-tenant/utilities'
-import type { CollectionConfig, Payload, PayloadRequest, TypedUser } from 'payload'
+import type { CollectionConfig, Payload, PayloadRequest, User } from 'payload'
 import { userTenantIds } from '../../src/access/membership'
 import { isValidTimeZone } from '../../src/timeframe/tz'
 import { devMemoryAdapter } from '../helpers/adapters'
@@ -33,7 +33,7 @@ import {
 } from './shared'
 
 /** The multi-tenant plugin's own answer, shared so analytics membership cannot drift from it. */
-const userHasAccessToAllTenants = (user: TypedUser): boolean => user.email === DEV_ADMIN_EMAIL
+const userHasAccessToAllTenants = (user: User): boolean => user.email === DEV_ADMIN_EMAIL
 
 const isPlatformStaff = ({ req }: { req: PayloadRequest }): boolean =>
 	req.user ? userHasAccessToAllTenants(req.user) : false

@@ -1,5 +1,5 @@
 import { GOALS_SLUG, PROVIDER_IDS, signItemRef } from '@10x-media/analytics'
-import { createLocalReq, type Payload, type PayloadRequest } from 'payload'
+import { createPayloadRequest, type Payload, type PayloadRequest } from 'payload'
 import { DEFAULT_JOBS } from '../../src/core/jobs'
 import { getRuntime, resolveTimezoneFor } from '../../src/plugin/runtime'
 import { syncTask } from '../../src/sync/syncTask'
@@ -385,7 +385,7 @@ interface TenancySeed {
  * the null scope, each on its own host and in its own zone, each converting its own goal.
  */
 const sitesOf = async (payload: Payload, tenancy?: TenancySeed): Promise<SiteProfile[]> => {
-	const req = await createLocalReq({}, payload)
+	const req = await createPayloadRequest({ payload })
 	if (!tenancy) {
 		return [
 			{
@@ -511,7 +511,7 @@ export const seedDev = async (
 		})
 		const handler = task.handler
 		if (typeof handler === 'function') {
-			const req = await createLocalReq({}, payload)
+			const req = await createPayloadRequest({ payload })
 			// The sync handler reads `req` alone; a job and its task helpers exist only in a queued run.
 			await handler({ req } as unknown as Parameters<typeof handler>[0])
 			payload.logger.info('Seeded analytics-daily via one sync pass')

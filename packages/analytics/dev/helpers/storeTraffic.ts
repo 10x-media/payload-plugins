@@ -1,5 +1,5 @@
 import type { Goal } from '@10x-media/analytics'
-import { createLocalReq, type Payload } from 'payload'
+import { createPayloadRequest, type Payload } from 'payload'
 import { isClosed, localDay } from '../../src/native/engine/days'
 import type { DayTarget } from '../../src/native/engine/engine'
 import { type NativeInstance, nativeInstanceOf } from '../../src/native/engine/instance'
@@ -124,7 +124,7 @@ export const seedTraffic = async (
 	if (!runtime) {
 		throw new Error('analytics dev seed: the analytics plugin has no runtime on this instance')
 	}
-	const req = await createLocalReq({}, payload)
+	const req = await createPayloadRequest({ payload })
 	const now = new Date()
 	let hits = 0
 	const targets: DayTarget[] = []

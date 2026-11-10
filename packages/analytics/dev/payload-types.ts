@@ -83,6 +83,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocument;
     'payload-preferences': PayloadPreference;
     'payload-migrations': PayloadMigration;
+    'payload-llm-instructions': PayloadLlmInstruction;
   };
   collectionsJoins: {};
   collectionsSelect: {
@@ -102,6 +103,7 @@ export interface Config {
     'payload-locked-documents': PayloadLockedDocumentsSelect<false> | PayloadLockedDocumentsSelect<true>;
     'payload-preferences': PayloadPreferencesSelect<false> | PayloadPreferencesSelect<true>;
     'payload-migrations': PayloadMigrationsSelect<false> | PayloadMigrationsSelect<true>;
+    'payload-llm-instructions': PayloadLlmInstructionsSelect<false> | PayloadLlmInstructionsSelect<true>;
   };
   db: {
     defaultIDType: string;
@@ -131,7 +133,10 @@ export interface Config {
     'analytics-breakdown-campaigns': AnalyticsBreakdownCampaignsWidget;
     'analytics-breakdown-events': AnalyticsBreakdownEventsWidget;
     'dev-custom-sources': DevCustomSourcesWidget;
+    welcome: WelcomeWidget;
     collections: CollectionsWidget;
+    'collection-query': CollectionQueryWidget;
+    activity: ActivityWidget;
   };
   user: User;
   jobs: {
@@ -177,6 +182,14 @@ export interface User {
         id?: string | null;
       }[]
     | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
   email: string;
@@ -184,6 +197,7 @@ export interface User {
   resetPasswordExpiration?: string | null;
   salt?: string | null;
   hash?: string | null;
+  resetPasswordRequestedAt?: string | null;
   loginAttempts?: number | null;
   lockUntil?: string | null;
   sessions?:
@@ -191,6 +205,8 @@ export interface User {
         id: string;
         createdAt?: string | null;
         expiresAt: string;
+        refreshCount?: number | null;
+        refreshedAt?: string | null;
       }[]
     | null;
   password?: string | null;
@@ -208,6 +224,14 @@ export interface Tenant {
    * The IANA timezone this tenant reports its analytics days in.
    */
   timezone?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -219,18 +243,29 @@ export interface Page {
   id: string;
   title?: string | null;
   slug: string;
-  layout?:
-    | {
-        heading?: string | null;
-        label: string;
-        goal: string;
-        id?: string | null;
-        blockName?: string | null;
-        blockType: 'cta';
-      }[]
-    | null;
+  layout?: Cta[] | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "Cta".
+ */
+export interface Cta {
+  heading?: string | null;
+  label: string;
+  goal: string;
+  id?: string | null;
+  blockName?: string | null;
+  blockType: 'cta';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -241,6 +276,14 @@ export interface Offer {
   tenant?: (string | null) | Tenant;
   title: string;
   slug: string;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -259,6 +302,7 @@ export interface AnalyticsProvider {
    */
   provider: 'native' | 'plausible' | 'umami' | 'ga4' | 'posthog';
   enabled?: boolean | null;
+  isDefault?: boolean | null;
   plausible?: {
     siteId?: string | null;
     apiKey?: string;
@@ -301,6 +345,18 @@ export interface AnalyticsProvider {
     scopeProperty?: string | null;
     host?: string | null;
   };
+  /**
+   * What this tool does for visitors who have not answered the consent banner yet, or refused it. Leave it empty to follow the site’s setting.
+   */
+  withoutConsent?: ('cookieless' | 'off') | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -328,6 +384,14 @@ export interface AnalyticsGoal {
     prop?: string | null;
   };
   currency?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -346,6 +410,7 @@ export interface AnalyticsHit {
   v: string;
   landing: boolean;
   server: boolean;
+  mode?: string | null;
   name?: string | null;
   ref?: string | null;
   source?: string | null;
@@ -429,6 +494,8 @@ export interface AnalyticsAggregate {
   revenue?: number | null;
   impressions?: number | null;
   interactions?: number | null;
+  pageviewsWithoutVisitor?: number | null;
+  pageviewsWithoutConsent?: number | null;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -554,6 +621,15 @@ export interface PayloadJob {
     | number
     | boolean
     | null;
+  meta?:
+    | {
+        [k: string]: unknown;
+      }
+    | unknown[]
+    | string
+    | number
+    | boolean
+    | null;
   completedAt?: string | null;
   totalTried?: number | null;
   /**
@@ -581,7 +657,7 @@ export interface PayloadJob {
         completedAt: string;
         taskSlug: 'inline' | 'analytics-maintain' | 'analytics-warm' | 'analytics-sync';
         taskID: string;
-        input?:
+        input:
           | {
               [k: string]: unknown;
             }
@@ -609,22 +685,22 @@ export interface PayloadJob {
           | number
           | boolean
           | null;
+        parent?: {
+          taskSlug?: ('inline' | 'analytics-maintain' | 'analytics-warm' | 'analytics-sync') | null;
+          taskID?: string | null;
+        };
         id?: string | null;
       }[]
     | null;
   taskSlug?: ('inline' | 'analytics-maintain' | 'analytics-warm' | 'analytics-sync') | null;
   queue?: string | null;
   waitUntil?: string | null;
-  processing?: boolean | null;
-  meta?:
-    | {
-        [k: string]: unknown;
-      }
-    | unknown[]
-    | string
-    | number
-    | boolean
-    | null;
+  processingUntil?: string | null;
+  processingToken?: string | null;
+  /**
+   * Used for concurrency control. Jobs with the same key are subject to exclusive/supersedes rules.
+   */
+  concurrencyKey?: string | null;
   updatedAt: string;
   createdAt: string;
 }
@@ -707,6 +783,28 @@ export interface PayloadMigration {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions".
+ */
+export interface PayloadLlmInstruction {
+  id: string;
+  entitySlug: string;
+  title?: string | null;
+  entityType: 'collection' | 'global';
+  additionalInstructions?: string | null;
+  systemInstructions?: string | null;
+  createdBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedBy?: {
+    relationTo: 'users';
+    value: string | User;
+  } | null;
+  updatedAt: string;
+  createdAt: string;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "users_select".
  */
 export interface UsersSelect<T extends boolean = true> {
@@ -716,6 +814,8 @@ export interface UsersSelect<T extends boolean = true> {
         tenant?: T;
         id?: T;
       };
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
   email?: T;
@@ -723,6 +823,7 @@ export interface UsersSelect<T extends boolean = true> {
   resetPasswordExpiration?: T;
   salt?: T;
   hash?: T;
+  resetPasswordRequestedAt?: T;
   loginAttempts?: T;
   lockUntil?: T;
   sessions?:
@@ -731,6 +832,8 @@ export interface UsersSelect<T extends boolean = true> {
         id?: T;
         createdAt?: T;
         expiresAt?: T;
+        refreshCount?: T;
+        refreshedAt?: T;
       };
 }
 /**
@@ -753,6 +856,8 @@ export interface PagesSelect<T extends boolean = true> {
               blockName?: T;
             };
       };
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -764,6 +869,8 @@ export interface TenantsSelect<T extends boolean = true> {
   name?: T;
   slug?: T;
   timezone?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -775,6 +882,8 @@ export interface OffersSelect<T extends boolean = true> {
   tenant?: T;
   title?: T;
   slug?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -787,6 +896,7 @@ export interface AnalyticsProvidersSelect<T extends boolean = true> {
   name?: T;
   provider?: T;
   enabled?: T;
+  isDefault?: T;
   plausible?:
     | T
     | {
@@ -834,6 +944,9 @@ export interface AnalyticsProvidersSelect<T extends boolean = true> {
         scopeProperty?: T;
         host?: T;
       };
+  withoutConsent?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -861,6 +974,8 @@ export interface AnalyticsGoalsSelect<T extends boolean = true> {
         prop?: T;
       };
   currency?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -879,6 +994,7 @@ export interface AnalyticsHitsSelect<T extends boolean = true> {
   v?: T;
   landing?: T;
   server?: T;
+  mode?: T;
   name?: T;
   ref?: T;
   source?: T;
@@ -938,6 +1054,8 @@ export interface AnalyticsAggregatesSelect<T extends boolean = true> {
   revenue?: T;
   impressions?: T;
   interactions?: T;
+  pageviewsWithoutVisitor?: T;
+  pageviewsWithoutConsent?: T;
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
@@ -1008,6 +1126,7 @@ export interface PayloadKvSelect<T extends boolean = true> {
 export interface PayloadJobsSelect<T extends boolean = true> {
   input?: T;
   taskStatus?: T;
+  meta?: T;
   completedAt?: T;
   totalTried?: T;
   hasError?: T;
@@ -1023,13 +1142,20 @@ export interface PayloadJobsSelect<T extends boolean = true> {
         output?: T;
         state?: T;
         error?: T;
+        parent?:
+          | T
+          | {
+              taskSlug?: T;
+              taskID?: T;
+            };
         id?: T;
       };
   taskSlug?: T;
   queue?: T;
   waitUntil?: T;
-  processing?: T;
-  meta?: T;
+  processingUntil?: T;
+  processingToken?: T;
+  concurrencyKey?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1062,6 +1188,22 @@ export interface PayloadPreferencesSelect<T extends boolean = true> {
 export interface PayloadMigrationsSelect<T extends boolean = true> {
   name?: T;
   batch?: T;
+  updatedAt?: T;
+  createdAt?: T;
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "payload-llm-instructions_select".
+ */
+export interface PayloadLlmInstructionsSelect<T extends boolean = true> {
+  id?: T;
+  entitySlug?: T;
+  title?: T;
+  entityType?: T;
+  additionalInstructions?: T;
+  systemInstructions?: T;
+  createdBy?: T;
+  updatedBy?: T;
   updatedAt?: T;
   createdAt?: T;
 }
@@ -1681,6 +1823,16 @@ export interface DevCustomSourcesWidget {
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "welcome_widget".
+ */
+export interface WelcomeWidget {
+  data?: {
+    [k: string]: unknown;
+  };
+  width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
  * via the `definition` "collections_widget".
  */
 export interface CollectionsWidget {
@@ -1688,6 +1840,40 @@ export interface CollectionsWidget {
     [k: string]: unknown;
   };
   width: 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "collection-query_widget".
+ */
+export interface CollectionQueryWidget {
+  data?: {
+    title?: string | null;
+    relatedCollection: 'users' | 'pages' | 'tenants' | 'offers' | 'analytics-providers' | 'analytics-goals';
+    where?:
+      | {
+          [k: string]: unknown;
+        }
+      | unknown[]
+      | string
+      | number
+      | boolean
+      | null;
+    sortField?: string | null;
+    sortDirection?: ('asc' | 'desc') | null;
+    limit?: number | null;
+  };
+  width: 'x-small' | 'small' | 'medium' | 'large' | 'x-large' | 'full';
+}
+/**
+ * This interface was referenced by `Config`'s JSON-Schema
+ * via the `definition` "activity_widget".
+ */
+export interface ActivityWidget {
+  data?: {
+    excludedCollections?:
+      ('users' | 'pages' | 'tenants' | 'offers' | 'analytics-providers' | 'analytics-goals')[] | null;
+  };
+  width: 'small' | 'medium' | 'large' | 'x-large' | 'full';
 }
 /**
  * This interface was referenced by `Config`'s JSON-Schema
