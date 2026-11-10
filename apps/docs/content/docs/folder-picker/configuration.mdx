@@ -17,7 +17,7 @@ folderPicker({
 | `translations` | `{}` | Per-locale overrides for the plugin's own strings. See [i18n](/folder-picker/i18n). |
 | `disabled` | `false` | Returns the incoming config untouched. |
 
-There is nothing else to set. What the picker applies to is Payload's own configuration: `folders: { browseByFolder: true }` at the root, and `folders: true` on each collection that should have them.
+There is nothing else to set. What the picker applies to is Payload's own configuration: a folder collection (`folders: true`), and `createFolderField` on each collection filed into it.
 
 `disabled` exists so an environment can opt out without removing the plugin call:
 
@@ -69,6 +69,6 @@ export const Media: CollectionConfig = {
 
 **A flat list, and the server log says `getFromImportMap: PayloadComponent not found`.** The import map is stale. Run `payload generate:importmap` and rebuild; see [Quick start](/folder-picker/quick-start#regenerate-the-import-map).
 
-**A flat list with nothing in the log.** The collection has no `folders: true`, or it declares its own list view.
+**A flat list with nothing in the log.** The collection has no folder field pointing at a folder collection, or it declares its own list view. Tag fields (`createTagField`, many values per document) do not count.
 
-**The drawer looks wrong after a Payload upgrade.** Its header reuses Payload's internal markup and class names, which semver does not cover. Nothing throws and no test catches it, so open a drawer and look at it once.
+**The drawer looks wrong after a Payload upgrade.** The folder tab hosts Payload's hierarchy view and restyles it through Payload's internal class names, which semver does not cover. Nothing throws and no test catches it, so open a drawer and look at it once.

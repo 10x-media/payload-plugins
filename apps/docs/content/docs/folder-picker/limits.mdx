@@ -5,21 +5,21 @@ description: What the plugin does not do.
 
 ## No per-field opt-out
 
-Folders are switched on or off per collection, through Payload's own `folders: true`. There is no way to say "folders in this field, but not in that one", because the list drawer carries no information about which field opened it.
+The picker follows the collection: every drawer for a collection filed into a folder collection gets the folder tab. There is no way to say "folders in this field, but not in that one", because the list drawer carries no information about which field opened it.
 
-Turning the picker off for a collection means removing `folders: true` from it, which also removes Payload's own **By folder** tab on the route.
+## The folder tab ignores `filterOptions` and the admin `baseFilter`
 
-## Documents without a folder are hidden
+The folder tab reads folders and documents over the REST API, so a field's `filterOptions` and a collection's `admin.baseFilter` do not narrow it the way they narrow the list tab. Access control still applies to every read. If a field must only offer a subset, pick from the **All** tab, where those filters hold.
 
-The folder view only lists documents that have a folder assigned. Unfiled documents are invisible there, exactly as in Payload's own folder view; they are still reachable from the **All** tab.
+## Folders, not tags
 
-Assign a folder first if a document must be pickable by folder.
+Only folder collections (`folders: true`, one folder per document) are browsable. A tag collection (`tags: true`) holds many values per document and has no single place to browse into, so a collection filed only into tags keeps the stock drawer.
 
-## Folders belong to collections
+## Folders can belong to collections
 
-A folder carries `folderType`, the list of collections whose documents it may hold. A folder created while picking for `media` does not appear when picking for `files`.
+With `folders: { collectionSpecific: true }`, a folder lists the collections whose documents it may hold. A folder created for `files` does not appear when picking for `media`; one with no collections listed appears for every collection.
 
-For a polymorphic upload field (`relationTo: ['media', 'files']`) this means one folder tree per collection, never a merged one. The drawer's collection select sits above the folder view exactly as it does above the list, so switching between those trees takes one click.
+For a polymorphic upload field (`relationTo: ['media', 'files']`) this means one folder tree per collection, never a merged one. The drawer's collection select sits above the folder view as it does above the list, so switching between those trees takes one click. Payload's own **Type** filter is hidden there: the drawer already decides the type.
 
 ## Collections with a custom list view are skipped
 

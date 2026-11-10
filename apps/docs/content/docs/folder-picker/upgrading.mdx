@@ -1,0 +1,54 @@
+---
+title: Upgrading to Payload 4
+description: Move an install from the Payload 3 line (0.x) to 4.x.
+---
+
+`@10x-media/folder-picker` 4.x is the Payload 4 line; the 0.x releases run on Payload 3. Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/docs/migration-guide/v4) first. The plugin's options are unchanged and it stores no data of its own, but Payload 4 rebuilt folders, so the config that switches the picker on changes with them.
+
+## Checklist
+
+1. Upgrade `@10x-media/folder-picker` with Payload: the peers are `payload`, `@payloadcms/ui` and `@payloadcms/translations` at `^4.0.0-beta.6`. `@dnd-kit/core` is no longer a peer, and the admin runs on Next.js and on TanStack Start alike.
+2. Replace the folder config (see [Folders in Payload 4](#folders-in-payload-4)), and move your folders and each document's folder by Payload's migration guide.
+3. Regenerate the import map (`pnpm payload generate:importmap`; on TanStack Start, its own as well) and your types (`pnpm payload generate:types`).
+
+The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## Folders in Payload 4
+
+Payload 3 kept every folder in one built-in `payload-folders` collection, switched on by a root `folders` option and `folders: true` on each collection that held documents. Payload 4 has no built-in folder collection: `folders: true` now makes a collection *the* folders, and each collection filed into it gets a field from `createFolderField`.
+
+```ts title="Payload 3"
+export default buildConfig({
+  folders: { browseByFolder: true },
+  collections: [{ slug: 'media', folders: true, upload: true, fields: [] }],
+  plugins: [folderPicker({})],
+})
+```
+
+```ts title="Payload 4"
+import { buildConfig, createFolderField } from 'payload'
+
+export default buildConfig({
+  collections: [
+    {
+      slug: 'folders',
+      admin: { useAsTitle: 'name' },
+      folders: { collectionSpecific: true },
+      fields: [{ name: 'name', type: 'text', required: true }],
+    },
+    { slug: 'media', upload: true, fields: [createFolderField({ relationTo: 'folders' })] },
+  ],
+  plugins: [folderPicker({})],
+})
+```
+
+The picker finds the folder collection on its own: any collection with a folder field pointing at a folder collection gets the folder tab in its drawer. `collectionSpecific` takes the place of Payload 3's `folderType`, and the drawer filters folders by it the same way.
+
+## What changed in the drawer
+
+The folder tab is now Payload's own hierarchy view rather than a copy of the Payload 3 folder browser:
+
+- folders and documents are table rows; there is no grid view and no sort pill (columns sort from their headers);
+- a single field picks with a click on a document's name, a `hasMany` field ticks documents and confirms with **Confirm**; the double click and the Ctrl / Shift hint are gone;
+- folders are not dragged onto each other any more; move them from the selection bar;
+- documents without a folder are listed at the root, as in Payload 4's own view.
