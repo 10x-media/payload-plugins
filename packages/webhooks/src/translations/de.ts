@@ -10,6 +10,10 @@ export const de: Record<TranslationKey, string> = {
 	[keys.fieldUrl]: 'Endpoint-URL',
 	[keys.urlInvalid]: 'Geben Sie eine absolute URL mit http:// oder https:// ein.',
 	[keys.urlHostNotAllowed]: 'Dieser Host steht nicht auf der Liste der erlaubten Webhook-Hosts.',
+	[keys.urlNotHttps]:
+		'Geben Sie eine https://-URL ein. Unverschlüsseltes http:// ist für Webhook-Endpunkte nicht erlaubt.',
+	[keys.urlPrivateAddress]:
+		'Diese Adresse ist privat, lokal oder nicht öffentlich erreichbar, daher können keine Webhooks dorthin gesendet werden.',
 	[keys.fieldEnabled]: 'Aktiviert',
 	[keys.fieldEvents]: 'Ereignisse',
 	[keys.fieldSecret]: 'Signaturgeheimnis',

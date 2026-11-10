@@ -1,7 +1,7 @@
 {
 	"name": "@10x-media/webhooks",
 	"version": "4.0.0-alpha.0",
-	"description": "Outbound webhook subscriptions for Payload v3",
+	"description": "Outbound webhook subscriptions for Payload",
 	"license": "MIT",
 	"repository": {
 		"type": "git",
@@ -73,6 +73,10 @@
 		"migrate:status": "pnpm --filter @10x-media/webhooks-dev migrate:status",
 		"migrate:fresh": "pnpm --filter @10x-media/webhooks-dev migrate:fresh",
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
+	},
+	"dependencies": {
+		"ipaddr.js": "^2.2.0",
+		"undici": "^7.24.4"
 	},
 	"peerDependencies": {
 		"@10x-media/fields": "^4.0.0-alpha.0",

@@ -1,5 +1,5 @@
 import type { KeysConfig } from '@10x-media/fields/encrypted'
-import type { CollectionConfig, CollectionSlug, Field, PayloadRequest } from 'payload'
+import type { CollectionConfig, CollectionSlug, Field, PayloadRequest, Where } from 'payload'
 
 import {
 	DEFAULT_DELIVERY_QUEUE,
@@ -8,9 +8,109 @@ import {
 	DEFAULT_TIMEOUT_MS,
 	MAX_ROTATION_GRACE_SECONDS,
 } from './constants'
+import type { UrlPolicy } from './delivery/destination'
 import type { TranslationsOption } from './translations'
 
 export type WebhookOperation = 'create' | 'update' | 'delete'
+
+export type MaybePromise<T> = Promise<T> | T
+
+/**
+ * What a `filter` or `owner.resolve` callback is shown of a subscription. `record` is the stored
+ * row at depth 0 for an admin-managed subscription, fields added through
+ * `subscriptionsCollection.overrides` included, or the config object for a code subscription.
+ * The signing secrets and the custom header values are never part of it.
+ */
+export type WebhookSubscriptionInfo = {
+	id: string
+	source: 'code' | 'collection'
+	url: string
+	events: string[]
+	record: Record<string, unknown>
+}
+
+/**
+ * Decide per subscription whether a document is delivered to it. Runs before a delivery row
+ * exists, so `false` leaves no record of the document and sends nothing. A filter that throws is
+ * logged and counts as `false`.
+ *
+ * It runs for code subscriptions as well, with `source: 'code'`; return `true` for those to keep
+ * a monitoring subscription receiving everything. It is a business rule, not the tenant boundary:
+ * `enforceOwnerAccess` is what guarantees a subscription cannot receive what its owner cannot read.
+ *
+ * `req` is the write's own request. As in any hook, a Local API call made with it that throws
+ * rolls the write's transaction back, so pass `disableErrors: true` to a lookup that may miss.
+ */
+export type SubscriptionFilter = (args: {
+	doc: Record<string, unknown>
+	previousDoc?: Record<string, unknown>
+	operation: WebhookOperation
+	subscription: WebhookSubscriptionInfo
+	req: PayloadRequest
+}) => MaybePromise<boolean>
+
+/**
+ * Narrow which subscriptions are loaded for a document, with a `Where` over the subscriptions
+ * collection that is combined with the plugin's own `enabled` and `events` constraints. A
+ * multi-tenant install then reads its own tenant's rows per write instead of every subscriber to
+ * the event.
+ *
+ * A performance dimension, not a boundary, and it cuts both ways: a subscription the `Where`
+ * leaves out is never considered, so `or` in the rows that carry no tenant of their own. A scope
+ * that throws, or returns a query the subscriptions collection cannot run, is logged and ignored.
+ * Code subscriptions are not affected by it.
+ */
+export type SubscriptionScope = (args: {
+	doc: Record<string, unknown>
+	previousDoc?: Record<string, unknown>
+	operation: WebhookOperation
+	req: PayloadRequest
+}) => MaybePromise<Where | null | undefined>
+
+/**
+ * A user whose read access a subscription is evaluated against. Pass the real user document,
+ * the thing Payload would put on `req.user`, with its `collection`. Without one the admin
+ * collection is assumed, the way Payload's own Local API does.
+ */
+export type OwnerUser = { id: number | string; collection?: string } & Record<string, unknown>
+
+/**
+ * Who a subscription acts as. `{ user }` binds it to that user: it can only subscribe to
+ * collections the user can read, and only ever receives documents the user can read, as the user
+ * reads them. `{ global: true }` marks trusted infrastructure and skips both checks, which is
+ * right for a subscription an operator manages and wrong for anything a tenant can create.
+ */
+export type SubscriptionOwner = { global: true; user?: never } | { global?: false; user: OwnerUser }
+
+export type SubscriptionOwnership = {
+	/**
+	 * Called when a subscription is saved, for every candidate subscription at dispatch (once
+	 * per subscription per request), and before every queued attempt and replay. `null` means no
+	 * owner could be determined, which under `enforceOwnerAccess` rejects the save and skips the
+	 * delivery. Never return `{ global: true }` just because an owner field is empty, unless only
+	 * operators can create subscriptions. Code subscriptions are always global and never reach this.
+	 *
+	 * `req` is a request of its own, outside the transaction of the write being dispatched: it
+	 * reads committed data, and nothing it does can roll that write back. It carries the user and
+	 * the headers of whoever is calling where it is asked: the one saving the subscription, the
+	 * one whose write is dispatched, the one replaying a delivery, and in a queued attempt the job
+	 * runner's request, which usually has neither. So derive the owner from the subscription, never
+	 * from `req`: an answer that changed with the caller would make a queued attempt see a
+	 * different owner than its write did, and refuse it as made for another owner.
+	 */
+	resolve: (args: {
+		subscription: WebhookSubscriptionInfo
+		req: PayloadRequest
+	}) => MaybePromise<SubscriptionOwner | null>
+	/**
+	 * Whether the caller may save a subscription that acts as `owner`. Asked on create and whenever
+	 * a save changes who the owner is. Without it, a logged-in user may only act as themselves and
+	 * never as the global owner. Server code, a Local API call with no user on it, is trusted and
+	 * not asked. `req` is a request of the plugin's own carrying the caller's user and headers
+	 * (cookies included), outside the caller's transaction, with an empty `context`.
+	 */
+	canActAs?: (args: { owner: SubscriptionOwner; req: PayloadRequest }) => MaybePromise<boolean>
+}
 
 export type CollectionWebhookConfig = {
 	operations?: WebhookOperation[]
@@ -28,14 +128,27 @@ export type CollectionWebhookConfig = {
 	 * when `includePreviousData` is set, to `previousData` as well, so redaction cannot
 	 * be bypassed through the prior document. `target` names the slot being built; on
 	 * the `previousData` call `doc` is the prior document and `previousDoc` is undefined.
+	 *
+	 * It is synchronous: the body is built from what it returns, so a promise is not awaited.
+	 *
+	 * Under `enforceOwnerAccess`, `doc` for an owner-bound subscription is the owner's view and
+	 * `owner` says whose. `req` is always the write's own request, so `req.user` is the writer,
+	 * not the receiver: redact by `owner`, never by `req.user`. `owner` is unset for the view
+	 * given to global subscriptions, and whenever enforcement is off, when one body is shared by
+	 * every subscriber.
 	 */
 	transform?: (args: {
 		doc: Record<string, unknown>
 		previousDoc?: Record<string, unknown>
 		operation: WebhookOperation
+		owner?: { user: OwnerUser }
 		req: PayloadRequest
 		target: 'data' | 'previousData'
 	}) => unknown
+	/** Decide per subscription whether this document is delivered. See `SubscriptionFilter`. */
+	filter?: SubscriptionFilter
+	/** Narrow the subscriptions loaded for this document. See `SubscriptionScope`. */
+	scope?: SubscriptionScope
 }
 
 export type CodeSubscription = {
@@ -55,13 +168,27 @@ export type DeliveryOptions = {
 	retries?: number
 	queue?: string
 	/**
-	 * Hostnames deliveries may be sent to. Unset, every host is allowed, localhost and private
-	 * addresses included, which is what development and internal receivers need. Set, it is an
+	 * Hostnames deliveries may be sent to. Unset, no host is ruled out by name. Set, it is an
 	 * allowlist: an exact hostname, or `*.example.com` for any subdomain. A subscription for any
 	 * other host is rejected on save, a code subscription for one fails at startup, and a row
 	 * that already points at one is refused at delivery time. An empty list allows no host at all.
+	 * It is independent of `allowPrivateAddresses`: a listed host still has to be public unless
+	 * that is on.
 	 */
 	allowedHosts?: string[]
+	/**
+	 * Let admin-managed subscriptions point at loopback, private, link-local and other non-public
+	 * addresses. Default `false`: a subscription URL is input from whoever may create one, and a
+	 * delivery to an internal address is a request made from inside your network on their behalf.
+	 * Turn it on for local development, or when receivers are internal and every subscription
+	 * author is trusted. Code subscriptions are never held to this.
+	 */
+	allowPrivateAddresses?: boolean
+	/**
+	 * Let admin-managed subscriptions use `http:`. Default `false`: the body is the document and the
+	 * custom headers are where a receiver's credential goes. Code subscriptions are never held to this.
+	 */
+	allowHttp?: boolean
 }
 
 /** Replace the default fields, or transform them (the idiomatic Payload form). */
@@ -131,6 +258,21 @@ export type WebhooksPluginOptions = {
 	}
 	secretEncryption?: SecretEncryptionOptions
 	secretRotation?: SecretRotationOptions
+	/**
+	 * Who each admin-managed subscription acts as. With it set, delivery rows record their owner
+	 * in `ownerId` and `ownerCollection` (two new columns on a SQL adapter), which is what a
+	 * tenant-scoped `deliveriesLog.overrides.access.read` matches on.
+	 */
+	owner?: SubscriptionOwnership
+	/**
+	 * Guarantee that a subscription never receives a document its owner could not read. Checked on
+	 * save (the owner must be able to read every collection the save subscribes it to)
+	 * and again per document on dispatch, where the document is re-read through Payload's access
+	 * control as the owner and that view, at depth 0, is what is sent. `previousData` is not sent
+	 * to an owner-bound subscription. Requires `owner`, and explicit access functions for both of
+	 * the plugin's collections.
+	 */
+	enforceOwnerAccess?: boolean
 }
 
 export type ResolvedSecretRotationOptions = {
@@ -162,6 +304,7 @@ export type ResolvedDeliveryOptions = {
 	retries: number
 	queue: string
 	allowedHosts?: string[]
+	urlPolicy: UrlPolicy
 }
 
 export const resolveDeliveryOptions = (
@@ -175,5 +318,10 @@ export const resolveDeliveryOptions = (
 		retries: opts.retries ?? DEFAULT_RETRIES,
 		queue: opts.queue ?? DEFAULT_DELIVERY_QUEUE,
 		allowedHosts: opts.allowedHosts,
+		urlPolicy: {
+			allowedHosts: opts.allowedHosts,
+			allowHttp: opts.allowHttp ?? false,
+			allowPrivateAddresses: opts.allowPrivateAddresses ?? false,
+		},
 	}
 }

@@ -1,7 +1,7 @@
 import type { PayloadRequest } from 'payload'
 
 import { eventId } from '../events/eventTypes'
-import type { CollectionWebhookConfig, WebhookOperation } from '../options'
+import type { CollectionWebhookConfig, OwnerUser, WebhookOperation } from '../options'
 
 /** The JSON body POSTed to a subscriber. */
 export type WebhookBody = {
@@ -21,13 +21,16 @@ export const buildPayload = (args: {
 	operation: WebhookOperation
 	doc: Record<string, unknown>
 	previousDoc?: Record<string, unknown>
+	/** Whose view `doc` is, when it was read as a subscription's owner. */
+	owner?: { user: OwnerUser }
 	occurredAt: string
 	config?: CollectionWebhookConfig
 	req: PayloadRequest
 }): WebhookBody => {
-	const { deliveryId, collection, operation, doc, previousDoc, occurredAt, config, req } = args
+	const { deliveryId, collection, operation, doc, previousDoc, owner, occurredAt, config, req } =
+		args
 	const data = config?.transform
-		? config.transform({ doc, previousDoc, operation, req, target: 'data' })
+		? config.transform({ doc, previousDoc, operation, owner, req, target: 'data' })
 		: doc
 	const body: WebhookBody = {
 		id: deliveryId,
@@ -39,7 +42,7 @@ export const buildPayload = (args: {
 	}
 	if (operation === 'update' && config?.includePreviousData && previousDoc) {
 		body.previousData = config?.transform
-			? config.transform({ doc: previousDoc, operation, req, target: 'previousData' })
+			? config.transform({ doc: previousDoc, operation, owner, req, target: 'previousData' })
 			: previousDoc
 	}
 	return body

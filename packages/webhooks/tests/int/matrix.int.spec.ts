@@ -1,11 +1,13 @@
 import { createServer, type IncomingHttpHeaders, type Server } from 'node:http'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, PayloadRequest } from 'payload'
+import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, expect, it } from 'vitest'
 import { GENERATED_SECRET_KEY } from '../../src/constants'
 import { pruneDeliveries, webhooks } from '../../src/index'
 import { resolveSubscriptionById } from '../../src/plugin/resolveSubscriptions'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
+import { LOCAL_SINK } from './localSink'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -30,7 +32,10 @@ describeForDb('webhooks outbound cross-db', {}, (db) => {
 		}
 		sinkUrl = `http://127.0.0.1:${addr.port}`
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: 'inline' }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', ...LOCAL_SINK },
+			}),
 			db,
 			collections: [posts],
 		})
@@ -156,7 +161,10 @@ describeForDb('webhooks rotation lifecycle', {}, (db) => {
 		}
 		sinkUrl = `http://127.0.0.1:${addr.port}`
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: { mode: 'inline', retries: 0 } }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', retries: 0, ...LOCAL_SINK },
+			}),
 			db,
 			collections: [posts],
 		})
@@ -244,7 +252,10 @@ describeForDb('webhooks rotation concurrency', {}, (db) => {
 
 	beforeAll(async () => {
 		booted = await bootPayload({
-			plugin: webhooks({ collections: { posts: true }, delivery: 'inline' }),
+			plugin: webhooks({
+				collections: { posts: true },
+				delivery: { mode: 'inline', ...LOCAL_SINK },
+			}),
 			db,
 			collections: [posts],
 		})
@@ -313,5 +324,231 @@ describeForDb('webhooks rotation concurrency', {}, (db) => {
 				)
 			}
 		}
+	})
+})
+
+/**
+ * The owner read happens inside the write's own transaction, through a request the plugin builds
+ * itself. Whether that request sees the uncommitted row is adapter behaviour, a session on Mongo
+ * and a connection on Postgres, so it is proven on both.
+ */
+describeForDb('webhooks owner access cross-db', {}, (db) => {
+	let booted: BootedPayload
+	let sink: Server
+	let paths: string[] = []
+
+	const tenantUsers: CollectionConfig = {
+		slug: 'users',
+		auth: true,
+		access: { read: () => true },
+		fields: [{ name: 'tenant', type: 'text' }],
+	}
+	const tenantPosts: CollectionConfig = {
+		slug: 'posts',
+		access: {
+			read: ({ req }) =>
+				req.user ? { tenant: { equals: (req.user as { tenant?: string }).tenant } } : false,
+		},
+		fields: [
+			{ name: 'title', type: 'text' },
+			{ name: 'tenant', type: 'text' },
+		],
+	}
+	/** Read access that throws for any user, the way a broken access function does. */
+	const guarded: CollectionConfig = {
+		slug: 'guarded',
+		access: {
+			read: ({ req }) => {
+				if (req.user) {
+					throw new Error('access blew up')
+				}
+				return false
+			},
+		},
+		fields: [{ name: 'title', type: 'text' }],
+	}
+	const allow = () => true
+
+	beforeAll(async () => {
+		sink = createServer((request, res) => {
+			paths.push(request.url ?? '')
+			res.writeHead(200)
+			res.end('ok')
+		})
+		await new Promise<void>((r) => sink.listen(0, r))
+		const addr = sink.address()
+		if (addr === null || typeof addr === 'string') {
+			throw new Error('no port')
+		}
+		const sinkUrl = `http://127.0.0.1:${addr.port}`
+		booted = await bootPayload({
+			plugin: webhooks({
+				collections: { posts: true, guarded: true },
+				delivery: { mode: 'inline', ...LOCAL_SINK },
+				enforceOwnerAccess: true,
+				owner: {
+					resolve: async ({ subscription, req }) => ({
+						user: {
+							...(await req.payload.findByID({
+								collection: 'users',
+								id: subscription.record.owner as number | string,
+								depth: 0,
+								overrideAccess: true,
+								req,
+							})),
+							collection: 'users',
+						},
+					}),
+				},
+				subscriptionsCollection: {
+					overrides: {
+						access: { read: allow, create: allow, update: allow, delete: allow },
+						fields: ({ defaultFields }) => [
+							...defaultFields,
+							{ name: 'owner', type: 'relationship', relationTo: 'users' },
+						],
+					},
+				},
+				deliveriesLog: { overrides: { access: { read: allow, delete: allow } } },
+			}),
+			db,
+			collections: [tenantUsers, tenantPosts, guarded],
+		})
+		for (const tenant of ['a', 'b']) {
+			const user = await booted.payload.create({
+				collection: 'users',
+				data: { email: `${tenant}@test.dev`, password: 'test1234', tenant },
+				overrideAccess: true,
+			})
+			await booted.payload.create({
+				collection: 'webhook-subscriptions',
+				data: {
+					name: tenant,
+					url: `${sinkUrl}/${tenant}`,
+					enabled: true,
+					events: ['posts.created', 'posts.deleted'],
+					owner: user.id,
+				},
+				overrideAccess: true,
+			})
+		}
+	})
+
+	afterAll(async () => {
+		await booted.stop()
+		await new Promise<void>((r) => sink.close(() => r()))
+	})
+
+	it(`sees the uncommitted document as its owner, and only as its owner, on ${db}`, async () => {
+		const post = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'x', tenant: 'a' },
+			overrideAccess: true,
+		})
+		expect(paths).toEqual(['/a'])
+		// The owner read ran on the write's own transaction, and left it standing.
+		const kept = await booted.payload.count({
+			collection: 'posts',
+			where: { id: { equals: post.id } },
+			overrideAccess: true,
+		})
+		expect(kept.totalDocs).toBe(1)
+		paths = []
+		await booted.payload.delete({ collection: 'posts', id: post.id, overrideAccess: true })
+		expect(paths).toEqual(['/a'])
+	})
+
+	/**
+	 * A replay re-reads the document as the owner by the id the row recorded, which is text on
+	 * every adapter while the document id is a serial on SQL ones. A delete asks about the
+	 * collection instead, since the document is gone.
+	 */
+	it(`asks again on a replay whether the owner can still read what it is about, on ${db}`, async () => {
+		const { token } = await booted.payload.login({
+			collection: 'users',
+			data: { email: 'a@test.dev', password: 'test1234' },
+		})
+		const replay = async (id: number | string) => {
+			const res = await handleEndpoints({
+				config: booted.payload.config,
+				payloadInstanceCacheKey: booted.cacheKey,
+				request: new Request(`http://localhost:3000/api/webhook-deliveries/${id}/redeliver`, {
+					method: 'POST',
+					headers: { Authorization: `JWT ${token}` },
+				}),
+			})
+			expect(res.status).toBe(202)
+			return ((await res.json()) as { status: string }).status
+		}
+		const subscription = await booted.payload.find({
+			collection: 'webhook-subscriptions',
+			where: { name: { equals: 'a' } },
+			overrideAccess: true,
+		})
+		const subscriptionId = String(subscription.docs[0]?.id)
+		const latest = async (event: string) =>
+			(
+				await booted.payload.find({
+					collection: 'webhook-deliveries',
+					where: { subscriptionId: { equals: subscriptionId }, event: { equals: event } },
+					sort: '-createdAt',
+					limit: 1,
+					overrideAccess: true,
+				})
+			).docs[0]?.id as number | string
+		const post = await booted.payload.create({
+			collection: 'posts',
+			data: { title: 'replayed', tenant: 'a' },
+			overrideAccess: true,
+		})
+		const created = await latest('posts.created')
+		paths = []
+		expect(await replay(created)).toBe('success')
+		expect(paths).toEqual(['/a'])
+		await booted.payload.update({
+			collection: 'posts',
+			id: post.id,
+			data: { tenant: 'b' },
+			overrideAccess: true,
+		})
+		paths = []
+		expect(await replay(created)).toBe('dead')
+		expect(paths).toEqual([])
+		const deleted = await latest('posts.deleted')
+		paths = []
+		expect(await replay(deleted)).toBe('success')
+		expect(paths).toEqual(['/a'])
+	})
+
+	/**
+	 * The owner read joins the write's transaction through a promise of its id, which is what
+	 * keeps a throw inside it from rolling the write back. That is adapter behaviour as well.
+	 */
+	it(`leaves the write standing when the owner read throws on ${db}`, async () => {
+		const owner = await booted.payload.find({ collection: 'users', limit: 1, overrideAccess: true })
+		// Past the save guard, which would refuse a collection its owner cannot read.
+		await booted.payload.db.create({
+			collection: 'webhook-subscriptions',
+			data: {
+				name: 'g',
+				url: 'http://127.0.0.1:1/g',
+				enabled: true,
+				events: ['guarded.created'],
+				owner: owner.docs[0]?.id,
+			},
+		})
+		paths = []
+		const doc = await booted.payload.create({
+			collection: 'guarded',
+			data: { title: 'x' },
+			overrideAccess: true,
+		})
+		const kept = await booted.payload.count({
+			collection: 'guarded',
+			where: { id: { equals: doc.id } },
+			overrideAccess: true,
+		})
+		expect(kept.totalDocs).toBe(1)
+		expect(paths).toEqual([])
 	})
 })
