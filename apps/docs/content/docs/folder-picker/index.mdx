@@ -3,17 +3,24 @@ title: Folder Picker
 description: Folder browsing inside Payload's list drawer, so any field picks documents by folder.
 ---
 
-`@10x-media/folder-picker` puts folders into the drawer that opens when a field picks an existing document. Payload has had folders since 3.39, but only on the collection route: from an upload field's "choose from existing" you get a flat, paginated list with no folders in sight.
+`@10x-media/folder-picker` puts folders into the drawer that opens when a field picks an existing document. Payload 4 browses folders on the collection route, but from an upload field's "choose from existing" you get a flat, paginated list with no folders in sight.
 
-![The list drawer with All Media and By Folder tabs, browsing the Media / Brand folder with one file selected and the move and delete actions in the header](/images/folder-picker/overview.png)
+![The list drawer with All Media and By Folder tabs, browsing the Brand folder with two files ticked and Confirm in the header](/images/folder-picker/overview.png)
 
 ```ts title="payload.config.ts"
-import { buildConfig } from 'payload'
+import { buildConfig, createFolderField } from 'payload'
 import { folderPicker } from '@10x-media/folder-picker'
 
 export default buildConfig({
-  folders: { browseByFolder: true },
-  collections: [{ slug: 'media', folders: true, upload: true, fields: [] }],
+  collections: [
+    {
+      slug: 'folders',
+      admin: { useAsTitle: 'name' },
+      folders: true,
+      fields: [{ name: 'name', type: 'text', required: true }],
+    },
+    { slug: 'media', upload: true, fields: [createFolderField({ relationTo: 'folders' })] },
+  ],
   plugins: [folderPicker({})],
 })
 ```
@@ -23,35 +30,38 @@ export default buildConfig({
 Anything that opens a list drawer:
 
 - upload fields, single and `hasMany`
-- polymorphic upload fields, one tab per collection
+- polymorphic upload fields, one folder tree per collection
 - relationship fields with `admin: { appearance: 'drawer' }`
 - the lexical upload node
 
 ## What it adds inside the drawer
 
-- subfolder navigation with breadcrumbs, plus search within the current folder
-- grid or list display, and sorting by name, created or updated
+The **By Folder** tab is Payload's own hierarchy view, the one the collection route shows, hosted in the drawer:
+
+- subfolder navigation with a trail back up, plus search within the current folder
 - create a folder or a document without leaving the editor
-- move, rename and delete folders
+- no bulk edit, move or delete: ticking selects for the field, and managing the library stays on the collection route
 - bulk upload straight into the folder being viewed, for `hasMany` fields
+
+Nothing the view does leaves the document you are editing, unsaved changes included.
 
 ## Picking documents
 
-Double-click opens a folder, and double-clicking a file picks it outright. A single click selects, and **Select** in the search bar confirms.
-
-A `hasMany` field takes Ctrl or Cmd for one more and Shift for a range, with a hint under the header saying so. A single-value field ignores the modifiers and draws no hint.
+A single-value field picks with a click on a document's name, as the list tab does. A `hasMany` field ticks documents and hands them over with **Confirm** in the header.
 
 Documents the field already holds are left out of the folder, exactly as they are left out of the list tab. Remove a value and the document is offered again.
 
+Only folders that accept the drawer's collection are listed: in a folder collection with `collectionSpecific`, a folder that holds only `files` does not show up when picking `media`.
+
 ## What it leaves alone
 
-- **The collection's list route.** Outside a drawer nothing changes: `/admin/collections/media` is byte-for-byte what it was.
-- **Collections without `folders: true`.** Their drawer stays the stock flat list.
+- **The collection's list route.** Outside a drawer nothing changes.
+- **Collections that are not filed into a folder collection.** Their drawer stays the stock flat list.
 - **Collections that already declare a list view.** A host customization is never overwritten.
 
 ## Requirements
 
-Payload `^3.83.0`, React 19, with folders enabled in the config and on at least one collection.
+Payload `^4.0.0-beta.6` on Next.js or TanStack Start, React 19, with a folder collection (`folders: true`) and at least one collection filed into it with `createFolderField`. Coming from Payload 3? See [Upgrading to Payload 4](/folder-picker/upgrading).
 
 ## Next
 

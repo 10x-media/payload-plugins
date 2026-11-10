@@ -1,74 +1,118 @@
-/* Styles for the folder browsing the plugin adds to Payload's list drawer. Class names
-   deliberately match Payload's own (.list-drawer__header, .collection-folder-list) rather than
-   carrying a plugin prefix: this restyles Payload's markup, it does not introduce its own. */
-
-/* Both drawer views stack below the All Media / By Folder tabs, so neither header should keep the
-   top margin it carries when it leads the drawer (base(2.5) on .list-drawer__header). Zeroing both
-   leaves the h1's own leading as the gap, which matches the space below the title and keeps the
-   two views identical. Keyed on markup only FolderListView renders, the folder view's own root and
-   the tabs gutter that precedes DefaultListView, so every other list drawer (a relationship field
-   with appearance: 'drawer', whose header does lead the drawer) keeps its margin. Two rules rather
-   than one selector group so the weaker selector comes first (noDescendingSpecificity). */
-.collection-folder-list .list-drawer__header {
-	margin-top: 0;
-}
-
-.default-list-view-tabs__drawer-gutter ~ .collection-list .list-drawer__header {
-	margin-top: 0;
-}
-
-/* The drawer folder view puts its trail beside the All Media / By Folder tabs, which the route
-   view cannot do because its own trail lives in the admin step nav. Slash separators rather than
-   the chevron the folder breadcrumbs use, and a muted icon that follows the active theme. */
-.collection-folder-list__tabs-row {
+/* The list drawer with its All / By folder tabs. The bar takes the place of the drawer header's
+   close button, so it carries the same padding and rule as `.drawer .list-drawer__header`. */
+.folder-picker__bar {
 	align-items: center;
+	background: var(--color-bg);
+	border-bottom: var(--stroke-width-small) solid var(--color-border);
 	display: flex;
-	flex-wrap: nowrap;
-	gap: calc(var(--base) * 0.75);
+	gap: var(--spacer-1);
+	padding: var(--spacer-2-5) var(--spacer-3) var(--spacer-2-5) var(--spacer-2);
+}
+
+.folder-picker__bar .default-list-view-tabs {
+	flex: 1 0 0;
 	min-width: 0;
 }
 
-.collection-folder-list__trail {
+/* One close button for both tabs: the bar's. */
+.folder-picker__drawer .list-drawer__header-close {
+	display: none;
+}
+
+/* Payload's hierarchy header, on the same lines as the list tab's header: title at the drawer
+   header's inset, everything below it at the controls' inset. Its own All / By tabs push the
+   collection route, and the bar above already switches. */
+.folder-picker .hierarchy-list-header {
+	padding: var(--spacer-2-5) var(--spacer-3) var(--spacer-2-5) var(--spacer-2);
+}
+
+/* The list tab's title row is as tall as its Create New button; this one has no button (Create
+   New sits in the controls row), so it takes the same height to keep the title on the same line. */
+.folder-picker .hierarchy-list-header .list-header__title-and-actions {
 	align-items: center;
-	color: var(--theme-elevation-500);
-	display: flex;
-	flex-wrap: nowrap;
-	gap: calc(var(--base) * 0.25);
-	min-width: 0;
-	overflow: hidden;
-	white-space: nowrap;
+	min-height: var(--spacer-4);
 }
 
-.collection-folder-list__trail .icon--folder {
-	flex-shrink: 0;
+/* The trail portals into the title row and the confirm into the actions, so in a drawer for one
+   collection (no collection select) the sub-header would only add its top padding under the title. */
+.folder-picker .hierarchy-list__sub-header:not(:has(.list-drawer__select-collection-wrap)) {
+	display: none;
 }
 
-.collection-folder-list__trail .btn {
-	margin: 0;
+/* With the collection select it stays, at the list tab's distance below the title (its own top
+   padding would push the select 12px lower than on the list tab). */
+.folder-picker .hierarchy-list__sub-header {
+	padding-top: 0;
 }
 
-.collection-folder-list__trail-sep {
-	color: var(--theme-elevation-400);
+/* The trail is the title: Payload's title (the current folder, which the trail ends on) and its
+   empty title actions make way for it. */
+.folder-picker .hierarchy-list-header .list-header__title,
+.folder-picker .hierarchy-list-header .list-header__title-actions {
+	display: none;
 }
 
-.collection-folder-list__trail-crumb {
-	color: var(--theme-elevation-800);
-	min-width: 0;
-	overflow: hidden;
-	text-overflow: ellipsis;
+/* A picker picks: the selection keeps its count and Clear All, but not the view's bulk Edit,
+   Publish, Delete and Move, which manage the library rather than choose from it (Delete would
+   remove documents other fields still reference). `HierarchyListView` does not forward
+   `disableBulkDelete` / `disableBulkEdit` to its header, and Move has no switch, so the second
+   action group and the dash before it are hidden. */
+.folder-picker .list-selection > .list-selection__actions:nth-of-type(2),
+.folder-picker .list-selection > span:nth-of-type(3) {
+	display: none;
 }
 
-/* The All Media tab's own header is owned by DefaultListView, so bulk upload sits with the view
-   tabs instead. Scoped to the drawer so no other list view is touched. */
-.list-drawer .default-list-view-tabs__drawer-row {
+/* Hidden rather than removed: the confirm button portals into the same actions row. */
+.folder-picker .hierarchy-list-header .default-list-view-tabs {
+	display: none;
+}
+
+/* The type filter narrows the related collections; a drawer only ever lists one. The "Accepts"
+   line follows `allowedCollections`, which the drawer sets to its own collection, not the folder's. */
+.folder-picker .hierarchy-list__controls .type-filter,
+.folder-picker .hierarchy-list__allowed-types {
+	display: none;
+}
+
+/* The tables run edge to edge with full-width rules, as the list tab's table does; the section
+   headings move in to the checkbox column, where the list tab's first column starts. */
+.folder-picker .hierarchy-list__controls {
+	padding-inline: var(--spacer-3);
+}
+
+.folder-picker .table-section__header-inner {
+	padding-inline: var(--spacer-3);
+}
+
+/* Set like the list tab's title; the ancestors read as the step nav does, in the secondary color. */
+.folder-picker__trail {
 	align-items: center;
+	color: var(--color-text-secondary);
 	display: flex;
-	gap: calc(var(--base) * 0.5);
+	flex-wrap: wrap;
+	font-size: var(--text-body-medium-bold-font-size);
+	font-weight: var(--text-body-medium-bold-font-weight);
+	gap: var(--spacer-1);
+	letter-spacing: var(--text-body-medium-bold-letter-spacing);
+	line-height: var(--text-body-medium-bold-line-height);
+	min-width: 0;
 }
 
-/* Styled like Payload's own field descriptions so the hint reads as part of the admin
-   rather than as an addition to it. */
-.collection-folder-list__pick-many-hint {
-	color: var(--theme-elevation-400);
-	font-size: 1rem;
+.folder-picker__trail-link {
+	background: none;
+	border: 0;
+	color: var(--color-text-secondary);
+	cursor: pointer;
+	font: inherit;
+	padding: 0;
+}
+
+.folder-picker__trail-link:hover,
+.folder-picker__trail-link:focus-visible {
+	color: var(--color-text);
+	text-decoration: underline;
+}
+
+.folder-picker__trail-current {
+	color: var(--color-text);
 }

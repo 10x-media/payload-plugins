@@ -28,7 +28,7 @@ The plugin ships several locales. For a locale it does not ship, Payload renders
 
 ## Everything else is Payload's
 
-The namespace is deliberately small. The drawer speaks in Payload's own strings, `general:select`, `general:move`, `general:delete`, `folder:byFolder` and the rest, so the picker follows the admin locale without the plugin restating any of it.
+The namespace is deliberately small. The drawer speaks in Payload's own strings, `general:all`, `general:by`, `general:confirm`, `upload:selectCollectionToBrowse` and the rest, plus everything the hosted hierarchy view says, so the picker follows the admin locale without the plugin restating any of it.
 
 Retitling those goes through Payload's `i18n.translations`, not this option:
 
@@ -36,7 +36,7 @@ Retitling those goes through Payload's `i18n.translations`, not this option:
 export default buildConfig({
   i18n: {
     translations: {
-      de: { general: { select: 'Übernehmen' } },
+      de: { general: { confirm: 'Übernehmen' } },
     },
   },
 })
