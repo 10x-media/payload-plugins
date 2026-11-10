@@ -8,9 +8,10 @@ const DEV_PASSWORD = 'password'
  * with sample data once the plugin gains feature behavior.
  */
 export const seedDev = async (payload: Payload): Promise<void> => {
-	const userCount = await payload.count({ collection: 'users' })
+	const userCount = await payload.count({ collection: 'users', overrideAccess: true })
 	if (userCount.totalDocs === 0) {
 		await payload.create({
+			overrideAccess: true,
 			collection: 'users',
 			data: { email: DEV_EMAIL, password: DEV_PASSWORD },
 		})

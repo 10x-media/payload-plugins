@@ -145,7 +145,7 @@ Scoping is by **package graph**, never by directory. A change to `jobs` also sel
 **What forces the whole workspace**, and this is the part to keep intact when editing any of it:
 
 - A path in `globalDependencies` (`config/**`, `tsconfig.json`, `biome.json`, `.npmrc`, the root `package.json`, `pnpm-workspace.yaml`). Turbo fans those out to all 29 packages. The root manifest and the catalog are in that list *specifically* for this: without them a Payload bump in `pnpm-workspace.yaml`'s `catalog:` selects no packages at all and CI passes having tested nothing.
-- A change under `.github/` or `scripts/`, which `ci-affected.sh` special-cases. Those are not a build input of any package, so turbo cannot see them, and a pull request that rewrites CI would otherwise go green having run nothing. On this branch a pull request into `v4` is scoped anyway, because the unported plugins make a full run red regardless; a CI change there has to bring along (or touch) a ported plugin that exercises it.
+- A change under `.github/` or `scripts/`, which `ci-affected.sh` special-cases. Those are not a build input of any package, so turbo cannot see them, and a pull request that rewrites CI would otherwise go green having run nothing.
 - `workflow_dispatch`, a first push to a branch, or a base commit that force-push removed.
 
 Verify a scoping change with `turbo ls`, which applies the filter without hashing (`--dry=json` also works but re-hashes the workspace, which is slow on Windows when a global dependency changed):

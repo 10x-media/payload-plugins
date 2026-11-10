@@ -3,9 +3,9 @@
 # @10x-media/automations
 
 > [!IMPORTANT]
-> **This is the Payload v4 branch.** `@10x-media/automations` has not been ported to Payload 4 yet, so there is no v4 release. For Payload 3, install `pnpm add @10x-media/automations` (`latest`) and read the [`main` branch](https://github.com/10x-media/payload-plugins/tree/main/packages/automations).
+> **This is the Payload v4 branch.** The scaffold runs on Payload `4.0.0-beta` on Next.js and TanStack Start. It has no v4 release yet; the Payload v3 version lives on [`main`](https://github.com/10x-media/payload-plugins/tree/main/packages/automations).
 
-A no-code automation engine for Payload v3: editors will compose automations from triggers and actions in the admin panel, with each action running as a Payload task. Beta scaffold; the engine is being built on top of [@10x-media/jobs](https://www.npmjs.com/package/@10x-media/jobs).
+A no-code automation engine for Payload: editors will compose automations from triggers and actions in the admin panel, with each action running as a Payload task. Beta scaffold; the engine is being built on top of [@10x-media/jobs](https://www.npmjs.com/package/@10x-media/jobs).
 
 [![npm](https://img.shields.io/npm/v/@10x-media/automations?style=flat-square)](https://www.npmjs.com/package/@10x-media/automations)
 

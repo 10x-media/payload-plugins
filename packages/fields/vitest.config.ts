@@ -17,6 +17,10 @@ const isMatrixRun = Boolean(process.env.DB_MATRIX)
 export default mergeConfig(sharedVitestConfig, {
 	test: {
 		dangerouslyIgnoreUnhandledErrors: isMatrixRun,
+		// Node 25 and later define a localStorage of their own, an empty shell without
+		// --localstorage-file, which vitest keeps over jsdom's in the jsdom suites. The flag (named so
+		// on Node 24 too) leaves the window jsdom's.
+		execArgv: ['--no-experimental-webstorage'],
 		include: ['tests/int/**/*.int.spec.ts', 'tests/dist/**/*.spec.ts', 'src/**/*.test.{ts,tsx}'],
 		exclude: ['node_modules', 'dist', '.next', 'tests/e2e/**'],
 	},

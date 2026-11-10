@@ -1,8 +1,23 @@
-import { defineConfig, devices } from '@playwright/test'
+// biome-ignore-all lint/plugin/noProcessEnv: e2e orchestration env boundary
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { defineConfig, devices } from '@playwright/test'
 
 const dirname = path.dirname(fileURLToPath(import.meta.url))
+
+const mongoPort = process.env.MONGO_E2E_PORT ?? '37017'
+const pgPort = process.env.PG_E2E_PORT ?? '35432'
+/** The app's port. The name predates the TanStack Start leg, which uses it as well. */
+const appPort = process.env.E2E_NEXT_PORT ?? '3100'
+
+/**
+ * `E2E_FRAMEWORK=tanstack` runs the suite on the TanStack Start dev app's production build, served
+ * by `srvx`; anything else on the Next dev app's, served by `next start`. `scripts/e2e.sh` builds
+ * whichever one it is.
+ */
+const tanstack = process.env.E2E_FRAMEWORK === 'tanstack'
+
+const baseURL = `http://localhost:${appPort}`
 
 export default defineConfig({
 	testDir: './tests/e2e',
@@ -13,25 +28,28 @@ export default defineConfig({
 	workers: 1,
 	reporter: process.env.CI ? 'github' : 'list',
 	use: {
-		baseURL: 'http://localhost:3100',
+		baseURL,
 		trace: 'on-first-retry',
 		actionTimeout: 15_000,
 	},
 	projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 	webServer: {
-		command: 'pnpm --filter @10x-media/automations-dev start',
+		command: tanstack
+			? 'pnpm --filter @10x-media/automations-dev-tanstack start'
+			: 'pnpm --filter @10x-media/automations-dev start',
 		cwd: path.resolve(dirname, '..', '..'),
-		url: 'http://localhost:3100/admin',
+		url: `${baseURL}/admin`,
 		reuseExistingServer: !process.env.CI,
 		timeout: 120_000,
 		env: {
-			PORT: '3100',
+			PORT: appPort,
 			DEV_DB: process.env.DEV_DB ?? 'mongo',
-			DATABASE_URI_MONGO:
-				'mongodb://localhost:37017/automations_e2e?replicaSet=rs0&directConnection=true',
-			DATABASE_URI_POSTGRES:
-				'postgres://e2e:e2e@localhost:35432/automations_e2e',
-			PAYLOAD_SECRET: 'e2e-secret',
+			DATABASE_URI_MONGO: `mongodb://localhost:${mongoPort}/automations_e2e?replicaSet=rs0&directConnection=true`,
+			DATABASE_URI_POSTGRES: `postgres://e2e:e2e@localhost:${pgPort}/automations_e2e`,
+			// At least 16 bytes: a plugin that stores anything through `encryptedField` derives its
+			// key from this, and `@10x-media/fields` refuses to derive one from less, which fails
+			// Payload's init and leaves every e2e test running against an empty admin.
+			PAYLOAD_SECRET: 'e2e-secret-material-32-bytes-minimum!!',
 		},
 	},
 })

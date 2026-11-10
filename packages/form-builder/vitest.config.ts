@@ -24,6 +24,10 @@ export default mergeConfig(
 					test: {
 						name: 'jsdom',
 						environment: 'jsdom',
+						// Node 25 and later define a localStorage of their own, an empty shell without
+						// --localstorage-file, which vitest keeps over jsdom's. The flag (named so on Node 24
+						// too) leaves the window jsdom's.
+						execArgv: ['--no-experimental-webstorage'],
 						include: ['src/**/*.test.tsx'],
 						exclude: ['node_modules', 'dist', '.next', 'registry/**'],
 						setupFiles: ['./vitest.setup.ts'],
@@ -34,6 +38,7 @@ export default mergeConfig(
 					test: {
 						name: 'registry',
 						environment: 'jsdom',
+						execArgv: ['--no-experimental-webstorage'],
 						include: ['registry/**/*.test.tsx', 'registry/**/*.test.ts'],
 						setupFiles: ['./vitest.setup.ts'],
 						passWithNoTests: true,
@@ -53,5 +58,5 @@ export default mergeConfig(
 				},
 			],
 		},
-	}),
+	})
 )

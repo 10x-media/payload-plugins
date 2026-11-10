@@ -45,15 +45,7 @@ git cat-file -e "${base}^{commit}" 2>/dev/null ||
 changed=$(git diff --name-only "${base}...HEAD") ||
 	fallback "git cannot diff ${base}...HEAD (unrelated history?)"
 meta_changed=$(grep -Ec '^(\.github/|scripts/)' <<<"$changed" || true)
-# Except on the v4 line while plugins are still being ported to Payload 4: every unported one is
-# red there, so a full run says nothing about a CI change. Such a pull request is scoped like any
-# other, which leaves it to select a ported plugin that exercises the change. Drop this once every
-# plugin is ported.
-if [ "$meta_changed" -gt 0 ] && [ "${GITHUB_BASE_REF:-}" = v4 ]; then
-	echo 'affected: the change touches CI itself, scoped anyway on the v4 line'
-elif [ "$meta_changed" -gt 0 ]; then
-	fallback 'the change touches CI itself'
-fi
+[ "$meta_changed" -eq 0 ] || fallback 'the change touches CI itself'
 
 echo "affected: comparing ${base}...HEAD"
 {
