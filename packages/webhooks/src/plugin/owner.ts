@@ -1,11 +1,11 @@
 import {
 	type CollectionSlug,
-	createLocalReq,
+	createPayloadRequest,
 	executeAccess,
 	Forbidden,
 	type JsonObject,
 	type PayloadRequest,
-	type TypedUser,
+	type User,
 } from 'payload'
 
 import { eventId } from '../events/eventTypes'
@@ -25,7 +25,7 @@ const OWNER_MEMO_CONTEXT = 'webhooksOwnerMemo'
 /**
  * A fresh request for a check made on someone's behalf.
  *
- * Payload's `createLocalReq` writes `user` onto whatever request it is handed, so reusing the
+ * Payload's `createPayloadRequest` writes `user` onto whatever request it is handed, so reusing the
  * live request with another user would re-authenticate the caller's own write. The fresh one
  * carries an empty context, and no headers or cookies unless `headers` asks for the caller's,
  * because the owner is not the caller: a flag the writer's request was given (an internal job
@@ -47,23 +47,21 @@ export const actingReq = (
 	req: PayloadRequest,
 	options: { detached?: boolean; headers?: boolean; user?: OwnerUser | null } = {}
 ): Promise<PayloadRequest> =>
-	createLocalReq(
-		{
-			req: {
-				context: {},
-				...(options.headers && req.headers ? { headers: req.headers } : {}),
-				fallbackLocale: req.fallbackLocale,
-				i18n: req.i18n,
-				locale: req.locale,
-				transactionID:
-					options.detached || req.transactionID === undefined
-						? undefined
-						: Promise.resolve(req.transactionID),
-			},
-			user: (options.user ?? undefined) as TypedUser | undefined,
+	createPayloadRequest({
+		payload: req.payload,
+		req: {
+			context: {},
+			...(options.headers && req.headers ? { headers: req.headers } : {}),
+			fallbackLocale: req.fallbackLocale,
+			i18n: req.i18n,
+			locale: req.locale,
+			transactionID:
+				options.detached || req.transactionID === undefined
+					? undefined
+					: Promise.resolve(req.transactionID),
 		},
-		req.payload
-	)
+		user: (options.user ?? undefined) as User | undefined,
+	})
 
 /**
  * Who a subscription acts as, asked of the application. A code subscription lives in the config
@@ -192,6 +190,7 @@ export const canReadCollection = async (args: {
 				{
 					disableErrors: true,
 					req: await actingReq(args.req, { detached: true, user: args.user }),
+					slug: args.collection,
 				},
 				access
 			)

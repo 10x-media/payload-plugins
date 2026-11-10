@@ -1,6 +1,6 @@
 import { createServer, type Server } from 'node:http'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
-import type { Access, CollectionConfig, FieldAccess, TypedUser } from 'payload'
+import type { Access, CollectionConfig, FieldAccess, User } from 'payload'
 import { handleEndpoints } from 'payload'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { webhooks } from '../../src/index'
@@ -138,9 +138,9 @@ let sink: Server
 let sinkUrl: string
 let hits: { path: string; body: Record<string, unknown> }[] = []
 let booted: BootedPayload
-let admin: TypedUser
-let memberA: TypedUser
-let memberB: TypedUser
+let admin: User
+let memberA: User
+let memberB: User
 let subA: string
 let subB: string
 
@@ -152,9 +152,9 @@ const createUser = async (email: string, role: string, tenant?: string) =>
 			overrideAccess: true,
 		})),
 		collection: 'users',
-	}) as unknown as TypedUser
+	}) as unknown as User
 
-const subscribeAs = async (user: TypedUser, path: string, events: string[]) =>
+const subscribeAs = async (user: User, path: string, events: string[]) =>
 	String(
 		(
 			await booted.payload.create({

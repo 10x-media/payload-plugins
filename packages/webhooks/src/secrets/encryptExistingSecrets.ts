@@ -1,5 +1,5 @@
 import { isSealed, withRawEncrypted } from '@10x-media/fields/encrypted'
-import { type CollectionSlug, createLocalReq, type JsonObject, type Payload } from 'payload'
+import { type CollectionSlug, createPayloadRequest, type JsonObject, type Payload } from 'payload'
 
 import { DEFAULT_SUBSCRIPTIONS_SLUG } from '../constants'
 import { InvalidSecretError, normalizeSecret } from './format'
@@ -121,7 +121,7 @@ export const encryptExistingSecrets = async (
 	// The raw window rides on a request, and the scan has no caller to borrow one from. Its own
 	// request is also what keeps the write below outside the window, so the field's seal hook runs
 	// normally rather than being told to leave the value alone.
-	const req = await createLocalReq({}, payload)
+	const req = await createPayloadRequest({ payload })
 
 	let page = 1
 	let hasNextPage = true

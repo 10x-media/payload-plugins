@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { encryptExistingSecrets, webhooks } from '../../src/index'
 import { generateSecret } from '../../src/secrets/format'
 import { LOCAL_SINK } from './localSink'
+import { operatorFor } from './operator'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -307,7 +308,7 @@ describe('a secret that cannot be recovered fails the delivery', () => {
 				data: { title: 'queued' },
 				overrideAccess: true,
 			})
-			await queued.payload.jobs.run()
+			await queued.payload.jobs.run({ overrideAccess: true })
 
 			expect(hits).toHaveLength(0)
 			const deliveries = await queued.payload.find({
@@ -367,7 +368,7 @@ describe('the stored secrets are not editable through the API', () => {
 				previousSecretExpiresAt: new Date(Date.now() + 86_400_000).toISOString(),
 			},
 			overrideAccess: false,
-			user: { id: 'someone', collection: 'users' } as never,
+			user: await operatorFor(booted.payload),
 		})
 
 		const row = await rawRow('injected')
@@ -395,7 +396,7 @@ describe('the stored secrets are not editable through the API', () => {
 			id: String(created.id),
 			data: { name: 'locked renamed', secret: replacement },
 			overrideAccess: false,
-			user: { id: 'someone', collection: 'users' } as never,
+			user: await operatorFor(booted.payload),
 		})
 
 		const after = await rawRow('locked renamed')

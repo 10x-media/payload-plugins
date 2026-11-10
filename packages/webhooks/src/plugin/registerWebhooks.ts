@@ -158,7 +158,7 @@ const canAccessDocument = async (args: {
 	}
 	let result: Awaited<ReturnType<typeof access>>
 	try {
-		result = await access({ req, id })
+		result = await access({ id, req, slug })
 	} catch (err) {
 		if (err instanceof Forbidden) {
 			return false

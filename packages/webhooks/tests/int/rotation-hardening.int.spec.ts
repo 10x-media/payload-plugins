@@ -8,6 +8,7 @@ import { resolveSecretRotationOptions } from '../../src/options'
 import { generateSecret } from '../../src/secrets/format'
 import { rotateSubscriptionSecret } from '../../src/secrets/rotate'
 import { LOCAL_SINK } from './localSink'
+import { operatorFor } from './operator'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 
@@ -154,7 +155,7 @@ describe('the rotate-secret endpoint handler', () => {
 	}
 
 	/** A request shaped like the one Payload hands a custom endpoint. */
-	const request = (args: {
+	const request = async (args: {
 		id?: string
 		user?: unknown
 		body?: unknown
@@ -170,12 +171,12 @@ describe('the rotate-secret endpoint handler', () => {
 			json: () => Promise.resolve(args.body ?? {}),
 			payload: booted.payload,
 			routeParams: args.id === undefined ? {} : { id: args.id },
-			user: 'user' in args ? args.user : { collection: 'users', id: 'u1' },
+			user: 'user' in args ? args.user : await operatorFor(booted.payload),
 		} as never
 	}
 
 	const call = async (args: Parameters<typeof request>[0]) => {
-		const res = await handler()(request(args))
+		const res = await handler()(await request(args))
 		return { body: (await res.json()) as Record<string, unknown>, status: res.status }
 	}
 

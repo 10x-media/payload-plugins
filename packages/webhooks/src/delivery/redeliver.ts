@@ -126,9 +126,12 @@ export const redeliverDelivery = async (args: {
 	}
 
 	if (deps.mode === 'queue') {
+		// The caller's access to the replay was settled above; `jobs.access.queue` is about who may
+		// queue arbitrary jobs, which a redelivery is not.
 		await payload.jobs.queue({
 			task: WEBHOOK_DELIVER_TASK,
 			input: { deliveryId: newId },
+			overrideAccess: true,
 			queue: deps.queue,
 			req,
 		})

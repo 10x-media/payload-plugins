@@ -20,7 +20,9 @@
 		"node": ">=24.22.1"
 	},
 	"type": "module",
-	"sideEffects": false,
+	"sideEffects": [
+		"*.css"
+	],
 	"exports": {
 		".": {
 			"development": "./src/index.ts",
@@ -81,15 +83,9 @@
 	"peerDependencies": {
 		"@10x-media/fields": "^4.0.0-alpha.0",
 		"@payloadcms/ui": "^4.0.0-beta.6",
-		"next": "^16.4.0",
 		"payload": "^4.0.0-beta.6",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
-	},
-	"peerDependenciesMeta": {
-		"next": {
-			"optional": true
-		}
 	},
 	"devDependencies": {
 		"@10x-media/fields": "workspace:*",

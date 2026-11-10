@@ -400,10 +400,12 @@ const dispatch = async (args: {
 			if (deps.mode === 'queue') {
 				// On the caller's request, like the delivery row above, so the two share a transaction:
 				// a write that rolls back takes its job with it, and a runner cannot pick the job up
-				// before the row it points at is committed.
+				// before the row it points at is committed. Whoever wrote the document is not asking to
+				// queue a job, so `jobs.access.queue` does not apply to them.
 				await payload.jobs.queue({
 					task: WEBHOOK_DELIVER_TASK,
 					input: { deliveryId },
+					overrideAccess: true,
 					queue: deps.queue,
 					req,
 				})

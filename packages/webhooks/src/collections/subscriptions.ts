@@ -275,6 +275,9 @@ export const buildSubscriptionsCollection = (args: {
 		hidden: args.hidden,
 	},
 	access: { read: adminUser, create: adminUser, update: adminUser, delete: adminUser },
+	// Payload 4 versions every collection by default. A subscription never had a history, and a
+	// version row would keep a copy of each sealed secret it ever held.
+	versions: false,
 	hooks: {
 		beforeValidate: [generateOnCreate],
 		beforeChange: [normalizeSuppliedSecrets, clearLapsedRotation],

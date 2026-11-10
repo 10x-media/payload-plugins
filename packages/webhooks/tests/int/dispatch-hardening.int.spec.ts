@@ -5,6 +5,7 @@ import type { CollectionConfig, PayloadRequest } from 'payload'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { pruneDeliveries, webhooks } from '../../src/index'
 import { LOCAL_SINK } from './localSink'
+import { operatorFor } from './operator'
 
 const posts: CollectionConfig = { slug: 'posts', fields: [{ name: 'title', type: 'text' }] }
 const articles: CollectionConfig = {
@@ -194,7 +195,7 @@ describe('dispatch hardening', () => {
 				data: {},
 				draft: true,
 				overrideAccess: true,
-				user: { id: 'u1', collection: 'users' } as never,
+				user: await operatorFor(booted.payload),
 			})
 			expect(hits).toHaveLength(0)
 
@@ -475,7 +476,7 @@ describe('dispatch hardening', () => {
 					context: {},
 					payload: booted.payload,
 					routeParams: { id: args.id },
-					user: { collection: 'users', id: 'u1' },
+					user: await operatorFor(booted.payload),
 				} as never)
 				return res.status
 			} finally {

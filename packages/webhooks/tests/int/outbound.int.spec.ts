@@ -153,7 +153,7 @@ describe('outbound delivery (queued)', () => {
 		})
 		expect(pending.docs[0]?.status).toBe('pending')
 
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 		expect(hits.length).toBe(1)
 		const done = await booted.payload.find({
 			collection: 'webhook-deliveries',
@@ -185,7 +185,7 @@ describe('outbound delivery failure (queued, retries=0)', () => {
 			data: { title: 'Fail' },
 			overrideAccess: true,
 		})
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 		const done = await booted.payload.find({
 			collection: 'webhook-deliveries',
 			overrideAccess: true,

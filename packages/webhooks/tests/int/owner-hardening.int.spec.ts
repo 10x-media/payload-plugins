@@ -1,7 +1,7 @@
 import { createServer, type Server } from 'node:http'
 import { type BootedPayload, bootPayload } from '@10x-media/payload-test-harness'
-import type { Access, CollectionConfig, CollectionSlug, TypedUser } from 'payload'
-import { createLocalReq, handleEndpoints } from 'payload'
+import type { Access, CollectionConfig, CollectionSlug, User } from 'payload'
+import { createPayloadRequest, handleEndpoints } from 'payload'
 import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { webhooks } from '../../src/index'
 import type { DeliveryMode } from '../../src/options'
@@ -177,9 +177,9 @@ const fixture = (booted: () => BootedPayload) => {
 				overrideAccess: true,
 			})),
 			collection: 'users',
-		}) as unknown as TypedUser
+		}) as unknown as User
 
-	const subscribe = async (name: string, owner: TypedUser, events: string[]) =>
+	const subscribe = async (name: string, owner: User, events: string[]) =>
 		String(
 			(
 				await booted().payload.create({
@@ -216,8 +216,8 @@ const dataAt = (path: string) =>
 
 describe('owner access, the paths around the happy one (inline)', () => {
 	let booted: BootedPayload
-	let memberA: TypedUser
-	let memberB: TypedUser
+	let memberA: User
+	let memberB: User
 	const { member, subscribe, stored } = fixture(() => booted)
 
 	beforeAll(async () => {
@@ -298,10 +298,10 @@ describe('owner access, the paths around the happy one (inline)', () => {
 	 * it sees the writer's headers. The read made as the owner is not the writer's, so it does not.
 	 */
 	it('hands owner.resolve the headers of the writer, and reads as the owner without them', async () => {
-		const req = await createLocalReq(
-			{ req: { headers: new Headers({ 'x-tenant': 'a', 'x-privileged': '1' }) } },
-			booted.payload
-		)
+		const req = await createPayloadRequest({
+			payload: booted.payload,
+			req: { headers: new Headers({ 'x-tenant': 'a', 'x-privileged': '1' }) },
+		})
 		await booted.payload.create({
 			collection: 'posts',
 			data: { title: 'x', tenant: 'a', headerNote: 'for privileged clients' },
@@ -316,10 +316,11 @@ describe('owner access, the paths around the happy one (inline)', () => {
 
 	/** Whether the caller may name an owner is a question about the caller, cookies included. */
 	it('hands owner.canActAs the headers of the one saving the subscription', async () => {
-		const req = await createLocalReq(
-			{ req: { headers: new Headers({ 'x-tenant': 'a' }) }, user: memberA },
-			booted.payload
-		)
+		const req = await createPayloadRequest({
+			payload: booted.payload,
+			req: { headers: new Headers({ 'x-tenant': 'a' }) },
+			user: memberA,
+		})
 		const saved = await booted.payload.create({
 			collection: 'webhook-subscriptions',
 			data: {
@@ -477,7 +478,7 @@ describe('owner access, the paths around the happy one (inline)', () => {
 			collection: 'users',
 			data: { email: 'd@test.dev', password: 'test1234', role: 'admin', tenant: 'd' },
 			overrideAccess: true,
-		})) as unknown as TypedUser
+		})) as unknown as User
 		const id = await subscribe('fd', demoted, ['fragile.created'])
 		await booted.payload.update({
 			collection: 'users',
@@ -507,7 +508,7 @@ describe('owner access, the paths around the happy one (inline)', () => {
 	 * was allowed to read when it started.
 	 */
 	it('asks about an owner again once the answer has aged, on a request that is reused', async () => {
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		await booted.payload.create({
 			collection: 'posts',
 			data: { title: 'first', tenant: 'a' },
@@ -565,8 +566,8 @@ describe('owner access, the paths around the happy one (inline)', () => {
 
 describe('owner access in queue mode', () => {
 	let booted: BootedPayload
-	let memberA: TypedUser
-	let memberB: TypedUser
+	let memberA: User
+	let memberB: User
 	let subscription: string
 	const { member, subscribe } = fixture(() => booted)
 
@@ -595,7 +596,7 @@ describe('owner access in queue mode', () => {
 			overrideAccess: true,
 		})
 		expect(hits).toHaveLength(0)
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 		expect(pathsHit()).toEqual(['/qa'])
 		expect(dataAt('/qa').title).toBe('queued')
 		expect(dataAt('/qa')).not.toHaveProperty('contextNote')
@@ -617,7 +618,7 @@ describe('owner access in queue mode', () => {
 			data: { owner: memberB.id, tenant: 'b', url: `${sinkUrl}/qb` },
 			overrideAccess: true,
 		})
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 		expect(hits).toHaveLength(0)
 		const rows = await booted.payload.find({
 			collection: 'webhook-deliveries',
@@ -646,7 +647,7 @@ describe('owner access in queue mode', () => {
 			data: { tenant: 'b' },
 			overrideAccess: true,
 		})
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 		expect(hits).toHaveLength(0)
 		const rows = await booted.payload.find({
 			collection: 'webhook-deliveries',
@@ -674,7 +675,7 @@ describe('owner access in queue mode', () => {
 			data: { title: 'fanned out', tenant: 'a' },
 			overrideAccess: true,
 		})
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 		expect(pathsHit().filter((p) => p.startsWith('/qc'))).toEqual(['/qc1', '/qc2', '/qc3'])
 		for (const id of ids) {
 			await booted.payload.delete({ collection: 'webhook-subscriptions', id, overrideAccess: true })
@@ -690,7 +691,7 @@ describe('owner access in queue mode', () => {
 			overrideAccess: true,
 		})
 		await booted.payload.delete({ collection: 'posts', id: post.id, overrideAccess: true })
-		await booted.payload.jobs.run()
+		await booted.payload.jobs.run({ overrideAccess: true })
 		expect(pathsHit()).toEqual(['/qk'])
 		await booted.payload.delete({ collection: 'webhook-subscriptions', id, overrideAccess: true })
 	})
@@ -715,7 +716,7 @@ describe('owner access in queue mode', () => {
 			throw new Error('database unavailable')
 		}
 		try {
-			await booted.payload.jobs.run()
+			await booted.payload.jobs.run({ overrideAccess: true })
 		} finally {
 			collection.config.access.read = configured
 		}
@@ -747,7 +748,7 @@ describe('owner access in queue mode', () => {
 		const configured = collection.config.access.read
 		collection.config.access.read = ({ req }) => (req.user as Who)?.role === 'admin'
 		try {
-			await booted.payload.jobs.run()
+			await booted.payload.jobs.run({ overrideAccess: true })
 		} finally {
 			collection.config.access.read = configured
 		}

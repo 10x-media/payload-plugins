@@ -26,6 +26,10 @@ export const buildDeliveriesCollection = (args: {
 		hidden: args.hidden,
 	},
 	access: { read: adminUser, create: () => false, update: () => false, delete: adminUser },
+	// Only the delivery path writes this log, so neither authorship nor a version history means
+	// anything here, and both would cost every delivery an extra write.
+	authorship: false,
+	versions: false,
 	fields: [
 		{ name: 'subscriptionId', type: 'text', index: true },
 		/**
