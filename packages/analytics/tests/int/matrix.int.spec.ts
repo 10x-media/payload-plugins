@@ -206,10 +206,18 @@ describeForDb('native goals', {}, (db) => {
 
 	it(`keeps one goal document per slug on ${db}`, async () => {
 		const demo = { name: 'Demo', slug: 'demo', match: { kind: 'goal' } }
-		await booted.payload.create({ collection: GOALS_SLUG, data: demo as never })
+		await booted.payload.create({
+			overrideAccess: true,
+			collection: GOALS_SLUG,
+			data: demo as never,
+		})
 		// The hook answers first; the collection's unique index is the storage-level backstop.
 		await expect(
-			booted.payload.create({ collection: GOALS_SLUG, data: { ...demo, name: 'Demo 2' } as never })
+			booted.payload.create({
+				overrideAccess: true,
+				collection: GOALS_SLUG,
+				data: { ...demo, name: 'Demo 2' } as never,
+			})
 		).rejects.toMatchObject({ data: { errors: [{ path: 'slug' }] } })
 	})
 
@@ -1176,12 +1184,14 @@ describeForDb('form-builder action block composition', {}, (db) => {
 
 	it(`stores the action config under the action block slug on ${db}`, async () => {
 		const created = await booted.payload.create({
+			overrideAccess: true,
 			collection: ACTION_HOST_SLUG as never,
 			data: {
 				actions: [{ blockType: GOAL_ACTION_TYPE, goal: 'book-demo', value: 40, currency: 'EUR' }],
 			} as never,
 		})
 		const read = await booted.payload.findByID({
+			overrideAccess: true,
 			collection: ACTION_HOST_SLUG as never,
 			id: (created as { id: string | number }).id,
 		})

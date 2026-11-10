@@ -69,11 +69,12 @@ describeForDb('native maintenance on a jobs worker', {}, (db) => {
 
 	it(`counts the closed days when a worker booted without onInit runs the job on ${db}`, async () => {
 		const job = await worker.payload.jobs.queue({
+			overrideAccess: true,
 			task: MAINTAIN_TASK_SLUG,
 			input: {},
 			queue: 'analytics',
 		})
-		const run = await worker.payload.jobs.run({ queue: 'analytics' })
+		const run = await worker.payload.jobs.run({ overrideAccess: true, queue: 'analytics' })
 		expect(run.jobStatus?.[String(job.id)]?.status).toBe('success')
 		const markers = await nativeOf(web.payload).state.markers('', DAYS[0] ?? 0, TODAY)
 		expect(markers.map((marker) => [marker.day, marker.status])).toEqual([
@@ -96,6 +97,7 @@ describeForDb('native maintenance on a jobs worker', {}, (db) => {
 
 	const openRuns = async (): Promise<Array<{ id: string | number }>> => {
 		const { docs } = await worker.payload.find({
+			overrideAccess: true,
 			collection: 'payload-jobs',
 			where: {
 				and: [
@@ -120,9 +122,12 @@ describeForDb('native maintenance on a jobs worker', {}, (db) => {
 		expect(queued).toBeDefined()
 		await worker.payload.db.updateJobs({
 			id: queued?.id ?? '',
+			// A run that started was due. Payload dates a scheduled run's waitUntil off the real
+			// clock, not the test's, so put it behind NOW as well.
 			data: {
 				processingUntil: new Date(NOW.getTime() - 60 * MINUTE).toISOString(),
 				processingToken: 'killed-run',
+				waitUntil: new Date(NOW.getTime() - 90 * MINUTE).toISOString(),
 			},
 			returning: false,
 		})

@@ -276,7 +276,11 @@ describeForDb('analytics goals endpoint - narrowed collection read access', {}, 
 			{ name: 'Newsletter', slug: 'newsletter', match: { kind: 'goal' } },
 			{ name: 'Board only', slug: 'board-target', match: { kind: 'goal' } },
 		]) {
-			await booted.payload.create({ collection: GOALS as never, data: data as never })
+			await booted.payload.create({
+				overrideAccess: true,
+				collection: GOALS as never,
+				data: data as never,
+			})
 		}
 	}, 240_000)
 

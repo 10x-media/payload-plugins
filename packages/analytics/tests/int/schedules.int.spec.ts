@@ -54,6 +54,7 @@ describeForDb("analytics tasks under Payload's schedule handling", {}, (db) => {
 	const openRuns = async (task: string) =>
 		(
 			await booted.payload.find({
+				overrideAccess: true,
 				collection: 'payload-jobs',
 				where: {
 					and: [

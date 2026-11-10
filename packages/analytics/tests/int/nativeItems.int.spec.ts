@@ -88,10 +88,12 @@ describeForDb('native content items', {}, (db) => {
 			],
 		})
 		const offer = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'offers' as never,
 			data: { title: 'Spring sale' } as never,
 		})
 		const gone = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'offers' as never,
 			data: { title: 'Gone sale' } as never,
 		})
@@ -131,6 +133,7 @@ describeForDb('native content items', {}, (db) => {
 		// A click on something that is no item is still a click, filed under no item.
 		await ingest({ type: 'event', name: 'item_click', path: '/', item: 'users:1' }, 'UA-2')
 		await booted.payload.delete({
+			overrideAccess: true,
 			collection: 'offers' as never,
 			id: goneRef.slice('offers:'.length),
 		})

@@ -232,6 +232,7 @@ describeForDb('engine store collections', {}, (db) => {
 		it('keeps the three collections out of the admin, even for a signed-in admin', async () => {
 			const { payload } = booted
 			const admin = await payload.create({
+				overrideAccess: true,
 				collection: USERS,
 				data: { email: `store-admin-${db}@example.test`, password: 'store-admin-pw' },
 			})

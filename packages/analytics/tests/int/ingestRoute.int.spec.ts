@@ -141,6 +141,7 @@ describeForDb('ingestRoute', {}, (db) => {
 
 	it(`keeps a signed item ref and drops an unsigned one, as the endpoint does, on ${db}`, async () => {
 		const offer = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'offers',
 			data: { title: 'Spring sale' },
 		})

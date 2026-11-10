@@ -121,11 +121,12 @@ describeForDb('every endpoint answers errors in one envelope', {}, (db) => {
 			}),
 		})
 		const page = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'pages' as never,
 			data: { slug: 'gone' } as never,
 		})
 		goneId = String((page as { id: number | string }).id)
-		await booted.payload.delete({ collection: 'pages' as never, id: goneId })
+		await booted.payload.delete({ overrideAccess: true, collection: 'pages' as never, id: goneId })
 	}, 240_000)
 
 	afterAll(async () => {

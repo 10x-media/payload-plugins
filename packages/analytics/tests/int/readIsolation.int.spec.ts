@@ -141,6 +141,7 @@ describeForDb('analytics read bounds: ranges, sync rows and named scopes', {}, (
 			],
 		})
 		const page = await booted.payload.create({
+			overrideAccess: true,
 			collection: 'pages' as never,
 			data: { title: 'About', slug: 'about' } as never,
 		})

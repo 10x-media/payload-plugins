@@ -156,8 +156,16 @@ describeForDb('analytics provider security: hosts, retargeting and access', {}, 
 			}),
 		})
 		const { payload } = booted
-		const alpha = await payload.create({ collection: 'tenants', data: { domain: 'alpha.test' } })
-		const beta = await payload.create({ collection: 'tenants', data: { domain: 'beta.test' } })
+		const alpha = await payload.create({
+			overrideAccess: true,
+			collection: 'tenants',
+			data: { domain: 'alpha.test' },
+		})
+		const beta = await payload.create({
+			overrideAccess: true,
+			collection: 'tenants',
+			data: { domain: 'beta.test' },
+		})
 		alphaId = String(alpha.id)
 		betaId = String(beta.id)
 		platform = await login(payload, {

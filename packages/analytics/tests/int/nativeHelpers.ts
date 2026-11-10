@@ -26,6 +26,7 @@ export type StoredHit = Record<string, unknown>
 export const storedHits = async (payload: Payload, where: Where = {}): Promise<StoredHit[]> =>
 	(
 		await payload.find({
+			overrideAccess: true,
 			collection: HITS_SLUG,
 			where,
 			pagination: false,
@@ -35,7 +36,7 @@ export const storedHits = async (payload: Payload, where: Where = {}): Promise<S
 	).docs
 
 export const countHits = async (payload: Payload, where: Where = {}): Promise<number> =>
-	(await payload.count({ collection: HITS_SLUG, where })).totalDocs
+	(await payload.count({ overrideAccess: true, collection: HITS_SLUG, where })).totalDocs
 
 /**
  * A beacon taken by the ingest endpoint the native adapter registered under the default base,

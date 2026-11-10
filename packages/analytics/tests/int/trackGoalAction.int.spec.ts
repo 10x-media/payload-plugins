@@ -76,6 +76,7 @@ describeForDb('analytics trackGoalAction', {}, (db) => {
 
 	it('completes a goal stored in the goals collection, valued from the submission', async () => {
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: GOALS_SLUG as never,
 			data: {
 				name: 'Quote requested',
@@ -129,6 +130,7 @@ describeForDb('analytics trackGoalAction', {}, (db) => {
 
 	it('stores the action config as a block under the action type', async () => {
 		const created = await booted.payload.create({
+			overrideAccess: true,
 			collection: ACTION_HOST_SLUG as never,
 			data: {
 				actions: [{ blockType: GOAL_ACTION_TYPE, goal: 'book-demo', value: 40, currency: 'EUR' }],
@@ -136,6 +138,7 @@ describeForDb('analytics trackGoalAction', {}, (db) => {
 		})
 
 		const read = await booted.payload.findByID({
+			overrideAccess: true,
 			collection: ACTION_HOST_SLUG as never,
 			id: (created as { id: string | number }).id,
 		})
@@ -150,6 +153,7 @@ describeForDb('analytics trackGoalAction', {}, (db) => {
 	it('refuses an action block whose goal slug is not a slug', async () => {
 		await expect(
 			booted.payload.create({
+				overrideAccess: true,
 				collection: ACTION_HOST_SLUG as never,
 				data: {
 					actions: [{ blockType: GOAL_ACTION_TYPE, goal: 'Not A Slug' }],

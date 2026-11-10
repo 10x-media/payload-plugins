@@ -89,7 +89,11 @@ describeForDb('analytics runtime without onInit', {}, (db) => {
 		})
 		mem.record({ path: '/lazy', timestamp: new Date(), visitor: 'v1' })
 		const credentials = { email: 'reader@lazy.dev', password: 'test-pass-1234' }
-		await booted.payload.create({ collection: 'lazy-users', data: credentials })
+		await booted.payload.create({
+			overrideAccess: true,
+			collection: 'lazy-users',
+			data: credentials,
+		})
 		token =
 			(await booted.payload.login({ collection: 'lazy-users', data: credentials })).token ?? ''
 	}, 240_000)
@@ -157,14 +161,20 @@ describeForDb('analytics runtime without onInit', {}, (db) => {
 	it(`runs every plugin task through the jobs queue on ${db}`, async () => {
 		const queued = []
 		for (const task of [WARM_TASK_SLUG, SYNC_TASK_SLUG, MAINTAIN_TASK_SLUG]) {
-			queued.push([task, (await booted.payload.jobs.queue({ task, input: {} })).id] as const)
+			queued.push([
+				task,
+				(await booted.payload.jobs.queue({ overrideAccess: true, task, input: {} })).id,
+			] as const)
 		}
-		const run = await booted.payload.jobs.run()
+		const run = await booted.payload.jobs.run({ overrideAccess: true })
 		for (const [task, id] of queued) {
 			expect(run.jobStatus?.[String(id)]?.status, task).toBe('success')
 		}
 		// The sync task wrote the memory source's day, which only a runtime could have read.
-		const { totalDocs } = await booted.payload.count({ collection: 'analytics-daily' as never })
+		const { totalDocs } = await booted.payload.count({
+			overrideAccess: true,
+			collection: 'analytics-daily' as never,
+		})
 		expect(totalDocs).toBeGreaterThan(0)
 	})
 

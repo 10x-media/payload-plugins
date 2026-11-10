@@ -309,6 +309,7 @@ describeForDb('analytics server track: scoped', {}, (db) => {
 
 	it('matches a collection goal belonging to the event’s scope', async () => {
 		await booted.payload.create({
+			overrideAccess: true,
 			collection: GOALS_SLUG as never,
 			data: {
 				name: 'Invoice paid',
@@ -403,7 +404,7 @@ describeForDb('analytics server track: inside a host transaction', {}, (db) => {
 		expect(transactionID).toBeTruthy()
 		const req = await createPayloadRequest({ payload: payload })
 		req.transactionID = transactionID ?? undefined
-		await payload.create({ collection: ORDERS, data: { total: 5 }, req })
+		await payload.create({ overrideAccess: true, collection: ORDERS, data: { total: 5 }, req })
 		const started = Date.now()
 		await trackServerEvent(
 			payload,
@@ -417,7 +418,7 @@ describeForDb('analytics server track: inside a host transaction', {}, (db) => {
 		}
 		await nativeOf(payload).writer.flush()
 
-		expect((await payload.count({ collection: ORDERS })).totalDocs).toBe(0)
+		expect((await payload.count({ overrideAccess: true, collection: ORDERS })).totalDocs).toBe(0)
 		expect(await countHits(payload, { path: { equals: '/rolled-back' } })).toBe(1)
 		const [hit] = await storedHits(payload, { path: { equals: '/rolled-back' } })
 		expect(hit).toMatchObject({ server: true, conversions: 1, revenue: 5 })
@@ -428,7 +429,7 @@ describeForDb('analytics server track: inside a host transaction', {}, (db) => {
 		const transactionID = await payload.db.beginTransaction()
 		const req = await createPayloadRequest({ payload: payload })
 		req.transactionID = transactionID ?? undefined
-		await payload.create({ collection: ORDERS, data: { total: 7 }, req })
+		await payload.create({ overrideAccess: true, collection: ORDERS, data: { total: 7 }, req })
 		await trackServerEvent(
 			payload,
 			{ type: 'goal', name: 'purchase', path: '/committed', hostname: HOST, value: 7 },
@@ -439,7 +440,7 @@ describeForDb('analytics server track: inside a host transaction', {}, (db) => {
 		}
 		await nativeOf(payload).writer.flush()
 
-		expect((await payload.count({ collection: ORDERS })).totalDocs).toBe(1)
+		expect((await payload.count({ overrideAccess: true, collection: ORDERS })).totalDocs).toBe(1)
 		expect(await countHits(payload, { path: { equals: '/committed' } })).toBe(1)
 	})
 })

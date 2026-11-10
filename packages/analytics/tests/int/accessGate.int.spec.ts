@@ -154,8 +154,16 @@ describeForDb('analytics access: read gate, membership and capture identity', {}
 			}),
 		})
 		const { payload } = booted
-		const alpha = await payload.create({ collection: 'tenants', data: { domain: 'alpha.test' } })
-		const beta = await payload.create({ collection: 'tenants', data: { domain: 'beta.test' } })
+		const alpha = await payload.create({
+			overrideAccess: true,
+			collection: 'tenants',
+			data: { domain: 'alpha.test' },
+		})
+		const beta = await payload.create({
+			overrideAccess: true,
+			collection: 'tenants',
+			data: { domain: 'beta.test' },
+		})
 		alphaId = String(alpha.id)
 		betaId = String(beta.id)
 		platform = await login(payload, {
@@ -187,7 +195,11 @@ describeForDb('analytics access: read gate, membership and capture identity', {}
 				overrideAccess: false,
 			})
 		}
-		const created = await payload.create({ collection: 'pages', data: { slug: 'home' } })
+		const created = await payload.create({
+			overrideAccess: true,
+			collection: 'pages',
+			data: { slug: 'home' },
+		})
 		page = { id: created.id, slug: 'home' }
 	}, 240_000)
 

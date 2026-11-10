@@ -62,10 +62,15 @@ type TaskSlug = (typeof TASK_SLUGS)[keyof typeof TASK_SLUGS]
 const runTasks = async (payload: Payload, tasks: readonly TaskSlug[]): Promise<void> => {
 	const queued: Array<[string, string]> = []
 	for (const task of tasks) {
-		const job = await payload.jobs.queue({ task, queue: 'analytics', input: {} })
+		const job = await payload.jobs.queue({
+			overrideAccess: true,
+			task,
+			queue: 'analytics',
+			input: {},
+		})
 		queued.push([task, String(job.id)])
 	}
-	const run = await payload.jobs.run({ queue: 'analytics' })
+	const run = await payload.jobs.run({ overrideAccess: true, queue: 'analytics' })
 	for (const [task, id] of queued) {
 		expect(run.jobStatus?.[id]?.status, task).toBe('success')
 	}
@@ -132,6 +137,7 @@ describeForDb('analytics with every collection renamed', {}, (db) => {
 	it(`ingests into the renamed hits, completing a goal of the renamed goals, on ${db}`, async () => {
 		const { payload } = booted
 		await payload.create({
+			overrideAccess: true,
 			collection: SLUGS.goals as CollectionSlug,
 			data: {
 				name: 'Signup',

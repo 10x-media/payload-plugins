@@ -103,6 +103,7 @@ describeForDb('native rebuilds', {}, (db) => {
 
 	it(`rebuilds a stretch through the maintenance task's input on ${db}`, async () => {
 		const job = await booted.payload.jobs.queue({
+			overrideAccess: true,
 			task: MAINTAIN_TASK_SLUG,
 			input: {
 				rebuild: {
@@ -111,7 +112,7 @@ describeForDb('native rebuilds', {}, (db) => {
 				},
 			},
 		})
-		const run = await booted.payload.jobs.runByID({ id: job.id })
+		const run = await booted.payload.jobs.runByID({ overrideAccess: true, id: job.id })
 		expect(run.jobStatus?.[String(job.id)]?.status).toBe('success')
 		const [first] = await nativeOf(booted.payload).state.markers('', FIRST, FIRST)
 		expect(first?.status).toBe('final')

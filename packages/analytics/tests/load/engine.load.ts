@@ -351,7 +351,11 @@ describeForDb('native engine under load', {}, (db) => {
 				const writing = (async () => {
 					while (counting) {
 						const begun = performance.now()
-						await booted.payload.create({ collection: NOTES.slug, data: { title: 'during' } })
+						await booted.payload.create({
+							overrideAccess: true,
+							collection: NOTES.slug,
+							data: { title: 'during' },
+						})
 						writes.push(performance.now() - begun)
 						await new Promise((resolve) => setTimeout(resolve, 20))
 					}

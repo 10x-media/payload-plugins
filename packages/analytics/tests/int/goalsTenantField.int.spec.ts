@@ -85,6 +85,7 @@ describeForDb('analytics goals owned through a tenant relationship', {}, (db) =>
 		data: { tenant: string | number; slug: string; name: string }
 	) =>
 		payload.create({
+			overrideAccess: true,
 			collection: GOALS_SLUG as never,
 			data: { ...data, match: { kind: 'goal' } } as never,
 			user: { ...staff, collection: 'editors' } as User,
@@ -121,15 +122,21 @@ describeForDb('analytics goals owned through a tenant relationship', {}, (db) =>
 			}),
 		})
 		const { payload } = booted
-		alphaId = (await payload.create({ collection: 'tenants' as never, data: {} })).id
-		betaId = (await payload.create({ collection: 'tenants' as never, data: {} })).id
+		alphaId = (
+			await payload.create({ overrideAccess: true, collection: 'tenants' as never, data: {} })
+		).id
+		betaId = (
+			await payload.create({ overrideAccess: true, collection: 'tenants' as never, data: {} })
+		).id
 		alpha = String(alphaId)
 		beta = String(betaId)
 		editor = (await payload.create({
+			overrideAccess: true,
 			collection: 'editors' as never,
 			data: { email: `alpha-${db}@t.dev`, password: 'test-password', tenant: alphaId } as never,
 		})) as unknown as Record<string, unknown>
 		const staff = (await payload.create({
+			overrideAccess: true,
 			collection: 'editors' as never,
 			data: { email: STAFF, password: 'test-password' } as never,
 		})) as unknown as Record<string, unknown>

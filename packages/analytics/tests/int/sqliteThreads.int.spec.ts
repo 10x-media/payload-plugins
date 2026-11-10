@@ -191,7 +191,11 @@ describeForDb('SQLite engine statements on worker threads', {}, (db) => {
 		const run = await ticking(async () => {
 			while (counting) {
 				const started = performance.now()
-				await booted.payload.create({ collection: 'notes', data: { title: `w${writes.length}` } })
+				await booted.payload.create({
+					overrideAccess: true,
+					collection: 'notes',
+					data: { title: `w${writes.length}` },
+				})
 				writes.push(performance.now() - started)
 				await new Promise((resolve) => setTimeout(resolve, 5))
 			}
@@ -201,7 +205,9 @@ describeForDb('SQLite engine statements on worker threads', {}, (db) => {
 		expect(run.value).toEqual({ outcome: 'completed', hits: 60_000 })
 		expect(run.ms).toBeGreaterThan(500)
 		expect(writes.length).toBeGreaterThan(10)
-		expect((await booted.payload.count({ collection: 'notes' })).totalDocs).toBe(writes.length)
+		expect(
+			(await booted.payload.count({ overrideAccess: true, collection: 'notes' })).totalDocs
+		).toBe(writes.length)
 		expect(run.worstGapMs).toBeLessThan(stallBound(run.ms))
 	})
 

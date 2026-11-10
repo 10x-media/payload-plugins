@@ -592,7 +592,7 @@ const payload = await getPayload({ config, disableOnInit: true })
 
 setInterval(async () => {
   await payload.jobs.handleSchedules({ queue: 'analytics' })
-  await payload.jobs.run({ queue: 'analytics' })
+  await payload.jobs.run({ overrideAccess: true, queue: 'analytics' })
 }, 60_000)
 ```
 
@@ -627,7 +627,7 @@ Registering a task turns Payload's jobs on for the whole app. Payload 4 admits o
 | the `payload-jobs` collection's `create`, `read`, `update` and `delete` | its REST and GraphQL API, and Local API calls with `overrideAccess: false` (denied for everyone unless `jobs.jobsCollectionOverrides` grants them) |
 | the `payload-jobs-stats` global's `read` and `update` | where Payload records when each scheduled task was last queued |
 
-Payload's own runners (`autoRun`, `payload jobs:run`, `payload.jobs.run()` from a worker) skip these checks, so they keep running every task.
+Payload's own runners (`autoRun`, `payload jobs:run`) skip these checks, so they keep running every task. A `payload.jobs.run()` of your own, on a worker, passes `overrideAccess: true` to do the same; without it Payload 4 checks `jobs.access.run` against the request's user, and a call with no user is refused.
 
 To choose otherwise, set them in your Payload config:
 
