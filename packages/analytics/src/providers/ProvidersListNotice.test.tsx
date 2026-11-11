@@ -7,6 +7,7 @@ import { ProvidersListNotice } from './ProvidersListNotice'
 
 vi.mock('@payloadcms/ui', () => ({
 	Banner: ({ children }: { children?: ReactNode }) => <div role="status">{children}</div>,
+	Gutter: ({ children }: { children?: ReactNode }) => <div className="gutter">{children}</div>,
 	useAuth: () => ({ user: { id: 'user-1' } }),
 	useConfig: () => ({
 		config: { routes: { admin: '/admin', api: '/api' }, serverURL: 'https://cms.test' },
