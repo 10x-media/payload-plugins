@@ -447,7 +447,7 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.sourcesPlatformFallback]:
 		"Ces chiffres proviennent de l'outil de statistiques de la plateforme tant que ce site n'a pas ajouté le sien. Dès qu'il est ajouté, c'est lui qui est utilisé.",
 	[keys.sourcesOwnSourceFailing]:
-		"L'outil de statistiques propre à ce site ne répond pas : ces chiffres proviennent donc de celui de la plateforme. Ses propres chiffres reviennent dès qu'il répond à nouveau.",
+		"L'outil de statistiques propre à ce site ne fonctionne pas : ces chiffres proviennent donc de celui de la plateforme. Il est réutilisé dès que sa connexion fonctionne à nouveau.",
 	[keys.stateSourceSubstituted]:
 		"La source de données enregistrée n'est plus disponible : la source par défaut est affichée.",
 	[keys.statePosthogCookielessDropped]:

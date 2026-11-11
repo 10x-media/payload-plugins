@@ -440,7 +440,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.sourcesPlatformFallback]:
 		'Angka ini berasal dari alat analitik platform sampai situs ini menambahkan alatnya sendiri. Setelah ditambahkan, angkanya beralih ke alat itu.',
 	[keys.sourcesOwnSourceFailing]:
-		'Alat analitik milik situs ini tidak menjawab, jadi angka ini berasal dari alat analitik platform. Angkanya sendiri kembali setelah alat itu menjawab lagi.',
+		'Alat analitik milik situs ini tidak berfungsi, jadi angka ini berasal dari alat analitik platform. Angkanya beralih kembali setelah koneksinya berfungsi lagi.',
 	[keys.stateSourceSubstituted]:
 		'Sumber data yang tersimpan tidak tersedia lagi, jadi sumber default yang ditampilkan.',
 	[keys.statePosthogCookielessDropped]:
