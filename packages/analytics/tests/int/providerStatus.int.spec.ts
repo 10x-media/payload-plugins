@@ -9,6 +9,7 @@ import { PROVIDERS_SLUG } from '../../src/providers/collection'
 import type { ProviderStatusResponse } from '../../src/providers/connectionState'
 import { PROVIDER_STATUS_SLUG } from '../../src/providers/status'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { settleAnalytics } from '../../src/testing/settle'
 import { callEndpoint, handlerAt } from './endpointHelpers'
 
 const routes = routePaths(DEFAULT_ROUTE_BASE)
@@ -282,6 +283,8 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		await status('POST', 'alpha', doc.id)
 		expect(await rowsOf(doc.id)).toHaveLength(1)
 		await booted.payload.delete({ collection: PROVIDERS_SLUG, id: doc.id, overrideAccess: true })
+		// The row goes once the delete's own transaction ends.
+		await settleAnalytics(booted.payload)
 		expect(await rowsOf(doc.id)).toEqual([])
 	})
 })

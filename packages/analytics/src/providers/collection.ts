@@ -158,8 +158,11 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	forgetStatus?: (docId: string, req: PayloadRequest) => Promise<void>
 }
 
-/** `req.context` flag a provider update that changes how the document connects sets for afterChange. */
-const RECONNECTED = 'analytics:providerReconnected'
+/**
+ * `req.context` key a provider update that changes how the document connects sets for its
+ * afterChange: per document, since a bulk update hands every document the same context.
+ */
+const reconnectedKey = (id: unknown): string => `analytics:providerReconnected:${String(id)}`
 
 const plainSecret: BuildSecretField = (source) => [source]
 
@@ -660,7 +663,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 						operation === 'update' &&
 						reconnects({ scopeField: args.scopeField, isSealed: args.isSealed, data, originalDoc })
 					) {
-						context[RECONNECTED] = true
+						context[reconnectedKey(originalDoc?.id)] = true
 					}
 					return data
 				},
@@ -668,7 +671,9 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			],
 			afterChange: [
 				async ({ context, doc, operation, previousDoc, req }) => {
-					if (operation === 'update' && context[RECONNECTED] === true) {
+					const reconnected = reconnectedKey(doc.id)
+					if (operation === 'update' && context[reconnected] === true) {
+						delete context[reconnected]
 						await args.forgetStatus?.(String(doc.id), req)
 					}
 					await args.onChange(

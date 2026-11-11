@@ -11,6 +11,7 @@ import { getRuntime } from '../../src/plugin/runtime'
 import { PROVIDERS_SLUG } from '../../src/providers/collection'
 import { PROVIDER_STATUS_SLUG } from '../../src/providers/status'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { settleAnalytics } from '../../src/testing/settle'
 import { callEndpoint } from './endpointHelpers'
 
 const routes = routePaths(DEFAULT_ROUTE_BASE)
@@ -402,10 +403,42 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 						user: alpha as never,
 						overrideAccess: false,
 					})
+					await settleAnalytics(booted.payload)
 					expect(uncleared).toHaveBeenCalledWith(id)
 				} finally {
 					uncleared.mockRestore()
 					await removeOwn(id)
+				}
+			})
+
+			it(`forgets, in a bulk save, only the result of a document whose connection moved, on ${db}`, async () => {
+				const moved = await createOwn('alpha-bulk-moved.test')
+				const kept = await createOwn('alpha-bulk-kept.test')
+				const host = `${vendor.origin}/kept`
+				try {
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						id: kept,
+						data: { plausible: { host } } as never,
+						overrideAccess: true,
+					})
+					await settleAnalytics(booted.payload)
+					for (const id of [moved, kept]) {
+						await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					}
+					// One request for both, the way a bulk edit in the list saves them.
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						where: { id: { in: [moved, kept] } },
+						data: { plausible: { host } } as never,
+						overrideAccess: true,
+					})
+					await settleAnalytics(booted.payload)
+					expect(await statusStore().read(moved)).toBeUndefined()
+					expect((await statusStore().read(kept))?.errorKind).toBe('source_misconfigured')
+				} finally {
+					await removeOwn(moved)
+					await removeOwn(kept)
 				}
 			})
 
@@ -421,6 +454,7 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 						user: alpha as never,
 						overrideAccess: false,
 					})
+					await settleAnalytics(booted.payload)
 					expect(await statusStore().read(id)).toBeUndefined()
 					expect((await listing()).notice).toBeUndefined()
 				} finally {
