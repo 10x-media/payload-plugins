@@ -254,7 +254,7 @@ A deterministic in-memory adapter for tests and local development. It serves `pa
 
 ### Waiting for background work
 
-The plugin does some of its work after a call has answered: it stores cached reads, runs the native engine's upkeep, and buffers hits when [write batching](/analytics/native#write-batching-opt-in) is on. A test that reads back what it just tracked, or destroys Payload, waits for that first with `settleAnalytics`, which flushes the write buffer too:
+The plugin does some of its work after a call has answered: it stores cached reads, runs the native engine's upkeep, buffers hits when [write batching](/analytics/native#write-batching-opt-in) is on, and writes or clears provider connection statuses. A test that reads back what it just tracked, or destroys Payload, waits for that first with `settleAnalytics`, which flushes the write buffer too:
 
 ```ts
 import { trackServerEvent } from '@10x-media/analytics'
