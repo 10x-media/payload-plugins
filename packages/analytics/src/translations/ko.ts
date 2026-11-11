@@ -375,10 +375,12 @@ export const ko: LocaleBundle<'other'> = {
 		'Plausible이 측정하는 웹사이트입니다. 보통 yourdomain.com 형태로 적습니다.',
 	[keys.providerFieldApiKeyHelp]:
 		'보고서를 읽어 오는 데 쓰는 읽기 전용 키입니다. 안전하게 저장되며 다시 표시되지 않습니다.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'Umami Cloud용입니다. 자체 호스팅 Umami라면 키를 API 토큰에 넣으세요. 안전하게 저장되며 다시 표시되지 않습니다.',
 	[keys.providerFieldWebsiteIdHelp]:
 		'웹사이트 ID입니다. Umami 대시보드의 주소창에서 확인할 수 있습니다.',
 	[keys.providerFieldTokenHelp]:
-		'사용자 이름과 비밀번호 대신 쓰는 Umami Cloud 토큰입니다. 안전하게 저장됩니다.',
+		'자체 호스팅 Umami용: 설정에서 만든 API 키 또는 로그인 토큰입니다. Umami Cloud라면 API 키를 쓰세요. 안전하게 저장됩니다.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Google Analytics에 있는 GA4 속성 번호입니다. properties/ 라는 단어는 빼세요.',
 	[keys.providerFieldClientEmailHelp]: 'Google에서 받은 파일에 있는 서비스 계정 주소입니다.',

@@ -382,9 +382,11 @@ export const id: LocaleBundle<'other'> = {
 		'Situs yang diukur Plausible, biasanya ditulis seperti yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
 		'Kunci baca-saja untuk mengambil laporan Anda. Disimpan dengan aman dan tidak ditampilkan lagi.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'Untuk Umami Cloud. Pada Umami yang di-host sendiri, isi kuncinya di Token API. Disimpan dengan aman dan tidak ditampilkan lagi.',
 	[keys.providerFieldWebsiteIdHelp]: 'ID situs Anda, terlihat di bilah alamat dasbor Umami.',
 	[keys.providerFieldTokenHelp]:
-		'Token Umami Cloud Anda, dipakai sebagai pengganti nama pengguna dan kata sandi. Disimpan dengan aman.',
+		'Untuk Umami yang di-host sendiri: kunci API dari pengaturannya atau token login. Untuk Umami Cloud, gunakan Kunci API. Disimpan dengan aman.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Nomor properti GA4 Anda dari Google Analytics. Tanpa kata properties/.',
 	[keys.providerFieldClientEmailHelp]: 'Alamat akun layanan dari berkas yang diberikan Google.',

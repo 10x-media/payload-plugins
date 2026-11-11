@@ -374,9 +374,11 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerFieldSiteIdHelp]: 'الموقع الذي يقيسه Plausible، ويُكتب عادةً بالشكل yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
 		'المفتاح للقراءة فقط الذي تُقرأ به تقاريرك. يُحفظ بأمان ولا يُعرض مرة أخرى.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'لـ Umami Cloud. في Umami المستضاف ذاتيًا ضع المفتاح في رمز API بدلًا من ذلك. يُحفظ بأمان ولا يُعرض مرة أخرى.',
 	[keys.providerFieldWebsiteIdHelp]: 'معرّف موقعك، وتجده في شريط العنوان في لوحة Umami.',
 	[keys.providerFieldTokenHelp]:
-		'رمز Umami Cloud الخاص بك، ويُستخدم بدل اسم المستخدم وكلمة المرور. يُحفظ بأمان.',
+		'لـ Umami المستضاف ذاتيًا: مفتاح API من إعداداته أو رمز تسجيل الدخول. في Umami Cloud استخدم مفتاح API. يُحفظ بأمان.',
 	[keys.providerFieldPropertyIdHelp]: 'رقم خاصية GA4 من Google Analytics. من دون كلمة properties/.',
 	[keys.providerFieldClientEmailHelp]: 'عنوان حساب الخدمة من الملف الذي أعطتك إياه Google.',
 	[keys.providerFieldPrivateKeyHelp]:

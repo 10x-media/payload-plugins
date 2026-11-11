@@ -381,10 +381,12 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldSiteIdHelp]: 'Сайт, который измеряет Plausible, обычно в виде yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
 		'Ключ только для чтения, по которому запрашиваются ваши отчёты. Хранится надёжно и больше не показывается.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'Для Umami Cloud. Для своего сервера Umami вставьте ключ в поле «Токен API». Хранится надёжно и больше не показывается.',
 	[keys.providerFieldWebsiteIdHelp]:
 		'Идентификатор сайта; он есть в адресной строке вашей панели Umami.',
 	[keys.providerFieldTokenHelp]:
-		'Токен Umami Cloud, который используется вместо логина и пароля. Хранится надёжно.',
+		'Для своего сервера Umami: ключ API из его настроек или токен входа. Для Umami Cloud используйте «Ключ API». Хранится надёжно.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Номер вашего ресурса GA4 в Google Analytics. Без слова properties/.',
 	[keys.providerFieldClientEmailHelp]: 'Адрес сервисного аккаунта из файла, который выдал Google.',

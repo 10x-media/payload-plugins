@@ -122,7 +122,7 @@ import { umami } from '@10x-media/analytics/adapters/umami'
 // Umami Cloud
 umami({ websiteId: 'xxxx', apiKey: process.env.UMAMI_API_KEY! })
 
-// Self-hosted (token from POST /api/auth/login)
+// Self-hosted (an API key from its settings, or a token from POST /api/auth/login)
 umami({ websiteId: 'xxxx', token: process.env.UMAMI_TOKEN!, host: 'https://analytics.example.com' })
 ```
 

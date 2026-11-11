@@ -458,11 +458,17 @@ const providerFields = (
 		options.connectionAccess
 	)
 	const allowPrivateNetwork = options.allowPrivateNetwork === true
-	const apiKeyField = (validate?: TextFieldSingleValidation): Field[] =>
+	const apiKeyField = ({
+		validate,
+		help = keys.providerFieldApiKeyHelp,
+	}: {
+		validate?: TextFieldSingleValidation
+		help?: SingularKey
+	} = {}): Field[] =>
 		secretField(buildSecret, staticLabel, {
 			name: 'apiKey',
 			label: keys.providerFieldApiKey,
-			help: keys.providerFieldApiKeyHelp,
+			help,
 			width: '50%',
 			...(validate ? { validate } : {}),
 		})
@@ -511,7 +517,7 @@ const providerFields = (
 						help: keys.providerFieldWebsiteIdHelp,
 						access,
 					}),
-					...apiKeyField(),
+					...apiKeyField({ help: keys.providerFieldUmamiApiKeyHelp }),
 				],
 			},
 			...secretField(buildSecret, staticLabel, {
@@ -561,7 +567,7 @@ const providerFields = (
 						help: keys.providerFieldProjectIdHelp,
 						access,
 					}),
-					...apiKeyField(validatePersonalApiKey),
+					...apiKeyField({ validate: validatePersonalApiKey }),
 				],
 			},
 			{

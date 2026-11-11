@@ -383,10 +383,12 @@ export const de: LocaleBundle<'one' | 'other'> = {
 		'Die Website, die Plausible misst, meist in der Form yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
 		'Der nur lesende Schlüssel, mit dem deine Berichte abgerufen werden. Er wird sicher gespeichert und nie wieder angezeigt.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'Für Umami Cloud. Bei selbst gehostetem Umami gehört der Schlüssel stattdessen in API-Token. Er wird sicher gespeichert und nie wieder angezeigt.',
 	[keys.providerFieldWebsiteIdHelp]:
 		'Die ID deiner Website, zu finden in der Adresszeile deines Umami-Dashboards.',
 	[keys.providerFieldTokenHelp]:
-		'Dein Umami-Cloud-Token, das statt Benutzername und Passwort verwendet wird. Es wird sicher gespeichert.',
+		'Für selbst gehostetes Umami: ein API-Schlüssel aus den Einstellungen oder ein Login-Token. Bei Umami Cloud stattdessen API-Schlüssel verwenden. Es wird sicher gespeichert.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Die Nummer deiner GA4-Property aus Google Analytics. Ohne das Wort properties/ davor.',
 	[keys.providerFieldClientEmailHelp]:

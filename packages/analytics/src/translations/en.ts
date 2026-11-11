@@ -378,10 +378,12 @@ export const en: LocaleBundle<'one' | 'other'> = {
 		'The website Plausible tracks, usually written as yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
 		'The read-only key for reading your reports. It is stored securely and never shown again.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'For Umami Cloud. On self-hosted Umami, put the key in API token instead. It is stored securely and never shown again.',
 	[keys.providerFieldWebsiteIdHelp]:
 		'The ID for your website, found in the address bar of your Umami dashboard.',
 	[keys.providerFieldTokenHelp]:
-		'Your Umami Cloud token, used instead of a username and password. It is stored securely.',
+		'For self-hosted Umami: an API key from its settings, or a login token. On Umami Cloud, use API key instead. It is stored securely.',
 	[keys.providerFieldPropertyIdHelp]:
 		'The number for your GA4 property, from Google Analytics. Leave off the word properties/.',
 	[keys.providerFieldClientEmailHelp]: 'The service account address from the file Google gave you.',
