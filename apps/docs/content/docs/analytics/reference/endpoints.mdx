@@ -390,7 +390,7 @@ POST /api/_x/provider-status?id=<provider document id>
 }
 ```
 
-Every field of `status` is absent until it was written, so a document nothing has read yet answers `{ "status": {} }`. Ordinary reads write it as well: a failure at once, a success at most every 15 minutes per instance and at once after a failure. `errorDetail` is the vendor's answer cut to 300 characters; a refused host keeps none, since it can name the address the host resolved to.
+Every field of `status` is absent until it was written, so a document nothing has read yet answers `{ "status": {} }`. Ordinary reads write it as well: a failure at once, a success at most every 15 minutes per instance and at once after a failure. `errorDetail` is the vendor's answer cut to 300 characters; a refused host keeps none.
 
 Access is Payload's own for the provider document, asked with the caller's user: `GET` needs read access to it and `POST` update access. A document the caller may not read, another tenant's included, answers `404` exactly like a missing one, and nothing is sent to its vendor.
 
@@ -570,7 +570,7 @@ The union is exported as `AnalyticsErrorCode` (with `QueryErrorCode` as an alias
 | `/_x/provider-status` | `400` | `invalid_param` | `id` | `id` is missing or blank, or a `POST` names a document whose provider has no connection to check (`native`) |
 | `/_x/provider-status` | `401` | `unauthorized` | | no signed-in user |
 | `/_x/provider-status` | `403` | `forbidden` | | a `POST` from a caller who may read the document but not update it |
-| `/_x/provider-status` | `404` | `not_found` | `id` | the document does not exist or the caller may not read it. The two are deliberately one answer |
+| `/_x/provider-status` | `404` | `not_found` | `id` | the document does not exist or the caller may not read it; the two are one answer |
 | `/_x/provider-status` | `500` | `internal` | | the document or its status could not be read or written; logged with the document id |
 | `/_x/provider-status` | `503` | `unavailable` | | this Payload instance runs without the plugin |
 | `/_x/goals` | `400` | `untrusted_scope` | | the request's own tenant is one `scope.member` says the user does not belong to |
