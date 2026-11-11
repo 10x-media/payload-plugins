@@ -14,13 +14,28 @@
 
 **Behavioral: a vendor's error names its own message.** A refused read carries the vendor's JSON `detail`, `message` or `error` rather than the first 200 characters of the body, and the query endpoint's warning names the scope it read for.
 
-
 **Fixed (Umami): a website id Umami does not know fails the connection check.** Self-hosted Umami answers an unknown website with `200` and a `null` body, and the check took that for a connection that works. It now fails with "umami: no website <id>; check the Website ID".
 
 **Fixed (Umami): the key fields say which key goes where.** **API token** said "Umami Cloud token" though it is the self-hosted key, sent as `Bearer`. It now names self-hosted Umami, and **API key** on an Umami document names Umami Cloud, in all 11 locales.
 
-**Behavioral: under a `fallback` policy, a tenant whose own sources all fail reads the shared source.** A provider document that was configured but failing used to switch its tenant off the shared platform source, so one bad key cost the tenant every number. While the last result of each of the tenant's documents is a failure, the shared source is listed beside them and opens as the default, and the view and the providers list say why (`notice: 'ownSourceFailing'` on `GET /api/_x/sources`). A document failing for more than 10 minutes is checked again in the background when its tenant's listing is read, so it takes its tenant back once it answers.
+**Behavioral: under a `fallback` policy, a tenant whose own sources all fail reads the shared source.** A provider document that was configured but failing used to switch its tenant off the shared platform source, so one bad key cost the tenant every number. A document now counts as failing while its last result is a refusal, or a vendor that did not answer while its reads rest. While every one of a tenant's documents is failing, the shared source is listed beside them, opens as the default in place of a failing one, and the view and the providers list say why (`notice: 'ownSourceFailing'` on `GET /api/_x/sources`). A document failing for more than 10 minutes is checked again in the background when its tenant's listing is read, at most once every 10 minutes, so it takes its tenant back once it works.
 
 **Fixed: credential fields are labelled in the reader's language.** The **API key**, **API token** and **Private key** fields kept their English label in every admin language, because Payload drops a function label from the client field the write-only editor renders. They now carry a label per locale, as their help already did.
 
 **Fixed: the providers list's notice lines up with the list.** It rendered outside the page's gutter, edge to edge. It now sits inside it.
+
+**Behavioral: a save that changes how a provider document connects clears its connection status.** A key sent again, another host, ID, provider or scope clears the document's row in `analytics-provider-status`, and its Connection panel reads the status again after every save, so a fixed key no longer shows the old refusal.
+
+**Behavioral: the Connection panel and the analytics view show only the vendor's own answer.** A failure the vendor did not word itself (a refused host, a network error, a check the plugin refused) keeps no detail and shows the translated advice alone, where the panel used to show the plugin's or the runtime's English message.
+
+**Fixed: Test connection says why it cannot run.** A reader who may not edit the document gets a disabled button that says so, where the check used to answer 403 as a failed connection. A document whose host is refused is checked and refused like a read, where it answered that there was nothing to check.
+
+**Fixed: read failures name their scope.** The engine's `analytics: read failed for adapter "<id>"` warning now says the scope it read for, or `install-wide`. The analytics view names when a failing source last worked, for a vendor that stopped answering as well as one that refused.
+
+**Fixed (Umami): the website ID is one path segment.** The connection check sends it URL-encoded, as the PostHog adapter sends its project ID.
+
+**Upgrade actions**
+
+1. On Postgres or SQLite in migrate mode, generate a migration (`pnpm payload migrate:create`), review it and run it: it creates the `analytics-provider-status` table. Push mode and MongoDB need nothing. Until it runs, connection checks and statuses fail, reads go on, and no source counts as failing ([From 1.0.0-beta.15](https://docs.10xmedia.de/analytics/upgrading/beta-16)).
+2. Pick a **Region** on every PostHog provider document whose **Host** is blank; it saves again once one is picked.
+3. Regenerate the import map (`pnpm payload generate:importmap`): the provider form renders the new Connection panel.
