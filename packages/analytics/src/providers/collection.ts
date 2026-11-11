@@ -159,10 +159,20 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 }
 
 /**
- * `req.context` key a provider update that changes how the document connects sets for its
- * afterChange: per document, since a bulk update hands every document the same context.
+ * The ids of the documents whose update changes how they connect, kept on `req.context` for their
+ * afterChange: a bulk update hands every document the same context.
  */
-const reconnectedKey = (id: unknown): string => `analytics:providerReconnected:${String(id)}`
+const RECONNECTED_KEY = '__analyticsReconnected'
+
+const reconnectedOf = (context: Record<string, unknown>): Set<string> => {
+	const existing = context[RECONNECTED_KEY]
+	if (existing instanceof Set) {
+		return existing
+	}
+	const created = new Set<string>()
+	context[RECONNECTED_KEY] = created
+	return created
+}
 
 const plainSecret: BuildSecretField = (source) => [source]
 
@@ -663,7 +673,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 						operation === 'update' &&
 						reconnects({ scopeField: args.scopeField, isSealed: args.isSealed, data, originalDoc })
 					) {
-						context[reconnectedKey(originalDoc?.id)] = true
+						reconnectedOf(context).add(String(originalDoc?.id))
 					}
 					return data
 				},
@@ -671,9 +681,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			],
 			afterChange: [
 				async ({ context, doc, operation, previousDoc, req }) => {
-					const reconnected = reconnectedKey(doc.id)
-					if (operation === 'update' && context[reconnected] === true) {
-						delete context[reconnected]
+					if (operation === 'update' && reconnectedOf(context).delete(String(doc.id))) {
 						await args.forgetStatus?.(String(doc.id), req)
 					}
 					await args.onChange(
