@@ -262,9 +262,9 @@ describe('buildProvidersCollection', () => {
 		})
 	})
 
-	// Payload drops a function description from the client field, and the write-only editor reads
-	// the client field's own: a credential's help has to reach the browser as strings.
-	it("keeps each credential's help on the client field, in every language, install strings first", () => {
+	// Payload drops a function label and description from the client field, and the write-only editor
+	// reads the client field's own: a credential's label and help have to reach the browser as strings.
+	it("keeps each credential's label and help on the client field, in every language, install strings first", () => {
 		const relabeled = buildProvidersCollection({
 			slug: 'analytics-providers',
 			onChange: () => {},
@@ -308,6 +308,8 @@ describe('buildProvidersCollection', () => {
 			})
 			const description = (client as { admin?: { description?: unknown } }).admin?.description
 			expect(description, path).toMatchObject({ en: expect.any(String), zh: expect.any(String) })
+			const label = (client as { label?: unknown }).label
+			expect(label, path).toMatchObject({ en: expect.any(String), de: expect.any(String) })
 			expect((description as Record<string, string>).nl, path).toBe(
 				(description as Record<string, string>).en
 			)

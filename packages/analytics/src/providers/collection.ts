@@ -178,15 +178,15 @@ const textField = (
 })
 
 /**
- * A sealed credential. Its help is a string per locale: Payload drops a function description from
- * the client field, which the write-only editor renders.
+ * A sealed credential. Its label and help are a string per locale: Payload drops a function label
+ * and description from the client field, which the write-only editor renders.
  */
 const secretField = (
 	buildSecret: BuildSecretField,
 	staticLabel: StaticLabelFor,
 	opts: {
 		name: string
-		label: TranslationKey
+		label: SingularKey
 		help: SingularKey
 		width?: string
 		validate?: TextFieldSingleValidation
@@ -195,7 +195,7 @@ const secretField = (
 	buildSecret({
 		name: opts.name,
 		type: 'text',
-		label: labelForKey(opts.label),
+		label: staticLabel(opts.label),
 		...(opts.validate ? { validate: opts.validate } : {}),
 		admin: {
 			description: staticLabel(opts.help),
@@ -554,7 +554,7 @@ const providerFields = (
 			...buildSecret({
 				name: 'privateKey',
 				type: 'textarea',
-				label: labelForKey(keys.providerFieldPrivateKey),
+				label: staticLabel(keys.providerFieldPrivateKey),
 				admin: { description: staticLabel(keys.providerFieldPrivateKeyHelp) },
 			}),
 		]),
