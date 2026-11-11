@@ -20,7 +20,10 @@ const TENANT: Record<string, string> = { alpha: 'alpha', 'alpha-viewer': 'alpha'
 
 const userOf = (id: string): TypedUser => ({ id, collection: 'users' }) as unknown as TypedUser
 
-/** Plausible's query API on loopback: `denied.example` is refused the way a wrong key is. */
+/**
+ * Plausible's query API on loopback: a `denied` site is refused the way a wrong key is, a `down` one
+ * answers an outage, and a `silent` one is never answered.
+ */
 const startPlausible = async () => {
 	const asked: string[] = []
 	const server = createServer((req, res) => {
@@ -36,6 +39,14 @@ const startPlausible = async () => {
 				res.end(JSON.stringify({ error: 'Invalid API key or site ID' }))
 				return
 			}
+			if (siteId.startsWith('down')) {
+				res.writeHead(503, { 'content-type': 'application/json' })
+				res.end(JSON.stringify({ error: 'Service Unavailable' }))
+				return
+			}
+			if (siteId.startsWith('silent')) {
+				return
+			}
 			res.writeHead(200, { 'content-type': 'application/json' })
 			res.end(JSON.stringify({ results: [{ metrics: [3], dimensions: [] }] }))
 		})
@@ -45,16 +56,31 @@ const startPlausible = async () => {
 	return {
 		origin: `http://127.0.0.1:${port}`,
 		asked,
-		stop: () => new Promise<void>((resolve) => server.close(() => resolve())),
+		stop: () =>
+			new Promise<void>((resolve) => {
+				server.close(() => resolve())
+				server.closeAllConnections()
+			}),
 	}
+}
+
+/** An origin on loopback that nothing listens on: the port is taken and given back at once. */
+const closedOrigin = async (): Promise<string> => {
+	const server = createServer()
+	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+	const { port } = server.address() as AddressInfo
+	await new Promise<void>((resolve) => server.close(() => resolve()))
+	return `http://127.0.0.1:${port}`
 }
 
 describeForDb('analytics provider status: reads, the Test connection button, tenants', {}, (db) => {
 	let booted: BootedPayload
 	let vendor: Awaited<ReturnType<typeof startPlausible>>
+	let closed: string
 
 	beforeAll(async () => {
 		vendor = await startPlausible()
+		closed = await closedOrigin()
 		booted = await bootPayload({
 			db,
 			plugin: analytics({
@@ -74,7 +100,7 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 									: false,
 						},
 					},
-					hosts: { allow: [vendor.origin], allowPrivateNetwork: true },
+					hosts: { allow: [vendor.origin, closed], allowPrivateNetwork: true },
 				},
 				widgets: { comparison: false },
 			}),
@@ -86,7 +112,7 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		await vendor?.stop()
 	})
 
-	const createProvider = async (scope: string, siteId: string) =>
+	const createProvider = async (scope: string, siteId: string, host = vendor.origin) =>
 		booted.payload.create({
 			collection: PROVIDERS_SLUG,
 			data: {
@@ -94,7 +120,7 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 				provider: 'plausible',
 				enabled: true,
 				scope,
-				plausible: { siteId, apiKey: 'plausible-key', host: vendor.origin },
+				plausible: { siteId, apiKey: 'plausible-key', host },
 			},
 			// Stamped into the creator's own tenant, which the scope it names must be.
 			user: userOf(scope),
@@ -156,6 +182,31 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 			errorDetail: expect.stringContaining('HTTP 401'),
 			lastErrorAt: expect.any(String),
 		})
+	})
+
+	it(`answers a vendor outage as no answer, not as a setup to fix, on ${db}`, async () => {
+		const doc = await createProvider('alpha', 'down-check.example')
+		const body = (await (await status('POST', 'alpha', doc.id)).json()) as ProviderStatusResponse
+		expect(body.checked).toMatchObject({ ok: false, kind: 'unavailable' })
+		expect(vendor.asked).toContain('down-check.example')
+		expect(body.status).toMatchObject({ errorKind: 'unavailable', lastErrorAt: expect.any(String) })
+		expect((await rowsOf(doc.id))[0]?.errorKind).toBe('unavailable')
+	})
+
+	it(`answers a vendor that never replies as no answer once the check times out on ${db}`, async () => {
+		const doc = await createProvider('alpha', 'silent-check.example')
+		const startedAt = Date.now()
+		const body = (await (await status('POST', 'alpha', doc.id)).json()) as ProviderStatusResponse
+		expect(Date.now() - startedAt).toBeGreaterThanOrEqual(9_500)
+		expect(body.checked).toMatchObject({ ok: false, kind: 'unavailable' })
+		expect((await rowsOf(doc.id))[0]?.errorKind).toBe('unavailable')
+	}, 20_000)
+
+	it(`answers a refused connection as no answer on ${db}`, async () => {
+		const doc = await createProvider('alpha', 'refused-check.example', closed)
+		const body = (await (await status('POST', 'alpha', doc.id)).json()) as ProviderStatusResponse
+		expect(body.checked).toMatchObject({ ok: false, kind: 'unavailable' })
+		expect((await rowsOf(doc.id))[0]?.errorKind).toBe('unavailable')
 	})
 
 	it(`records what an ordinary read found, the pause included, on ${db}`, async () => {
