@@ -3,11 +3,10 @@ set -euo pipefail
 
 # Interactive publish for a plugin. Builds, packs with pnpm (so the dist/ exports rewrite
 # is applied), then publishes the tarball with npm, whose browser passkey 2FA approval
-# pnpm publish cannot do. This is the publishing path for every release (not just the
-# first): the npm account is auth-and-writes 2FA and pnpm 10 has no OIDC, so CI cannot
-# publish yet. After a successful publish it creates and pushes the @scope/name@version
-# git tag, which triggers release-notes.yml to create the GitHub release. Fold publishing
-# back into changesets/action once the pnpm 11 + OIDC trusted-publishing migration lands.
+# pnpm publish cannot do. On v4, release.yml publishes through trusted publishing, so this
+# is for a new plugin's first release (npm configures a trusted publisher only for a package
+# that exists) and a manual fallback. After a successful publish it creates and pushes the
+# @scope/name@version git tag, which triggers release-notes.yml to create the GitHub release.
 #
 #   Usage: bash scripts/bootstrap-publish.sh <plugin>     (e.g. jobs)
 #
@@ -29,7 +28,7 @@ rm -f ./*.tgz
 # publishConfig.provenance forces provenance generation, which only works on a CI OIDC
 # provider and overrides env vars and flags, breaking this local publish. No package
 # declares it today, but strip it defensively before pack/publish, then restore. Manual
-# publishes carry no provenance; the pnpm 11 + OIDC CI will add it automatically.
+# publishes carry no provenance; release.yml's trusted publishing adds it.
 cp package.json .package.json.orig
 trap 'mv -f .package.json.orig package.json 2>/dev/null || true' EXIT
 node -e "const fs=require('fs'); const p=JSON.parse(fs.readFileSync('package.json','utf8')); if (p.publishConfig) delete p.publishConfig.provenance; fs.writeFileSync('package.json', JSON.stringify(p, null, '\t') + '\n');"

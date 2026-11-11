@@ -1,9 +1,9 @@
 name: Snapshot Release
 
-# NOTE: blocked on publishing auth. Like release.yml, this cannot publish until the
-# pnpm 11 + OIDC trusted-publishing migration (the npm account is auth-and-writes 2FA
-# and pnpm 10 has no OIDC), so a `snapshot`-labeled PR currently fails at the publish
-# step with EOTP. Kept in place for when trusted publishing is configured.
+# NOTE: does not publish. It still authenticates with NPM_TOKEN, which the account's
+# auth-and-writes 2FA rejects (EOTP), and npm allows one trusted publisher workflow per
+# package, which is release.yml. Making snapshots work means moving this job into
+# release.yml (pnpm pack + npm publish, as scripts/publish-unreleased.sh does). Kept for that.
 
 on:
   pull_request:

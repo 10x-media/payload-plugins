@@ -1,16 +1,25 @@
 name: Release
 
-# Opens/updates the "Version Packages" PR from queued changesets. It deliberately
-# does NOT publish: the npm account is auth-and-writes 2FA and pnpm 10 has no OIDC,
-# so publishing is manual (scripts/bootstrap-publish.sh) and GitHub releases are
-# created by release-notes.yml when the version tag is pushed. Restore a `publish:`
-# step here (with OIDC, no token) after the pnpm 11 + trusted-publishing migration.
+# Two jobs. `version` opens or updates the "Version Packages" PR from queued changesets.
+# Once no changesets are queued (the merge of that PR, or a dispatch), `publish` publishes
+# every public package whose version is not on npm yet (scripts/publish-unreleased.sh),
+# tags it and dispatches release-notes.yml for it.
+#
+# Publishing authenticates with npm trusted publishing (OIDC), no token. Every public
+# package on npmjs.com names this repository and this workflow file as its trusted
+# publisher, so this file cannot be renamed without updating all of them. No environment
+# is configured: merging the Version Packages PR is the release decision.
+#
+# Publishing is idempotent: after a failure, re-run the job or dispatch this workflow from
+# the branch, and only the missing versions go out. `pnpm publish:plugin <name>` remains
+# for a new plugin's first release, which has no trusted publisher yet.
 
 on:
   push:
     branches: [main, v4]
   # A push whose workflows GitHub never started leaves the Version Packages PR without that
-  # merge's changesets; dispatching from the branch (main or v4) regenerates its PR.
+  # merge's changesets; dispatching from the branch (main or v4) regenerates its PR, or
+  # retries a publish that failed.
   workflow_dispatch:
 
 concurrency:
@@ -23,6 +32,8 @@ jobs:
     permissions:
       contents: write
       pull-requests: write
+    outputs:
+      hasChangesets: ${{ steps.changesets.outputs.hasChangesets }}
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 0 }
@@ -32,10 +43,40 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - uses: changesets/action@v1
+      - id: changesets
+        uses: changesets/action@v1
         with:
           version: pnpm version-packages
           title: 'chore: version packages'
           commit: 'chore: version packages'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  publish:
+    needs: version
+    if: needs.version.outputs.hasChangesets == 'false' && github.ref == 'refs/heads/v4'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      actions: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v6
+        with: { fetch-depth: 0 }
+      - uses: pnpm/action-setup@v6
+      # No registry-url: setup-node would then write an .npmrc with a placeholder token,
+      # and npm must authenticate through OIDC instead.
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+      # Trusted publishing needs npm 11.5.1 or later; do not rely on the one Node bundles.
+      - run: npm install -g npm@11
+      - run: pnpm install --frozen-lockfile
+      - run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+      - run: bash scripts/publish-unreleased.sh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
