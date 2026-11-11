@@ -118,8 +118,8 @@ export interface EngineOptions {
 	 * aborted past it.
 	 */
 	timeoutMs: number
-	/** Called once per failed fetch, before falling back to a stale cache entry. */
-	onError?: (err: unknown, adapterId: string) => void
+	/** Called once per failed fetch, before falling back to a stale cache entry; `scope` null is install-wide. */
+	onError?: (err: unknown, adapterId: string, scope: string | null) => void
 	/** Called when the store fails; the read carries on as if the entry were absent or unwritten. */
 	onStoreError?: (err: unknown, operation: CacheOperation) => void
 	/** Called after each value the store accepted. */
@@ -624,7 +624,7 @@ export function createEngine(opts: EngineOptions): Required<Engine> {
 			failures.set(key, failure, FAILURE_MEMO_MS)
 			// A lane refusal sent nothing: the failure that opened or paused the lane was told already.
 			if (!isLaneRefused(err)) {
-				opts.onError?.(err, adapter.id)
+				opts.onError?.(err, adapter.id, scope)
 			}
 			throw new ReadFailedError(
 				withLaneRetryAfter(failure, lanes.for(adapter, scope).health()),
@@ -883,7 +883,7 @@ export function createEngine(opts: EngineOptions): Required<Engine> {
 				)
 			} catch (err) {
 				if (!isLaneRefused(err)) {
-					opts.onError?.(err, adapter.id)
+					opts.onError?.(err, adapter.id, scope)
 				}
 				throw new ReadFailedError(
 					withLaneRetryAfter(classifyError(err), lanes.for(adapter, scope).health()),
