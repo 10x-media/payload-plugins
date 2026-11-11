@@ -49,6 +49,16 @@ export const connectionStateOf = (status: ProviderStatus): ConnectionState => {
 	return success === undefined ? 'unchecked' : 'works'
 }
 
+/**
+ * Whether a document's source counts as failing, for a `fallback` policy to stand in for it:
+ * refused until a read or a check works again, unreachable only while its reads rest, so one slow
+ * answer moves no one off their own numbers.
+ */
+export const isFailingConnection = (status: ProviderStatus, now: number): boolean => {
+	const state = connectionStateOf(status)
+	return state === 'refused' || (state === 'unreachable' && (timeOf(status.pausedUntil) ?? 0) > now)
+}
+
 const isOptionalString = (value: unknown): boolean =>
 	value === undefined || typeof value === 'string'
 

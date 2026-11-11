@@ -19,12 +19,12 @@ import {
 	type ScopeGates,
 	scopeGates,
 } from '../plugin/runtime'
-import { checkConnectionOf } from '../providers/connectionCheck'
-import { connectionStateOf } from '../providers/connectionState'
+import { isFailingConnection, type ProviderStatus } from '../providers/connectionState'
 import { MAX_SCOPE_LENGTH } from '../query/limits'
 import { BREAKER_MAX_MS } from '../surfacing/breaker'
 import { currentDate } from './clock'
 import { type AnalyticsAdapter, PLATFORM_SCOPE } from './contract'
+import { monotonicMs } from './monotonic'
 import {
 	type AdapterRegistry,
 	createRegistry,
@@ -33,6 +33,7 @@ import {
 } from './registry'
 import { sourceLabelFor, sourceRefFor } from './sourceLabel'
 import type { DefaultSourceFunction, SourceRef } from './sourcePolicy'
+import { throttled, WARN_EVERY_MS } from './throttle'
 
 export type ReadContext =
 	| {
@@ -212,51 +213,30 @@ interface Granted {
 	docId: string
 }
 
-/** Each runtime's provider documents a background check is running for, so concurrent readers start one. */
-const rechecking = new WeakMap<AnalyticsRuntime, Set<string>>()
+/** Each runtime's warning that its status rows could not be read, at most once a minute. */
+const statusWarnings = new WeakMap<AnalyticsRuntime, (message: string) => void>()
 
-/**
- * Runs a refused document's Test connection check without anyone waiting and writes what it found.
- * Nothing else reads a source its scope no longer opens on, so this is how one that answers again
- * takes its scope back from the platform.
- */
-const recheckInBackground = (
+const statusWarning = (
 	runtime: AnalyticsRuntime,
-	req: PayloadRequest,
-	docId: string
-): void => {
-	const store = runtime.providerStatus
-	const running = rechecking.get(runtime) ?? new Set<string>()
-	rechecking.set(runtime, running)
-	if (!store || !runtime.providerAdapter || running.has(docId)) {
-		return
+	req: PayloadRequest
+): ((message: string) => void) => {
+	const known = statusWarnings.get(runtime)
+	if (known) {
+		return known
 	}
-	running.add(docId)
-	const { payload } = req
-	const check = async () => {
-		const adapter = await runtime.providerAdapter?.(docId)
-		if (!adapter?.checkConnection) {
-			return
-		}
-		try {
-			await store.record(docId, await checkConnectionOf(payload, adapter))
-		} finally {
-			await adapter.close?.(payload)
-		}
-	}
-	check()
-		.catch((err: unknown) => {
-			payload.logger?.warn(
-				`analytics: checking provider document "${docId}" again failed: ${String(err)}`
-			)
-		})
-		.finally(() => running.delete(docId))
+	const warn = throttled((message) => req.payload.logger?.warn(message), {
+		now: monotonicMs,
+		intervalMs: WARN_EVERY_MS,
+	})
+	statusWarnings.set(runtime, warn)
+	return warn
 }
 
 /**
- * The scope's own documents whose last connection result is a failure, which a `fallback` policy
- * stands in for. One that failed longer ago than the breaker's longest rest is checked again in the
- * background. Only an install with a `fallback` policy reads the status rows.
+ * The scope's own documents whose source is failing (`isFailingConnection`), which a `fallback`
+ * policy stands in for; empty unless the install has one. A document failing for longer than the
+ * breaker's longest rest is checked again in the background, since nothing else reads a source its
+ * scope no longer opens on. Rows that cannot be read count as no failure, so the reads go on.
  */
 const failingOwnDocs = async (
 	runtime: AnalyticsRuntime,
@@ -271,16 +251,27 @@ const failingOwnDocs = async (
 	) {
 		return NONE_ADMITTED
 	}
+	let statuses: Map<string, ProviderStatus>
+	try {
+		statuses = await store.readMany(own.map((granted) => granted.docId))
+	} catch (err) {
+		statusWarning(
+			runtime,
+			req
+		)(
+			`analytics: provider connection statuses could not be read, so no source counts as failing: ${String(err)}`
+		)
+		return NONE_ADMITTED
+	}
+	const at = currentDate().getTime()
 	const failing = new Set<string>()
-	for (const { docId } of own) {
-		const status = await store.read(docId)
-		const state = status ? connectionStateOf(status) : 'unchecked'
-		if (state !== 'refused' && state !== 'unreachable') {
+	for (const [docId, status] of statuses) {
+		if (!isFailingConnection(status, at)) {
 			continue
 		}
 		failing.add(docId)
-		if (currentDate().getTime() - Date.parse(status?.lastErrorAt ?? '') >= BREAKER_MAX_MS) {
-			recheckInBackground(runtime, req, docId)
+		if (at - Date.parse(status.lastErrorAt ?? '') >= BREAKER_MAX_MS) {
+			runtime.providerRecheck?.request(docId)
 		}
 	}
 	return failing
@@ -482,13 +473,13 @@ export const visibleSourcesFor = async (args: VisibleArgs): Promise<VisibleSourc
 	const visible = filterRegistry(registry, (adapter) => keep.has(adapter.id))
 	const scoped = await withScopeDefault({ runtime, req, resolved, scope, visible })
 	const ownFailing = own.length > 0 && fallbackAdmitted.size > 0
-	// A scope whose own sources all fail opens on the shared one standing in for them.
-	const standIn = ownFailing ? [...fallbackAdmitted][0] : undefined
+	const defaultDoc = scoped ? resolved.grants.get(scoped.default().id) : undefined
+	const standIn =
+		ownFailing && defaultDoc !== undefined && failing.has(defaultDoc)
+			? [...fallbackAdmitted][0]
+			: undefined
 	return {
-		registry:
-			scoped && standIn !== undefined && standIn !== scoped.default().id
-				? createRegistry(scoped.all(), standIn)
-				: scoped,
+		registry: scoped && standIn !== undefined ? createRegistry(scoped.all(), standIn) : scoped,
 		fallbackAdmitted,
 		ownFailing,
 	}

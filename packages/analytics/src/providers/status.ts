@@ -93,6 +93,10 @@ export interface ProviderStatusStore {
 	 */
 	record(docId: string, outcome: ConnectionOutcome, options?: { throttle?: boolean }): Promise<void>
 	read(docId: string): Promise<ProviderStatus | undefined>
+	/** The rows of `docIds` that exist, keyed by document id, in one read. */
+	readMany(docIds: readonly string[]): Promise<Map<string, ProviderStatus>>
+	/** Waits for every write already queued, for a runtime that closes or a test that settles. */
+	idle(): Promise<void>
 }
 
 /** Deletes a provider document's row in `req`'s transaction, so the document takes it along. */
@@ -208,6 +212,24 @@ export const providerStatusStore = (
 				}
 			})
 			return queued
+		},
+
+		async readMany(docIds) {
+			if (docIds.length === 0) {
+				return new Map()
+			}
+			const { docs } = await payload.db.find<Record<string, unknown>>({
+				collection: collection(),
+				where: { id: { in: [...docIds] } },
+				limit: docIds.length,
+				pagination: false,
+				req: DETACHED,
+			})
+			return new Map(docs.map((row) => [String(row.id), statusOf(row)]))
+		},
+
+		async idle() {
+			await Promise.all(queues.values())
 		},
 
 		async read(docId) {

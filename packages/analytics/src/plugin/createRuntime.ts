@@ -19,7 +19,7 @@ import {
 } from '../core/options'
 import { type AdapterRegistry, withoutRevenue } from '../core/registry'
 import { describeWithCauses } from '../core/sourceErrors'
-import { throttled } from '../core/throttle'
+import { throttled, WARN_EVERY_MS } from '../core/throttle'
 import { isRecord } from '../core/values'
 import { hostHoldsWriteLock, sqliteTransactionsNotice } from '../db/detachedWrite'
 import { configGoalsResolver, createGoalsResolver, type GoalsResolver } from '../goals/resolver'
@@ -28,6 +28,7 @@ import { stateLease, stateStoreOf } from '../maintenance/lease'
 import { trackServerEvent } from '../native/ingest/serverTrack'
 import { NATIVE_ADAPTER_ID } from '../native/nativeAdapter'
 import { createGuardedFetch } from '../net/guardedFetch'
+import { createConnectionRecheck } from '../providers/connectionCheck'
 import { documentIdOf } from '../providers/ids'
 import { configTokenBackend } from '../providers/refresh'
 import { createProviderRegistry, type ProviderPlan } from '../providers/registry'
@@ -37,6 +38,7 @@ import {
 	providerStatusStore,
 } from '../providers/status'
 import { emptyTrackerConfig, type TrackerConfigSource } from '../site/getTrackerConfig'
+import { BREAKER_MAX_MS } from '../surfacing/breaker'
 import { createCacheSweeper, SWEEP_LEASE, SWEEP_LEASE_MS } from '../surfacing/cacheSweep'
 import { collectionCacheStore } from '../surfacing/collectionCacheStore'
 import { type CacheOperation, createEngine } from '../surfacing/engine'
@@ -52,9 +54,6 @@ import { isProductionBuild } from './peers'
 import { assertRoutesReachable } from './routeChecks'
 import { type AnalyticsRuntime, getRuntime, type RuntimeFactory } from './runtime'
 import { validateScopeField } from './scopeFieldBoot'
-
-/** How often a failing read cache, or a throwing `hooks.afterRead`, is reported, at most. */
-const CACHE_WARN_EVERY_MS = 60_000
 
 /** node-postgres' own default for the pool's `max`. */
 const PG_DEFAULT_POOL_MAX = 10
@@ -136,7 +135,7 @@ const lanesFor = (
 	const poolMax = postgresPoolMax(payload)
 	const statusWarning = throttled((message: string) => payload.logger?.warn(message), {
 		now: monotonicMs,
-		intervalMs: CACHE_WARN_EVERY_MS,
+		intervalMs: WARN_EVERY_MS,
 	})
 	return createLanes({
 		global: concurrency.global,
@@ -333,6 +332,17 @@ export const createRuntimeFactory = (
 					: {}),
 				now,
 			})
+			const providerRecheck =
+				providerStatus && registry.documentAdapter
+					? createConnectionRecheck({
+							payload,
+							store: providerStatus,
+							adapterFor: registry.documentAdapter,
+							now: monotonicMs,
+							cooldownMs: BREAKER_MAX_MS,
+							warn,
+						})
+					: undefined
 			const goals = goalsResolverFor(payload, resolved, now)
 			// Only where something can change at runtime; an install configured in code keys every read
 			// on the fixed epoch.
@@ -369,7 +379,7 @@ export const createRuntimeFactory = (
 							warn,
 						})
 					: undefined
-			const cacheWarning = throttled(warn, { now: monotonicMs, intervalMs: CACHE_WARN_EVERY_MS })
+			const cacheWarning = throttled(warn, { now: monotonicMs, intervalMs: WARN_EVERY_MS })
 			const onStoreError = (err: unknown, operation: CacheOperation) => {
 				cacheWarning(
 					`analytics: the read cache failed to ${operation}, reads go on without it: ${String(err)}`
@@ -381,7 +391,7 @@ export const createRuntimeFactory = (
 				warn,
 			})
 			const afterRead = resolved.hooks.afterRead
-			const hookWarning = throttled(warn, { now: monotonicMs, intervalMs: CACHE_WARN_EVERY_MS })
+			const hookWarning = throttled(warn, { now: monotonicMs, intervalMs: WARN_EVERY_MS })
 			const engine = createEngine({
 				payload,
 				store,
@@ -425,9 +435,16 @@ export const createRuntimeFactory = (
 				...(providerConnections ? { providerFetch: providerConnections.fetch } : {}),
 				...(providerStatus ? { providerStatus } : {}),
 				...(registry.documentAdapter ? { providerAdapter: registry.documentAdapter } : {}),
+				...(providerRecheck ? { providerRecheck } : {}),
 				// Refreshes and sweeps still running write to the database, which closes after this.
 				close: async () => {
-					await Promise.all([engine.close(), sweeper.idle(), syncWatch?.idle()])
+					await Promise.all([
+						engine.close(),
+						sweeper.idle(),
+						syncWatch?.idle(),
+						providerRecheck?.idle(),
+					])
+					await providerStatus?.idle()
 					await registry.close()
 					await providerConnections?.close()
 				},

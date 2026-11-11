@@ -107,6 +107,10 @@ export const failingAdapter = (
 		capabilities: shape.capabilities,
 		isConfigured: shape.isConfigured ?? (() => true),
 		query: fail,
+		// So Test connection says why, as a read would, rather than that there is nothing to check.
+		checkConnection: async () => {
+			throw error()
+		},
 		...(shape.realtime ? { realtime: fail } : {}),
 	}
 }
