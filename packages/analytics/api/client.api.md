@@ -521,7 +521,7 @@ export type MetricValues = Partial<Record<MetricKey, MetricValue>>;
 export function ProviderConnection(input: UIFieldClientProps): JSX.Element;
 
 // @beta
-export function ProvidersListNotice(): JSX.Element;
+export function ProvidersListNotice(): JSX.Element | null;
 
 // @public
 export class QueryFetchError extends Error {
@@ -808,7 +808,7 @@ export type SourceErrorKind = 'misconfigured' | 'host-refused';
 export const SourceSelectField: (props: SelectFieldClientProps) => JSX_2.Element;
 
 // @public
-export type SourcesNotice = 'platformFallback';
+export type SourcesNotice = 'platformFallback' | 'ownSourceFailing';
 
 // @public (undocumented)
 export interface SourcesResponse {

@@ -181,7 +181,7 @@ describe('sources.<id>.tenants', () => {
 			req,
 			scope: 'alpha',
 			adapterId: 'posthog',
-			ownSources: [{ id: 'plausible:doc-1', label: 'Own site', docId: 'doc-1' }],
+			ownSources: [{ id: 'plausible:doc-1', label: 'Own site', docId: 'doc-1', failing: false }],
 		})
 	})
 

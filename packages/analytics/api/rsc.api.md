@@ -537,7 +537,7 @@ export interface SeriesPoint {
 export function SourceSelectFieldServer(props: SelectFieldServerProps): JSX.Element;
 
 // @public
-export type SourcesNotice = 'platformFallback';
+export type SourcesNotice = 'platformFallback' | 'ownSourceFailing';
 
 // @public (undocumented)
 export interface SourcesResponse {
