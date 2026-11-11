@@ -877,4 +877,31 @@ describe('umami checkConnection', () => {
 			umami({ websiteId: 'w', apiKey: 'bad' }).checkConnection?.(ctx())
 		).rejects.toMatchObject({ name: 'ProviderHttpError', status: 401 })
 	})
+
+	// Self-hosted Umami 3 answers an unknown website with 200 and a `null` body (its API docs:
+	// "Website details, or null if it does not exist").
+	it('fails for a website id Umami does not know', async () => {
+		server.use(
+			http.get('https://umami.example.com/api/websites/unknown', () => HttpResponse.json(null))
+		)
+		await expect(
+			umami({
+				websiteId: 'unknown',
+				token: 't',
+				host: 'https://umami.example.com',
+			}).checkConnection?.(ctx())
+		).rejects.toMatchObject({ name: 'SourceMisconfiguredError' })
+	})
+
+	it('puts the website id in the address as one path segment', async () => {
+		let path: string | null = null
+		server.use(
+			http.get('https://api.umami.is/v1/websites/:id', ({ request }) => {
+				path = new URL(request.url).pathname
+				return HttpResponse.json({ id: 'w' })
+			})
+		)
+		await umami({ websiteId: 'a/b', apiKey: 'k' }).checkConnection?.(ctx())
+		expect(path).toBe('/v1/websites/a%2Fb')
+	})
 })
