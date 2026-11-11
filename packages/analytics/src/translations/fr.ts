@@ -167,7 +167,7 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerConnectionSaveFirst]: 'Enregistrez le document pour le tester.',
 	[keys.providerConnectionUnsaved]: 'Enregistrez vos modifications pour les tester.',
 	[keys.providerConnectionNoPermission]:
-		'Seule une personne autorisée à modifier ce document peut le tester.',
+		'Seule une personne autorisée à modifier ce document peut en tester la connexion.',
 	[keys.providerConnectionRefusedHelp]: 'Vérifiez la clé, les identifiants et l’hôte.',
 	[keys.providerConnectionUnreachableHelp]: 'Le service n’a pas répondu. Réessayez plus tard.',
 	[keys.providerConnectionChecked]: 'La connexion fonctionne',

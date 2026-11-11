@@ -158,7 +158,8 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerConnectionResumes]: '읽기 재개',
 	[keys.providerConnectionSaveFirst]: '테스트하려면 문서를 저장하세요.',
 	[keys.providerConnectionUnsaved]: '테스트하려면 변경 사항을 저장하세요.',
-	[keys.providerConnectionNoPermission]: '이 문서를 수정할 수 있는 사람만 테스트할 수 있습니다.',
+	[keys.providerConnectionNoPermission]:
+		'이 문서를 수정할 수 있는 사람만 연결을 테스트할 수 있습니다.',
 	[keys.providerConnectionRefusedHelp]: '키, ID, 호스트를 확인하세요.',
 	[keys.providerConnectionUnreachableHelp]: '서비스가 응답하지 않았습니다. 나중에 다시 시도하세요.',
 	[keys.providerConnectionChecked]: '연결 정상',

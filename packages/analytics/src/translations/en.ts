@@ -161,7 +161,8 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionResumes]: 'Reads resume',
 	[keys.providerConnectionSaveFirst]: 'Save the document to test it.',
 	[keys.providerConnectionUnsaved]: 'Save your changes to test them.',
-	[keys.providerConnectionNoPermission]: 'Only someone who may edit this document can test it.',
+	[keys.providerConnectionNoPermission]:
+		'Only someone who may edit this document can test its connection.',
 	[keys.providerConnectionRefusedHelp]: 'Check the key, the IDs and the host.',
 	[keys.providerConnectionUnreachableHelp]: 'The service did not answer. Try again later.',
 	[keys.providerConnectionChecked]: 'Connection works',
@@ -436,7 +437,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.sourcesPlatformFallback]:
 		"These numbers come from the platform's analytics tool until this site adds its own. Adding one switches to it.",
 	[keys.sourcesOwnSourceFailing]:
-		"This site's own analytics tool is not working, so these numbers come from the platform's. They switch back once its connection works again.",
+		"This site's own analytics tool is not working, so these numbers come from the platform's. The view switches back once its connection works again.",
 	[keys.stateSourceSubstituted]:
 		'The saved data source is no longer available, so the default one is shown.',
 	[keys.statePosthogCookielessDropped]:

@@ -159,7 +159,7 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerConnectionResumes]: 'تُستأنف القراءة',
 	[keys.providerConnectionSaveFirst]: 'احفظ المستند لاختباره.',
 	[keys.providerConnectionUnsaved]: 'احفظ تغييراتك لاختبارها.',
-	[keys.providerConnectionNoPermission]: 'لا يمكن اختبار هذا المستند إلا لمن يحق له تعديله.',
+	[keys.providerConnectionNoPermission]: 'لا يمكن اختبار اتصال هذا المستند إلا لمن يحق له تعديله.',
 	[keys.providerConnectionRefusedHelp]: 'تحقق من المفتاح والمعرّفات والمضيف.',
 	[keys.providerConnectionUnreachableHelp]: 'لم تستجب الخدمة. حاول لاحقًا.',
 	[keys.providerConnectionChecked]: 'الاتصال يعمل',

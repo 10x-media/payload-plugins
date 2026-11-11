@@ -165,7 +165,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerConnectionSaveFirst]: 'Simpan dokumen untuk mengujinya.',
 	[keys.providerConnectionUnsaved]: 'Simpan perubahan untuk mengujinya.',
 	[keys.providerConnectionNoPermission]:
-		'Hanya yang boleh mengubah dokumen ini yang dapat mengujinya.',
+		'Hanya yang boleh mengubah dokumen ini yang dapat menguji koneksinya.',
 	[keys.providerConnectionRefusedHelp]: 'Periksa kunci, ID, dan host.',
 	[keys.providerConnectionUnreachableHelp]: 'Layanan tidak menjawab. Coba lagi nanti.',
 	[keys.providerConnectionChecked]: 'Koneksi berfungsi',
@@ -440,7 +440,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.sourcesPlatformFallback]:
 		'Angka ini berasal dari alat analitik platform sampai situs ini menambahkan alatnya sendiri. Setelah ditambahkan, angkanya beralih ke alat itu.',
 	[keys.sourcesOwnSourceFailing]:
-		'Alat analitik milik situs ini tidak berfungsi, jadi angka ini berasal dari alat analitik platform. Angkanya beralih kembali setelah koneksinya berfungsi lagi.',
+		'Alat analitik milik situs ini tidak berfungsi, jadi angka ini berasal dari alat analitik platform. Tampilan beralih kembali setelah koneksinya berfungsi lagi.',
 	[keys.stateSourceSubstituted]:
 		'Sumber data yang tersimpan tidak tersedia lagi, jadi sumber default yang ditampilkan.',
 	[keys.statePosthogCookielessDropped]:
