@@ -434,6 +434,8 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.panelNoViews]: 'No views in this date range.',
 	[keys.sourcesPlatformFallback]:
 		"These numbers come from the platform's analytics tool until this site adds its own. Adding one switches to it.",
+	[keys.sourcesOwnSourceFailing]:
+		"This site's own analytics tool is not answering, so these numbers come from the platform's. Its own numbers come back once it answers again.",
 	[keys.stateSourceSubstituted]:
 		'The saved data source is no longer available, so the default one is shown.',
 	[keys.statePosthogCookielessDropped]:

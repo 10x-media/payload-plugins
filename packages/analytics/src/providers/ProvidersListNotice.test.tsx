@@ -46,6 +46,12 @@ describe('ProvidersListNotice', () => {
 		expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/sources')
 	})
 
+	it("tells a tenant whose own source is failing that the platform's numbers stand in", async () => {
+		answer({ ...listing, notice: 'ownSourceFailing' })
+		await renderNotice()
+		expect(screen.getByText(keys.sourcesOwnSourceFailing)).toBeDefined()
+	})
+
 	it('renders nothing for a listing without a notice', async () => {
 		answer(listing)
 		const { container } = await renderNotice()

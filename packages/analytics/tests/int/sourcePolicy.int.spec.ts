@@ -1,11 +1,15 @@
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter } from '../../src/core/contract'
 import type { SourcePolicy } from '../../src/core/sourcePolicy'
 import { analytics } from '../../src/index'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
+import { getRuntime } from '../../src/plugin/runtime'
 import { PROVIDERS_SLUG } from '../../src/providers/collection'
+import { PROVIDER_STATUS_SLUG } from '../../src/providers/status'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { callEndpoint } from './endpointHelpers'
 
@@ -50,6 +54,33 @@ const sharedAdapter = (asked: Array<string | undefined>): AnalyticsAdapter => {
 	}
 }
 
+/** Plausible's query API on loopback, answering every site; it records which sites it was asked about. */
+const startPlausible = async () => {
+	const asked: string[] = []
+	const server = createServer((req, res) => {
+		let body = ''
+		req.on('data', (chunk: Buffer) => {
+			body += chunk.toString()
+		})
+		req.on('end', () => {
+			asked.push(String((JSON.parse(body) as { site_id?: unknown }).site_id))
+			res.writeHead(200, { 'content-type': 'application/json' })
+			res.end(JSON.stringify({ results: [{ metrics: [3], dimensions: [] }] }))
+		})
+	})
+	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+	const { port } = server.address() as AddressInfo
+	return {
+		origin: `http://127.0.0.1:${port}`,
+		asked,
+		stop: () =>
+			new Promise<void>((resolve) => {
+				server.close(() => resolve())
+				server.closeAllConnections()
+			}),
+	}
+}
+
 const login = async (payload: Payload, email: string, data: Record<string, unknown>) => {
 	await payload.create({ collection: 'users', data: { email, password: PASSWORD, ...data } })
 	return (await payload.login({ collection: 'users', data: { email, password: PASSWORD } })).user
@@ -67,9 +98,11 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 		let booted: BootedPayload
 		let alpha: unknown
 		let betaPage: string
+		let vendor: Awaited<ReturnType<typeof startPlausible>>
 		const asked: Array<string | undefined> = []
 
 		beforeAll(async () => {
+			vendor = await startPlausible()
 			booted = await bootPayload({
 				db,
 				collections: [users, pages],
@@ -84,7 +117,10 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 					},
 					access: { crossScope: ({ req }) => readerOf(req)?.platform === true },
 					sources: { shared: { tenants: policy } },
-					providers: { collection: true },
+					providers: {
+						collection: true,
+						hosts: { allow: [vendor.origin], allowPrivateNetwork: true },
+					},
 					collections: { pages: { pathField: 'slug' } },
 				}),
 			})
@@ -98,6 +134,7 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 
 		afterAll(async () => {
 			await booted?.stop()
+			await vendor?.stop()
 		})
 
 		const get = (path: string, query: string) =>
@@ -187,6 +224,79 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 						id: doc.id,
 						overrideAccess: true,
 					})
+				}
+			})
+
+			const createOwn = async (siteId: string): Promise<string> => {
+				const doc = (await booted.payload.create({
+					collection: PROVIDERS_SLUG as never,
+					data: {
+						name: 'Alpha Plausible',
+						provider: 'plausible',
+						enabled: true,
+						plausible: { siteId, apiKey: 'alpha-plausible-key-1234', host: vendor.origin },
+					} as never,
+					user: alpha as never,
+					overrideAccess: false,
+				})) as unknown as { id: string | number }
+				return String(doc.id)
+			}
+			const removeOwn = (id: string) =>
+				booted.payload.delete({ collection: PROVIDERS_SLUG as never, id, overrideAccess: true })
+			const statusStore = () => {
+				const store = getRuntime(booted.payload)?.providerStatus
+				if (!store) throw new Error('no provider status store')
+				return store
+			}
+
+			it(`lists the shared adapter beside the tenant's own source while that source is refused, and opens on it, on ${db}`, async () => {
+				const id = await createOwn('alpha-refused.test')
+				try {
+					await statusStore().record(id, {
+						ok: false,
+						kind: 'source_misconfigured',
+						detail: 'plausible: HTTP 401 Invalid API key or site ID',
+					})
+					const failing = await listing()
+					expect(failing.sources.map((source) => source.id).sort()).toEqual(
+						[`plausible:${id}`, 'shared'].sort()
+					)
+					expect(failing.defaultId).toBe('shared')
+					expect(failing.notice).toBe('ownSourceFailing')
+					const shared = await get(routes.query, `metrics=pageviews&${RANGE}&source=shared`)
+					expect(shared.status).toBe(200)
+					// Refused just now: nothing asks the vendor again yet.
+					expect(vendor.asked).not.toContain('alpha-refused.test')
+
+					await statusStore().record(id, { ok: true })
+					const working = await listing()
+					expect(working.sources.map((source) => source.id)).toEqual([`plausible:${id}`])
+					expect(working.defaultId).toBe(`plausible:${id}`)
+					expect(working.notice).toBeUndefined()
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`checks a refused source again once it has rested, and lists it alone when it answers, on ${db}`, async () => {
+				const id = await createOwn('alpha-back.test')
+				try {
+					await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					await booted.payload.db.updateOne({
+						collection: PROVIDER_STATUS_SLUG,
+						where: { id: { equals: id } },
+						data: { lastErrorAt: new Date(Date.now() - 11 * 60_000).toISOString() },
+					})
+					expect((await listing()).notice).toBe('ownSourceFailing')
+					await vi.waitFor(() => expect(vendor.asked).toContain('alpha-back.test'), {
+						timeout: 10_000,
+					})
+					await vi.waitFor(async () => expect((await listing()).notice).toBeUndefined(), {
+						timeout: 10_000,
+					})
+					expect((await listing()).defaultId).toBe(`plausible:${id}`)
+				} finally {
+					await removeOwn(id)
 				}
 			})
 		}

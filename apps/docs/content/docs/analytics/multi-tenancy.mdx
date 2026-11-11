@@ -415,7 +415,7 @@ export const plugin = analytics({
 |---|---|
 | `'staff'` | Readers `access.crossScope.unscopedSource` admits, and nobody else. The default, and what 1.0.0-beta.12 did. |
 | `'tenant'` | Also the tenant's own members, always. |
-| `'fallback'` | Also the tenant's own members, until they read a source of their own. |
+| `'fallback'` | Also the tenant's own members, until they read a source of their own, and again while every one of those is failing. |
 | a function | Also the tenant's own members, while it answers `true`. |
 
 Staff are whoever `unscopedSource` admits, and no policy changes what they read. A member is a user `scope.member` says belongs to the tenant the request resolved, and a member reads the shared adapter narrowed to that tenant. A policy adds members for their own tenant and never widens which scope anyone reads: under every policy a tenant user asking for `scope=*` or another tenant's id gets `400 untrusted_scope`, since the `aggregate` and `named` gates decide those and a policy does not touch them.
@@ -437,6 +437,8 @@ Alpha's editors read Alpha's slice of the platform PostHog. Beta's editors get t
 Alpha's editors read Alpha's slice of the platform PostHog, and the view and the providers list tell them these are the platform's numbers until they add a source of their own, and that adding one switches to it. `GET /api/_x/sources` answers with `notice: 'platformFallback'` then. Beta's and Gamma's editors do not see the platform PostHog: each reads a source of its own, and a `native` document counts as one.
 
 A source of one's own is an [available](/analytics/providers#when-a-document-is-a-source) provider document of the tenant that grants a source this reader may read under `providers.collection.sourceAccess`. When Alpha's admin saves a Plausible document with its credentials, the next request lists Plausible alone and opens on it, with no cache in between. Where the app runs more than one instance, the others follow within ten seconds, as they do for any provider save ([How a document becomes an adapter](/analytics/providers#how-a-document-becomes-an-adapter)). Switching the document off brings the platform PostHog back the same way.
+
+A source of one's own that is failing does not count. When the last result of every one of the tenant's documents is a failure (the vendor refused the key or the site, or did not answer), the listing shows the platform PostHog beside them and opens on it, and the view and the providers list say that the tenant's own tool is not answering, so these are the platform's numbers. `GET /api/_x/sources` answers with `notice: 'ownSourceFailing'` then. The failing source stays listed, so a reader can still open it and see the vendor's error. The result is the one the document's [Connection panel](/analytics/providers#checking-a-connection) shows: a read through the document or its **Test connection** writes it. A document that has been failing for more than 10 minutes is checked again in the background when its tenant's listing is read, the same check **Test connection** runs, so a source that answers again takes its tenant back without anyone pressing the button. Reads do not wait for that check.
 
 #### A function
 

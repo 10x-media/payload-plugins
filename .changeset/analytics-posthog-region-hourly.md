@@ -14,3 +14,9 @@
 
 **Behavioral: a vendor's error names its own message.** A refused read carries the vendor's JSON `detail`, `message` or `error` rather than the first 200 characters of the body, and the query endpoint's warning names the scope it read for.
 
+
+**Fixed (Umami): a website id Umami does not know fails the connection check.** Self-hosted Umami answers an unknown website with `200` and a `null` body, and the check took that for a connection that works. It now fails with "umami: no website <id>; check the Website ID".
+
+**Fixed (Umami): the key fields say which key goes where.** **API token** said "Umami Cloud token" though it is the self-hosted key, sent as `Bearer`. It now names self-hosted Umami, and **API key** on an Umami document names Umami Cloud, in all 11 locales.
+
+**Behavioral: under a `fallback` policy, a tenant whose own sources all fail reads the shared source.** A provider document that was configured but failing used to switch its tenant off the shared platform source, so one bad key cost the tenant every number. While the last result of each of the tenant's documents is a failure, the shared source is listed beside them and opens as the default, and the view and the providers list say why (`notice: 'ownSourceFailing'` on `GET /api/_x/sources`). A document failing for more than 10 minutes is checked again in the background when its tenant's listing is read, so it takes its tenant back once it answers.

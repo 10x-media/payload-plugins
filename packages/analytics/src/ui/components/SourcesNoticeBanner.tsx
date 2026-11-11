@@ -9,9 +9,14 @@ import '../analytics.css'
 /** What a source listing tells its reader about itself, as a banner; nothing when it says nothing. */
 export function SourcesNoticeBanner({ notice }: { notice: SourcesNotice | undefined }) {
 	const { t } = useTranslation()
-	return notice === 'platformFallback' ? (
+	if (notice === undefined) {
+		return null
+	}
+	return (
 		<Banner className="analytics-sources-notice" type="info">
-			{t(keys.sourcesPlatformFallback)}
+			{t(
+				notice === 'ownSourceFailing' ? keys.sourcesOwnSourceFailing : keys.sourcesPlatformFallback
+			)}
 		</Banner>
-	) : null
+	)
 }
