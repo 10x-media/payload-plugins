@@ -12,7 +12,7 @@ import {
 } from '../core/registry'
 import type { AnalyticsSdks } from '../core/sdks'
 import { SourceMisconfiguredError } from '../core/sourceErrors'
-import { throttled } from '../core/throttle'
+import { throttled, WARN_EVERY_MS } from '../core/throttle'
 import { isRecord, valueAt } from '../core/values'
 import { loadEncrypted } from '../plugin/encrypted'
 import { GA4_SDK_WARNING, isProductionBuild } from '../plugin/peers'
@@ -36,9 +36,6 @@ import {
 	type RegistryBase,
 } from './resolver'
 import { SECRET_PATHS } from './secrets'
-
-/** How often a failing probe is reported, at most. */
-const WARN_EVERY_MS = 60_000
 
 /**
  * How long a document whose adapter could not be built (its secrets did not decrypt, its settings

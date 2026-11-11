@@ -127,8 +127,13 @@ export interface AnalyticsRuntime {
 	providerStatus?: ProviderStatusStore
 	/** A fresh adapter of one stored provider document, for its Test connection button. */
 	providerAdapter?: (id: string) => Promise<AnalyticsAdapter | null>
-	/** Background checks of a scope's failing provider documents, under a `fallback` policy. */
+	/**
+	 * Background checks of a scope's failing provider documents, under a `fallback` policy or a
+	 * policy function.
+	 */
 	providerRecheck?: ConnectionRecheck
+	/** Reports a provider status row that could not be read, written or cleared, at most once a minute. */
+	providerStatusWarning?: (message: string) => void
 	/**
 	 * Releases what the runtime itself holds once it is retired: the adapters built from provider
 	 * documents, then the connections they reached their vendors through.
