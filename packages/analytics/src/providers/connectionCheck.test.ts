@@ -72,6 +72,23 @@ describe('createConnectionRecheck', () => {
 		expect(adapterFor).toHaveBeenCalledTimes(2)
 	})
 
+	it('writes nothing for an adapter with no connection to check, and still closes it', async () => {
+		const recorded: Array<[string, ConnectionOutcome]> = []
+		const close = vi.fn(async () => {})
+		const recheck = createConnectionRecheck({
+			payload,
+			store: storeRecording(recorded),
+			adapterFor: async () => ({ ...memoryAdapter(), close }),
+			now: () => 0,
+			cooldownMs: 600_000,
+			warn: () => {},
+		})
+		recheck.request('doc-1')
+		await recheck.idle()
+		expect(recorded).toEqual([])
+		expect(close).toHaveBeenCalledTimes(1)
+	})
+
 	it('logs a check that could not run, and writes nothing', async () => {
 		const recorded: Array<[string, ConnectionOutcome]> = []
 		const warn = vi.fn()
