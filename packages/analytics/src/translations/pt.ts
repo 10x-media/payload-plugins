@@ -442,7 +442,7 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.sourcesPlatformFallback]:
 		'Estes números vêm da ferramenta de análises da plataforma até que este site adicione a sua. Ao adicionar uma, ela passa a ser usada.',
 	[keys.sourcesOwnSourceFailing]:
-		'A ferramenta de análises própria deste site não está respondendo, então estes números vêm da ferramenta da plataforma. Os números dela voltam assim que ela responder de novo.',
+		'A ferramenta de análises própria deste site não está funcionando, então estes números vêm da ferramenta da plataforma. Ela volta a ser usada assim que a conexão funcionar de novo.',
 	[keys.stateSourceSubstituted]:
 		'A fonte de dados salva não está mais disponível, então a fonte padrão é exibida.',
 	[keys.statePosthogCookielessDropped]:
