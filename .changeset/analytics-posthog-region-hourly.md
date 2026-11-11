@@ -14,7 +14,7 @@
 
 **Behavioral: a vendor's error names its own message.** A refused read carries the vendor's JSON `detail`, `message` or `error` rather than the first 200 characters of the body, and the query endpoint's warning names the scope it read for.
 
-**Fixed (Umami): a website id Umami does not know fails the connection check.** Self-hosted Umami answers an unknown website with `200` and a `null` body, and the check took that for a connection that works. It now fails with "umami: no website <id>; check the Website ID".
+**Fixed (Umami): a website id Umami does not know fails the connection check.** Self-hosted Umami answers an unknown website with `200` and a `null` body, and the check took that for a connection that works. It now fails as refused.
 
 **Fixed (Umami): the key fields say which key goes where.** **API token** said "Umami Cloud token" though it is the self-hosted key, sent as `Bearer`. It now names self-hosted Umami, and **API key** on an Umami document names Umami Cloud, in all 11 locales.
 
@@ -38,6 +38,6 @@
 
 **Upgrade actions**
 
-1. On Postgres or SQLite in migrate mode, generate a migration (`pnpm payload migrate:create`), review it and run it: it creates the `analytics-provider-status` table. Push mode and MongoDB need nothing. Until it runs, connection checks and statuses fail, reads go on, and no source counts as failing ([From 1.0.0-beta.15](https://docs.10xmedia.de/analytics/upgrading/beta-16)).
+1. On Postgres or SQLite in migrate mode, generate a migration (`pnpm payload migrate:create`), review it and run it: it creates the `analytics-provider-status` table. Push mode and MongoDB need nothing. Until it runs, connection checks and statuses fail while reads, saves and deletes go on, and no source counts as failing ([From 1.0.0-beta.15](https://docs.10xmedia.de/analytics/upgrading/beta-16)).
 2. Pick a **Region** on every PostHog provider document whose **Host** is blank; it saves again once one is picked.
 3. Regenerate the import map (`pnpm payload generate:importmap`): the provider form renders the new Connection panel.

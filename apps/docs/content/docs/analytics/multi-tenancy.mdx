@@ -475,9 +475,9 @@ A reader who names no source reads the default: the view opens on it, a widget w
 
 1. The tenant's provider document flagged **Default for this site**, when it is a source and the reader may read it.
 2. The `defaultSource` rule.
-
-Under a [`fallback` policy](#fallback), when the default this picks is one of the tenant's own failing documents, the shared source standing in for them is the default instead. A shared source the rule picked is kept.
 3. What 1.0.0-beta.12 picked: `defaultAdapter`, else the first config adapter, else the first source the reader may read.
+
+Under a [`fallback` policy](#fallback), when the default these steps pick is one of the tenant's own failing documents, the shared source standing in for them is the default instead. A default they pick that works is kept.
 
 `defaultSource` takes one of three forms, and fails the boot without `scope.resolve`:
 
