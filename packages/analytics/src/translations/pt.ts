@@ -164,7 +164,8 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerConnectionResumes]: 'Retoma em',
 	[keys.providerConnectionSaveFirst]: 'Salve o documento para testá-lo.',
 	[keys.providerConnectionUnsaved]: 'Salve as alterações para testá-las.',
-	[keys.providerConnectionNoPermission]: 'Só quem pode editar este documento pode testá-lo.',
+	[keys.providerConnectionNoPermission]:
+		'Só quem pode editar este documento pode testar a conexão.',
 	[keys.providerConnectionRefusedHelp]: 'Verifique a chave, os IDs e o host.',
 	[keys.providerConnectionUnreachableHelp]: 'O serviço não respondeu. Tente mais tarde.',
 	[keys.providerConnectionChecked]: 'A conexão funciona',

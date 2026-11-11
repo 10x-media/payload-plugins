@@ -162,7 +162,7 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionSaveFirst]: 'Збережіть документ, щоб перевірити його.',
 	[keys.providerConnectionUnsaved]: 'Збережіть зміни, щоб перевірити їх.',
 	[keys.providerConnectionNoPermission]:
-		'Перевірити може лише той, кому можна редагувати цей документ.',
+		'Перевірити підключення може лише той, кому можна редагувати цей документ.',
 	[keys.providerConnectionRefusedHelp]: 'Перевірте ключ, ID і хост.',
 	[keys.providerConnectionUnreachableHelp]: 'Сервіс не відповів. Спробуйте пізніше.',
 	[keys.providerConnectionChecked]: 'Підключення працює',
