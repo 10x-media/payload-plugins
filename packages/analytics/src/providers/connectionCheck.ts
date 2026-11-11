@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 import type { AnalyticsAdapter } from '../core/contract'
-import { classifyError } from '../surfacing/classifyError'
+import { classifyError, vendorAnswerOf } from '../surfacing/classifyError'
 import type { ConnectionOutcome } from './connectionState'
 import type { ProviderStatusStore } from './status'
 
@@ -13,10 +13,11 @@ const CONNECTION_CHECK_TIMEOUT_MS = 10_000
  */
 const checkFailureOf = (err: unknown): ConnectionOutcome => {
 	const failure = classifyError(err)
+	const vendorAnswer = failure.hostRefused ? undefined : vendorAnswerOf(err)
 	return {
 		ok: false,
 		kind: failure.kind === 'unavailable' ? 'unavailable' : 'source_misconfigured',
-		...(!failure.hostRefused && err instanceof Error ? { detail: err.message } : {}),
+		...(vendorAnswer === undefined ? {} : { detail: vendorAnswer }),
 	}
 }
 

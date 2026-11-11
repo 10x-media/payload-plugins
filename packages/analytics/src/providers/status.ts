@@ -3,7 +3,7 @@ import { currentDate } from '../core/clock'
 import { isCollectionSlug } from '../core/collectionSlug'
 import { DETACHED } from '../db/openTransaction'
 import { storeCollection } from '../native/collections/storeCollection'
-import type { ReadFailureKind } from '../surfacing/classifyError'
+import { type ReadFailureKind, vendorAnswerOf } from '../surfacing/classifyError'
 import type { LaneHealth, LaneOutcome } from '../surfacing/lanes'
 import type { ConnectionOutcome, ProviderStatus } from './connectionState'
 
@@ -33,7 +33,8 @@ export const providerStatusCollection = (slug: string = PROVIDER_STATUS_SLUG): C
 /**
  * What a read that reached the source says about the connection; undefined for a read refused as
  * asked or held back by the plugin's own limits, which says nothing about it. A refused host keeps
- * no detail, which can name the address it resolved to.
+ * no detail, which can name the address it resolved to; only the vendor's own answer is kept as
+ * detail (`vendorAnswerOf`).
  */
 export const connectionOutcomeOf = (
 	outcome: LaneOutcome,
@@ -46,10 +47,11 @@ export const connectionOutcomeOf = (
 	if (failure.kind === 'invalid_param' || failure.kind === 'rate_limited') {
 		return undefined
 	}
+	const vendorAnswer = failure.hostRefused ? undefined : vendorAnswerOf(error)
 	return {
 		ok: false,
 		kind: failure.kind,
-		...(!failure.hostRefused && error instanceof Error ? { detail: error.message } : {}),
+		...(vendorAnswer === undefined ? {} : { detail: vendorAnswer }),
 		...(health.retryAfterMs ? { pausedForMs: health.retryAfterMs } : {}),
 	}
 }

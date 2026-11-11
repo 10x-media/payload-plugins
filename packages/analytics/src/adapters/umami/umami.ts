@@ -338,12 +338,15 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		capture: buildCapture(config, endpoints),
 		isConfigured: () => Boolean(config.websiteId && (config.apiKey || config.token)),
 		async checkConnection(ctx: ConnectionCheckContext): Promise<void> {
-			const website = await fetchJson<unknown>(`${endpoints.api}/websites/${config.websiteId}`, {
-				headers: authHeaders(),
-				provider: 'umami',
-				signal: ctx.signal,
-				...(config.fetch ? { fetch: config.fetch } : {}),
-			})
+			const website = await fetchJson<unknown>(
+				`${endpoints.api}/websites/${encodeURIComponent(config.websiteId)}`,
+				{
+					headers: authHeaders(),
+					provider: 'umami',
+					signal: ctx.signal,
+					...(config.fetch ? { fetch: config.fetch } : {}),
+				}
+			)
 			// Self-hosted Umami answers a website id it does not know with 200 and a `null` body.
 			if (!isRecord(website)) {
 				throw new SourceMisconfiguredError(

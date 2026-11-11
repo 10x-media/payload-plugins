@@ -365,6 +365,29 @@ export const classifyError = (err: unknown): ReadFailure => {
 }
 
 /**
+ * What the vendor itself said about a failure: the message of the first link in the cause chain
+ * that carries an HTTP status or a gRPC code. The plugin's own refusals and the runtime's network
+ * errors are not the vendor's words, so a surface shows its own translated text for them instead.
+ */
+export const vendorAnswerOf = (err: unknown): string | undefined => {
+	let current: unknown = err
+	for (let depth = 0; depth < MAX_CAUSE_DEPTH && isRecord(current); depth++) {
+		const status = numberAt(current, 'status')
+		const code = current instanceof DOMException ? undefined : numberAt(current, 'code')
+		const message: unknown = Reflect.get(current, 'message')
+		if (
+			typeof message === 'string' &&
+			((status !== undefined && status >= 100 && status < 600) ||
+				(code !== undefined && Number.isInteger(code) && code >= 1 && code <= 16))
+		) {
+			return message
+		}
+		current = Reflect.get(current, 'cause')
+	}
+	return undefined
+}
+
+/**
  * What a surface shows for a failed read; only `busy` (an outage, a timeout or a full queue) is
  * one a retry can fix.
  */
