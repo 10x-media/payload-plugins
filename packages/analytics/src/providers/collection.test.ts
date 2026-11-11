@@ -159,8 +159,9 @@ describe('buildProvidersCollection', () => {
 			...unscopedArgs,
 			isSealed: (value) => value === sealed,
 		})
-		const [stamp, retarget] = withSeal.hooks?.beforeChange ?? []
-		expect(withSeal.hooks?.beforeChange).toHaveLength(2)
+		// The scope stamp, the status reset (a no-op here: no status collection), then the retarget.
+		const [stamp, , retarget] = withSeal.hooks?.beforeChange ?? []
+		expect(withSeal.hooks?.beforeChange).toHaveLength(3)
 		const data = {
 			provider: 'plausible',
 			plausible: { host: 'https://b.example.com', siteId: 's', apiKey: sealed },
