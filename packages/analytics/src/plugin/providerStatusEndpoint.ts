@@ -1,11 +1,10 @@
 import { docAccessOperation, type PayloadHandler, type PayloadRequest } from 'payload'
 import { isCollectionSlug } from '../core/collectionSlug'
-import type { AnalyticsAdapter } from '../core/contract'
 import { monotonicMs } from '../core/monotonic'
 import { isRecord } from '../core/values'
-import type { ConnectionOutcome, ProviderStatusResponse } from '../providers/connectionState'
+import { checkConnectionOf } from '../providers/connectionCheck'
+import type { ProviderStatusResponse } from '../providers/connectionState'
 import { versionOf } from '../providers/probe'
-import { classifyError } from '../surfacing/classifyError'
 import {
 	analyticsError,
 	errorResponse,
@@ -15,9 +14,6 @@ import {
 } from './errors'
 import { createRefreshDebounce } from './refreshEndpoint'
 import { getRuntime } from './runtime'
-
-/** How long a Test connection waits for the vendor before it counts as unreachable. */
-const CONNECTION_CHECK_TIMEOUT_MS = 10_000
 
 /** A second check of one saved document this soon answers the first one's result, asking nothing. */
 const CONNECTION_CHECK_DEBOUNCE_MS = 5_000
@@ -29,39 +25,6 @@ interface ProviderStatusHandlerOptions {
 
 const notFound = (): Response =>
 	errorResponse(404, analyticsError('not_found', 'analytics: no such provider document', 'id'))
-
-/**
- * What a check's failure says about the connection: a vendor refusing the cheapest read it has is
- * set up wrong whatever its status code, so only an outage stays `unavailable`.
- */
-const checkFailureOf = (err: unknown): ConnectionOutcome => {
-	const failure = classifyError(err)
-	return {
-		ok: false,
-		kind: failure.kind === 'unavailable' ? 'unavailable' : 'source_misconfigured',
-		...(!failure.hostRefused && err instanceof Error ? { detail: err.message } : {}),
-	}
-}
-
-/** What the document's check found; an incomplete document is refused without asking the vendor. */
-const runCheck = async (
-	req: PayloadRequest,
-	adapter: AnalyticsAdapter
-): Promise<ConnectionOutcome> => {
-	if (!adapter.isConfigured()) {
-		return { ok: false, kind: 'source_misconfigured' }
-	}
-	try {
-		await adapter.checkConnection?.({
-			signal: AbortSignal.timeout(CONNECTION_CHECK_TIMEOUT_MS),
-			timeoutMs: CONNECTION_CHECK_TIMEOUT_MS,
-			payload: req.payload,
-		})
-		return { ok: true }
-	} catch (err) {
-		return checkFailureOf(err)
-	}
-}
 
 /**
  * GET answers one provider document's last connection result, POST checks the connection first.
@@ -129,7 +92,7 @@ export const makeProviderStatusHandler = (
 				)
 			}
 			debounce.record(version)
-			const checked = await runCheck(req, adapter)
+			const checked = await checkConnectionOf(req.payload, adapter)
 			try {
 				await store.record(id, checked)
 			} finally {

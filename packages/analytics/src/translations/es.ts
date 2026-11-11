@@ -440,6 +440,8 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.panelNoViews]: 'No hay vistas en este rango de fechas.',
 	[keys.sourcesPlatformFallback]:
 		'Estas cifras vienen de la herramienta de analítica de la plataforma hasta que este sitio añada la suya. Al añadirla, se cambia a ella.',
+	[keys.sourcesOwnSourceFailing]:
+		'La herramienta de analítica propia de este sitio no responde, así que estas cifras vienen de la de la plataforma. En cuanto vuelva a responder, se muestran de nuevo sus cifras.',
 	[keys.stateSourceSubstituted]:
 		'La fuente de datos guardada ya no está disponible, así que se muestra la predeterminada.',
 	[keys.statePosthogCookielessDropped]:

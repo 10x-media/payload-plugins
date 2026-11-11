@@ -413,6 +413,8 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.panelNoViews]: '此日期范围内没有展示。',
 	[keys.sourcesPlatformFallback]:
 		'在此站点添加自己的分析工具之前，这些数据来自平台的分析工具。添加后将切换为使用它。',
+	[keys.sourcesOwnSourceFailing]:
+		'此站点自己的分析工具没有响应，因此这些数据来自平台的分析工具。它恢复响应后将重新使用它的数据。',
 	[keys.stateSourceSubstituted]: '已保存的数据源不再可用，因此显示默认数据源。',
 	[keys.statePosthogCookielessDropped]:
 		'PostHog 正在丢弃未经同意统计的访问：请在项目的 Web analytics 设置中启用 “Cookieless tracking”。',

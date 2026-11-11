@@ -430,6 +430,8 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.panelNoViews]: '이 날짜 범위에는 노출이 없습니다.',
 	[keys.sourcesPlatformFallback]:
 		'이 사이트가 자체 분석 도구를 추가하기 전까지는 플랫폼의 분석 도구에서 가져온 수치입니다. 도구를 추가하면 그 도구로 전환됩니다.',
+	[keys.sourcesOwnSourceFailing]:
+		'이 사이트의 자체 분석 도구가 응답하지 않아 플랫폼의 분석 도구에서 가져온 수치입니다. 도구가 다시 응답하면 자체 수치로 돌아갑니다.',
 	[keys.stateSourceSubstituted]:
 		'저장된 데이터 소스를 더 이상 사용할 수 없어 기본 데이터 소스를 표시합니다.',
 	[keys.statePosthogCookielessDropped]:

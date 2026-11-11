@@ -392,6 +392,7 @@ export const keys = {
 	panelNoVisits: 'analytics:panelNoVisits',
 	panelNoViews: 'analytics:panelNoViews',
 	sourcesPlatformFallback: 'analytics:sourcesPlatformFallback',
+	sourcesOwnSourceFailing: 'analytics:sourcesOwnSourceFailing',
 	stateSourceSubstituted: 'analytics:stateSourceSubstituted',
 	statePosthogCookielessDropped: 'analytics:statePosthogCookielessDropped',
 	viewWithoutConsentShare: 'analytics:viewWithoutConsentShare',

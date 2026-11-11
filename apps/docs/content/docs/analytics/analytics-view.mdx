@@ -149,7 +149,7 @@ Four URL rules follow. That tagged marker is the only scope an address may carry
 
 The source select lists that request's sources, which on a scoped install are the [provider documents that tenant holds and this reader may read](/analytics/multi-tenancy#which-sources-a-request-sees), each under its document name; another tenant's never appear, and neither does a config adapter whose queries cannot narrow to one tenant. One source draws no select at all. The view opens on the tenant's [default source](/analytics/multi-tenancy#a-tenants-default-source).
 
-Where a [`fallback` policy](/analytics/multi-tenancy#letting-tenants-read-a-shared-source) lets a tenant's own users read the platform's adapter because they have no source of their own, the view tells them so: these are the platform's numbers until they add a source, and adding one switches to it. The providers list says the same. Goal names are resolved per scope too. See [Multi-tenancy](/analytics/multi-tenancy) for how the scope itself is resolved.
+Where a [`fallback` policy](/analytics/multi-tenancy#letting-tenants-read-a-shared-source) lets a tenant's own users read the platform's adapter because they have no source of their own, the view tells them so: these are the platform's numbers until they add a source, and adding one switches to it. While every source of their own is failing, the platform's adapter stands in for them the same way, and the view opens on it and says their own tool is not answering. The providers list says the same. Goal names are resolved per scope too. See [Multi-tenancy](/analytics/multi-tenancy) for how the scope itself is resolved.
 
 ## Keyboard
 
