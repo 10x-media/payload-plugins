@@ -127,16 +127,20 @@ const goalsResolverFor = (
 const lanesFor = (
 	payload: Payload,
 	resolved: ResolvedOptions,
-	{ plan, status }: { plan: ProviderPlan; status: ProviderStatusStore | undefined }
+	{
+		plan,
+		status,
+		statusWarning,
+	}: {
+		plan: ProviderPlan
+		status: ProviderStatusStore | undefined
+		statusWarning: (message: string) => void
+	}
 ) => {
 	const { concurrency } = resolved.cache
 	const configAdapters = new Set(resolved.adapters)
 	const configIds = new Set(resolved.adapters.map((adapter) => adapter.id))
 	const poolMax = postgresPoolMax(payload)
-	const statusWarning = throttled((message: string) => payload.logger?.warn(message), {
-		now: monotonicMs,
-		intervalMs: WARN_EVERY_MS,
-	})
 	return createLanes({
 		global: concurrency.global,
 		perSource: concurrency.perSource,
@@ -312,6 +316,7 @@ export const createRuntimeFactory = (
 				plan.kind === 'collection' ? providerStatusStore(payload, providers.status.slug) : undefined
 			const now = currentTime
 			const warn = (message: string) => payload.logger?.warn(message)
+			const providerStatusWarning = throttled(warn, { now: monotonicMs, intervalMs: WARN_EVERY_MS })
 			const registry = createProviderRegistry({
 				payload,
 				plan,
@@ -396,7 +401,11 @@ export const createRuntimeFactory = (
 				payload,
 				store,
 				memo,
-				lanes: lanesFor(payload, resolved, { plan, status: providerStatus }),
+				lanes: lanesFor(payload, resolved, {
+					plan,
+					status: providerStatus,
+					statusWarning: providerStatusWarning,
+				}),
 				coldReadsPerScope: resolved.cache.concurrency.perScope,
 				ttl: resolved.cache.ttl,
 				timeoutMs: resolved.cache.timeoutMs,
@@ -435,7 +444,7 @@ export const createRuntimeFactory = (
 				listGoals: goals.listReadable,
 				listGoalsAcross: goals.listAcross,
 				...(providerConnections ? { providerFetch: providerConnections.fetch } : {}),
-				...(providerStatus ? { providerStatus } : {}),
+				...(providerStatus ? { providerStatus, providerStatusWarning } : {}),
 				...(registry.documentAdapter ? { providerAdapter: registry.documentAdapter } : {}),
 				...(providerRecheck ? { providerRecheck } : {}),
 				// Refreshes and sweeps still running write to the database, which closes after this.

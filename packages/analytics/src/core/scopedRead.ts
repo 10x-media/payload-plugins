@@ -24,7 +24,6 @@ import { MAX_SCOPE_LENGTH } from '../query/limits'
 import { BREAKER_MAX_MS } from '../surfacing/breaker'
 import { currentDate } from './clock'
 import { type AnalyticsAdapter, PLATFORM_SCOPE } from './contract'
-import { monotonicMs } from './monotonic'
 import {
 	type AdapterRegistry,
 	createRegistry,
@@ -33,7 +32,6 @@ import {
 } from './registry'
 import { sourceLabelFor, sourceRefFor } from './sourceLabel'
 import type { DefaultSourceFunction, SourceRef } from './sourcePolicy'
-import { throttled, WARN_EVERY_MS } from './throttle'
 
 export type ReadContext =
 	| {
@@ -213,25 +211,6 @@ interface Granted {
 	docId: string
 }
 
-/** Each runtime's warning that its status rows could not be read, at most once a minute. */
-const statusWarnings = new WeakMap<AnalyticsRuntime, (message: string) => void>()
-
-const statusWarning = (
-	runtime: AnalyticsRuntime,
-	req: PayloadRequest
-): ((message: string) => void) => {
-	const known = statusWarnings.get(runtime)
-	if (known) {
-		return known
-	}
-	const warn = throttled((message) => req.payload.logger?.warn(message), {
-		now: monotonicMs,
-		intervalMs: WARN_EVERY_MS,
-	})
-	statusWarnings.set(runtime, warn)
-	return warn
-}
-
 /**
  * The scope's own documents whose source is failing (`isFailingConnection`), which a `fallback`
  * policy stands in for and a policy function reads as `failing`; empty unless the install has
@@ -241,7 +220,6 @@ const statusWarning = (
  */
 const failingOwnDocs = async (
 	runtime: AnalyticsRuntime,
-	req: PayloadRequest,
 	own: readonly Granted[]
 ): Promise<ReadonlySet<string>> => {
 	const store = runtime.providerStatus
@@ -258,10 +236,7 @@ const failingOwnDocs = async (
 	try {
 		statuses = await store.readMany(own.map((granted) => granted.docId))
 	} catch (err) {
-		statusWarning(
-			runtime,
-			req
-		)(
+		runtime.providerStatusWarning?.(
 			`analytics: provider connection statuses could not be read, so no source counts as failing: ${String(err)}`
 		)
 		return NONE_ADMITTED
@@ -290,8 +265,8 @@ const policyAdmits = async (args: {
 	scope: string
 	adapter: AnalyticsAdapter
 	own: readonly Granted[]
-	/** The ids of `own`'s documents whose connection is failing. */
-	failing: ReadonlySet<string>
+	/** The ids of `own`'s documents whose connection is failing, read when a policy asks. */
+	failing: () => Promise<ReadonlySet<string>>
 }): Promise<boolean> => {
 	const { runtime, req, scope, adapter, own, failing } = args
 	const policy = runtime.sourcePolicies?.get(adapter.id)
@@ -313,15 +288,17 @@ const policyAdmits = async (args: {
 				return true
 			}
 			if (policy === 'fallback') {
-				return own.every((granted) => failing.has(granted.docId))
+				const failed = await failing()
+				return own.every((granted) => failed.has(granted.docId))
 			}
 			try {
+				const failed = await failing()
 				const ownSources = await Promise.all(
 					own.map(async (granted) => ({
 						id: granted.adapter.id,
 						label: await sourceLabelFor(granted.adapter, { req, scope }),
 						docId: granted.docId,
-						failing: failing.has(granted.docId),
+						failing: failed.has(granted.docId),
 					}))
 				)
 				return (await policy({ req, scope, adapterId: adapter.id, ownSources })) === true
@@ -453,7 +430,11 @@ export const visibleSourcesFor = async (args: VisibleArgs): Promise<VisibleSourc
 		}
 	}
 	const keep = new Set(own.map((granted) => granted.adapter.id))
-	const failing = await failingOwnDocs(runtime, req, own)
+	let failingRead: Promise<ReadonlySet<string>> | undefined
+	const failing = () => {
+		failingRead ??= failingOwnDocs(runtime, own)
+		return failingRead
+	}
 	const fallbackAdmitted = new Set<string>()
 	for (const adapter of registry.all()) {
 		if (grants.has(adapter.id)) {
@@ -479,7 +460,7 @@ export const visibleSourcesFor = async (args: VisibleArgs): Promise<VisibleSourc
 	const ownFailing = own.length > 0 && fallbackAdmitted.size > 0
 	const defaultDoc = scoped ? resolved.grants.get(scoped.default().id) : undefined
 	const standIn =
-		ownFailing && defaultDoc !== undefined && failing.has(defaultDoc)
+		ownFailing && defaultDoc !== undefined && (await failing()).has(defaultDoc)
 			? [...fallbackAdmitted][0]
 			: undefined
 	return {
