@@ -32,6 +32,7 @@ import { isRecord } from '../core/values'
 import type { GoalsResolver, ResolvedGoal } from '../goals/resolver'
 import type { Goal } from '../goals/types'
 import type { TrustedPlatform } from '../net/platform'
+import type { ConnectionRecheck } from '../providers/connectionCheck'
 import type { ProviderStatusStore } from '../providers/status'
 import type { CacheStore } from '../surfacing/cacheStore'
 import type { CacheSweeper } from '../surfacing/cacheSweep'
@@ -126,6 +127,8 @@ export interface AnalyticsRuntime {
 	providerStatus?: ProviderStatusStore
 	/** A fresh adapter of one stored provider document, for its Test connection button. */
 	providerAdapter?: (id: string) => Promise<AnalyticsAdapter | null>
+	/** Background checks of a scope's failing provider documents, under a `fallback` policy. */
+	providerRecheck?: ConnectionRecheck
 	/**
 	 * Releases what the runtime itself holds once it is retired: the adapters built from provider
 	 * documents, then the connections they reached their vendors through.
