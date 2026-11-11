@@ -300,6 +300,72 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 				}
 			})
 
+			it(`counts a vendor that did not answer as failing only while its reads rest, on ${db}`, async () => {
+				const id = await createOwn('alpha-slow.test')
+				try {
+					await statusStore().record(id, { ok: false, kind: 'unavailable' })
+					const once = await listing()
+					expect(once.sources.map((source) => source.id)).toEqual([`plausible:${id}`])
+					expect(once.notice).toBeUndefined()
+
+					await statusStore().record(id, { ok: false, kind: 'unavailable', pausedForMs: 60_000 })
+					const resting = await listing()
+					expect(resting.defaultId).toBe('shared')
+					expect(resting.notice).toBe('ownSourceFailing')
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`stands in for no one while one of the tenant's own sources still works, on ${db}`, async () => {
+				const broken = await createOwn('alpha-broken.test')
+				const working = await createOwn('alpha-working.test')
+				try {
+					await statusStore().record(broken, { ok: false, kind: 'source_misconfigured' })
+					const mixed = await listing()
+					expect(mixed.sources.map((source) => source.id).sort()).toEqual(
+						[`plausible:${broken}`, `plausible:${working}`].sort()
+					)
+					expect(mixed.notice).toBeUndefined()
+				} finally {
+					await removeOwn(broken)
+					await removeOwn(working)
+				}
+			})
+
+			it(`opens on the shared source in place of a failing document marked the default, on ${db}`, async () => {
+				const id = await createOwn('alpha-default.test')
+				try {
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						id,
+						data: { isDefault: true } as never,
+						user: alpha as never,
+						overrideAccess: false,
+					})
+					expect((await listing()).defaultId).toBe(`plausible:${id}`)
+					await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					expect((await listing()).defaultId).toBe('shared')
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`reads on when the status rows cannot be read, counting no source as failing, on ${db}`, async () => {
+				const id = await createOwn('alpha-unread.test')
+				const store = statusStore()
+				const unread = vi.spyOn(store, 'readMany').mockRejectedValue(new Error('no such table'))
+				try {
+					await store.record(id, { ok: false, kind: 'source_misconfigured' })
+					const body = await listing()
+					expect(body.sources.map((source) => source.id)).toEqual([`plausible:${id}`])
+					expect(body.notice).toBeUndefined()
+				} finally {
+					unread.mockRestore()
+					await removeOwn(id)
+				}
+			})
+
 			it(`forgets a document's last result once its key is sent again, on ${db}`, async () => {
 				const id = await createOwn('alpha-rekeyed.test')
 				try {
