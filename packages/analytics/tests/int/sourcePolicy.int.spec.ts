@@ -4,7 +4,7 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter } from '../../src/core/contract'
-import type { SourcePolicy } from '../../src/core/sourcePolicy'
+import type { OwnSource, SourcePolicy } from '../../src/core/sourcePolicy'
 import { analytics } from '../../src/index'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { getRuntime } from '../../src/plugin/runtime'
@@ -387,3 +387,84 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 		}
 	})
 }
+
+describeForDb('analytics source policy: a function sees which own sources fail', {}, (db) => {
+	let booted: BootedPayload
+	let alpha: unknown
+	let vendor: Awaited<ReturnType<typeof startPlausible>>
+	const seen: OwnSource[][] = []
+
+	beforeAll(async () => {
+		vendor = await startPlausible()
+		booted = await bootPayload({
+			db,
+			collections: [users, pages],
+			plugin: analytics({
+				adapters: [sharedAdapter([])],
+				platformAdapter: 'shared',
+				capture: { gate: 'off' },
+				scope: {
+					resolve: ({ req }) => readerOf(req)?.tenant ?? null,
+					member: ({ req, scope }) =>
+						readerOf(req)?.platform === true || readerOf(req)?.tenant === scope,
+				},
+				access: { crossScope: ({ req }) => readerOf(req)?.platform === true },
+				sources: {
+					shared: {
+						tenants: ({ ownSources }) => {
+							seen.push(ownSources)
+							return ownSources.every((source) => source.failing)
+						},
+					},
+				},
+				providers: {
+					collection: true,
+					hosts: { allow: [vendor.origin], allowPrivateNetwork: true },
+				},
+			}),
+		})
+		alpha = await login(booted.payload, 'alpha@t.dev', { tenant: 'alpha' })
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted?.stop()
+		await vendor?.stop()
+	})
+
+	it(`passes each own source with whether it is failing, on ${db}`, async () => {
+		const doc = (await booted.payload.create({
+			collection: PROVIDERS_SLUG as never,
+			data: {
+				name: 'Alpha Plausible',
+				provider: 'plausible',
+				enabled: true,
+				plausible: {
+					siteId: 'alpha-fn.test',
+					apiKey: 'alpha-plausible-key-1234',
+					host: vendor.origin,
+				},
+			} as never,
+			user: alpha as never,
+			overrideAccess: false,
+		})) as unknown as { id: string | number }
+		const id = String(doc.id)
+		const listed = async (): Promise<string[]> => {
+			const res = await callEndpoint(booted.payload, {
+				path: routes.sources,
+				query: '',
+				user: alpha,
+			})
+			expect(res.status).toBe(200)
+			return ((await res.json()) as SourcesBody).sources.map((source) => source.id).sort()
+		}
+		const store = getRuntime(booted.payload)?.providerStatus
+		if (!store) throw new Error('no provider status store')
+
+		expect(await listed()).toEqual([`plausible:${id}`])
+		expect(seen.at(-1)).toEqual([expect.objectContaining({ docId: id, failing: false })])
+
+		await store.record(id, { ok: false, kind: 'source_misconfigured' })
+		expect(await listed()).toEqual([`plausible:${id}`, 'shared'].sort())
+		expect(seen.at(-1)).toEqual([expect.objectContaining({ docId: id, failing: true })])
+	})
+})

@@ -234,7 +234,8 @@ const statusWarning = (
 
 /**
  * The scope's own documents whose source is failing (`isFailingConnection`), which a `fallback`
- * policy stands in for; empty unless the install has one. A document failing for longer than the
+ * policy stands in for and a policy function reads as `failing`; empty unless the install has
+ * either. A document failing for longer than the
  * breaker's longest rest is checked again in the background, since nothing else reads a source its
  * scope no longer opens on. Rows that cannot be read count as no failure, so the reads go on.
  */
@@ -247,7 +248,9 @@ const failingOwnDocs = async (
 	if (
 		!store ||
 		own.length === 0 ||
-		![...(runtime.sourcePolicies?.values() ?? [])].includes('fallback')
+		![...(runtime.sourcePolicies?.values() ?? [])].some(
+			(policy) => policy === 'fallback' || typeof policy === 'function'
+		)
 	) {
 		return NONE_ADMITTED
 	}
@@ -318,6 +321,7 @@ const policyAdmits = async (args: {
 						id: granted.adapter.id,
 						label: await sourceLabelFor(granted.adapter, { req, scope }),
 						docId: granted.docId,
+						failing: failing.has(granted.docId),
 					}))
 				)
 				return (await policy({ req, scope, adapterId: adapter.id, ownSources })) === true

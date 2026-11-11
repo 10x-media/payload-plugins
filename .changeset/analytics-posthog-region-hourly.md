@@ -34,6 +34,8 @@
 
 **Fixed (Umami): the website ID is one path segment.** The connection check sends it URL-encoded, as the PostHog adapter sends its project ID.
 
+**Additive: a policy function sees which own sources fail.** Each of `ownSources` carries `failing`, true while the source counts as failing for `'fallback'`, so `({ ownSources }) => ownSources.every((source) => source.failing)` reads the shared source while no own source works.
+
 **Upgrade actions**
 
 1. On Postgres or SQLite in migrate mode, generate a migration (`pnpm payload migrate:create`), review it and run it: it creates the `analytics-provider-status` table. Push mode and MongoDB need nothing. Until it runs, connection checks and statuses fail, reads go on, and no source counts as failing ([From 1.0.0-beta.15](https://docs.10xmedia.de/analytics/upgrading/beta-16)).

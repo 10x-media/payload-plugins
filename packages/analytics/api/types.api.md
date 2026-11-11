@@ -1221,6 +1221,7 @@ export const keys: {
     readonly providerConnectionResumes: "analytics:providerConnectionResumes";
     readonly providerConnectionSaveFirst: "analytics:providerConnectionSaveFirst";
     readonly providerConnectionUnsaved: "analytics:providerConnectionUnsaved";
+    readonly providerConnectionNoPermission: "analytics:providerConnectionNoPermission";
     readonly providerConnectionRefusedHelp: "analytics:providerConnectionRefusedHelp";
     readonly providerConnectionUnreachableHelp: "analytics:providerConnectionUnreachableHelp";
     readonly providerConnectionChecked: "analytics:providerConnectionChecked";
@@ -1413,6 +1414,7 @@ export const keys: {
     readonly providerFieldEnabledHelp: "analytics:providerFieldEnabledHelp";
     readonly providerFieldSiteIdHelp: "analytics:providerFieldSiteIdHelp";
     readonly providerFieldApiKeyHelp: "analytics:providerFieldApiKeyHelp";
+    readonly providerFieldUmamiApiKeyHelp: "analytics:providerFieldUmamiApiKeyHelp";
     readonly providerFieldWebsiteIdHelp: "analytics:providerFieldWebsiteIdHelp";
     readonly providerFieldTokenHelp: "analytics:providerFieldTokenHelp";
     readonly providerFieldPropertyIdHelp: "analytics:providerFieldPropertyIdHelp";
@@ -1456,6 +1458,7 @@ export const keys: {
     readonly panelNoVisits: "analytics:panelNoVisits";
     readonly panelNoViews: "analytics:panelNoViews";
     readonly sourcesPlatformFallback: "analytics:sourcesPlatformFallback";
+    readonly sourcesOwnSourceFailing: "analytics:sourcesOwnSourceFailing";
     readonly stateSourceSubstituted: "analytics:stateSourceSubstituted";
     readonly statePosthogCookielessDropped: "analytics:statePosthogCookielessDropped";
     readonly viewWithoutConsentShare: "analytics:viewWithoutConsentShare";
@@ -1502,6 +1505,7 @@ export type OrderSignatureMode = 'required' | 'optional';
 export interface OwnSource {
     // (undocumented)
     docId: string;
+    failing: boolean;
     // (undocumented)
     id: string;
     // (undocumented)
@@ -2005,7 +2009,7 @@ export interface SourceRef {
 }
 
 // @public
-export type SourcesNotice = 'platformFallback';
+export type SourcesNotice = 'platformFallback' | 'ownSourceFailing';
 
 // @public (undocumented)
 export interface SourcesResponse {
