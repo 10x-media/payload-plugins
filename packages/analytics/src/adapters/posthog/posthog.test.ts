@@ -1157,3 +1157,17 @@ describe('posthog checkConnection', () => {
 		).rejects.toMatchObject({ name: 'ProviderHttpError', status: 403 })
 	})
 })
+
+describe('posthog ids in addresses', () => {
+	it('reads with the project id as one path segment', async () => {
+		let path: string | null = null
+		server.use(
+			http.post('https://us.posthog.com/api/projects/:id/query/', ({ request }) => {
+				path = new URL(request.url).pathname
+				return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: 'a/b', apiKey: 'phx_k' }).query(q(), {})
+		expect(path).toBe('/api/projects/a%2Fb/query/')
+	})
+})
