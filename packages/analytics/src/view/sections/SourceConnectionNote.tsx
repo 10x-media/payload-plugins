@@ -22,8 +22,8 @@ interface SourceConnectionNoteProps {
 
 /**
  * What the vendor said when it refused a provider document's source, until when reads rest and
- * when it last worked, inside the view's error banner. Shown only to a reader who may read the document; nothing for anyone
- * else, nor for a source no document gives.
+ * when it last worked, inside the view's error banner. Shown only to a reader who may read the
+ * document; nothing for anyone else, nor for a source no document gives.
  */
 export function SourceConnectionNote({ endpoint, sourceId, locale }: SourceConnectionNoteProps) {
 	const { t } = useTranslation()

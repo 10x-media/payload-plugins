@@ -32,7 +32,7 @@
 
 **Fixed: read failures name their scope.** The engine's `analytics: read failed for adapter "<id>"` warning now says the scope it read for, or `install-wide`. The analytics view names when a failing source last worked, for a vendor that stopped answering as well as one that refused.
 
-**Fixed (Umami): the website ID is one path segment.** The connection check sends it URL-encoded, as the PostHog adapter sends its project ID.
+**Fixed (Umami, PostHog): IDs are one path segment.** Umami's website ID and PostHog's project ID are sent URL-encoded on reads and connection checks alike.
 
 **Additive: a policy function sees which own sources fail.** Each of `ownSources` carries `failing`, true while the source counts as failing for `'fallback'`, so `({ ownSources }) => ownSources.every((source) => source.failing)` reads the shared source while no own source works.
 

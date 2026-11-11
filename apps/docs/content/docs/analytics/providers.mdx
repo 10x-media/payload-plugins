@@ -385,7 +385,7 @@ A cleared key goes together with its hint, so the source reads as not configured
 
 The sidebar of a vendor document (Plausible, Umami, GA4, PostHog) has a **Connection** panel. It shows what the document's connection last came to, and a **Test connection** button checks it:
 
-1. Save the document. The button checks the saved settings, so it stays off on a new document and while the form has unsaved changes.
+1. Save the document. The button checks the saved settings, so it stays off on a new document, while the form has unsaved changes, and for a reader who may not edit the document.
 2. Press **Test connection**. The plugin sends the vendor's cheapest read: one `SELECT 1` HogQL query for PostHog, one day of visitors for Plausible, the website for Umami, one day of active users for GA4.
 3. Read the result. **Works** means the key, the IDs and the host are right. **Refused** means the vendor refused them, with its own words under the label. **Unreachable** means the vendor did not answer within 10 seconds or failed.
 
