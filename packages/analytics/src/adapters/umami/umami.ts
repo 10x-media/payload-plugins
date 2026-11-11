@@ -412,7 +412,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			const getJson = <T>(endpoint: string, params: URLSearchParams): Promise<T> =>
 				upstreamJson<T>(
 					ctx,
-					`${endpoints.api}/websites/${config.websiteId}/${endpoint}?${params.toString()}`,
+					`${endpoints.api}/websites/${encodeURIComponent(config.websiteId)}/${endpoint}?${params.toString()}`,
 					{ headers, provider: 'umami', fetch: config.fetch }
 				)
 

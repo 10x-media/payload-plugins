@@ -508,13 +508,17 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			}
 
 			const runSql = (sql: string): Promise<PosthogQueryResponse> =>
-				upstreamJson<PosthogQueryResponse>(ctx, `${host}/api/projects/${config.projectId}/query/`, {
-					method: 'POST',
-					headers: { authorization: `Bearer ${config.apiKey}` },
-					body: { query: { kind: 'HogQLQuery', query: sql } },
-					provider: 'posthog',
-					fetch: config.fetch,
-				})
+				upstreamJson<PosthogQueryResponse>(
+					ctx,
+					`${host}/api/projects/${encodeURIComponent(config.projectId)}/query/`,
+					{
+						method: 'POST',
+						headers: { authorization: `Bearer ${config.apiKey}` },
+						body: { query: { kind: 'HogQLQuery', query: sql } },
+						provider: 'posthog',
+						fetch: config.fetch,
+					}
+				)
 
 			/** A result row's metrics, its metric columns starting at `offset`. */
 			const readRow = (row: unknown[], offset: number): MetricValues => {
