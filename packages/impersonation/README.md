@@ -9,7 +9,7 @@
 
 Let an authorised account sign in as another user without their password, then return. Every session is recorded. After start, `req.user` is the target.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/impersonation?style=flat-square)](https://www.npmjs.com/package/@10x-media/impersonation)
+[![npm](https://img.shields.io/npm/v/@10x-media/impersonation/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/impersonation)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

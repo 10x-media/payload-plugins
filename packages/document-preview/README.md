@@ -9,7 +9,7 @@
 
 Read-only previews of upload documents in the Payload 4 admin. Word, Excel, PowerPoint, CSV, text and code and Markdown open in viewers styled like the admin, in the edit view's file panel or, from a list column, in a drawer; images, video, audio and PDF too, if you want the plugin's viewers for them over Payload's own. Everything renders in the browser and loads only when a file of its kind is opened.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/document-preview?style=flat-square)](https://www.npmjs.com/package/@10x-media/document-preview)
+[![npm](https://img.shields.io/npm/v/@10x-media/document-preview/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/document-preview)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

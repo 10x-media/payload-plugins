@@ -9,7 +9,7 @@
 
 Client-side undo/redo for Payload admin forms. Snapshots the document form state as the editor works and steps back and forth through it, independent of Payload's document versions: nothing reaches the server until the editor saves.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/undo-redo?style=flat-square)](https://www.npmjs.com/package/@10x-media/undo-redo)
+[![npm](https://img.shields.io/npm/v/@10x-media/undo-redo/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/undo-redo)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

@@ -9,7 +9,7 @@
 
 An ops dashboard plus reliability, worker, and queue-control layers for Payload's built-in jobs queue. See what the queue is doing, recover jobs that die mid-run, run a proper worker process with graceful drain, and pause or drive the queue from the outside. Every layer is opt-in.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/jobs?style=flat-square)](https://www.npmjs.com/package/@10x-media/jobs)
+[![npm](https://img.shields.io/npm/v/@10x-media/jobs/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/jobs)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

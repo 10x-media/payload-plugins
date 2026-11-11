@@ -9,7 +9,7 @@
 
 Conversations for Payload: messages bound to any document, global or custom key, with channels that decide who reads what, one-level threads, mentions and per-user read state. Comments on documents, reactions and file attachments ship as extensions; support tickets, chat rooms and website chats are built from the same primitives.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/conversations?style=flat-square)](https://www.npmjs.com/package/@10x-media/conversations)
+[![npm](https://img.shields.io/npm/v/@10x-media/conversations/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/conversations)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
