@@ -349,6 +349,7 @@ export const keys = {
 	providerFieldEnabledHelp: 'analytics:providerFieldEnabledHelp',
 	providerFieldSiteIdHelp: 'analytics:providerFieldSiteIdHelp',
 	providerFieldApiKeyHelp: 'analytics:providerFieldApiKeyHelp',
+	providerFieldUmamiApiKeyHelp: 'analytics:providerFieldUmamiApiKeyHelp',
 	providerFieldWebsiteIdHelp: 'analytics:providerFieldWebsiteIdHelp',
 	providerFieldTokenHelp: 'analytics:providerFieldTokenHelp',
 	providerFieldPropertyIdHelp: 'analytics:providerFieldPropertyIdHelp',
