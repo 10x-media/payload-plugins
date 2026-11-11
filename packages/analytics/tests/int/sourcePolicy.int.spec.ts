@@ -299,6 +299,25 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 					await removeOwn(id)
 				}
 			})
+
+			it(`forgets a document's last result once its key is sent again, on ${db}`, async () => {
+				const id = await createOwn('alpha-rekeyed.test')
+				try {
+					await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					expect((await listing()).notice).toBe('ownSourceFailing')
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						id,
+						data: { plausible: { apiKey: 'alpha-plausible-key-5678' } } as never,
+						user: alpha as never,
+						overrideAccess: false,
+					})
+					expect(await statusStore().read(id)).toBeUndefined()
+					expect((await listing()).notice).toBeUndefined()
+				} finally {
+					await removeOwn(id)
+				}
+			})
 		}
 	})
 }

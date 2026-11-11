@@ -37,6 +37,25 @@ const withCleared = (doc: Doc, path: string): Doc => {
 	return isRecord(current) ? { ...doc, [group]: { ...current, [field]: null } } : doc
 }
 
+/** Which providers an update moves: every one on a new `provider` or scope, else those whose host or id changed. */
+const movedBy = (
+	data: Doc,
+	originalDoc: Doc,
+	scopeField: string
+): { everyProvider: boolean; retargeted: ReadonlySet<ProviderId> } => {
+	const moved = (path: string): boolean => {
+		const next = valueAt(data, path)
+		return next !== undefined && comparable(next) !== comparable(valueAt(originalDoc, path))
+	}
+	const retargeted = new Set<ProviderId>()
+	for (const { provider, path } of CONNECTION_PATHS) {
+		if (provider !== null && moved(path)) {
+			retargeted.add(provider)
+		}
+	}
+	return { everyProvider: moved('provider') || moved(scopeField), retargeted }
+}
+
 /**
  * On an update that changes where a document connects, nulls every secret not resent in plaintext:
  * a changed `provider` or scope reaches all providers, a changed host or id only its own.
@@ -47,17 +66,7 @@ export const retargetSecrets =
 		if (operation !== 'update' || !isRecord(data) || !isRecord(originalDoc)) {
 			return data
 		}
-		const moved = (path: string): boolean => {
-			const next = valueAt(data, path)
-			return next !== undefined && comparable(next) !== comparable(valueAt(originalDoc, path))
-		}
-		const everyProvider = moved('provider') || moved(args.scopeField)
-		const retargeted = new Set<ProviderId>()
-		for (const { provider, path } of CONNECTION_PATHS) {
-			if (provider !== null && moved(path)) {
-				retargeted.add(provider)
-			}
-		}
+		const { everyProvider, retargeted } = movedBy(data, originalDoc, args.scopeField)
 		let next: Doc = data
 		for (const { provider, path } of SECRET_PATHS) {
 			const reached = everyProvider || retargeted.has(provider)
@@ -67,3 +76,22 @@ export const retargetSecrets =
 		}
 		return next
 	}
+
+/**
+ * Whether an update changes how a document connects: where it connects, as {@link retargetSecrets}
+ * reads it, or a secret sent anew in plaintext. Its last connection result is about the old setup.
+ */
+export const reconnects = (
+	args: RetargetArgs & { data: unknown; originalDoc: unknown }
+): boolean => {
+	if (!isRecord(args.data) || !isRecord(args.originalDoc)) {
+		return false
+	}
+	const { everyProvider, retargeted } = movedBy(args.data, args.originalDoc, args.scopeField)
+	const data = args.data
+	return (
+		everyProvider ||
+		retargeted.size > 0 ||
+		SECRET_PATHS.some(({ path }) => freshlySent(valueAt(data, path), args.isSealed))
+	)
+}

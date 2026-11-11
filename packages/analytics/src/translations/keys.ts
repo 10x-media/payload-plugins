@@ -156,6 +156,7 @@ export const keys = {
 	providerConnectionResumes: 'analytics:providerConnectionResumes',
 	providerConnectionSaveFirst: 'analytics:providerConnectionSaveFirst',
 	providerConnectionUnsaved: 'analytics:providerConnectionUnsaved',
+	providerConnectionNoPermission: 'analytics:providerConnectionNoPermission',
 	providerConnectionRefusedHelp: 'analytics:providerConnectionRefusedHelp',
 	providerConnectionUnreachableHelp: 'analytics:providerConnectionUnreachableHelp',
 	providerConnectionChecked: 'analytics:providerConnectionChecked',

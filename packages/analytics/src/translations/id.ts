@@ -164,6 +164,8 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerConnectionResumes]: 'Pembacaan berlanjut',
 	[keys.providerConnectionSaveFirst]: 'Simpan dokumen untuk mengujinya.',
 	[keys.providerConnectionUnsaved]: 'Simpan perubahan untuk mengujinya.',
+	[keys.providerConnectionNoPermission]:
+		'Hanya yang boleh mengubah dokumen ini yang dapat mengujinya.',
 	[keys.providerConnectionRefusedHelp]: 'Periksa kunci, ID, dan host.',
 	[keys.providerConnectionUnreachableHelp]: 'Layanan tidak menjawab. Coba lagi nanti.',
 	[keys.providerConnectionChecked]: 'Koneksi berfungsi',

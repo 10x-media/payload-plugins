@@ -51,7 +51,7 @@ const HELP: Partial<Record<ConnectionState, TranslationKey>> = {
  */
 export function ProviderConnection({ path }: UIFieldClientProps) {
 	const { config } = useConfig()
-	const { id } = useDocumentInfo()
+	const { hasSavePermission, id, lastUpdateTime } = useDocumentInfo()
 	const modified = useFormModified()
 	const { i18n, t } = useTranslation()
 	const [status, setStatus] = useState<ProviderStatus>()
@@ -62,6 +62,7 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 			? undefined
 			: `${apiPath(config, analyticsRoutes(config).providerStatus)}?id=${encodeURIComponent(docId)}`
 
+	// biome-ignore lint/correctness/useExhaustiveDependencies: `lastUpdateTime` is the save that may have reset the status (a new key, another host), not a value it reads.
 	useEffect(() => {
 		if (url === undefined) {
 			return
@@ -77,7 +78,7 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 			}
 		)
 		return () => controller.abort()
-	}, [url])
+	}, [url, lastUpdateTime])
 
 	const check = useCallback(async () => {
 		if (url === undefined) {
@@ -118,9 +119,11 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 	const blocked =
 		docId === undefined
 			? keys.providerConnectionSaveFirst
-			: modified
-				? keys.providerConnectionUnsaved
-				: undefined
+			: hasSavePermission === false
+				? keys.providerConnectionNoPermission
+				: modified
+					? keys.providerConnectionUnsaved
+					: undefined
 
 	return (
 		<div className={`${fieldBaseClass} analytics-provider-connection`}>
@@ -159,7 +162,7 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 						) : null}
 					</Banner>
 				) : null}
-				<div className="analytics-provider-connection__action">
+				<div>
 					<Button
 						buttonStyle="secondary"
 						disabled={blocked !== undefined || checking || state === undefined}
