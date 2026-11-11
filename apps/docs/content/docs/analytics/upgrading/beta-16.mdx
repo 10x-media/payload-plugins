@@ -18,7 +18,7 @@ Work through these in order; each links to its details below. The commands use p
 
 On Postgres or SQLite in migrate mode, generate a migration (`pnpm payload migrate:create`), review it and run it (`pnpm payload migrate`). It creates the `analytics-provider-status` table, or the table `providers.collection.status` names. Nothing else in the schema changes.
 
-Until it runs, reads go on: a connection check fails, no status is written, and under a `fallback` policy no source counts as failing, with a warning logged once a minute.
+Until it runs, reads, saves and deletes of provider documents go on: a connection check fails, no status is written or cleared, and under a `fallback` policy no source counts as failing, with a warning logged once a minute.
 
 ## PostHog's Region
 
