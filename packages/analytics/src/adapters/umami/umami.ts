@@ -22,7 +22,9 @@ import {
 	type MetricValues,
 } from '../../core/contract'
 import type { FetchLike } from '../../core/fetch'
+import { SourceMisconfiguredError } from '../../core/sourceErrors'
 import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
+import { isRecord } from '../../core/values'
 import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
 import type { WithoutConsentLevel } from '../../tracker/config'
 import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
@@ -336,12 +338,18 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 		capture: buildCapture(config, endpoints),
 		isConfigured: () => Boolean(config.websiteId && (config.apiKey || config.token)),
 		async checkConnection(ctx: ConnectionCheckContext): Promise<void> {
-			await fetchJson<unknown>(`${endpoints.api}/websites/${config.websiteId}`, {
+			const website = await fetchJson<unknown>(`${endpoints.api}/websites/${config.websiteId}`, {
 				headers: authHeaders(),
 				provider: 'umami',
 				signal: ctx.signal,
 				...(config.fetch ? { fetch: config.fetch } : {}),
 			})
+			// Self-hosted Umami answers a website id it does not know with 200 and a `null` body.
+			if (!isRecord(website)) {
+				throw new SourceMisconfiguredError(
+					`umami: no website ${config.websiteId}; check the Website ID`
+				)
+			}
 		},
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = readTime(ctx)
