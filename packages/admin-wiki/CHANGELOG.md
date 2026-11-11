@@ -1,5 +1,11 @@
 # @10x-media/admin-wiki
 
+## 4.0.0-alpha.1
+
+### Major Changes
+
+- Payload 4 support, on Next.js and TanStack Start. The plugin now runs at `order: 1000` (exported as `ADMIN_WIKI_PLUGIN_ORDER`), so it walks the config after every plugin that keeps the default order and no longer has to be listed last. Blocks are read from `blocks` alone, as slugs or inline configs, since Payload 4 removed `blockReferences`. Guides are published per locale: with localized drafts a guide reaches readers only in the locales it is published in, and the seeder publishes only the locales it writes content for. `seedWiki` passes `overrideAccess: true` on every Local API call, keeping its Payload 3 behaviour under Payload 4's access-by-default Local API. Every admin surface takes the Payload 4 look: the wiki index uses Payload's list header and controls, its target filter is a popup of switches like Payload's Columns control, cards and rows use the Payload 4 tokens, the edit mode toggle is a secondary button that reads as selected while on (its class is now `wiki-edit-mode__toggle`), and the guide drawer is wider, lays out against its own width, and carries the guide title as its heading under a "Wiki" drawer header. `next` and `@payloadcms/next` are no longer peer dependencies. Wiki media opts out of the versions Payload 4 enables by default (`versions: false`), so it stays unversioned as on Payload 3.
+
 ## 0.1.0-beta.6
 
 ### Patch Changes

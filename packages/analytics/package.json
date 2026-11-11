@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/analytics",
-	"version": "4.0.0-alpha.0",
+	"version": "4.0.0-alpha.1",
 	"description": "Adapter-based analytics for Payload: providers, a native engine, dashboard widgets, and portable fields.",
 	"license": "MIT",
 	"repository": {

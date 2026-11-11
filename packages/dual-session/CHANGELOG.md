@@ -1,5 +1,11 @@
 # @10x-media/dual-session
 
+## 4.0.0-alpha.1
+
+### Major Changes
+
+- Payload 4 support, on Next.js and TanStack Start. The Next.js proxy moved from `@10x-media/dual-session/proxy` to `@10x-media/dual-session/next`, and `@10x-media/dual-session/tanstack-start` adds `createAuthScopeMiddleware`, a TanStack Start request middleware that applies the same scope rule and attributes server functions by `Referer` like REST calls. Isolated sessions are verified the way Payload 4 verifies its own: against every secret in the keyring, so `previousSecrets` keeps them alive through a secret rotation, and only for tokens with Payload 4's auth version, so sessions from Payload 3 end with the upgrade. The strategy reads the user past access control and in the request locale, as core does; on Payload 4 the Local API applies access by default, and without that an isolated user whose collection restricts reads was never authenticated. Requires Payload `4.0.0-beta.7`: its refresh tokens (`auth.refreshTokens`) work on isolated collections, with the plugin's `refresh-token` endpoint taking the refresh token from the body and writing the isolated cookie, and isolated cookies pass the same CSRF gate as core's, including its new `Referer` fallback for browsers that send no `Sec-Fetch-Site`. `isolate` predicates take Payload 4's `User` type. Payload 4's default access only admits the `admin.user` collection, so frontend auth collections need a `read` access their users pass, or `/me` answers 403. See Upgrading to Payload 4 in the docs.
+
 ## 0.1.0-beta.2
 
 ### Patch Changes

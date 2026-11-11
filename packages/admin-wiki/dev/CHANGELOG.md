@@ -1,5 +1,13 @@
 # @10x-media/admin-wiki-dev
 
+## 0.0.1-alpha.11
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/admin-wiki@4.0.0-alpha.1
+  - @10x-media/fields@4.0.0-alpha.1
+
 ## 0.0.1-beta.10
 
 ### Patch Changes
