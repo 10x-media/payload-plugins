@@ -905,3 +905,17 @@ describe('umami checkConnection', () => {
 		expect(path).toBe('/v1/websites/a%2Fb')
 	})
 })
+
+describe('umami ids in addresses', () => {
+	it('reads with the website id as one path segment', async () => {
+		let path: string | null = null
+		server.use(
+			http.get('https://api.umami.is/v1/websites/:id/stats', ({ request }) => {
+				path = new URL(request.url).pathname
+				return HttpResponse.json({ pageviews: 0, visitors: 0, visits: 0, bounces: 0, totaltime: 0 })
+			})
+		)
+		await umami({ websiteId: 'a/b', apiKey: 'k' }).query(q(), {})
+		expect(path).toBe('/v1/websites/a%2Fb/stats')
+	})
+})
