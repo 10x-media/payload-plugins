@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { retargetSecrets } from './retarget'
+import { reconnects, retargetSecrets } from './retarget'
 
 const SEALED = 'pfe1.sealed'
 
@@ -189,5 +189,42 @@ describe('retargetSecrets', () => {
 		const result = run(data)
 		expect(result.plausible).toBeUndefined()
 		expect(group(result, 'posthog').apiKey).toBeNull()
+	})
+})
+
+describe('reconnects', () => {
+	const sealed = 'sealed-ciphertext'
+	const args = { scopeField: 'scope', isSealed: (value: unknown) => value === sealed }
+	const originalDoc = {
+		provider: 'plausible',
+		scope: 'alpha',
+		enabled: true,
+		plausible: { host: 'https://a.example.com', siteId: 's', apiKey: sealed },
+	}
+
+	it('keeps the status of a save that leaves the connection alone', () => {
+		expect(
+			reconnects({
+				...args,
+				originalDoc,
+				data: { ...originalDoc, name: 'Renamed', enabled: false },
+			})
+		).toBe(false)
+		// The stored key comes back sealed from the form: it was not sent anew.
+		expect(reconnects({ ...args, originalDoc, data: { plausible: { apiKey: sealed } } })).toBe(
+			false
+		)
+	})
+
+	it('forgets it on a key sent anew, another host or id, provider or scope', () => {
+		for (const data of [
+			{ plausible: { apiKey: 'new-plain-key' } },
+			{ plausible: { host: 'https://b.example.com' } },
+			{ plausible: { siteId: 't' } },
+			{ provider: 'umami' },
+			{ scope: 'beta' },
+		]) {
+			expect(reconnects({ ...args, originalDoc, data }), JSON.stringify(data)).toBe(true)
+		}
 	})
 })

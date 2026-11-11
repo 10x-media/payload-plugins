@@ -73,6 +73,18 @@ const configChanged =
 		getRuntime(req.payload)?.configChanged?.(collection, changedScopes(change))
 	}
 
+const forgetProviderStatus = async (docId: string, req: PayloadRequest): Promise<void> => {
+	const runtime = getRuntime(req.payload)
+	try {
+		await runtime?.providerStatus?.forget(docId)
+	} catch (err) {
+		// The save goes on: the next read or check writes the row again.
+		runtime?.providerStatusWarning?.(
+			`analytics: the connection status of provider document "${docId}" could not be cleared: ${String(err)}`
+		)
+	}
+}
+
 const addEndpoints = (config: Config, ...endpoints: Endpoint[]): void => {
 	config.endpoints = [...(config.endpoints ?? []), ...endpoints]
 }
@@ -103,7 +115,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		}
 		const collections = await configCollections(
 			resolved,
-			{ resolveAdminScope, onChange: configChanged },
+			{ resolveAdminScope, onChange: configChanged, forgetProviderStatus },
 			context
 		)
 		const sync = syncCollectionOf(resolved, resolveAdminScope, context)

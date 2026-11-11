@@ -15,6 +15,7 @@ const storeRecording = (recorded: Array<[string, ConnectionOutcome]>): ProviderS
 	},
 	read: async () => undefined,
 	readMany: async () => new Map(),
+	forget: async () => {},
 	idle: async () => {},
 })
 

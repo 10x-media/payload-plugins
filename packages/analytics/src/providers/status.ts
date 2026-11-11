@@ -1,4 +1,4 @@
-import type { CollectionConfig, CollectionSlug, Payload, PayloadRequest } from 'payload'
+import type { CollectionConfig, CollectionSlug, Payload } from 'payload'
 import { currentDate } from '../core/clock'
 import { isCollectionSlug } from '../core/collectionSlug'
 import { DETACHED } from '../db/openTransaction'
@@ -97,20 +97,13 @@ export interface ProviderStatusStore {
 	read(docId: string): Promise<ProviderStatus | undefined>
 	/** The rows of `docIds` that exist, keyed by document id, in one read. */
 	readMany(docIds: readonly string[]): Promise<Map<string, ProviderStatus>>
+	/**
+	 * Deletes a document's row, outside any transaction, after its writes already queued: on its
+	 * delete, and on a save that changes how it connects, whose last result was about the old setup.
+	 */
+	forget(docId: string): Promise<void>
 	/** Waits for every write already queued, for a runtime that closes or a test that settles. */
 	idle(): Promise<void>
-}
-
-/** Deletes a provider document's row in `req`'s transaction, so the document takes it along. */
-export const removeProviderStatus = async (
-	req: PayloadRequest,
-	slug: string,
-	docId: string
-): Promise<void> => {
-	if (!isCollectionSlug(req.payload, slug)) {
-		return
-	}
-	await req.payload.db.deleteMany({ collection: slug, where: { id: { equals: docId } }, req })
 }
 
 /**
@@ -228,6 +221,25 @@ export const providerStatusStore = (
 				req: DETACHED,
 			})
 			return new Map(docs.map((row) => [String(row.id), statusOf(row)]))
+		},
+
+		forget(docId) {
+			successWrittenAt.delete(docId)
+			const queued = (queues.get(docId) ?? Promise.resolve()).then(async () => {
+				await payload.db.deleteMany({
+					collection: collection(),
+					where: { id: { equals: docId } },
+					req: DETACHED,
+				})
+			})
+			const settled = queued.catch(() => {})
+			queues.set(docId, settled)
+			void settled.then(() => {
+				if (queues.get(docId) === settled) {
+					queues.delete(docId)
+				}
+			})
+			return queued
 		},
 
 		async idle() {

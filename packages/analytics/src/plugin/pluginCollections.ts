@@ -43,6 +43,8 @@ interface CollectionCallbacks {
 	onChange: (
 		collection: 'providers' | 'goals'
 	) => (change: ScopeChange, req: PayloadRequest) => void
+	/** Forgets a provider document's last connection result; a switched-off install keeps none. */
+	forgetProviderStatus: (docId: string, req: PayloadRequest) => Promise<void>
 }
 
 /**
@@ -101,7 +103,7 @@ const providersCollectionOf = async (
 		types: providers.types,
 		staticLabel: context.staticLabel,
 		listNotice: [...resolved.sources.policies.values()].includes('fallback'),
-		statusSlug: providers.status.slug,
+		forgetStatus: callbacks.forgetProviderStatus,
 	})
 	const checked = checkEditorCollection(built, {
 		role: 'providers',
