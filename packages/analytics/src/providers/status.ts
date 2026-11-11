@@ -166,6 +166,19 @@ export const providerStatusStore = (
 		}
 	}
 
+	/** Runs `work` after the document's writes already queued, so a late one never lands over it. */
+	const enqueue = (docId: string, work: () => Promise<void>): Promise<void> => {
+		const queued = (queues.get(docId) ?? Promise.resolve()).then(work)
+		const settled = queued.catch(() => {})
+		queues.set(docId, settled)
+		void settled.then(() => {
+			if (queues.get(docId) === settled) {
+				queues.delete(docId)
+			}
+		})
+		return queued
+	}
+
 	const dataOf = (outcome: ConnectionOutcome, at: Date): Record<string, unknown> =>
 		outcome.ok
 			? { lastSuccessAt: at.toISOString(), pausedUntil: null }
@@ -192,21 +205,11 @@ export const providerStatusStore = (
 				successWrittenAt.delete(docId)
 			}
 			const data = dataOf(outcome, at)
-			const queued = (queues.get(docId) ?? Promise.resolve())
-				.then(() => put(docId, data))
-				.catch((err: unknown) => {
-					// Unwritten, so the next success is written whatever the throttle says.
-					successWrittenAt.delete(docId)
-					throw err
-				})
-			const settled = queued.catch(() => {})
-			queues.set(docId, settled)
-			void settled.then(() => {
-				if (queues.get(docId) === settled) {
-					queues.delete(docId)
-				}
+			return enqueue(docId, () => put(docId, data)).catch((err: unknown) => {
+				// Unwritten, so the next success is written whatever the throttle says.
+				successWrittenAt.delete(docId)
+				throw err
 			})
-			return queued
 		},
 
 		async readMany(docIds) {
@@ -225,21 +228,13 @@ export const providerStatusStore = (
 
 		forget(docId) {
 			successWrittenAt.delete(docId)
-			const queued = (queues.get(docId) ?? Promise.resolve()).then(async () => {
+			return enqueue(docId, async () => {
 				await payload.db.deleteMany({
 					collection: collection(),
 					where: { id: { equals: docId } },
 					req: DETACHED,
 				})
 			})
-			const settled = queued.catch(() => {})
-			queues.set(docId, settled)
-			void settled.then(() => {
-				if (queues.get(docId) === settled) {
-					queues.delete(docId)
-				}
-			})
-			return queued
 		},
 
 		async idle() {

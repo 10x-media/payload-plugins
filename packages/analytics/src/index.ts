@@ -13,6 +13,7 @@ import {
 	type ScopeCallSite,
 } from './core/options'
 import { createRegistry, withoutRevenue } from './core/registry'
+import { afterTransaction, openTransactionOf } from './db/openTransaction'
 import { CURRENCY_PATTERN } from './goals/currency'
 import { makeGoalsHandler } from './goals/goalsEndpoint'
 import { applyConfigRevenueVisibility } from './goals/moneyFields'
@@ -75,14 +76,24 @@ const configChanged =
 
 const forgetProviderStatus = async (docId: string, req: PayloadRequest): Promise<void> => {
 	const runtime = getRuntime(req.payload)
-	try {
-		await runtime?.providerStatus?.forget(docId)
-	} catch (err) {
-		// The save goes on: the next read or check writes the row again.
-		runtime?.providerStatusWarning?.(
-			`analytics: the connection status of provider document "${docId}" could not be cleared: ${String(err)}`
-		)
+	const store = runtime?.providerStatus
+	if (!runtime || !store) {
+		return
 	}
+	// The save goes on whatever happens here: the next read or check writes the row again.
+	const forget = () =>
+		store.forget(docId).catch((err: unknown) => {
+			runtime.providerStatusWarning?.(
+				`analytics: the connection status of provider document "${docId}" could not be cleared: ${String(err)}`
+			)
+		})
+	const open = await openTransactionOf(req.payload, req)
+	if (!open) {
+		await forget()
+		return
+	}
+	// After the save's own transaction: a write outside it would wait on the locks it holds.
+	runtime.engine.keep?.(afterTransaction(open, forget))
 }
 
 const addEndpoints = (config: Config, ...endpoints: Endpoint[]): void => {
