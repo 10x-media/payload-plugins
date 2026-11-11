@@ -29,7 +29,6 @@ import { PROVIDER_IDS, PROVIDER_NAMES, type ProviderId } from './ids'
 import { reconnects, retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
 import { stampScope } from './stampScope'
-import { removeProviderStatus } from './status'
 
 export const PROVIDERS_SLUG = 'analytics-providers'
 
@@ -152,9 +151,15 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	staticLabel?: StaticLabelFor
 	/** Mount the list's note on the platform fallback, for an install with a `fallback` policy. */
 	listNotice?: boolean
-	/** The provider status collection, whose row of a deleted document goes with it. */
-	statusSlug?: string
+	/**
+	 * Forgets a document's last connection result: on its delete, and on a save that changes how
+	 * it connects. Absent without the provider status collection.
+	 */
+	forgetStatus?: (docId: string, req: PayloadRequest) => Promise<void>
 }
+
+/** `req.context` flag a provider update that changes how the document connects sets for afterChange. */
+const RECONNECTED = 'analytics:providerReconnected'
 
 const plainSecret: BuildSecretField = (source) => [source]
 
@@ -648,23 +653,24 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			...(args.scoped ? { beforeValidate: [checkSingleDefault(args)] } : {}),
 			beforeChange: [
 				stampScope(args),
-				// Before retargetSecrets, which clears the secrets this reads as sent anew.
-				async ({ data, operation, originalDoc, req }) => {
-					const { statusSlug } = args
+				// Only notes the change: field validation runs after this hook, and a save it refuses
+				// keeps the status. afterChange forgets it.
+				({ context, data, operation, originalDoc }) => {
 					if (
-						statusSlug &&
 						operation === 'update' &&
-						originalDoc?.id !== undefined &&
 						reconnects({ scopeField: args.scopeField, isSealed: args.isSealed, data, originalDoc })
 					) {
-						await removeProviderStatus(req, statusSlug, String(originalDoc.id))
+						context[RECONNECTED] = true
 					}
 					return data
 				},
 				retargetSecrets({ scopeField: args.scopeField, isSealed: args.isSealed }),
 			],
 			afterChange: [
-				async ({ doc, operation, previousDoc, req }) => {
+				async ({ context, doc, operation, previousDoc, req }) => {
+					if (operation === 'update' && context[RECONNECTED] === true) {
+						await args.forgetStatus?.(String(doc.id), req)
+					}
 					await args.onChange(
 						{
 							scope: docScope(doc, args.scopeField),
@@ -679,9 +685,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			],
 			afterDelete: [
 				async ({ doc, id, req }) => {
-					if (args.statusSlug) {
-						await removeProviderStatus(req, args.statusSlug, String(id))
-					}
+					await args.forgetStatus?.(String(id), req)
 					await args.onChange({ scope: docScope(doc, args.scopeField) }, req)
 					return doc
 				},

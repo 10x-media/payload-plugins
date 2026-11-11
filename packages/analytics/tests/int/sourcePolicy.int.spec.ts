@@ -366,6 +366,49 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 				}
 			})
 
+			it(`keeps a document's last result through a save its fields refuse, on ${db}`, async () => {
+				const id = await createOwn('alpha-refused-save.test')
+				try {
+					await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					await expect(
+						booted.payload.update({
+							collection: PROVIDERS_SLUG as never,
+							id,
+							// Past access: the Host is a connection field a tenant member may not write.
+							data: {
+								plausible: {
+									apiKey: 'alpha-plausible-key-9999',
+									host: 'ftp://alpha.example.com/?x=1',
+								},
+							} as never,
+							overrideAccess: true,
+						})
+					).rejects.toThrow()
+					expect((await statusStore().read(id))?.errorKind).toBe('source_misconfigured')
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`saves a document whose status cannot be cleared, on ${db}`, async () => {
+				const id = await createOwn('alpha-uncleared.test')
+				const store = statusStore()
+				const uncleared = vi.spyOn(store, 'forget').mockRejectedValue(new Error('no such table'))
+				try {
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						id,
+						data: { plausible: { apiKey: 'alpha-plausible-key-4321' } } as never,
+						user: alpha as never,
+						overrideAccess: false,
+					})
+					expect(uncleared).toHaveBeenCalledWith(id)
+				} finally {
+					uncleared.mockRestore()
+					await removeOwn(id)
+				}
+			})
+
 			it(`forgets a document's last result once its key is sent again, on ${db}`, async () => {
 				const id = await createOwn('alpha-rekeyed.test')
 				try {
