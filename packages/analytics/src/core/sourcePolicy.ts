@@ -18,6 +18,11 @@ export interface OwnSource {
 	id: string
 	label: string
 	docId: string
+	/**
+	 * True while the document's connection is failing, as the `fallback` policy reads it: refused,
+	 * or a vendor that did not answer while its reads rest.
+	 */
+	failing: boolean
 }
 
 /**
