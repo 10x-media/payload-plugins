@@ -26,7 +26,7 @@ import { builtInStaticLabel, type StaticLabelFor } from '../translations/staticL
 import { type ProviderAccessArgs, providerCreateAccess, providerRowAccess } from './access'
 import { validatePosthogHost, validatePosthogRegion, validateProviderHost } from './hosts'
 import { PROVIDER_IDS, PROVIDER_NAMES, type ProviderId } from './ids'
-import { retargetSecrets } from './retarget'
+import { reconnects, retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
 import { stampScope } from './stampScope'
 import { removeProviderStatus } from './status'
@@ -648,6 +648,19 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			...(args.scoped ? { beforeValidate: [checkSingleDefault(args)] } : {}),
 			beforeChange: [
 				stampScope(args),
+				// Before retargetSecrets, which clears the secrets this reads as sent anew.
+				async ({ data, operation, originalDoc, req }) => {
+					const { statusSlug } = args
+					if (
+						statusSlug &&
+						operation === 'update' &&
+						originalDoc?.id !== undefined &&
+						reconnects({ scopeField: args.scopeField, isSealed: args.isSealed, data, originalDoc })
+					) {
+						await removeProviderStatus(req, statusSlug, String(originalDoc.id))
+					}
+					return data
+				},
 				retargetSecrets({ scopeField: args.scopeField, isSealed: args.isSealed }),
 			],
 			afterChange: [

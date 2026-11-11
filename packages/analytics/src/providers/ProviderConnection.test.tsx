@@ -8,6 +8,8 @@ import { ProviderConnection } from './ProviderConnection'
 const doc = vi.hoisted(() => ({
 	id: '6650f1c2a9e4b3d2c1a09f87' as string | undefined,
 	modified: false,
+	hasSavePermission: true,
+	lastUpdateTime: 1,
 }))
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
@@ -36,7 +38,11 @@ vi.mock('@payloadcms/ui', () => ({
 	useConfig: () => ({
 		config: { admin: { dateFormat: 'yyyy-MM-dd HH:mm' }, routes: { admin: '/admin', api: '/api' } },
 	}),
-	useDocumentInfo: () => ({ id: doc.id }),
+	useDocumentInfo: () => ({
+		id: doc.id,
+		hasSavePermission: doc.hasSavePermission,
+		lastUpdateTime: doc.lastUpdateTime,
+	}),
 	useFormModified: () => doc.modified,
 	useTranslation: () => ({
 		i18n: { language: 'en', dateFNS: undefined },
@@ -76,6 +82,8 @@ const testButton = () => screen.getByRole('button', { name: keys.providerConnect
 beforeEach(() => {
 	doc.id = '6650f1c2a9e4b3d2c1a09f87'
 	doc.modified = false
+	doc.hasSavePermission = true
+	doc.lastUpdateTime = 1
 	fetchMock.mockReset()
 	toasts.success.mockReset()
 	toasts.error.mockReset()
@@ -186,6 +194,30 @@ describe('ProviderConnection', () => {
 		await renderPanel()
 		expect((testButton() as HTMLButtonElement).disabled).toBe(true)
 		expect(screen.getByText(keys.providerConnectionUnsaved)).toBeDefined()
+	})
+
+	it('says why a reader who may not edit the document cannot test it', async () => {
+		doc.hasSavePermission = false
+		answers({ status: {} })
+		await renderPanel()
+		expect((testButton() as HTMLButtonElement).disabled).toBe(true)
+		expect(screen.getByText(keys.providerConnectionNoPermission)).toBeDefined()
+	})
+
+	it('reads the status again after a save, which may have reset it', async () => {
+		answers(
+			{ status: { lastErrorAt: '2026-11-08T10:00:00.000Z', errorKind: 'source_misconfigured' } },
+			{ status: {} }
+		)
+		const panel = await renderPanel()
+		expect(statusOf()).toBe(keys.providerConnectionNotConnected)
+		doc.lastUpdateTime = 2
+		panel.rerender(
+			<ProviderConnection field={{ name: 'connection', type: 'ui' } as never} path="connection" />
+		)
+		await act(async () => {})
+		expect(fetchMock).toHaveBeenCalledTimes(2)
+		expect(statusOf()).toBe(keys.providerConnectionUnchecked)
 	})
 
 	it('toasts a check the endpoint refused, and keeps the status it had', async () => {

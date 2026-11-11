@@ -161,6 +161,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionResumes]: 'Reads resume',
 	[keys.providerConnectionSaveFirst]: 'Save the document to test it.',
 	[keys.providerConnectionUnsaved]: 'Save your changes to test them.',
+	[keys.providerConnectionNoPermission]: 'Only someone who may edit this document can test it.',
 	[keys.providerConnectionRefusedHelp]: 'Check the key, the IDs and the host.',
 	[keys.providerConnectionUnreachableHelp]: 'The service did not answer. Try again later.',
 	[keys.providerConnectionChecked]: 'Connection works',

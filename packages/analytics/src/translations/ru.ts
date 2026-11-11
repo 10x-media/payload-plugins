@@ -165,6 +165,8 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionResumes]: 'Чтение возобновится',
 	[keys.providerConnectionSaveFirst]: 'Сохраните документ, чтобы проверить его.',
 	[keys.providerConnectionUnsaved]: 'Сохраните изменения, чтобы проверить их.',
+	[keys.providerConnectionNoPermission]:
+		'Проверить может только тот, кому можно редактировать этот документ.',
 	[keys.providerConnectionRefusedHelp]: 'Проверьте ключ, ID и хост.',
 	[keys.providerConnectionUnreachableHelp]: 'Сервис не ответил. Попробуйте позже.',
 	[keys.providerConnectionChecked]: 'Подключение работает',

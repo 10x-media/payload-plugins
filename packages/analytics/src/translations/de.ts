@@ -163,6 +163,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionResumes]: 'Abrufe wieder ab',
 	[keys.providerConnectionSaveFirst]: 'Speichern Sie das Dokument, um es zu testen.',
 	[keys.providerConnectionUnsaved]: 'Speichern Sie Ihre Änderungen, um sie zu testen.',
+	[keys.providerConnectionNoPermission]: 'Nur wer dieses Dokument bearbeiten darf, kann es testen.',
 	[keys.providerConnectionRefusedHelp]: 'Prüfen Sie Schlüssel, IDs und Host.',
 	[keys.providerConnectionUnreachableHelp]:
 		'Der Dienst hat nicht geantwortet. Versuchen Sie es später erneut.',

@@ -156,6 +156,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerConnectionResumes]: '恢复读取',
 	[keys.providerConnectionSaveFirst]: '请先保存文档再测试。',
 	[keys.providerConnectionUnsaved]: '请先保存更改再测试。',
+	[keys.providerConnectionNoPermission]: '只有可以编辑此文档的人才能测试它。',
 	[keys.providerConnectionRefusedHelp]: '请检查密钥、ID 和主机。',
 	[keys.providerConnectionUnreachableHelp]: '服务没有响应。请稍后再试。',
 	[keys.providerConnectionChecked]: '连接正常',
