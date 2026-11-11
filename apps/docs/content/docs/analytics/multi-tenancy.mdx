@@ -438,9 +438,9 @@ Alpha's editors read Alpha's slice of the platform PostHog, and the view and the
 
 A source of one's own is an [available](/analytics/providers#when-a-document-is-a-source) provider document of the tenant that grants a source this reader may read under `providers.collection.sourceAccess`. When Alpha's admin saves a Plausible document with its credentials, the next request lists Plausible alone and opens on it, with no cache in between. Where the app runs more than one instance, the others follow within ten seconds, as they do for any provider save ([How a document becomes an adapter](/analytics/providers#how-a-document-becomes-an-adapter)). Switching the document off brings the platform PostHog back the same way.
 
-A source of one's own that is failing does not count. A document is failing while its last result is a refusal (the vendor refused the key, the site or the host), or a vendor that did not answer while its reads rest; one slow answer moves no one. When every one of the tenant's documents is failing, the listing shows the platform PostHog beside them, and the view and the providers list say that the tenant's own tool is not working, so these are the platform's numbers. `GET /api/_x/sources` answers with `notice: 'ownSourceFailing'` then. The failing sources stay listed, so a reader can still open one and see the vendor's error.
+A source of one's own that is failing does not count. A document is failing while its last result is a refusal (the vendor refused the key, the site or the host), or a vendor that did not answer while its reads rest. When every one of the tenant's documents is failing, the listing shows the platform PostHog beside them, and the view and the providers list say that the tenant's own tool is not working, so these are the platform's numbers. `GET /api/_x/sources` answers with `notice: 'ownSourceFailing'` then. The failing sources stay listed.
 
-The result is the one the document's [Connection panel](/analytics/providers#checking-a-connection) shows: a read through the document or its **Test connection** writes it, and a save that changes how the document connects (a key sent again, another host or ID) clears it. A document that has been failing for more than 10 minutes is checked again in the background when its tenant's listing is read, at most once every 10 minutes per document, with the check **Test connection** runs, so a source that works again takes its tenant back without anyone pressing the button. Reads do not wait for that check. On Postgres and SQLite the status rows need the `analytics-provider-status` table: while they cannot be read, no source counts as failing and a warning is logged once a minute.
+The last result is the one the document's [Connection panel](/analytics/providers#checking-a-connection) shows. A document failing for more than 10 minutes is checked again in the background, at most once every 10 minutes.
 
 #### A function
 
@@ -477,7 +477,7 @@ A reader who names no source reads the default: the view opens on it, a widget w
 2. The `defaultSource` rule.
 3. What 1.0.0-beta.12 picked: `defaultAdapter`, else the first config adapter, else the first source the reader may read.
 
-Under a [`fallback` policy](#fallback), when the default these steps pick is one of the tenant's own failing documents, the shared source standing in for them is the default instead. A default they pick that works is kept.
+Under a [`fallback` policy](#fallback), when the default these steps pick is one of the tenant's own failing documents, the shared source standing in for them is the default instead.
 
 `defaultSource` takes one of three forms, and fails the boot without `scope.resolve`:
 

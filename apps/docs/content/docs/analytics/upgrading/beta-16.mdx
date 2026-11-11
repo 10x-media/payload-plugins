@@ -30,8 +30,6 @@ A document with a blank Host also needs a Region now. One saved without it keeps
 
 Under `sources.<id>.tenants: 'fallback'`, a tenant whose own sources all fail reads the shared source again, where one failing document used to cost it every number. A document is failing while its last result is a refusal, or a vendor that did not answer while its reads rest. The shared source is listed beside the failing ones, opens as the default in place of a failing one, and the view and the providers list say why (`notice: 'ownSourceFailing'`). See [Letting tenants read a shared source](/analytics/multi-tenancy#fallback).
 
-A save that changes how a document connects clears its result, and a document failing for more than 10 minutes is checked again in the background, so a source that works again takes its tenant back by itself.
-
 ## Connection status
 
 A provider document's sidebar shows its connection: works, refused or unreachable, when it last worked and failed, and the vendor's own answer, with a **Test connection** button for readers who may edit it ([Checking a connection](/analytics/providers#checking-a-connection)). Code reads the same through `GET /api/_x/provider-status?id=`, and `POST` checks the connection first ([Provider status endpoint](/analytics/reference/endpoints#provider-status-endpoint)).
