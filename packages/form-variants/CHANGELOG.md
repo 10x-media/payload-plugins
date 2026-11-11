@@ -1,5 +1,11 @@
 # @10x-media/form-variants
 
+## 4.0.0-alpha.1
+
+### Major Changes
+
+- Payload 4 support, on Next.js and TanStack Start. `next` is no longer a peer: the plugin reads and writes its `?variant=` parameter through Payload's router. The variant's edit form follows Payload 4's own: the save flow, lock expiry, trash and hierarchy checks and the stale data notice (`DocumentStaleData`) match the native view, and in a drawer the switcher and save controls move into the drawer's header bar. The chrome takes Payload 4's look from Payload's own components on its tokens: document controls markup for the top bar, Payload's tabs for the progress rail (the step classes now sit on the tab button), a secondary `Button` for the switcher, and `Button`'s `loading` state on the primary step button. The fallback outcome screen's title and message take Payload 4's heading and body styles (`form-variants__outcome-title`, `form-variants__outcome-message`). `--form-variants-rail` and `--form-variants-current` are removed. The package declares its CSS as side effects. See Upgrading to Payload 4 in the docs.
+
 ## 0.1.0-beta.0
 
 ### Minor Changes

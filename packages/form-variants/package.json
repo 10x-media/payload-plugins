@@ -1,6 +1,6 @@
 {
 	"name": "@10x-media/form-variants",
-	"version": "4.0.0-alpha.0",
+	"version": "4.0.0-alpha.1",
 	"description": "Alternative edit forms for Payload collections: simplified and step-by-step variants over the native form state",
 	"license": "MIT",
 	"repository": {

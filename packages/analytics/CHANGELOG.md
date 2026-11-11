@@ -1,5 +1,13 @@
 # @10x-media/analytics
 
+## 4.0.0-alpha.1
+
+### Major Changes
+
+- Payload 4 support. `next` and `@payloadcms/next` are no longer peers: the `/next` entry is replaced by a framework-neutral `/routes` entry (`captureRoute`, `ingestRoute`, `ingestPreflight`), and the deprecated `captureRewrites` and `posthogProxyRewrites` are removed. The plugin's Local API calls pass `overrideAccess` explicitly, as Payload 4 applies access by default. Its own stuck-job guards are gone, since Payload 4's `processingUntil` lease re-runs a killed job, and `jobsConcurrency` leaves the adapter contract; jobs access follows Payload 4's admin-only defaults. The system collections (hits, aggregates, state, cache, sync) opt out of Payload 4's default versions and authorship; providers and goals opt out of versions, so no old secret lands in `_versions`. The Mongo state store asks for `returnDocument: 'after'`.
+
+  The admin UI is restyled on Payload 4's tokens, with no rem and Payload's colors as they are; contrast follows Payload's enhanced contrast mode. The view's toolbar is laid out like Payload's list controls: the window caption on the start side; Site, Data source and Date range as menu buttons, Compare and an icon Refresh on the end side; filter chips on their own row. Chart readouts are Payload's popover. Bars are as tall as a Payload control, and `BarList` now draws `fill="soft"` by default (pass `fill="solid"` for the old look); every bar sits on a track, solid bars fill with `--color-bg-brand`, and `--analytics-bar-fill-hover` is new. The goals widget names the comparison once, in its caption. The sidebar stat is set like a Payload field and the New badge is Payload's own pill. Requires Payload `4.0.0-beta.7`.
+
 ## 1.0.0-beta.15
 
 ### Minor Changes

@@ -1,5 +1,11 @@
 # @10x-media/settings-overlay
 
+## 4.0.0-alpha.1
+
+### Major Changes
+
+- Payload 4 support, on Next.js and TanStack Start. The `@10x-media/settings-overlay/embed` template shim is removed with its `next` and `@payloadcms/next` peers: a view of your own skips `DefaultTemplate` (now from `@payloadcms/ui/rsc`) when it receives `settingsOverlayEmbed`. The panel no longer writes the URL: `?settings=<overlay>/<item>[/<id>]` still opens it on load or on a navigation that brings a new value, nothing is written while it is in use, so the back button leaves the page, and closing a panel a link opened removes the parameter. Removed with it: the `history` option and `OverlayHistory`, `QUERY_PARAM`, the `settingsQuery` parameter and `setTarget`'s `replace` option. The server-function transport is documented for both frameworks. Server-rendered panes suspend inside their own boundary, so a pane load no longer blanks the admin on TanStack Start and the list search keeps its focus, a document pane leaves the page's breadcrumbs alone, and a hosted list's controls wrap to the pane's width instead of overflowing it. The panel takes Payload 4's dialog look and Payload's own controls (`Button`, `SearchInput`, the ghost more menu) on Payload 4's tokens, and the package declares its CSS as side effects. See Upgrading to Payload 4 in the docs.
+
 ## 0.1.0-beta.3
 
 ### Patch Changes

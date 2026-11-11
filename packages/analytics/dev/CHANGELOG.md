@@ -1,5 +1,12 @@
 # @10x-media/analytics-dev
 
+## 0.0.1-alpha.16
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@4.0.0-alpha.1
+
 ## 0.0.1-beta.15
 
 ### Patch Changes
