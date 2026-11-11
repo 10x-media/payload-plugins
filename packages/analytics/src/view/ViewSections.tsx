@@ -68,7 +68,8 @@ function Overview() {
 		<OverviewCards
 			compare={state.compare}
 			currency={answers.currency}
-			{...(cards.status === 'error' && cards.error?.code === 'source_misconfigured'
+			{...(cards.status === 'error' &&
+			(cards.error?.code === 'source_misconfigured' || cards.error?.code === 'unavailable')
 				? {
 						errorNote: (
 							<SourceConnectionNote

@@ -403,8 +403,10 @@ export const createRuntimeFactory = (
 				epoch,
 				...(configEpoch ? { configEpoch } : {}),
 				now,
-				onError: (err, adapterId) => {
-					warn(`analytics: read failed for adapter "${adapterId}": ${describeWithCauses(err)}`)
+				onError: (err, adapterId, scope) => {
+					warn(
+						`analytics: read failed for adapter "${adapterId}" (${scope === null ? 'install-wide' : `scope "${scope}"`}): ${describeWithCauses(err)}`
+					)
 				},
 				onStoreError,
 				onWrite: () => sweeper.maybeSweep(),
