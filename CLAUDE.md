@@ -197,13 +197,15 @@ A dev app that adds a TanStack route of its own (the website demo pages of dual-
 
 This branch is the Payload 4 line, in alpha pre-mode: every package is `4.0.0-alpha.N` on the `alpha` dist-tag (plugin major = Payload major). `main` is the Payload 3 line, on `beta`, and owns `latest`. The branches never merge, because merging would collide on every changeset, `pre.json`, changelog and version. Fixes land on `main` and are ported here by hand; `main` pull requests that need it carry the `port-to-v4` label and a `v4: ported in #N` / `v4: not needed` line.
 
-The flow is split, because the npm account is `auth-and-writes` 2FA and pnpm 10 has no OIDC, so CI cannot publish:
+CI publishes through npm trusted publishing (OIDC, no token):
 
-1. `release.yml` opens or updates a "Version Packages" PR into `v4` aggregating queued changesets. It does not publish.
-2. Merge that PR, then publish each bumped package from `v4` with `pnpm publish:plugin <name>` (interactive passkey). The script publishes to npm under the dist-tag named by the version's prerelease id and pushes the `@10x-media/<name>@<version>` tag.
-3. The tag push triggers `release-notes.yml`, which creates the per-package GitHub release from its `CHANGELOG.md`.
+1. `release.yml`'s `version` job opens or updates a "Version Packages" PR into `v4` aggregating queued changesets.
+2. Merging that PR is the release. With no changesets left queued, the `publish` job (environment `npm`, no reviewers) runs `scripts/publish-unreleased.sh`: every public package whose version is not on npm is built, packed with pnpm and published with npm (pnpm 10 cannot do OIDC) under the dist-tag named by the version's prerelease id, so `latest` is never touched from here. It pushes the `@10x-media/<name>@<version>` tag and dispatches `release-notes.yml`, which creates the GitHub release from the package's `CHANGELOG.md`.
+3. Publishing is idempotent. After a failure, re-run the job or dispatch `release.yml` from `v4`: only missing versions go out, and nothing needs a bump. `private` packages (automations) are skipped.
 
-Planned: npm OIDC trusted publishing so CI publishes and releases again (restore the `publish:` step in `release.yml`). When Payload 4 is stable: branch `v3` from `main`, merge `v4` into `main`, `pnpm changeset pre exit` cuts `4.0.0` on `latest`, and the Payload 3 line moves to the `payload-v3` dist-tag.
+Each public package's trusted publisher on npmjs.com names this repository, `release.yml` and the `npm` environment, so renaming the workflow means updating every package. npm only configures one for a package that exists, so a new plugin's first release is manual: `pnpm publish:plugin <name>` (interactive passkey), then `npm trust github @10x-media/<name> --repo 10x-media/payload-plugins --file release.yml --env npm`. `main` still publishes by hand with that script; `snapshot.yml` cannot publish until it moves into `release.yml`.
+
+When Payload 4 is stable: branch `v3` from `main`, merge `v4` into `main`, `pnpm changeset pre exit` cuts `4.0.0` on `latest`, and the Payload 3 line moves to the `payload-v3` dist-tag.
 
 ## Process hygiene
 
