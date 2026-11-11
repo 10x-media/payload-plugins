@@ -9,7 +9,7 @@
 
 A living wiki inside the Payload admin panel. Editors write guides as Payload documents, attach each one to the collections, globals, fields, and blocks it explains, and the admin renders it exactly there: under the field, inside the block, in the document sidebar, above the list table.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/admin-wiki?style=flat-square)](https://www.npmjs.com/package/@10x-media/admin-wiki)
+[![npm](https://img.shields.io/npm/v/@10x-media/admin-wiki/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/admin-wiki)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

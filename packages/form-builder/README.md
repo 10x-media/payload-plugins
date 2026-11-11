@@ -9,7 +9,7 @@
 
 An end-to-end forms platform for Payload: author forms in the admin, validate server-side, render headless on your frontend, collect typed submissions, aggregate results, and act on them. Simple by default for editors, with a definition seam (`defineFormField`, `defineValidationRule`, `defineAction`, and friends) wherever developers need depth, and 100% native to Payload.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/form-builder?style=flat-square)](https://www.npmjs.com/package/@10x-media/form-builder)
+[![npm](https://img.shields.io/npm/v/@10x-media/form-builder/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/form-builder)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

@@ -9,7 +9,7 @@
 
 Outbound webhook subscriptions for Payload. Opt collections in, let subscribers register URLs in the admin panel (or in code), and deliver signed HTTP POSTs on every create, update, and delete, inline or through Payload's jobs queue, with retries and an append-only delivery log.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/webhooks?style=flat-square)](https://www.npmjs.com/package/@10x-media/webhooks)
+[![npm](https://img.shields.io/npm/v/@10x-media/webhooks/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/webhooks)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

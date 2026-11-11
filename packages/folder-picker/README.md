@@ -9,7 +9,7 @@
 
 Folder browsing inside Payload's list drawer, so any field picks documents by folder. Payload 4 browses folders on the collection route, but open the same collection from an upload field's "choose from existing" and you get a flat, paginated list. This plugin puts the folders back, for every field that opens a drawer.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/folder-picker?style=flat-square)](https://www.npmjs.com/package/@10x-media/folder-picker)
+[![npm](https://img.shields.io/npm/v/@10x-media/folder-picker/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/folder-picker)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

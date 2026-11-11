@@ -9,7 +9,7 @@
 
 Reusable fields for Payload that look and behave native: a full color picker in a constant-height row, a searchable icon picker over pluggable icon libraries, encrypted fields with key rotation and opt-in exact-match querying, and a unit-aware measurement field. Built from `@payloadcms/ui` primitives on Payload design tokens, indistinguishable from Payload's own fields.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/fields?style=flat-square)](https://www.npmjs.com/package/@10x-media/fields)
+[![npm](https://img.shields.io/npm/v/@10x-media/fields/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/fields)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

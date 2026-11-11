@@ -9,7 +9,7 @@
 
 Files any Payload collection, global, registered admin view or component behind a floating panel, and lets a link open it. `?settings=system/tags/abc` opens the panel on that document, from a bookmark, an email or a `<Link>`.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/settings-overlay?style=flat-square)](https://www.npmjs.com/package/@10x-media/settings-overlay)
+[![npm](https://img.shields.io/npm/v/@10x-media/settings-overlay/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/settings-overlay)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

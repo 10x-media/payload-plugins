@@ -9,7 +9,7 @@
 
 Audit logging for Payload. Records a separate entry with a field-level diff for every change, in a queryable collection with its own admin view, and shows Payload's own `createdBy` and `updatedBy` on the document.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/audit-logs?style=flat-square)](https://www.npmjs.com/package/@10x-media/audit-logs)
+[![npm](https://img.shields.io/npm/v/@10x-media/audit-logs/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/audit-logs)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

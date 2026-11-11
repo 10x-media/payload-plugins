@@ -9,7 +9,7 @@
 
 Give each Payload auth collection its own session cookie, so an admin session and a frontend session can coexist. Payload signs every collection's token into one config-wide `payload-token`, which means a customer logging in on your website overwrites the editor's admin session in the same browser, and back again. This plugin moves the collections you name onto cookies of their own.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/dual-session?style=flat-square)](https://www.npmjs.com/package/@10x-media/dual-session)
+[![npm](https://img.shields.io/npm/v/@10x-media/dual-session/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/dual-session)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 

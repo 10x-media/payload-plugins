@@ -9,6 +9,8 @@
 
 Find duplicate documents in any Payload collection and merge a group of them into one from the admin.
 
+[![npm](https://img.shields.io/npm/v/@10x-media/dedupe/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/dedupe)
+
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In alpha on this branch: published under the `alpha` dist-tag until Payload 4 is stable.
 
 ## Features

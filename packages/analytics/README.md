@@ -9,7 +9,7 @@
 
 Analytics for Payload v3 behind one adapter contract: a self-hosted native engine that stores hits in your own database, or GA4, Plausible, Umami and PostHog, read through an analytics view, dashboard widgets and per-document stat fields. Every surface hides what the active source cannot answer.
 
-[![npm](https://img.shields.io/npm/v/@10x-media/analytics?style=flat-square)](https://www.npmjs.com/package/@10x-media/analytics)
+[![npm](https://img.shields.io/npm/v/@10x-media/analytics/alpha?style=flat-square)](https://www.npmjs.com/package/@10x-media/analytics)
 
 Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
 
