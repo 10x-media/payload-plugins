@@ -78,7 +78,10 @@ export const createConnectionRecheck = (args: {
 					return
 				}
 				try {
-					await args.store.record(docId, await checkConnectionOf(args.payload, adapter))
+					// Nothing to check: writing what checkConnectionOf answers would call it working.
+					if (adapter.checkConnection) {
+						await args.store.record(docId, await checkConnectionOf(args.payload, adapter))
+					}
 				} finally {
 					await adapter.close?.(args.payload)
 				}
