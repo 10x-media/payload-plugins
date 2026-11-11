@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
+import { ProviderHttpError } from '../adapters/http/fetchJson'
 import { vendorWordsOf } from './connectionState'
 import {
 	connectionOutcomeOf,
@@ -59,7 +60,11 @@ describe('connectionOutcomeOf', () => {
 	})
 
 	it('keeps the vendor’s words and how long the source rests', () => {
-		const error = new Error('posthog: HTTP 403 {"detail":"Invalid personal API key."}')
+		const error = new ProviderHttpError(
+			403,
+			'posthog',
+			'posthog: HTTP 403 {"detail":"Invalid personal API key."}'
+		)
 		expect(
 			connectionOutcomeOf(
 				{ ok: false, failure: { kind: 'source_misconfigured' }, error },
@@ -71,6 +76,20 @@ describe('connectionOutcomeOf', () => {
 			detail: 'posthog: HTTP 403 {"detail":"Invalid personal API key."}',
 			pausedForMs: 30_000,
 		})
+	})
+
+	it('keeps no detail the vendor did not say: the plugin’s own refusal and a network error', () => {
+		for (const error of [
+			new Error('umami: no website w; check the Website ID'),
+			new TypeError('fetch failed'),
+		]) {
+			expect(
+				connectionOutcomeOf(
+					{ ok: false, failure: { kind: 'source_misconfigured' }, error },
+					{ open: true }
+				)
+			).toEqual({ ok: false, kind: 'source_misconfigured' })
+		}
 	})
 
 	it('keeps no detail of a refused host, which can name the address it resolved to', () => {
