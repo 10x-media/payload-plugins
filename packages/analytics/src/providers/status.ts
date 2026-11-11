@@ -15,7 +15,8 @@ export const STATUS_SUCCESS_EVERY_MS = 15 * 60_000
 
 /**
  * The last connection result of each provider document, one row per document under the document's
- * own id, written by reads and by the Test connection button.
+ * own id, written by reads and by the Test connection button, and cleared by a save that changes
+ * how the document connects.
  */
 export const providerStatusCollection = (slug: string = PROVIDER_STATUS_SLUG): CollectionConfig =>
 	storeCollection({

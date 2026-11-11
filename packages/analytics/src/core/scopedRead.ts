@@ -214,9 +214,9 @@ interface Granted {
 /**
  * The scope's own documents whose source is failing (`isFailingConnection`), which a `fallback`
  * policy stands in for and a policy function reads as `failing`; empty unless the install has
- * either. A document failing for longer than the
- * breaker's longest rest is checked again in the background, since nothing else reads a source its
- * scope no longer opens on. Rows that cannot be read count as no failure, so the reads go on.
+ * either. A document failing for longer than the breaker's longest rest is checked again in the
+ * background, since nothing else reads a source its scope no longer opens on. Rows that cannot be
+ * read count as no failure, so the reads go on.
  */
 const failingOwnDocs = async (
 	runtime: AnalyticsRuntime,

@@ -39,7 +39,8 @@ export type SourcePolicyFunction = (args: {
 
 /**
  * Who besides `access.crossScope.unscopedSource` reads a tenant through a shared adapter: `staff`
- * nobody else, `tenant` the scope's members, `fallback` its members until they have a source of their own.
+ * nobody else, `tenant` the scope's members, `fallback` its members while they have no source of their own
+ * that works.
  */
 export type SourcePolicy = 'staff' | 'tenant' | 'fallback' | SourcePolicyFunction
 
