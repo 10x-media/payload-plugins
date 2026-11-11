@@ -511,3 +511,72 @@ describeForDb('analytics source policy: a function sees which own sources fail',
 		expect(seen.at(-1)).toEqual([expect.objectContaining({ docId: id, failing: true })])
 	})
 })
+
+describeForDb('analytics source policy: a working default the host picked stays', {}, (db) => {
+	let booted: BootedPayload
+	let alpha: unknown
+	let vendor: Awaited<ReturnType<typeof startPlausible>>
+
+	beforeAll(async () => {
+		vendor = await startPlausible()
+		booted = await bootPayload({
+			db,
+			collections: [users, pages],
+			plugin: analytics({
+				// The platform's PostHog stands in under `fallback`; a partner's shared source is read by
+				// every member, and the host's rule opens tenants on it.
+				adapters: [sharedAdapter([]), { ...sharedAdapter([]), id: 'partner', label: 'Partner' }],
+				platformAdapter: 'shared',
+				capture: { gate: 'off' },
+				scope: {
+					resolve: ({ req }) => readerOf(req)?.tenant ?? null,
+					member: ({ req, scope }) =>
+						readerOf(req)?.platform === true || readerOf(req)?.tenant === scope,
+				},
+				access: { crossScope: ({ req }) => readerOf(req)?.platform === true },
+				sources: { shared: { tenants: 'fallback' }, partner: { tenants: 'tenant' } },
+				defaultSource: ({ sources }) => sources.find((source) => source.id === 'partner')?.id,
+				providers: {
+					collection: true,
+					hosts: { allow: [vendor.origin], allowPrivateNetwork: true },
+				},
+			}),
+		})
+		alpha = await login(booted.payload, 'alpha@t.dev', { tenant: 'alpha' })
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted?.stop()
+		await vendor?.stop()
+	})
+
+	it(`keeps the host's working default while the tenant's own source fails, on ${db}`, async () => {
+		const doc = (await booted.payload.create({
+			collection: PROVIDERS_SLUG as never,
+			data: {
+				name: 'Alpha Plausible',
+				provider: 'plausible',
+				enabled: true,
+				plausible: {
+					siteId: 'alpha-kept.test',
+					apiKey: 'alpha-plausible-key-1234',
+					host: vendor.origin,
+				},
+			} as never,
+			user: alpha as never,
+			overrideAccess: false,
+		})) as unknown as { id: string | number }
+		const store = getRuntime(booted.payload)?.providerStatus
+		if (!store) throw new Error('no provider status store')
+		await store.record(String(doc.id), { ok: false, kind: 'source_misconfigured' })
+
+		const res = await callEndpoint(booted.payload, { path: routes.sources, query: '', user: alpha })
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as SourcesBody
+		expect(body.sources.map((source) => source.id).sort()).toEqual(
+			[`plausible:${doc.id}`, 'partner', 'shared'].sort()
+		)
+		expect(body.notice).toBe('ownSourceFailing')
+		expect(body.defaultId).toBe('partner')
+	})
+})
