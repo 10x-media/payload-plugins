@@ -55,6 +55,24 @@ describe('SourceConnectionNote', () => {
 		expect(screen.getByText(new RegExp(`^${keys.providerConnectionPaused} .*2999`))).toBeDefined()
 	})
 
+	it('says when the source last worked, for a vendor that stopped answering', async () => {
+		fetchMock.mockImplementation(() =>
+			Promise.resolve(
+				Response.json({
+					status: {
+						lastSuccessAt: '2026-11-08T09:00:00.000Z',
+						lastErrorAt: '2026-11-09T10:00:00.000Z',
+						errorKind: 'unavailable',
+					},
+				})
+			)
+		)
+		await renderNote('plausible:5')
+		expect(
+			screen.getByText(new RegExp(`^${keys.providerConnectionLastSuccess}: .*2026`))
+		).toBeDefined()
+	})
+
 	it('says nothing to a reader the document is closed to', async () => {
 		fetchMock.mockImplementation(() =>
 			Promise.resolve(

@@ -457,7 +457,7 @@ describe('createEngine stale serving', () => {
 			await vi.advanceTimersByTimeAsync(2000)
 			await engine.idle()
 			expect(onError).toHaveBeenCalledTimes(1)
-			expect(onError).toHaveBeenCalledWith(err, adapter.id)
+			expect(onError).toHaveBeenCalledWith(err, adapter.id, null)
 			expect((await engine.read(adapter, q)).meta.stale).toBe(true)
 			await vi.advanceTimersByTimeAsync(2000)
 			await engine.idle()

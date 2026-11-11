@@ -21,8 +21,8 @@ interface SourceConnectionNoteProps {
 }
 
 /**
- * What the vendor said when it refused a provider document's source, and until when reads rest,
- * inside the view's error banner. Shown only to a reader who may read the document; nothing for anyone
+ * What the vendor said when it refused a provider document's source, until when reads rest and
+ * when it last worked, inside the view's error banner. Shown only to a reader who may read the document; nothing for anyone
  * else, nor for a source no document gives.
  */
 export function SourceConnectionNote({ endpoint, sourceId, locale }: SourceConnectionNoteProps) {
@@ -48,12 +48,12 @@ export function SourceConnectionNote({ endpoint, sourceId, locale }: SourceConne
 	}, [url])
 
 	const words = status?.errorDetail ? vendorWordsOf(status.errorDetail) : undefined
+	const format = dateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' })
 	const pausedAt = status?.pausedUntil ? Date.parse(status.pausedUntil) : Number.NaN
-	const pausedUntil =
-		pausedAt > viewerNow().getTime()
-			? dateTimeFormat(locale, { dateStyle: 'medium', timeStyle: 'short' }).format(pausedAt)
-			: undefined
-	if (!words && !pausedUntil) {
+	const pausedUntil = pausedAt > viewerNow().getTime() ? format.format(pausedAt) : undefined
+	const workedAt = status?.lastSuccessAt ? Date.parse(status.lastSuccessAt) : Number.NaN
+	const lastWorked = Number.isNaN(workedAt) ? undefined : format.format(workedAt)
+	if (!words && !pausedUntil && !lastWorked) {
 		return null
 	}
 	return (
@@ -67,6 +67,11 @@ export function SourceConnectionNote({ endpoint, sourceId, locale }: SourceConne
 			{pausedUntil ? (
 				<span className="analytics-view__source-note">
 					{t(keys.providerConnectionPaused, { date: pausedUntil })}
+				</span>
+			) : null}
+			{lastWorked ? (
+				<span className="analytics-view__source-note">
+					{`${t(keys.providerConnectionLastSuccess)}: ${lastWorked}`}
 				</span>
 			) : null}
 		</>
