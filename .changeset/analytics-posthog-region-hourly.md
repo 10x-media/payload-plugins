@@ -20,3 +20,7 @@
 **Fixed (Umami): the key fields say which key goes where.** **API token** said "Umami Cloud token" though it is the self-hosted key, sent as `Bearer`. It now names self-hosted Umami, and **API key** on an Umami document names Umami Cloud, in all 11 locales.
 
 **Behavioral: under a `fallback` policy, a tenant whose own sources all fail reads the shared source.** A provider document that was configured but failing used to switch its tenant off the shared platform source, so one bad key cost the tenant every number. While the last result of each of the tenant's documents is a failure, the shared source is listed beside them and opens as the default, and the view and the providers list say why (`notice: 'ownSourceFailing'` on `GET /api/_x/sources`). A document failing for more than 10 minutes is checked again in the background when its tenant's listing is read, so it takes its tenant back once it answers.
+
+**Fixed: credential fields are labelled in the reader's language.** The **API key**, **API token** and **Private key** fields kept their English label in every admin language, because Payload drops a function label from the client field the write-only editor renders. They now carry a label per locale, as their help already did.
+
+**Fixed: the providers list's notice lines up with the list.** It rendered outside the page's gutter, edge to edge. It now sits inside it.
