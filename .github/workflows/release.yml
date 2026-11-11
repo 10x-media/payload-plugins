@@ -6,10 +6,9 @@ name: Release
 # tags it and dispatches release-notes.yml for it.
 #
 # Publishing authenticates with npm trusted publishing (OIDC), no token. Every public
-# package on npmjs.com names this repository, this workflow file and the `npm` environment
-# as its trusted publisher, so this file cannot be renamed without updating all of them.
-# The environment carries no reviewers (merging the Version Packages PR is the decision);
-# it limits deployments to the release branch.
+# package on npmjs.com names this repository and this workflow file as its trusted
+# publisher, so this file cannot be renamed without updating all of them. No environment
+# is configured: merging the Version Packages PR is the release decision.
 #
 # Publishing is idempotent: after a failure, re-run the job or dispatch this workflow from
 # the branch, and only the missing versions go out. `pnpm publish:plugin <name>` remains
@@ -58,7 +57,6 @@ jobs:
     if: needs.version.outputs.hasChangesets == 'false' && github.ref == 'refs/heads/v4'
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    environment: npm
     permissions:
       contents: write
       actions: write
