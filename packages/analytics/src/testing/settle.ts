@@ -10,11 +10,8 @@ import { builtRuntime } from '../plugin/runtime'
 export const settleAnalytics = async (payload: Payload): Promise<void> => {
 	const native = nativeInstanceOf(payload)
 	const runtime = builtRuntime(payload)
+	// In order: a read that settles queues a status write, and a check finishing queues one too.
+	await Promise.all([runtime?.engine.idle?.(), native?.engine.idle(), native?.writer.flush()])
 	await runtime?.providerRecheck?.idle()
-	await Promise.all([
-		runtime?.engine.idle?.(),
-		runtime?.providerStatus?.idle(),
-		native?.engine.idle(),
-		native?.writer.flush(),
-	])
+	await runtime?.providerStatus?.idle()
 }
