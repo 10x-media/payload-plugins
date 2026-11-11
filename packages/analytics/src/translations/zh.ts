@@ -361,8 +361,11 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerFieldEnabledHelp]: '关闭后会保留已保存的信息，但网站上任何位置都不再使用这个工具。',
 	[keys.providerFieldSiteIdHelp]: 'Plausible 统计的网站，通常写成 yourdomain.com。',
 	[keys.providerFieldApiKeyHelp]: '用于读取报告的只读密钥。会被安全保存且不再显示。',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'用于 Umami Cloud。自托管的 Umami 请把密钥填在 API 令牌中。会被安全保存且不再显示。',
 	[keys.providerFieldWebsiteIdHelp]: '您的网站 ID，可在 Umami 面板的地址栏中找到。',
-	[keys.providerFieldTokenHelp]: '您的 Umami Cloud 令牌，用来代替用户名和密码。会被安全保存。',
+	[keys.providerFieldTokenHelp]:
+		'用于自托管的 Umami：其设置中的 API 密钥或登录令牌。Umami Cloud 请使用 API 密钥。会被安全保存。',
 	[keys.providerFieldPropertyIdHelp]:
 		'Google Analytics 中 GA4 媒体资源的编号。不要带 properties/ 这个词。',
 	[keys.providerFieldClientEmailHelp]: 'Google 提供的文件中的服务账号地址。',

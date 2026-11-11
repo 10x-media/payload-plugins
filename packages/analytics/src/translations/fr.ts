@@ -387,10 +387,12 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 		'Le site mesuré par Plausible, généralement écrit sous la forme yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
 		"La clé en lecture seule qui sert à consulter vos rapports. Elle est enregistrée de façon sécurisée et n'est plus jamais affichée.",
+	[keys.providerFieldUmamiApiKeyHelp]:
+		"Pour Umami Cloud. Avec Umami auto-hébergé, mettez la clé dans Jeton API. Elle est enregistrée de façon sécurisée et n'est plus jamais affichée.",
 	[keys.providerFieldWebsiteIdHelp]:
 		"L'identifiant de votre site, visible dans la barre d'adresse de votre tableau de bord Umami.",
 	[keys.providerFieldTokenHelp]:
-		"Votre jeton Umami Cloud, utilisé à la place d'un identifiant et d'un mot de passe. Il est enregistré de façon sécurisée.",
+		'Pour Umami auto-hébergé : une clé API de ses paramètres ou un jeton de connexion. Avec Umami Cloud, utilisez Clé API. Il est enregistré de façon sécurisée.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Le numéro de votre propriété GA4, dans Google Analytics. Sans le mot properties/.',
 	[keys.providerFieldClientEmailHelp]:

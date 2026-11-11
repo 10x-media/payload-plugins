@@ -383,10 +383,12 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 		'El sitio web que mide Plausible, normalmente escrito como yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
 		'La clave de solo lectura con la que se consultan tus informes. Se guarda de forma segura y no vuelve a mostrarse.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'Para Umami Cloud. En Umami autoalojado, pon la clave en Token de API. Se guarda de forma segura y no vuelve a mostrarse.',
 	[keys.providerFieldWebsiteIdHelp]:
 		'El ID de tu sitio web, que aparece en la barra de direcciones de tu panel de Umami.',
 	[keys.providerFieldTokenHelp]:
-		'Tu token de Umami Cloud, que se usa en lugar de usuario y contraseña. Se guarda de forma segura.',
+		'Para Umami autoalojado: una clave de API de su configuración o un token de inicio de sesión. En Umami Cloud, usa Clave de API. Se guarda de forma segura.',
 	[keys.providerFieldPropertyIdHelp]:
 		'El número de tu propiedad GA4, en Google Analytics. Sin la palabra properties/.',
 	[keys.providerFieldClientEmailHelp]:
