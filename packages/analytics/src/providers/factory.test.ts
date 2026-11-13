@@ -123,6 +123,37 @@ describe('adapterFromProviderDoc', () => {
 		expect(urls).toEqual(['https://eu.posthog.com/api/projects/1/query/'])
 	})
 
+	it('reads with the ids a document stores, spaces around them left out', async () => {
+		const asked: string[] = []
+		const fetch: FetchLike = async (input, init?: FetchInit) => {
+			asked.push(`${String(input)} ${typeof init?.body === 'string' ? init.body : ''}`)
+			return Response.json({ results: [], pageviews: { value: 0 } })
+		}
+		const query: AnalyticsQuery = {
+			metrics: ['pageviews'],
+			dateRange: { start: new Date('2026-01-01T00:00:00Z'), end: new Date('2026-01-02T00:00:00Z') },
+		}
+		await build(
+			{ provider: 'plausible', plausible: { siteId: '  example.com  ', apiKey: 'key' } },
+			{ fetch }
+		)
+			?.query(query, {})
+			.catch(() => {})
+		await build({ provider: 'umami', umami: { websiteId: '  site-1  ', apiKey: 'key' } }, { fetch })
+			?.query(query, {})
+			.catch(() => {})
+		expect(asked.find((line) => line.includes('plausible'))).toContain('"site_id":"example.com"')
+		expect(asked.find((line) => line.includes('umami'))).toContain('/websites/site-1/')
+	})
+
+	it('captures with the public ids a document stores, spaces around them left out', () => {
+		const adapter = build({
+			provider: 'posthog',
+			posthog: { projectId: '1', apiKey: 'phx_x', projectToken: '  phc_public  ', region: 'eu' },
+		})
+		expect(adapter?.capture?.client).toEqual({ kind: 'posthog', token: 'phc_public' })
+	})
+
 	it('passes the public posthog capture fields through to the adapter', () => {
 		const adapter = build({
 			provider: 'posthog',
