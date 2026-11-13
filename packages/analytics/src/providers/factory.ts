@@ -55,7 +55,11 @@ export type ProviderDoc = {
 }
 
 /** A stored blank reads as unset. */
-const orUndefined = (value: string | null | undefined): string | undefined => value || undefined
+/** A stored text value as an adapter takes it: an admin's paste keeps spaces around it. */
+const trimmed = (value: string | null | undefined): string => value?.trim() ?? ''
+
+const orUndefined = (value: string | null | undefined): string | undefined =>
+	trimmed(value) || undefined
 
 /** An unset or unrecognized stored level follows `capture.withoutConsent`. */
 const documentWithoutConsent = (
@@ -149,7 +153,7 @@ const buildBaseAdapter = (
 			const cfg = doc.plausible ?? {}
 			return onDocumentHost(checkDocumentHost('plausible', cfg.host, ctx.hosts), (host) =>
 				plausible({
-					siteId: cfg.siteId ?? '',
+					siteId: trimmed(cfg.siteId),
 					apiKey: cfg.apiKey ?? '',
 					host,
 					domain: orUndefined(cfg.domain),
@@ -164,7 +168,7 @@ const buildBaseAdapter = (
 			const cfg = doc.umami ?? {}
 			return onDocumentHost(checkDocumentHost('umami', cfg.host, ctx.hosts), (host) =>
 				umami({
-					websiteId: cfg.websiteId ?? '',
+					websiteId: trimmed(cfg.websiteId),
 					apiKey: orUndefined(cfg.apiKey),
 					token: orUndefined(cfg.token),
 					host,
@@ -176,9 +180,9 @@ const buildBaseAdapter = (
 		case 'ga4': {
 			const cfg = doc.ga4 ?? {}
 			return ga4({
-				propertyId: cfg.propertyId ?? '',
+				propertyId: trimmed(cfg.propertyId),
 				credentials: {
-					client_email: cfg.clientEmail ?? '',
+					client_email: trimmed(cfg.clientEmail),
 					private_key: normalizePrivateKey(cfg.privateKey ?? ''),
 				},
 				projectId: orUndefined(cfg.projectId),
@@ -192,12 +196,12 @@ const buildBaseAdapter = (
 			const cfg = doc.posthog ?? {}
 			return onDocumentHost(checkDocumentHost('posthog', cfg.host, ctx.hosts), (host) =>
 				posthog({
-					projectId: cfg.projectId ?? '',
+					projectId: trimmed(cfg.projectId),
 					apiKey: cfg.apiKey ?? '',
 					host,
 					projectToken: orUndefined(cfg.projectToken),
 					region: posthogRegion(cfg.region),
-					scopeProperty: orUndefined(cfg.scopeProperty?.trim()),
+					scopeProperty: orUndefined(cfg.scopeProperty),
 					fetch: ctx.fetch,
 					...consent,
 				})
