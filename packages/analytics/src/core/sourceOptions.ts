@@ -6,8 +6,7 @@ import {
 } from '../providers/collection'
 import { resolveHostPolicy } from '../providers/hosts'
 import { PROVIDER_IDS, type ProviderId } from '../providers/ids'
-import { PROVIDER_STATUS_SLUG } from '../providers/status'
-import { resolveCollectionOption, resolveScopedCollection } from './collectionOption'
+import { resolveScopedCollection } from './collectionOption'
 import { keysOf, optionalFunction, optionalList, optionsObject } from './optionChecks'
 import type { ProvidersCollectionOptions, ProvidersOptions, ResolvedOptions } from './options'
 import { isRecord, kindOf, listOf } from './values'
@@ -24,7 +23,6 @@ const PROVIDERS_COLLECTION_KEYS = keysOf<ProvidersCollectionOptions>({
 	defaultAccess: true,
 	types: true,
 	sourceAccess: true,
-	status: true,
 })
 const PROVIDER_FIELD_KEYS = keysOf<ProviderCollectionFieldOverrides>({
 	name: true,
@@ -120,12 +118,8 @@ const resolveProvidersCollection = (
 		fieldKeys: PROVIDER_FIELD_KEYS,
 		exampleSlug: 'providers',
 	})
-	const status = resolveCollectionOption(
-		option === undefined || typeof option === 'boolean' ? undefined : option.status,
-		{ path: 'providers.collection.status', fallback: PROVIDER_STATUS_SLUG }
-	)
 	if (option === undefined || typeof option === 'boolean') {
-		return { ...collection, types: available, status }
+		return { ...collection, types: available }
 	}
 	assertEncryption(option.encryption)
 	const connectionAccess = connectionFieldAccess(
@@ -140,7 +134,6 @@ const resolveProvidersCollection = (
 	return {
 		...collection,
 		types: servedProviderTypes('providers.collection.types', option.types, available),
-		status,
 		...(option.encryption ? { encryption: option.encryption } : {}),
 		...(connectionAccess ? { connectionAccess } : {}),
 		...(defaultAccess ? { defaultAccess } : {}),

@@ -164,10 +164,9 @@ On MongoDB, or Postgres and SQLite in push mode, skip this step.
 On Postgres or SQLite in migrate mode:
 
 1. Generate a migration: `pnpm payload migrate:create`.
-2. Review it. It creates the plugin's tables, `analytics-provider-status` among them.
+2. Review it. It creates the plugin's tables.
 3. Run it: `pnpm payload migrate`.
 
-Without the `analytics-provider-status` table, the Connection panel stays **Not checked** ([Troubleshooting](/analytics/troubleshooting#connection-panel-stays-not-checked-on-postgres-or-sqlite)).
 
 ## 7. Regenerate the import map
 

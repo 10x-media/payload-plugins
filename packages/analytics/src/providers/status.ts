@@ -1,35 +1,15 @@
-import type { CollectionConfig, CollectionSlug, Payload } from 'payload'
+import type { Payload } from 'payload'
 import { currentDate } from '../core/clock'
-import { isCollectionSlug } from '../core/collectionSlug'
-import { DETACHED } from '../db/openTransaction'
-import { storeCollection } from '../native/collections/storeCollection'
+import { isRecord } from '../core/values'
 import { type ReadFailureKind, vendorAnswerOf } from '../surfacing/classifyError'
 import type { LaneHealth, LaneOutcome } from '../surfacing/lanes'
 import type { ConnectionOutcome, ProviderStatus } from './connectionState'
 
-/** The provider status collection's slug, unless `providers.collection.status.slug` names another. */
-export const PROVIDER_STATUS_SLUG = 'analytics-provider-status'
-
 /** How long a read's success goes unwritten after the last one was, unless a failure came between. */
 export const STATUS_SUCCESS_EVERY_MS = 15 * 60_000
 
-/**
- * The last connection result of each provider document, one row per document under the document's
- * own id, written by reads and by the Test connection button, and cleared by a save that changes
- * how the document connects.
- */
-export const providerStatusCollection = (slug: string = PROVIDER_STATUS_SLUG): CollectionConfig =>
-	storeCollection({
-		slug,
-		fields: [
-			{ name: 'lastSuccessAt', type: 'date' },
-			{ name: 'lastErrorAt', type: 'date' },
-			{ name: 'errorKind', type: 'text' },
-			{ name: 'errorDetail', type: 'text' },
-			{ name: 'pausedUntil', type: 'date' },
-		],
-		indexes: [],
-	})
+/** The `payload.kv` key of one provider document's last connection result. */
+export const providerStatusKey = (docId: string): string => `analytics:provider-status:${docId}`
 
 /**
  * What a read that reached the source says about the connection; undefined for a read refused as
@@ -108,63 +88,26 @@ export interface ProviderStatusStore {
 }
 
 /**
- * The status rows of one instance, through `payload.db`. Each document's writes run one after
- * another, so a late success never lands over the failure that followed it.
+ * Each provider document's last connection result in `payload.kv`, outside any transaction. Each
+ * document's writes run one after another, so a late success never lands over the failure that
+ * followed it.
  */
 export const providerStatusStore = (
 	payload: Payload,
-	slug: string,
 	options: { now?: () => Date } = {}
 ): ProviderStatusStore => {
 	const now = options.now ?? currentDate
 	const successWrittenAt = new Map<string, number>()
 	const queues = new Map<string, Promise<void>>()
 
-	const collection = (): CollectionSlug => {
-		if (!isCollectionSlug(payload, slug)) {
-			throw new Error(`analytics: the "${slug}" collection is not registered`)
-		}
-		return slug
-	}
-
 	const rowOf = async (id: string): Promise<Record<string, unknown> | undefined> => {
-		const { docs } = await payload.db.find<Record<string, unknown>>({
-			collection: collection(),
-			where: { id: { equals: id } },
-			limit: 1,
-			pagination: false,
-			req: DETACHED,
-		})
-		return docs[0]
+		const row: unknown = await payload.kv.get(providerStatusKey(id))
+		return isRecord(row) ? row : undefined
 	}
 
+	/** Merges `data` over the stored row, so a success keeps the last failure beside it. */
 	const put = async (id: string, data: Record<string, unknown>): Promise<void> => {
-		const update = () =>
-			payload.db.updateOne({
-				collection: collection(),
-				id,
-				data,
-				req: DETACHED,
-				returning: false,
-			})
-		if ((await rowOf(id)) !== undefined) {
-			await update()
-			return
-		}
-		try {
-			await payload.db.create({
-				collection: collection(),
-				data: { ...data, id },
-				req: DETACHED,
-				returning: false,
-			})
-		} catch (err) {
-			// Another instance created it first.
-			if ((await rowOf(id)) === undefined) {
-				throw err
-			}
-			await update()
-		}
+		await payload.kv.set(providerStatusKey(id), { ...(await rowOf(id)), ...data })
 	}
 
 	/** Runs `work` after the document's writes already queued, so a late one never lands over it. */
@@ -214,28 +157,19 @@ export const providerStatusStore = (
 		},
 
 		async readMany(docIds) {
-			if (docIds.length === 0) {
-				return new Map()
-			}
-			const { docs } = await payload.db.find<Record<string, unknown>>({
-				collection: collection(),
-				where: { id: { in: [...docIds] } },
-				limit: docIds.length,
-				pagination: false,
-				req: DETACHED,
-			})
-			return new Map(docs.map((row) => [String(row.id), statusOf(row)]))
+			// One read per document: `payload.kv` has no batch read, and a scope holds a few.
+			const entries = await Promise.all(
+				docIds.map(async (id): Promise<[string, ProviderStatus] | undefined> => {
+					const row = await rowOf(id)
+					return row ? [id, statusOf(row)] : undefined
+				})
+			)
+			return new Map(entries.filter((entry) => entry !== undefined))
 		},
 
 		forget(docId) {
 			successWrittenAt.delete(docId)
-			return enqueue(docId, async () => {
-				await payload.db.deleteMany({
-					collection: collection(),
-					where: { id: { equals: docId } },
-					req: DETACHED,
-				})
-			})
+			return enqueue(docId, () => payload.kv.delete(providerStatusKey(docId)))
 		},
 
 		async idle() {

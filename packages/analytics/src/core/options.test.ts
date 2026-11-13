@@ -460,7 +460,6 @@ describe('resolveOptions providers', () => {
 			slug: 'analytics-providers',
 			scopeField: 'scope',
 			types: vendorTypes,
-			status: { slug: 'analytics-provider-status' },
 		})
 		expect(p.hosts).toEqual(vendorClouds)
 		expect(p.resolve).toBeUndefined()
@@ -473,7 +472,6 @@ describe('resolveOptions providers', () => {
 			slug: 'analytics-providers',
 			scopeField: 'scope',
 			types: vendorTypes,
-			status: { slug: 'analytics-provider-status' },
 		})
 		expect(p.hosts).toEqual(vendorClouds)
 	})
@@ -623,7 +621,6 @@ describe('resolveOptions providers', () => {
 					scopeField: 'tenant',
 					overrides,
 					access,
-					status: { slug: 'tenant-analytics-status', overrides },
 				},
 			},
 		}).providers
@@ -634,17 +631,7 @@ describe('resolveOptions providers', () => {
 			overrides,
 			access,
 			types: vendorTypes,
-			status: { slug: 'tenant-analytics-status', overrides },
 		})
-	})
-
-	it('refuses a status option that is not a slug and overrides', () => {
-		expect(() =>
-			resolveOptions({ adapters, providers: { collection: { status: { hidden: true } as never } } })
-		).toThrow(/providers\.collection\.status/)
-		expect(() =>
-			resolveOptions({ adapters, providers: { collection: { status: { slug: '  ' } } } })
-		).toThrow(/providers\.collection\.status\.slug must be a non-empty collection slug/)
 	})
 
 	it('carries the resolve escape hatch through', () => {

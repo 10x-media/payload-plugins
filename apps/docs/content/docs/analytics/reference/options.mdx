@@ -170,9 +170,6 @@ Bindings, keyed by collection slug: how a document's [display fields](/analytics
 | `providers.collection.defaultAccess` | `FieldAccess \| { create?, update? }` | `connectionAccess`, else its default | Who may set or change a document's **Default for this site** checkbox on a scoped install; a denied value is dropped ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)). |
 | `providers.collection.defaultAccess.create`, `providers.collection.defaultAccess.update` | `FieldAccess` | as above | One operation each. |
 | `providers.collection.sourceAccess` | `Access` | the collection's read access | Which of a scope's documents a reader reads analytics through ([Who reads through a document](/analytics/providers#who-reads-through-a-document)). |
-| `providers.collection.status` | `{ slug?, overrides? }` | | The collection each document's last connection result is kept in ([Checking a connection](/analytics/providers#checking-a-connection)). |
-| `providers.collection.status.slug` | `string` | `'analytics-provider-status'` | Its slug. |
-| `providers.collection.status.overrides` | `(collection) => CollectionConfig` | none | Reshapes it, within what the plugin reads and writes. |
 | `providers.resolve` | `({ payload, req?, scope, fetch, hosts, sdks }) => AnalyticsAdapter[]` | none | Replaces the collection: a scope's adapters from a store of your own ([Keeping the settings somewhere else](/analytics/providers#keeping-the-settings-somewhere-else)). |
 | `providers.hosts` | `{ allow?, allowPrivateNetwork? }` | | Where provider documents may connect ([Where a document may connect](/analytics/providers#where-a-document-may-connect)). |
 | `providers.hosts.allow` | `string[]` | `[]`: each vendor's own cloud only | Further origins a document's host may name; `https://*.example.com` covers every subdomain. |
@@ -301,10 +298,9 @@ Every collection the plugin registers takes a `slug` and an `overrides` function
 | [Read cache](/analytics/cache#the-analytics-cache-collection) | `analytics-cache` | every install without `cache.store` | `cache.collection` |
 | [Synced daily metrics](/analytics/sync) | `analytics-daily` | `sync` | `sync.collection`, which also takes `hidden` |
 | [Provider settings](/analytics/providers#provider-documents) | `analytics-providers` | `providers.collection` | `providers.collection`, which also takes `fields`, `access` and more |
-| [Connection status](/analytics/providers#checking-a-connection) of each provider document | `analytics-provider-status` | `providers.collection` | `providers.collection.status` |
 | [Goals](/analytics/goals#5-let-editors-manage-goals) | `analytics-goals` | `goals.collection` | `goals.collection`, which also takes `fields`, `access` and more |
 
-The default slugs are exported for code that queries these collections: `CACHE_SLUG`, `GOALS_SLUG`, `PROVIDER_STATUS_SLUG`, `PROVIDERS_SLUG`, `STATE_SLUG` and `SYNC_SLUG` from `@10x-media/analytics`, and `HITS_SLUG` and `AGGREGATES_SLUG` from `@10x-media/analytics/adapters/native`. On an install that renames a collection, use the slug it set.
+The default slugs are exported for code that queries these collections: `CACHE_SLUG`, `GOALS_SLUG`, `PROVIDERS_SLUG`, `STATE_SLUG` and `SYNC_SLUG` from `@10x-media/analytics`, and `HITS_SLUG` and `AGGREGATES_SLUG` from `@10x-media/analytics/adapters/native`. On an install that renames a collection, use the slug it set.
 
 ```ts
 analytics({
