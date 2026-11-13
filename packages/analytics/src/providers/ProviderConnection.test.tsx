@@ -169,6 +169,15 @@ describe('ProviderConnection', () => {
 		expect(screen.queryByText(keys.providerConnectionRefusedHelp)).toBeNull()
 	})
 
+	it('tells a refused GA4 document to check the property access', async () => {
+		doc.provider = 'ga4'
+		answers({
+			status: { lastErrorAt: '2026-11-09T10:00:00.000Z', errorKind: 'source_misconfigured' },
+		})
+		await renderPanel()
+		expect(screen.getByText(keys.providerConnectionRefusedHelpGa4)).toBeDefined()
+	})
+
 	it('says an outage is unreachable rather than refused', async () => {
 		answers({ status: { lastErrorAt: '2026-11-09T10:00:00.000Z', errorKind: 'unavailable' } })
 		await renderPanel()
