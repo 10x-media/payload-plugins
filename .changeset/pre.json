@@ -92,6 +92,7 @@
 		"analytics-optional-peer-deps",
 		"analytics-options",
 		"analytics-postgres-parity",
+		"analytics-posthog-region-hourly",
 		"analytics-posthog-tenant-client",
 		"analytics-privacy-and-exclusion",
 		"analytics-provider-adapters",
