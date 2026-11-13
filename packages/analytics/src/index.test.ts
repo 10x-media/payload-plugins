@@ -588,9 +588,7 @@ describe('analytics collections', () => {
 				}),
 				memoryAdapter(),
 			],
-			providers: {
-				collection: { slug: 'site-providers', status: { slug: 'site-provider-status' } },
-			},
+			providers: { collection: { slug: 'site-providers' } },
 			goals: { collection: { slug: 'site-goals' } },
 			sync: { collection: { slug: 'site-daily' } },
 			cache: { collection: { slug: 'site-cache' }, warm: true },
@@ -600,7 +598,6 @@ describe('analytics collections', () => {
 			'site-daily',
 			'site-goals',
 			'site-hits',
-			'site-provider-status',
 			'site-providers',
 			'site-state',
 			'site-totals',

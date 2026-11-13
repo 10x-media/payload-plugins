@@ -1619,7 +1619,6 @@ export type ProvidersCollectionOptions = {
     defaultAccess?: ConnectionAccess;
     types?: ProviderId[];
     sourceAccess?: Access;
-    status?: AnalyticsCollectionOptions;
 };
 
 // @public (undocumented)

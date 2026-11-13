@@ -1,0 +1,41 @@
+---
+title: From 1.0.0-beta.16
+description: Everything 1.0.0-beta.17 changes for an install upgrading from 1.0.0-beta.16 or 1.0.0-beta.15, and what to do about each change.
+---
+
+1.0.0-beta.17 removes no option and adds no table, so no migration is needed. The changes are in what provider documents need, what tenants see when one fails, and a Connection panel on each provider document. An install on 1.0.0-beta.15 follows this page too: 1.0.0-beta.16 added only the PostHog checks in step 4.
+
+## Before you start
+
+Work through these in order; each links to its details below. The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+1. **Regenerate the import map** (`pnpm payload generate:importmap`): the provider form renders a new Connection panel.
+2. **Pick a Region on every PostHog provider document whose Host is blank** ([PostHog's Region](#posthogs-region)).
+3. **Check the Host of every provider document against `providers.hosts.allow`** ([Hosts outside the allow list](#hosts-outside-the-allow-list)).
+4. **Correct the values the provider form now refuses** ([Values the form refuses](#values-the-form-refuses)).
+
+Under a `fallback` policy, tenants with failing sources now read the shared source ([Failing sources under `fallback`](#failing-sources-under-fallback)); nothing to do unless that does not suit the install.
+
+## PostHog's Region
+
+A PostHog provider document with a blank **Host** needs a Region now. One saved without it keeps reading from US Cloud, and saves again once a Region is picked. Picking US keeps its personal API key, because reads still go to US Cloud. Picking EU moves its reads, so the key has to be entered again.
+
+## Hosts outside the allow list
+
+A provider document's **Host** must now be its vendor's cloud or an address in `providers.hosts.allow` when the document is saved. A document saved before with another host keeps reading as refused, and its next save is refused until the host is changed or allowed.
+
+## Values the form refuses
+
+A stored document with one of these values keeps reading as before, and saves again once the value is corrected:
+
+- Plausible **Site ID** or **Website address** with `https://`, `www.`, a trailing slash or capital letters: enter the site as Plausible lists it, such as `example.com`.
+- GA4 **Property ID** as `properties/<id>`: enter the number alone.
+- From 1.0.0-beta.16, for an install on 1.0.0-beta.15: a PostHog **Host** on the other Cloud region than the **Region**, a project token (`phc_...`) in **API key**, or a private key (`phx_...`, `phs_...`) in **Project token**.
+
+## Failing sources under `fallback`
+
+Under `sources.<id>.tenants: 'fallback'`, a tenant whose own sources all fail reads the shared source again, where one failing document used to cost it every number. A document is failing while its last result is a refusal, or a vendor that did not answer while its reads rest. The shared source is listed beside the failing ones, opens as the default in place of a failing one, and the view and the providers list say why (`notice: 'ownSourceFailing'`). See [Letting tenants read a shared source](/analytics/multi-tenancy#fallback).
+
+## Connection status
+
+A provider document's sidebar shows its connection, with a **Test connection** button for readers who may edit it ([Checking a connection](/analytics/providers#checking-a-connection)). The result is kept in `payload.kv`, which every Payload install already has.
