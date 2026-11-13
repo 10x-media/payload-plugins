@@ -148,6 +148,7 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerErrorHostNotAllowed]: 'هذا الموقع لا يسمح بهذا العنوان. اطلب من مطوّره إضافته.',
 	[keys.providerErrorSiteDomain]:
 		'أدخل الموقع كما يظهر في Plausible، مثل example.com أو example.com/blog.',
+	[keys.providerErrorPropertyId]: 'أدخل الرقم فقط، مثل 123456789.',
 	[keys.providerErrorPosthogRegionRequired]: 'اختر منطقة مشروع PostHog.',
 	[keys.providerErrorPosthogHostRegion]: 'هذا العنوان من منطقة PostHog الأخرى.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'هذا رمز مشروع (phc_XXXX) وليس مفتاح API.',
@@ -168,6 +169,8 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerConnectionNoPermission]: 'لا يمكن اختبار اتصال هذا المستند إلا لمن يحق له تعديله.',
 	[keys.providerConnectionRefusedHelp]: 'تحقق من المفتاح والمعرّفات والمضيف.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'تحقق من المفتاح والمعرّفات والمنطقة والمضيف.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'تحقق من معرّف الموقع والمفتاح، ومن أن بريد العميل مُضاف كمُشاهد للموقع.',
 	[keys.providerConnectionUnreachableHelp]: 'لم تستجب الخدمة. حاول لاحقًا.',
 	[keys.providerConnectionChecked]: 'الاتصال يعمل',
 	[keys.providerConnectionFailed]: 'فشل الاتصال',

@@ -13,6 +13,7 @@ import {
 	validations,
 } from 'payload'
 import { validateMeasurementId } from '../adapters/ga4/measurementId'
+import { validatePropertyId } from '../adapters/ga4/propertyId'
 import { validateScriptId } from '../adapters/plausible/scriptId'
 import { validateSiteDomain } from '../adapters/plausible/siteId'
 import { validatePersonalApiKey, validateProjectToken } from '../adapters/posthog/credentials'
@@ -577,6 +578,7 @@ const providerFields = (
 						width: '50%',
 						help: keys.providerFieldPropertyIdHelp,
 						access,
+						validate: validatePropertyId,
 					}),
 					textField('projectId', keys.providerFieldProjectId, {
 						width: '50%',

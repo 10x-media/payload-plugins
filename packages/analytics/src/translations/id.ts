@@ -154,6 +154,7 @@ export const id: LocaleBundle<'other'> = {
 		'Situs ini tidak mengizinkan alamat ini. Minta pengembangnya untuk menambahkannya.',
 	[keys.providerErrorSiteDomain]:
 		'Masukkan situs seperti yang tercantum di Plausible, seperti example.com atau example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Masukkan angkanya saja, seperti 123456789.',
 	[keys.providerErrorPosthogRegionRequired]: 'Pilih wilayah proyek PostHog Anda.',
 	[keys.providerErrorPosthogHostRegion]: 'Alamat ini dari wilayah PostHog lain.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Token proyek (phc_), bukan kunci API.',
@@ -175,6 +176,8 @@ export const id: LocaleBundle<'other'> = {
 		'Hanya yang boleh mengubah dokumen ini yang dapat menguji koneksinya.',
 	[keys.providerConnectionRefusedHelp]: 'Periksa kunci, ID, dan host.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'Periksa kunci, ID, wilayah, dan host.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Periksa ID properti dan kunci, serta pastikan email klien adalah Viewer properti.',
 	[keys.providerConnectionUnreachableHelp]: 'Layanan tidak menjawab. Coba lagi nanti.',
 	[keys.providerConnectionChecked]: 'Koneksi berfungsi',
 	[keys.providerConnectionFailed]: 'Koneksi gagal',

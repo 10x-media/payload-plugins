@@ -153,6 +153,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 		'Diese Website erlaubt diese Adresse nicht. Bitten Sie den Entwickler, sie hinzuzufügen.',
 	[keys.providerErrorSiteDomain]:
 		'Geben Sie die Website so ein, wie Plausible sie führt, etwa example.com oder example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Geben Sie nur die Zahl ein, etwa 123456789.',
 	[keys.providerErrorPosthogRegionRequired]: 'Wählen Sie die Region des Projekts.',
 	[keys.providerErrorPosthogHostRegion]: 'Adresse aus der anderen PostHog-Region.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Projekt-Token (phc_), kein API-Schlüssel.',
@@ -174,6 +175,8 @@ export const de: LocaleBundle<'one' | 'other'> = {
 		'Nur wer dieses Dokument bearbeiten darf, kann seine Verbindung testen.',
 	[keys.providerConnectionRefusedHelp]: 'Prüfen Sie Schlüssel, IDs und Host.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'Prüfen Sie Schlüssel, IDs, Region und Host.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Prüfen Sie die Property-ID und den Schlüssel und ob die Client-E-Mail Betrachter der Property ist.',
 	[keys.providerConnectionUnreachableHelp]:
 		'Der Dienst hat nicht geantwortet. Versuchen Sie es später erneut.',
 	[keys.providerConnectionChecked]: 'Verbindung funktioniert',

@@ -120,9 +120,11 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 	const help =
 		state === 'refused' && provider === 'posthog'
 			? keys.providerConnectionRefusedHelpPosthog
-			: state
-				? HELP[state]
-				: undefined
+			: state === 'refused' && provider === 'ga4'
+				? keys.providerConnectionRefusedHelpGa4
+				: state
+					? HELP[state]
+					: undefined
 	const blocked =
 		docId === undefined
 			? keys.providerConnectionSaveFirst

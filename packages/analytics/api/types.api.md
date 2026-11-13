@@ -1207,6 +1207,7 @@ export const keys: {
     readonly providerErrorHostInsecure: "analytics:providerErrorHostInsecure";
     readonly providerErrorHostNotAllowed: "analytics:providerErrorHostNotAllowed";
     readonly providerErrorSiteDomain: "analytics:providerErrorSiteDomain";
+    readonly providerErrorPropertyId: "analytics:providerErrorPropertyId";
     readonly providerErrorPosthogRegionRequired: "analytics:providerErrorPosthogRegionRequired";
     readonly providerErrorPosthogHostRegion: "analytics:providerErrorPosthogHostRegion";
     readonly providerErrorPosthogTokenAsApiKey: "analytics:providerErrorPosthogTokenAsApiKey";
@@ -1227,6 +1228,7 @@ export const keys: {
     readonly providerConnectionNoPermission: "analytics:providerConnectionNoPermission";
     readonly providerConnectionRefusedHelp: "analytics:providerConnectionRefusedHelp";
     readonly providerConnectionRefusedHelpPosthog: "analytics:providerConnectionRefusedHelpPosthog";
+    readonly providerConnectionRefusedHelpGa4: "analytics:providerConnectionRefusedHelpGa4";
     readonly providerConnectionUnreachableHelp: "analytics:providerConnectionUnreachableHelp";
     readonly providerConnectionChecked: "analytics:providerConnectionChecked";
     readonly providerConnectionFailed: "analytics:providerConnectionFailed";

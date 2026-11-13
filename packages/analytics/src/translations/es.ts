@@ -154,6 +154,7 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 		'Este sitio no permite esta dirección. Pide a su desarrollador que la añada.',
 	[keys.providerErrorSiteDomain]:
 		'Escribe el sitio tal como aparece en Plausible, como example.com o example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Escribe solo el número, como 123456789.',
 	[keys.providerErrorPosthogRegionRequired]: 'Elige la región de tu proyecto.',
 	[keys.providerErrorPosthogHostRegion]: 'Dirección de la otra región de PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Token de proyecto (phc_), no clave API.',
@@ -175,6 +176,8 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 		'Solo quien puede editar este documento puede probar su conexión.',
 	[keys.providerConnectionRefusedHelp]: 'Revisa la clave, los ID y el host.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'Revisa la clave, los ID, la región y el host.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Revisa el ID de propiedad y la clave, y que el correo del cliente sea Lector de la propiedad.',
 	[keys.providerConnectionUnreachableHelp]: 'El servicio no respondió. Inténtalo más tarde.',
 	[keys.providerConnectionChecked]: 'La conexión funciona',
 	[keys.providerConnectionFailed]: 'La conexión falló',

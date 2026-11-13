@@ -44,6 +44,8 @@
 
 **Fixed: provider fields say what to paste and where to find it.** PostHog's **Project ID**, **API key** (a personal `phx_...` key with the Query Read scope) and **Region**, Plausible's **API key** (a Stats API key), GA4's **Project ID**, **Client email** (added as a Viewer on the property) and **Measurement ID**, and every **Host** (only for a self-hosted instance) say so in all 11 locales. A refused PostHog document's Connection panel names the Region among what to check.
 
+**Fixed (GA4): Property ID takes the number alone, and a refused document names the property access.** `properties/<id>` saved, and every read answered "3 INVALID_ARGUMENT: ... A numeric Property ID is required." The field now refuses it. The Connection panel of a refused GA4 document says to check the Property ID, the key and that the client email is a Viewer of the property, where it said to check the host GA4 does not have.
+
 **Upgrade actions**
 
 1. On Postgres or SQLite in migrate mode, generate a migration (`pnpm payload migrate:create`), review it and run it: it creates the `analytics-provider-status` table. Push mode and MongoDB need nothing. Until it runs, connection checks and statuses fail while reads, saves and deletes go on, and no source counts as failing ([From 1.0.0-beta.15](https://docs.10xmedia.de/analytics/upgrading/beta-16)).
