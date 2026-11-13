@@ -1738,9 +1738,6 @@ export type PluralVariant<C extends PluralCategory = PluralCategory> = (typeof p
 // @public (undocumented)
 export const PROVIDER_IDS: readonly ["native", "plausible", "umami", "ga4", "posthog"];
 
-// @public
-export const PROVIDER_STATUS_SLUG = "analytics-provider-status";
-
 // @public (undocumented)
 export interface ProviderCollectionFieldOverrides {
     // (undocumented)
@@ -1863,7 +1860,6 @@ export type ProvidersCollectionOptions = {
     defaultAccess?: ConnectionAccess;
     types?: ProviderId[];
     sourceAccess?: Access;
-    status?: AnalyticsCollectionOptions;
 };
 
 // @public (undocumented)

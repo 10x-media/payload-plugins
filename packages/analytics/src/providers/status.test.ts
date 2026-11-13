@@ -4,37 +4,32 @@ import { ProviderHttpError } from '../adapters/http/fetchJson'
 import { vendorWordsOf } from './connectionState'
 import {
 	connectionOutcomeOf,
-	PROVIDER_STATUS_SLUG,
-	providerStatusCollection,
+	providerStatusKey,
 	providerStatusStore,
 	STATUS_SUCCESS_EVERY_MS,
 } from './status'
 
 type Row = Record<string, unknown>
 
-/** Payload's database API over a map keyed by id, counting the writes that reach it. */
+/** `payload.kv` over a map, counting the writes that reach it. */
 const fakePayload = (options: { failWrites?: number } = {}) => {
 	const rows = new Map<string, Row>()
 	let failures = options.failWrites ?? 0
 	const writes: Row[] = []
-	const write = (id: string, data: Row): void => {
-		if (failures > 0) {
-			failures--
-			throw new Error('the database is down')
-		}
-		writes.push(data)
-		rows.set(id, { ...rows.get(id), ...data, id })
-	}
-	const idOf = (where: { id: { equals: string } }) => where.id.equals
 	const payload = {
-		collections: { [PROVIDER_STATUS_SLUG]: {} },
-		db: {
-			find: async ({ where }: { where: { id: { equals: string } } }) => {
-				const row = rows.get(idOf(where))
-				return { docs: row ? [row] : [] }
+		kv: {
+			get: async (key: string) => rows.get(key) ?? null,
+			set: async (key: string, data: Row) => {
+				if (failures > 0) {
+					failures--
+					throw new Error('the database is down')
+				}
+				writes.push(data)
+				rows.set(key, data)
 			},
-			create: async ({ data }: { data: Row }) => write(String(data.id), data),
-			updateOne: async ({ id, data }: { id: string; data: Row }) => write(id, data),
+			delete: async (key: string) => {
+				rows.delete(key)
+			},
 		},
 	} as unknown as Payload
 	return { payload, rows, writes }
@@ -44,15 +39,6 @@ const clock = (start = Date.parse('2026-11-09T10:00:00.000Z')) => {
 	let at = start
 	return { now: () => new Date(at), advance: (ms: number) => (at += ms) }
 }
-
-describe('providerStatusCollection', () => {
-	it('keys each row by a text id, the provider document’s own', () => {
-		const collection = providerStatusCollection()
-		expect(collection.slug).toBe('analytics-provider-status')
-		expect(collection.fields[0]).toEqual({ name: 'id', type: 'text' })
-		expect(collection.access?.read?.({} as never)).toBe(false)
-	})
-})
 
 describe('connectionOutcomeOf', () => {
 	it('reads a success as working', () => {
@@ -116,10 +102,10 @@ describe('connectionOutcomeOf', () => {
 })
 
 describe('providerStatusStore', () => {
-	it('creates the row under the document id, then updates it', async () => {
+	it('keeps the row under the document’s key, merging each result into it', async () => {
 		const { payload, rows } = fakePayload()
 		const time = clock()
-		const store = providerStatusStore(payload, PROVIDER_STATUS_SLUG, time)
+		const store = providerStatusStore(payload, time)
 		await store.record('6650f1c2a9e4b3d2c1a09f87', { ok: true })
 		time.advance(1000)
 		await store.record('6650f1c2a9e4b3d2c1a09f87', {
@@ -128,7 +114,7 @@ describe('providerStatusStore', () => {
 			detail: 'posthog: HTTP 503',
 			pausedForMs: 60_000,
 		})
-		expect([...rows.keys()]).toEqual(['6650f1c2a9e4b3d2c1a09f87'])
+		expect([...rows.keys()]).toEqual(['analytics:provider-status:6650f1c2a9e4b3d2c1a09f87'])
 		expect(await store.read('6650f1c2a9e4b3d2c1a09f87')).toEqual({
 			lastSuccessAt: '2026-11-09T10:00:00.000Z',
 			lastErrorAt: '2026-11-09T10:00:01.000Z',
@@ -141,7 +127,7 @@ describe('providerStatusStore', () => {
 	it('clears the pause on a success and keeps the last failure beside it', async () => {
 		const { payload } = fakePayload()
 		const time = clock()
-		const store = providerStatusStore(payload, PROVIDER_STATUS_SLUG, time)
+		const store = providerStatusStore(payload, time)
 		await store.record('5', { ok: false, kind: 'source_misconfigured', pausedForMs: 30_000 })
 		time.advance(1000)
 		await store.record('5', { ok: true })
@@ -155,7 +141,7 @@ describe('providerStatusStore', () => {
 	it('writes a throttled success at most every 15 minutes, and at once after a failure', async () => {
 		const { payload, writes } = fakePayload()
 		const time = clock()
-		const store = providerStatusStore(payload, PROVIDER_STATUS_SLUG, time)
+		const store = providerStatusStore(payload, time)
 		await store.record('5', { ok: true }, { throttle: true })
 		time.advance(STATUS_SUCCESS_EVERY_MS - 1)
 		await store.record('5', { ok: true }, { throttle: true })
@@ -170,7 +156,7 @@ describe('providerStatusStore', () => {
 
 	it('writes an unthrottled success every time, as the Test connection button asks', async () => {
 		const { payload, writes } = fakePayload()
-		const store = providerStatusStore(payload, PROVIDER_STATUS_SLUG, clock())
+		const store = providerStatusStore(payload, clock())
 		await store.record('5', { ok: true })
 		await store.record('5', { ok: true })
 		expect(writes).toHaveLength(2)
@@ -178,7 +164,7 @@ describe('providerStatusStore', () => {
 
 	it('writes the next success after one that failed to save, whatever the throttle says', async () => {
 		const { payload, writes } = fakePayload({ failWrites: 1 })
-		const store = providerStatusStore(payload, PROVIDER_STATUS_SLUG, clock())
+		const store = providerStatusStore(payload, clock())
 		await expect(store.record('5', { ok: true }, { throttle: true })).rejects.toThrow('down')
 		await store.record('5', { ok: true }, { throttle: true })
 		expect(writes).toHaveLength(1)
@@ -187,20 +173,30 @@ describe('providerStatusStore', () => {
 	it('lands one document’s writes in the order they were recorded', async () => {
 		const { payload, rows } = fakePayload()
 		const time = clock()
-		const store = providerStatusStore(payload, PROVIDER_STATUS_SLUG, time)
+		const store = providerStatusStore(payload, time)
 		const first = store.record('5', { ok: true })
 		time.advance(1000)
 		const second = store.record('5', { ok: false, kind: 'unavailable' })
 		await Promise.all([first, second])
-		expect(rows.get('5')).toMatchObject({
+		expect(rows.get(providerStatusKey('5'))).toMatchObject({
 			lastSuccessAt: '2026-11-09T10:00:00.000Z',
 			lastErrorAt: '2026-11-09T10:00:01.000Z',
 		})
 	})
 
+	it('forgets a document’s row after the writes already queued for it', async () => {
+		const { payload, rows } = fakePayload()
+		const store = providerStatusStore(payload, clock())
+		const written = store.record('5', { ok: false, kind: 'unavailable' })
+		await store.forget('5')
+		await written
+		expect(rows.has(providerStatusKey('5'))).toBe(false)
+		expect(await store.read('5')).toBeUndefined()
+	})
+
 	it('cuts a vendor message past 300 characters', async () => {
 		const { payload } = fakePayload()
-		const store = providerStatusStore(payload, PROVIDER_STATUS_SLUG, clock())
+		const store = providerStatusStore(payload, clock())
 		await store.record('5', { ok: false, kind: 'unavailable', detail: 'x'.repeat(5000) })
 		expect((await store.read('5'))?.errorDetail).toHaveLength(300)
 	})

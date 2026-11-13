@@ -9,7 +9,7 @@ import { analytics } from '../../src/index'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { getRuntime } from '../../src/plugin/runtime'
 import { PROVIDERS_SLUG } from '../../src/providers/collection'
-import { PROVIDER_STATUS_SLUG } from '../../src/providers/status'
+import { providerStatusKey } from '../../src/providers/status'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { settleAnalytics } from '../../src/testing/settle'
 import { callEndpoint } from './endpointHelpers'
@@ -283,10 +283,10 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 				const id = await createOwn('alpha-back.test')
 				try {
 					await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
-					await booted.payload.db.updateOne({
-						collection: PROVIDER_STATUS_SLUG,
-						where: { id: { equals: id } },
-						data: { lastErrorAt: new Date(Date.now() - 11 * 60_000).toISOString() },
+					const key = providerStatusKey(id)
+					await booted.payload.kv.set(key, {
+						...(await booted.payload.kv.get<Record<string, unknown>>(key)),
+						lastErrorAt: new Date(Date.now() - 11 * 60_000).toISOString(),
 					})
 					expect((await listing()).notice).toBe('ownSourceFailing')
 					await vi.waitFor(() => expect(vendor.asked).toContain('alpha-back.test'), {

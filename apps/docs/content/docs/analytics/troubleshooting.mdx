@@ -119,8 +119,6 @@ Under **Test connection**, for a reader without update access to the document. A
 
 Nothing has read or checked this document yet, or a save changed how it connects. Press **Test connection**.
 
-If it still reads **Not checked** and a **Connection failed** message appears, the database is missing the status table: see [Connection panel stays "Not checked" on Postgres or SQLite](#connection-panel-stays-not-checked-on-postgres-or-sqlite).
-
 ### "Not connected" with "Check the key, the IDs and the host."
 
 The plugin could not read with these settings. For a PostHog document the advice reads "Check the key, the IDs, the Region and the host.", for a GA4 document "Check the Property ID and the key, and that the client email is a Viewer of the property." Under it, the panel shows what the vendor answered, after the vendor's name, when the vendor answered in words. The sections below cover the answers seen most.
@@ -208,23 +206,6 @@ The vendor did not answer within 10 seconds, or answered with an outage (a timeo
 1. Wait, then press **Test connection** again.
 2. For a self-hosted vendor, check that the instance runs and that the app's server can reach it.
 3. If it stays, the developer reads the server log. On a development machine, a line naming `198.18.0.0/15` means a local proxy's fake-IP mode ([Server log and boot](#server-log-and-boot)).
-
-### Connection panel stays "Not checked" on Postgres or SQLite
-
-A tenant admin sees **Not checked** however often they press **Test connection**, and each press shows **Connection failed**. `GET` and `POST` on `/api/_x/provider-status` answer `500`, and the server logs:
-
-```
-analytics: the status of provider document "<id>" could not be answered: ...
-```
-
-Reads also log `analytics: the connection status of provider document "<id>" could not be saved, reads go on without it: ...`, and under a `fallback` policy `analytics: provider connection statuses could not be read, so no source counts as failing: ...`.
-
-The database lacks the `analytics-provider-status` table, which 1.0.0-beta.16 added. Reads, saves and deletes of provider documents go on without it.
-
-1. Generate a migration: `pnpm payload migrate:create`.
-2. Review it and run it: `pnpm payload migrate`.
-
-See [From 1.0.0-beta.15](/analytics/upgrading/beta-16#the-migration).
 
 ## Analytics view
 

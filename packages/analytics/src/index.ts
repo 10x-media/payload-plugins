@@ -614,7 +614,6 @@ export { type ProviderHostPolicy, resolveHostPolicy } from './providers/hosts'
 export { PROVIDER_IDS, type ProviderId } from './providers/ids'
 export { type RefreshProvidersOptions, refreshProviders } from './providers/refresh'
 export { CONNECTION_PATHS, SECRET_PATHS } from './providers/secrets'
-export { PROVIDER_STATUS_SLUG } from './providers/status'
 export type { QueryError, QueryErrorCode } from './query/errors'
 export type {
 	ItemLabels,

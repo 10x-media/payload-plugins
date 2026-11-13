@@ -312,8 +312,7 @@ export const createRuntimeFactory = (
 						})
 					: undefined
 			const epoch = createEpochStore(payload)
-			const providerStatus =
-				plan.kind === 'collection' ? providerStatusStore(payload, providers.status.slug) : undefined
+			const providerStatus = plan.kind === 'collection' ? providerStatusStore(payload) : undefined
 			const now = currentTime
 			const warn = (message: string) => payload.logger?.warn(message)
 			const providerStatusWarning = throttled(warn, { now: monotonicMs, intervalMs: WARN_EVERY_MS })

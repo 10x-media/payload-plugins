@@ -7,7 +7,7 @@ import { analytics } from '../../src/index'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { PROVIDERS_SLUG } from '../../src/providers/collection'
 import type { ProviderStatusResponse } from '../../src/providers/connectionState'
-import { PROVIDER_STATUS_SLUG } from '../../src/providers/status'
+import { providerStatusKey } from '../../src/providers/status'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { settleAnalytics } from '../../src/testing/settle'
 import { callEndpoint, handlerAt } from './endpointHelpers'
@@ -141,17 +141,15 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		return handlerAt(booted.payload, routes.providerStatus)(req)
 	}
 
-	const rowsOf = async (id: unknown) =>
-		(
-			await booted.payload.db.find<{ id: unknown; errorKind?: string; pausedUntil?: unknown }>({
-				collection: PROVIDER_STATUS_SLUG,
-				where: { id: { equals: String(id) } },
-				limit: 0,
-				pagination: false,
-			})
-		).docs
+	/** The document's status row in `payload.kv`, as a list of at most one. */
+	const rowsOf = async (id: unknown) => {
+		const row = await booted.payload.kv.get<{ errorKind?: string; pausedUntil?: unknown }>(
+			providerStatusKey(String(id))
+		)
+		return row ? [row] : []
+	}
 
-	it(`checks a new document's connection and keys its row by the document's own id on ${db}`, async () => {
+	it(`checks a new document's connection and keys its status by the document's own id on ${db}`, async () => {
 		const doc = await createProvider('alpha', 'works.example')
 		const res = await status('POST', 'alpha', doc.id)
 		expect(res.status).toBe(200)
@@ -160,10 +158,8 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		expect(body.status.lastSuccessAt).toEqual(expect.any(String))
 		expect(vendor.asked).toContain('works.example')
 
-		const rows = await rowsOf(doc.id)
-		expect(rows).toHaveLength(1)
-		expect(String(rows[0]?.id)).toBe(String(doc.id))
-		// A Postgres document is numbered, a Mongo one an ObjectId: the row's text id is either.
+		expect(await rowsOf(doc.id)).toHaveLength(1)
+		// A Postgres document is numbered, a Mongo one an ObjectId: the key holds either.
 		expect(String(doc.id)).toMatch(db === 'mongo' ? /^[0-9a-f]{24}$/ : /^\d+$/)
 
 		const read = await status('GET', 'alpha-viewer', doc.id)
