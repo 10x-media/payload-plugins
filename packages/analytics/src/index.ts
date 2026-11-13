@@ -51,6 +51,7 @@ import { changedScopes, type ScopeChange } from './plugin/scopeChange'
 import { makeSourcesHandler } from './plugin/sourcesEndpoint'
 import { fillUnbundledLanguages, unbundledLanguages } from './plugin/unbundledLanguages'
 import { warmTask } from './plugin/warmTask'
+import type { ProviderStatusStore } from './providers/status'
 import { syncTask } from './sync/syncTask'
 import { createStrictTimezoneResolver, createTimezoneResolver } from './timeframe/reportingTimezone'
 import { keys } from './translations/keys'
@@ -74,27 +75,47 @@ const configChanged =
 		getRuntime(req.payload)?.configChanged?.(collection, changedScopes(change))
 	}
 
-const forgetProviderStatus = async (docId: string, req: PayloadRequest): Promise<void> => {
+/**
+ * Runs a status write of a saved or deleted provider document once the save's own transaction is
+ * over: a write outside it would wait on the locks it holds. The save goes on whatever happens
+ * here; the next read or check writes the row again.
+ */
+const afterProviderSave = async (
+	req: PayloadRequest,
+	{
+		docId,
+		failed,
+		write,
+	}: { docId: string; failed: string; write: (store: ProviderStatusStore) => Promise<void> }
+): Promise<void> => {
 	const runtime = getRuntime(req.payload)
 	const store = runtime?.providerStatus
 	if (!runtime || !store) {
 		return
 	}
-	// The save goes on whatever happens here: the next read or check writes the row again.
-	const forget = () =>
-		store.forget(docId).catch((err: unknown) => {
+	const run = () =>
+		write(store).catch((err: unknown) => {
 			runtime.providerStatusWarning?.(
-				`analytics: the connection status of provider document "${docId}" could not be cleared: ${String(err)}`
+				`analytics: the connection status of provider document "${docId}" could not be ${failed}: ${String(err)}`
 			)
 		})
 	const open = await openTransactionOf(req.payload, req)
 	if (!open) {
-		await forget()
+		await run()
 		return
 	}
-	// After the save's own transaction: a write outside it would wait on the locks it holds.
-	runtime.engine.keep?.(afterTransaction(open, forget))
+	runtime.engine.keep?.(afterTransaction(open, run))
 }
+
+const forgetProviderStatus = (docId: string, req: PayloadRequest): Promise<void> =>
+	afterProviderSave(req, { docId, failed: 'cleared', write: (store) => store.forget(docId) })
+
+const carryProviderStatus = (
+	docId: string,
+	{ from, to }: { from: string; to: string },
+	req: PayloadRequest
+): Promise<void> =>
+	afterProviderSave(req, { docId, failed: 'kept', write: (store) => store.carry(docId, from, to) })
 
 const addEndpoints = (config: Config, ...endpoints: Endpoint[]): void => {
 	config.endpoints = [...(config.endpoints ?? []), ...endpoints]
@@ -126,7 +147,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		}
 		const collections = await configCollections(
 			resolved,
-			{ resolveAdminScope, onChange: configChanged, forgetProviderStatus },
+			{ resolveAdminScope, onChange: configChanged, forgetProviderStatus, carryProviderStatus },
 			context
 		)
 		const sync = syncCollectionOf(resolved, resolveAdminScope, context)

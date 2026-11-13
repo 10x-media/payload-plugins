@@ -234,7 +234,15 @@ const failingOwnDocs = async (
 	}
 	let statuses: Map<string, ProviderStatus>
 	try {
-		statuses = await store.readMany(own.map((granted) => granted.docId))
+		// A config adapter lent to a document (native) writes no status: any row it has is stale.
+		const checked = own.filter((granted) => !runtime.configAdapterIds.has(granted.adapter.id))
+		const versions = new Map(
+			checked.map((granted) => [granted.docId, runtime.providerVersionOf?.(granted.adapter)])
+		)
+		statuses = await store.readMany(
+			checked.map((granted) => granted.docId),
+			(docId) => versions.get(docId)
+		)
 	} catch (err) {
 		runtime.providerStatusWarning?.(
 			`analytics: provider connection statuses could not be read, so no source counts as failing: ${String(err)}`

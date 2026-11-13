@@ -100,6 +100,11 @@ interface ProviderRegistry {
 	 * button: null when there is no such document or it builds none. Only on the providers collection.
 	 */
 	documentAdapter?(id: string): Promise<AnalyticsAdapter | null>
+	/**
+	 * The saved version (`updatedAt`) of the document an adapter of this registry was built from,
+	 * which the connection results it gives are stamped with.
+	 */
+	versionOf?(adapter: AnalyticsAdapter): string | undefined
 	close(): Promise<void>
 }
 
@@ -281,6 +286,14 @@ const collectionRegistry = (
 		return (custom ?? payload.db.defaultIDType) === 'number' && /^\d+$/.test(id) ? Number(id) : id
 	}
 
+	const versions = new WeakMap<AnalyticsAdapter, string>()
+	const stamped = (adapter: AnalyticsAdapter | null, version: string): AnalyticsAdapter | null => {
+		if (adapter) {
+			versions.set(adapter, version)
+		}
+		return adapter
+	}
+
 	const fromDocument = (doc: Record<string, unknown>): AnalyticsAdapter | null =>
 		// A row of the providers collection, whose fields `ProviderDoc` mirrors.
 		adapterFromProviderDoc(doc as ProviderDoc, {
@@ -365,9 +378,12 @@ const collectionRegistry = (
 			const doc: PooledDocument = { id: String(raw.id), version: versionOf(raw.updatedAt), scope }
 			const outcome = await adapterOf(raw, decryptFieldValue)
 			if (outcome.ok) {
-				built.set(doc.id, pool.put(doc, outcome.adapter, raw.provider !== 'native'))
+				built.set(
+					doc.id,
+					stamped(pool.put(doc, outcome.adapter, raw.provider !== 'native'), doc.version)
+				)
 			} else {
-				built.set(doc.id, outcome.standIn)
+				built.set(doc.id, stamped(outcome.standIn, doc.version))
 				failed = true
 			}
 		}
@@ -392,8 +408,16 @@ const collectionRegistry = (
 		}
 		pool.retain(scope, new Set(docs.map((doc) => doc.id)))
 		const combined = combineRegistries(options.base, extras)
+		const narrowed = options.narrow(combined.registry)
+		// Reads reach the narrowed copy (an install without `revenue`), so it carries the version too.
+		for (const adapter of narrowed.all()) {
+			const version = versions.get(combined.registry.get(adapter.id))
+			if (version !== undefined) {
+				versions.set(adapter, version)
+			}
+		}
 		return {
-			registry: { ...combined, registry: options.narrow(combined.registry) },
+			registry: { ...combined, registry: narrowed },
 			failed: read?.failed === true,
 		}
 	}
@@ -494,12 +518,14 @@ const collectionRegistry = (
 			}
 			// As in adapterOf: a corrupt or key-rotated ciphertext stands in as a failing source, so
 			// Test connection says to check the keys rather than answering a server error.
+			const version = versionOf(raw.updatedAt)
 			try {
-				return fromDocument(await decrypted(raw, decryptFieldValue))
+				return stamped(fromDocument(await decrypted(raw, decryptFieldValue)), version)
 			} catch (err) {
-				return standInFor(raw, err, fromDocument)
+				return stamped(standInFor(raw, err, fromDocument), version)
 			}
 		},
+		versionOf: (adapter) => versions.get(adapter),
 		close: () => pool.close(),
 	}
 }

@@ -66,11 +66,16 @@ export const makeProviderStatusHandler = (
 			if (!isRecord(readable)) {
 				return notFound()
 			}
-			// Per saved version, so a check right after a save asks about the new settings.
-			const version = `${id}@${versionOf(readable.updatedAt)}`
-			if (req.method !== 'POST' || !debounce.allows(version)) {
-				const answer: ProviderStatusResponse = { status: (await store.read(id)) ?? {} }
+			// Per saved version, so a check right after a save asks about the new settings, and a result
+			// about the settings before it reads as none.
+			const saved = versionOf(readable.updatedAt)
+			const version = `${id}@${saved}`
+			const stored = async (): Promise<Response> => {
+				const answer: ProviderStatusResponse = { status: (await store.read(id, saved)) ?? {} }
 				return Response.json(answer, { headers: NO_STORE })
+			}
+			if (req.method !== 'POST' || !debounce.allows(version)) {
+				return stored()
 			}
 			const collection = req.payload.collections[slug]
 			const permissions = collection ? await docAccessOperation({ collection, id, req }) : undefined
@@ -80,6 +85,11 @@ export const makeProviderStatusHandler = (
 					analyticsError('forbidden', 'analytics: checking a connection needs update access')
 				)
 			}
+			// No await between this check and `record`, so concurrent checks ask the vendor once.
+			if (!debounce.allows(version)) {
+				return stored()
+			}
+			debounce.record(version)
 			const adapter = await runtime.providerAdapter?.(id)
 			if (!adapter?.checkConnection) {
 				return errorResponse(
@@ -91,14 +101,23 @@ export const makeProviderStatusHandler = (
 					)
 				)
 			}
-			debounce.record(version)
 			const checked = await checkConnectionOf(req.payload, adapter)
+			// A status that could not be saved or read is logged; the check's result is still answered.
+			const logged =
+				(failed: string) =>
+				(err: unknown): undefined => {
+					runtime.providerStatusWarning?.(
+						`analytics: the connection status of provider document "${id}" could not be ${failed}: ${String(err)}`
+					)
+					return undefined
+				}
 			try {
-				await store.record(id, checked)
+				await store.record(id, checked, { version: saved }).catch(logged('saved'))
 			} finally {
 				await adapter.close?.(req.payload)
 			}
-			const answer: ProviderStatusResponse = { status: (await store.read(id)) ?? {}, checked }
+			const status = await store.read(id, saved).catch(logged('read'))
+			const answer: ProviderStatusResponse = { status: status ?? {}, checked }
 			return Response.json(answer, { headers: NO_STORE })
 		} catch (err) {
 			req.payload.logger?.error(

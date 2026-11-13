@@ -203,6 +203,23 @@ describe('ProviderConnection', () => {
 		expect(screen.getByText(keys.providerConnectionConnected)).toBeDefined()
 	})
 
+	it('toasts a check the debounce answered from the one before it', async () => {
+		answers(
+			{ status: {} },
+			{ status: { lastSuccessAt: '2026-11-09T10:00:00.000Z' } },
+			{ status: { lastErrorAt: '2026-11-09T10:00:00.000Z', errorKind: 'source_misconfigured' } }
+		)
+		await renderPanel()
+		await act(async () => {
+			fireEvent.click(testButton())
+		})
+		expect(toasts.success).toHaveBeenCalledWith(keys.providerConnectionChecked)
+		await act(async () => {
+			fireEvent.click(testButton())
+		})
+		expect(toasts.error).toHaveBeenCalledWith(keys.providerConnectionFailed)
+	})
+
 	it('asks for a save first on a new document, and reads nothing', async () => {
 		doc.id = undefined
 		await renderPanel()

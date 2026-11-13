@@ -318,6 +318,24 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 				}
 			})
 
+			it(`counts no refusal written about the document before its last save as failing, on ${db}`, async () => {
+				const id = await createOwn('alpha-stale.test')
+				try {
+					await statusStore().record(
+						id,
+						{ ok: false, kind: 'source_misconfigured' },
+						{
+							version: '2000-01-01T00:00:00.000Z',
+						}
+					)
+					const listed = await listing()
+					expect(listed.sources.map((source) => source.id)).toEqual([`plausible:${id}`])
+					expect(listed.notice).toBeUndefined()
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
 			it(`stands in for no one while one of the tenant's own sources still works, on ${db}`, async () => {
 				const broken = await createOwn('alpha-broken.test')
 				const working = await createOwn('alpha-working.test')
