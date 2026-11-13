@@ -3,7 +3,13 @@ import { currentDate } from '../core/clock'
 import { isRecord } from '../core/values'
 import { type ReadFailureKind, vendorAnswerOf } from '../surfacing/classifyError'
 import type { LaneHealth, LaneOutcome } from '../surfacing/lanes'
-import type { ConnectionOutcome, ProviderStatus } from './connectionState'
+import { type ConnectionOutcome, connectionStateOf, type ProviderStatus } from './connectionState'
+
+/**
+ * How long the rows a scope's reads look up (`readMany`) are answered from this instance's memory;
+ * its own writes and forgets clear them at once, another instance's show this much later.
+ */
+export const STATUS_MEMO_MS = 5_000
 
 /** How long a read's success goes unwritten after the last one was, unless a failure came between. */
 export const STATUS_SUCCESS_EVERY_MS = 15 * 60_000
@@ -73,16 +79,33 @@ export interface ProviderStatusStore {
 	/**
 	 * Writes what a read or a check told. `throttle` skips a success written less than
 	 * {@link STATUS_SUCCESS_EVERY_MS} ago with no failure since, so reads cost no write each.
+	 * `version` is the saved version of the document the outcome is about.
 	 */
-	record(docId: string, outcome: ConnectionOutcome, options?: { throttle?: boolean }): Promise<void>
-	read(docId: string): Promise<ProviderStatus | undefined>
-	/** The rows of `docIds` that exist, keyed by document id, in one read. */
-	readMany(docIds: readonly string[]): Promise<Map<string, ProviderStatus>>
+	record(
+		docId: string,
+		outcome: ConnectionOutcome,
+		options?: { throttle?: boolean; version?: string }
+	): Promise<void>
+	/**
+	 * The document's row; none when it is about another saved version than `version`, which a read
+	 * of the settings before a save can write after the save.
+	 */
+	read(docId: string, version?: string): Promise<ProviderStatus | undefined>
+	/** The rows of `docIds` that exist and are about the version `versionOf` names, keyed by id. */
+	readMany(
+		docIds: readonly string[],
+		versionOf?: (docId: string) => string | undefined
+	): Promise<Map<string, ProviderStatus>>
 	/**
 	 * Deletes a document's row, outside any transaction, after its writes already queued: on its
 	 * delete, and on a save that changes how it connects, whose last result was about the old setup.
 	 */
 	forget(docId: string): Promise<void>
+	/**
+	 * Moves a row about the saved version `from` to `to`, after its writes already queued: a save
+	 * that leaves how the document connects as it was keeps its last result.
+	 */
+	carry(docId: string, from: string, to: string): Promise<void>
 	/** Waits for every write already queued, for a runtime that closes or a test that settles. */
 	idle(): Promise<void>
 }
@@ -99,10 +122,30 @@ export const providerStatusStore = (
 	const now = options.now ?? currentDate
 	const successWrittenAt = new Map<string, number>()
 	const queues = new Map<string, Promise<void>>()
+	const memo = new Map<string, { row: Record<string, unknown> | undefined; until: number }>()
 
 	const rowOf = async (id: string): Promise<Record<string, unknown> | undefined> => {
 		const row: unknown = await payload.kv.get(providerStatusKey(id))
 		return isRecord(row) ? row : undefined
+	}
+
+	/**
+	 * A row this instance reads, which another instance may have written: none when it is about
+	 * another saved version, and one that no longer says the source works lets this instance's next
+	 * success through its throttle.
+	 */
+	const seen = (
+		id: string,
+		row: Record<string, unknown> | undefined,
+		version: string | undefined
+	): ProviderStatus | undefined => {
+		const about = typeof row?.version === 'string' ? row.version : undefined
+		const current = version === undefined || about === undefined || about === version
+		const status = row && current ? statusOf(row) : undefined
+		if (!status || connectionStateOf(status) !== 'works') {
+			successWrittenAt.delete(id)
+		}
+		return status
 	}
 
 	/** Merges `data` over the stored row, so a success keeps the last failure beside it. */
@@ -137,7 +180,7 @@ export const providerStatusStore = (
 				}
 
 	return {
-		record(docId, outcome, { throttle = false } = {}) {
+		record(docId, outcome, { throttle = false, version } = {}) {
 			const at = now()
 			if (outcome.ok) {
 				const written = successWrittenAt.get(docId)
@@ -148,20 +191,29 @@ export const providerStatusStore = (
 			} else {
 				successWrittenAt.delete(docId)
 			}
-			const data = dataOf(outcome, at)
-			return enqueue(docId, () => put(docId, data)).catch((err: unknown) => {
+			const data = { ...dataOf(outcome, at), version: version ?? null }
+			return enqueue(docId, async () => {
+				await put(docId, data)
+				memo.delete(docId)
+			}).catch((err: unknown) => {
 				// Unwritten, so the next success is written whatever the throttle says.
 				successWrittenAt.delete(docId)
 				throw err
 			})
 		},
 
-		async readMany(docIds) {
+		async readMany(docIds, versionOf) {
 			// One read per document: `payload.kv` has no batch read, and a scope holds a few.
 			const entries = await Promise.all(
 				docIds.map(async (id): Promise<[string, ProviderStatus] | undefined> => {
-					const row = await rowOf(id)
-					return row ? [id, statusOf(row)] : undefined
+					const at = now().getTime()
+					const held = memo.get(id)
+					const row = held && held.until > at ? held.row : await rowOf(id)
+					if (!held || held.until <= at) {
+						memo.set(id, { row, until: at + STATUS_MEMO_MS })
+					}
+					const status = seen(id, row, versionOf?.(id))
+					return status ? [id, status] : undefined
 				})
 			)
 			return new Map(entries.filter((entry) => entry !== undefined))
@@ -169,16 +221,28 @@ export const providerStatusStore = (
 
 		forget(docId) {
 			successWrittenAt.delete(docId)
-			return enqueue(docId, () => payload.kv.delete(providerStatusKey(docId)))
+			return enqueue(docId, async () => {
+				await payload.kv.delete(providerStatusKey(docId))
+				memo.delete(docId)
+			})
+		},
+
+		carry(docId, from, to) {
+			return enqueue(docId, async () => {
+				const row = await rowOf(docId)
+				if (row?.version === from) {
+					await payload.kv.set(providerStatusKey(docId), { ...row, version: to })
+					memo.delete(docId)
+				}
+			})
 		},
 
 		async idle() {
 			await Promise.all(queues.values())
 		},
 
-		async read(docId) {
-			const row = await rowOf(docId)
-			return row ? statusOf(row) : undefined
+		async read(docId, version) {
+			return seen(docId, await rowOf(docId), version)
 		},
 	}
 }

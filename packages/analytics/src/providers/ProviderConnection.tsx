@@ -90,9 +90,12 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 		try {
 			const answer = await requestShaped(url, isProviderStatusResponse, { method: 'POST' })
 			setStatus(answer.status)
-			if (answer.checked?.ok === true) {
+			// A check sent seconds after another is answered from that one, without `checked`.
+			const state = connectionStateOf(answer.status)
+			const works = answer.checked ? answer.checked.ok : state === 'works'
+			if (works) {
 				toast.success(t(keys.providerConnectionChecked))
-			} else if (answer.checked?.ok === false) {
+			} else if (answer.checked || state !== 'unchecked') {
 				toast.error(t(keys.providerConnectionFailed))
 			}
 		} catch {

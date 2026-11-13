@@ -6,6 +6,7 @@ import {
 	connectionOutcomeOf,
 	providerStatusKey,
 	providerStatusStore,
+	STATUS_MEMO_MS,
 	STATUS_SUCCESS_EVERY_MS,
 } from './status'
 
@@ -16,9 +17,13 @@ const fakePayload = (options: { failWrites?: number } = {}) => {
 	const rows = new Map<string, Row>()
 	let failures = options.failWrites ?? 0
 	const writes: Row[] = []
+	const gets: string[] = []
 	const payload = {
 		kv: {
-			get: async (key: string) => rows.get(key) ?? null,
+			get: async (key: string) => {
+				gets.push(key)
+				return rows.get(key) ?? null
+			},
 			set: async (key: string, data: Row) => {
 				if (failures > 0) {
 					failures--
@@ -32,7 +37,7 @@ const fakePayload = (options: { failWrites?: number } = {}) => {
 			},
 		},
 	} as unknown as Payload
-	return { payload, rows, writes }
+	return { payload, rows, writes, gets }
 }
 
 const clock = (start = Date.parse('2026-11-09T10:00:00.000Z')) => {
@@ -181,6 +186,62 @@ describe('providerStatusStore', () => {
 		expect(rows.get(providerStatusKey('5'))).toMatchObject({
 			lastSuccessAt: '2026-11-09T10:00:00.000Z',
 			lastErrorAt: '2026-11-09T10:00:01.000Z',
+		})
+	})
+
+	// Two instances share the rows but each keeps its own throttle.
+	it('writes a throttled success once it reads that another instance recorded a failure', async () => {
+		const { payload } = fakePayload()
+		const time = clock()
+		const a = providerStatusStore(payload, time)
+		const b = providerStatusStore(payload, time)
+		await b.record('5', { ok: true }, { throttle: true })
+		time.advance(60_000)
+		await a.record('5', { ok: false, kind: 'source_misconfigured' })
+		await b.readMany(['5'])
+		time.advance(60_000)
+		await b.record('5', { ok: true }, { throttle: true })
+		expect(await b.read('5')).toMatchObject({ lastSuccessAt: '2026-11-09T10:02:00.000Z' })
+	})
+
+	it('writes a throttled success once it reads that another instance forgot the row', async () => {
+		const { payload } = fakePayload()
+		const time = clock()
+		const a = providerStatusStore(payload, time)
+		const b = providerStatusStore(payload, time)
+		await b.record('5', { ok: true }, { throttle: true })
+		await a.forget('5')
+		await b.read('5')
+		time.advance(60_000)
+		await b.record('5', { ok: true }, { throttle: true })
+		expect(await b.read('5')).toEqual({ lastSuccessAt: '2026-11-09T10:01:00.000Z' })
+	})
+
+	it('answers the reads every request makes from memory for a few seconds', async () => {
+		const { payload, gets } = fakePayload()
+		const time = clock()
+		const store = providerStatusStore(payload, time)
+		await store.readMany(['5'])
+		await store.readMany(['5'])
+		expect(gets).toHaveLength(1)
+		time.advance(STATUS_MEMO_MS)
+		await store.readMany(['5'])
+		expect(gets).toHaveLength(2)
+		await store.record('5', { ok: false, kind: 'unavailable' })
+		expect((await store.readMany(['5'])).get('5')).toMatchObject({ errorKind: 'unavailable' })
+		await store.read('5')
+		expect(gets).toHaveLength(5)
+	})
+
+	it('answers a row about another saved version of the document as none', async () => {
+		const { payload } = fakePayload()
+		const store = providerStatusStore(payload, clock())
+		await store.record('5', { ok: false, kind: 'source_misconfigured' }, { version: 'v1' })
+		expect(await store.read('5', 'v2')).toBeUndefined()
+		expect((await store.readMany(['5'], () => 'v2')).has('5')).toBe(false)
+		expect(await store.read('5', 'v1')).toMatchObject({ errorKind: 'source_misconfigured' })
+		expect((await store.readMany(['5'], () => 'v1')).get('5')).toMatchObject({
+			errorKind: 'source_misconfigured',
 		})
 	})
 

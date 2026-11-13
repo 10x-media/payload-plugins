@@ -2,11 +2,12 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import { createLocalReq, type TypedUser } from 'payload'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { analytics } from '../../src/index'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { PROVIDERS_SLUG } from '../../src/providers/collection'
 import type { ProviderStatusResponse } from '../../src/providers/connectionState'
+import { versionOf } from '../../src/providers/probe'
 import { providerStatusKey } from '../../src/providers/status'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
 import { settleAnalytics } from '../../src/testing/settle'
@@ -143,9 +144,11 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 
 	/** The document's status row in `payload.kv`, as a list of at most one. */
 	const rowsOf = async (id: unknown) => {
-		const row = await booted.payload.kv.get<{ errorKind?: string; pausedUntil?: unknown }>(
-			providerStatusKey(String(id))
-		)
+		const row = await booted.payload.kv.get<{
+			errorKind?: string
+			pausedUntil?: unknown
+			version?: unknown
+		}>(providerStatusKey(String(id)))
 		return row ? [row] : []
 	}
 
@@ -165,6 +168,18 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		const read = await status('GET', 'alpha-viewer', doc.id)
 		expect(read.status).toBe(200)
 		expect(((await read.json()) as ProviderStatusResponse).status).toEqual(body.status)
+	})
+
+	it(`answers a check the vendor accepted even when its status could not be saved on ${db}`, async () => {
+		const doc = await createProvider('alpha', 'works-unsaved.example')
+		const set = vi.spyOn(booted.payload.kv, 'set').mockRejectedValueOnce(new Error('kv is down'))
+		try {
+			const res = await status('POST', 'alpha', doc.id)
+			expect(res.status).toBe(200)
+			expect(((await res.json()) as ProviderStatusResponse).checked).toEqual({ ok: true })
+		} finally {
+			set.mockRestore()
+		}
 	})
 
 	it(`answers a refused key with the vendor's own words, and keeps them on ${db}`, async () => {
@@ -244,8 +259,40 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		await expect
 			.poll(async () => (await rowsOf(doc.id))[0]?.errorKind, { timeout: 5000 })
 			.toBe('source_misconfigured')
+		// Stamped with the saved version the read was about.
+		expect((await rowsOf(doc.id))[0]?.version).toBe(versionOf(doc.updatedAt))
 		const body = (await (await status('GET', 'alpha', doc.id)).json()) as ProviderStatusResponse
 		expect(Date.parse(body.status.pausedUntil ?? '')).toBeGreaterThan(Date.now())
+	})
+
+	it(`stamps a read's status with the saved version when the install measures no revenue on ${db}`, async () => {
+		// A currency gives the adapter `revenue`, which an install without `revenue` reads through a copy.
+		const doc = await booted.payload.create({
+			collection: PROVIDERS_SLUG,
+			data: {
+				name: 'denied-revenue Plausible',
+				provider: 'plausible',
+				enabled: true,
+				scope: 'alpha',
+				plausible: {
+					siteId: 'denied-revenue.example',
+					apiKey: 'plausible-key',
+					host: vendor.origin,
+					revenueCurrency: 'EUR',
+				},
+			},
+			user: userOf('alpha'),
+			overrideAccess: true,
+		})
+		await callEndpoint(booted.payload, {
+			path: routes.query,
+			query: `source=plausible:${doc.id}&metrics=pageviews&from=2026-10-01&to=2026-10-09`,
+			user: userOf('alpha'),
+		})
+		await expect
+			.poll(async () => (await rowsOf(doc.id))[0]?.errorKind, { timeout: 5000 })
+			.toBe('source_misconfigured')
+		expect((await rowsOf(doc.id))[0]?.version).toBe(versionOf(doc.updatedAt))
 	})
 
 	it(`shows another tenant nothing and checks nothing for it on ${db}`, async () => {
@@ -284,6 +331,55 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		expect(again.checked).toBeUndefined()
 		expect(again.status.lastSuccessAt).toEqual(expect.any(String))
 		expect(vendor.asked.filter((site) => site === 'twice.example')).toHaveLength(1)
+	})
+
+	it(`ignores a refusal a read of the settings before a save wrote after it on ${db}`, async () => {
+		const doc = await createProvider('alpha', 'denied-late.example')
+		const refused = (await (await status('POST', 'alpha', doc.id)).json()) as ProviderStatusResponse
+		expect(refused.status.errorKind).toBe('source_misconfigured')
+		const key = providerStatusKey(String(doc.id))
+		const stale = await booted.payload.kv.get<Record<string, unknown>>(key)
+		await booted.payload.update({
+			collection: PROVIDERS_SLUG,
+			id: doc.id,
+			data: { plausible: { siteId: 'works-late.example', apiKey: 'plausible-key' } },
+			user: userOf('alpha'),
+			overrideAccess: true,
+		})
+		await settleAnalytics(booted.payload)
+		// A read that started with the old key lands after the save cleared the row.
+		await booted.payload.kv.set(key, { ...stale })
+		const read = (await (await status('GET', 'alpha', doc.id)).json()) as ProviderStatusResponse
+		expect(read.status).toEqual({})
+	})
+
+	it(`keeps the status through a save that leaves how the document connects as it was on ${db}`, async () => {
+		const doc = await createProvider('alpha', 'denied-renamed.example')
+		const refused = (await (await status('POST', 'alpha', doc.id)).json()) as ProviderStatusResponse
+		expect(refused.status.errorKind).toBe('source_misconfigured')
+		const renamed = await booted.payload.update({
+			collection: PROVIDERS_SLUG,
+			id: doc.id,
+			data: { name: 'Renamed Plausible' },
+			user: userOf('alpha'),
+			overrideAccess: true,
+		})
+		await settleAnalytics(booted.payload)
+		const read = (await (await status('GET', 'alpha', doc.id)).json()) as ProviderStatusResponse
+		expect(read.status).toEqual(refused.status)
+		expect((await rowsOf(doc.id))[0]?.version).toBe(versionOf(renamed.updatedAt))
+	})
+
+	it(`asks the vendor once for two checks sent at the same time on ${db}`, async () => {
+		const doc = await createProvider('alpha', 'together.example')
+		const answers = await Promise.all([
+			status('POST', 'alpha', doc.id),
+			status('POST', 'alpha', doc.id),
+		])
+		const bodies = (await Promise.all(answers.map((res) => res.json()))) as ProviderStatusResponse[]
+		expect(answers.map((res) => res.status)).toEqual([200, 200])
+		expect(bodies.filter((body) => body.checked !== undefined)).toHaveLength(1)
+		expect(vendor.asked.filter((site) => site === 'together.example')).toHaveLength(1)
 	})
 
 	it(`checks again at once after a save, whatever the debounce says, on ${db}`, async () => {

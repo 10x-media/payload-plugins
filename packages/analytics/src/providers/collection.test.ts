@@ -159,7 +159,7 @@ describe('buildProvidersCollection', () => {
 			...unscopedArgs,
 			isSealed: (value) => value === sealed,
 		})
-		// The scope stamp, the status reset (a no-op here: no status collection), then the retarget.
+		// The scope stamp, the note of a connection change, then the retarget.
 		const [stamp, , retarget] = withSeal.hooks?.beforeChange ?? []
 		expect(withSeal.hooks?.beforeChange).toHaveLength(3)
 		const data = {

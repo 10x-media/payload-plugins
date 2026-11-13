@@ -2,7 +2,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import { itemCollectionsOf } from '../binding/report'
 import { resolveTrackerConfig } from '../capture/trackerConfig'
 import { currentDate, currentTime } from '../core/clock'
-import type { AnalyticsResult } from '../core/contract'
+import type { AnalyticsAdapter, AnalyticsResult } from '../core/contract'
 import { TASK_SLUGS } from '../core/jobs'
 import { monotonicMs } from '../core/monotonic'
 import {
@@ -130,10 +130,13 @@ const lanesFor = (
 		plan,
 		status,
 		statusWarning,
+		versionOf,
 	}: {
 		plan: ProviderPlan
 		status: ProviderStatusStore | undefined
 		statusWarning: (message: string) => void
+		/** The saved version of the provider document a pooled adapter was built from. */
+		versionOf: ((adapter: AnalyticsAdapter) => string | undefined) | undefined
 	}
 ) => {
 	const { concurrency } = resolved.cache
@@ -161,7 +164,9 @@ const lanesFor = (
 						if (docId === undefined || told === undefined) {
 							return
 						}
-						status.record(docId, told, { throttle: true }).catch((err: unknown) => {
+						const version = versionOf?.(adapter)
+						const options = version === undefined ? { throttle: true } : { throttle: true, version }
+						status.record(docId, told, options).catch((err: unknown) => {
 							statusWarning(
 								`analytics: the connection status of provider document "${docId}" could not be saved, reads go on without it: ${String(err)}`
 							)
@@ -340,6 +345,7 @@ export const createRuntimeFactory = (
 							payload,
 							store: providerStatus,
 							adapterFor: registry.documentAdapter,
+							...(registry.versionOf ? { versionOf: registry.versionOf } : {}),
 							now: monotonicMs,
 							cooldownMs: BREAKER_MAX_MS,
 							warn,
@@ -402,6 +408,7 @@ export const createRuntimeFactory = (
 					plan,
 					status: providerStatus,
 					statusWarning: providerStatusWarning,
+					versionOf: registry.versionOf,
 				}),
 				coldReadsPerScope: resolved.cache.concurrency.perScope,
 				ttl: resolved.cache.ttl,
@@ -443,6 +450,7 @@ export const createRuntimeFactory = (
 				...(providerConnections ? { providerFetch: providerConnections.fetch } : {}),
 				...(providerStatus ? { providerStatus, providerStatusWarning } : {}),
 				...(registry.documentAdapter ? { providerAdapter: registry.documentAdapter } : {}),
+				...(registry.versionOf ? { providerVersionOf: registry.versionOf } : {}),
 				...(providerRecheck ? { providerRecheck } : {}),
 				// Refreshes and sweeps still running write to the database, which closes after this.
 				close: async () => {

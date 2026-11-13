@@ -47,6 +47,8 @@ export interface ConnectionRecheck {
 	request(docId: string): void
 	/** Waits for the checks still running, for a runtime that closes or a test that settles. */
 	idle(): Promise<void>
+	/** Documents currently held, which is one cooldown's distinct documents at most. */
+	readonly size: number
 }
 
 /**
@@ -58,6 +60,8 @@ export const createConnectionRecheck = (args: {
 	payload: Payload
 	store: ProviderStatusStore
 	adapterFor: (docId: string) => Promise<AnalyticsAdapter | null>
+	/** The saved version of the document an adapter was built from, stamped on what it found. */
+	versionOf?: (adapter: AnalyticsAdapter) => string | undefined
 	now: () => number
 	cooldownMs: number
 	warn: (message: string) => void
@@ -71,17 +75,26 @@ export const createConnectionRecheck = (args: {
 			if (last !== undefined && at - last < args.cooldownMs) {
 				return
 			}
+			for (const [seen, when] of startedAt) {
+				if (at - when >= args.cooldownMs) {
+					startedAt.delete(seen)
+				}
+			}
 			startedAt.set(docId, at)
 			const check = async () => {
 				const adapter = await args.adapterFor(docId)
-				if (!adapter) {
+				// Nothing to check, and nothing to close: a native document's adapter is the
+				// instance's engine, lent rather than built for the check.
+				if (!adapter?.checkConnection) {
 					return
 				}
 				try {
-					// Nothing to check: writing what checkConnectionOf answers would call it working.
-					if (adapter.checkConnection) {
-						await args.store.record(docId, await checkConnectionOf(args.payload, adapter))
-					}
+					const version = args.versionOf?.(adapter)
+					await args.store.record(
+						docId,
+						await checkConnectionOf(args.payload, adapter),
+						version === undefined ? {} : { version }
+					)
 				} finally {
 					await adapter.close?.(args.payload)
 				}
@@ -94,6 +107,9 @@ export const createConnectionRecheck = (args: {
 		},
 		idle: async () => {
 			await Promise.all(running)
+		},
+		get size() {
+			return startedAt.size
 		},
 	}
 }

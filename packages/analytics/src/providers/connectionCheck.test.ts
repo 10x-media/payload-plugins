@@ -16,6 +16,7 @@ const storeRecording = (recorded: Array<[string, ConnectionOutcome]>): ProviderS
 	read: async () => undefined,
 	readMany: async () => new Map(),
 	forget: async () => {},
+	carry: async () => {},
 	idle: async () => {},
 })
 
@@ -72,7 +73,20 @@ describe('createConnectionRecheck', () => {
 		expect(adapterFor).toHaveBeenCalledTimes(2)
 	})
 
-	it('writes nothing for an adapter with no connection to check, and still closes it', async () => {
+	// The native document's adapter is the instance's shared engine, lent rather than built.
+	it('holds only the documents still inside the cooldown', async () => {
+		const { clock, recheck } = setup()
+		recheck.request('doc-1')
+		clock.at = 599_999
+		recheck.request('doc-2')
+		expect(recheck.size).toBe(2)
+		clock.at = 1_200_000
+		recheck.request('doc-3')
+		await recheck.idle()
+		expect(recheck.size).toBe(1)
+	})
+
+	it('writes nothing for an adapter with no connection to check, and leaves it open', async () => {
 		const recorded: Array<[string, ConnectionOutcome]> = []
 		const close = vi.fn(async () => {})
 		const recheck = createConnectionRecheck({
@@ -86,7 +100,7 @@ describe('createConnectionRecheck', () => {
 		recheck.request('doc-1')
 		await recheck.idle()
 		expect(recorded).toEqual([])
-		expect(close).toHaveBeenCalledTimes(1)
+		expect(close).not.toHaveBeenCalled()
 	})
 
 	it('logs a check that could not run, and writes nothing', async () => {
