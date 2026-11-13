@@ -5,6 +5,7 @@ import { filterableDimensions, filterOperatorsFor, metricReaches } from '../../c
 import type { AdapterRegisterContext, AnalyticsQuery } from '../../core/contract'
 import type { Ga4Sdk } from '../../core/sdks'
 import { GA4_SDK_WARNING } from '../../plugin/peers'
+import { classifyError } from '../../surfacing/classifyError'
 import { EXCLUSION_STORAGE_KEY } from '../../tracker/exclusion'
 import { GA4_DISABLE_PREFIX } from './disableKey'
 
@@ -1003,5 +1004,43 @@ describe('ga4 checkConnection', () => {
 	it('throws what the Data API refused with', async () => {
 		runReport.mockRejectedValue(Object.assign(new Error('7 PERMISSION_DENIED'), { code: 7 }))
 		await expect(ga4(config).checkConnection?.(ctx())).rejects.toMatchObject({ code: 7 })
+	})
+})
+
+// gRPC reports a key OpenSSL cannot read as UNKNOWN from its metadata plugin, a code that otherwise
+// reads as an outage.
+describe('ga4 service account key refusals', () => {
+	const pluginFailure = (reason: string) =>
+		Object.assign(
+			new Error(`2 UNKNOWN: Getting metadata from plugin failed with error: ${reason}`),
+			{
+				code: 2,
+			}
+		)
+	const kindOf = async (read: Promise<unknown> | undefined): Promise<string> =>
+		classifyError(
+			await read?.then(
+				() => undefined,
+				(err: unknown) => err
+			)
+		).kind
+
+	it('answers a key OpenSSL cannot read as a setup to fix, on a check and on a read', async () => {
+		runReport.mockRejectedValue(pluginFailure('error:1E08010C:DECODER routines::unsupported'))
+		const check = ga4(config).checkConnection?.({
+			signal: AbortSignal.timeout(5_000),
+			timeoutMs: 5_000,
+		})
+		expect(await kindOf(check)).toBe('source_misconfigured')
+		expect(await kindOf(ga4(config).query(q(), {}))).toBe('source_misconfigured')
+	})
+
+	it('keeps any other failure of the metadata plugin an outage', async () => {
+		runReport.mockRejectedValue(
+			pluginFailure(
+				'request to https://oauth2.googleapis.com/token failed, reason: getaddrinfo ENOTFOUND'
+			)
+		)
+		expect(await kindOf(ga4(config).query(q(), {}))).toBe('unavailable')
 	})
 })

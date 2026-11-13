@@ -23,6 +23,7 @@ import {
 } from '../../core/contract'
 import { vendorReading } from '../../core/metricValues'
 import type { Ga4Client, Ga4ReportResponse, Ga4ReportRow, Ga4Sdk } from '../../core/sdks'
+import { SourceMisconfiguredError } from '../../core/sourceErrors'
 import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { CURRENCY_PATTERN, currencyOption } from '../../goals/currency'
 import { GA4_SDK_WARNING, isProductionBuild, loadGa4 } from '../../plugin/peers'
@@ -87,6 +88,29 @@ export interface Ga4Config {
 	 * the tag with every consent signal denied (Consent Mode "advanced") and grants on consent.
 	 */
 	withoutConsent?: WithoutConsentLevel
+}
+
+/**
+ * Awaits a Data API call, answering a private key OpenSSL cannot read as a setup to fix: gRPC
+ * reports it as UNKNOWN from its metadata plugin, a code that otherwise reads as an outage. A key
+ * Google refuses (deleted, or another account's) answers UNAUTHENTICATED, refused already.
+ */
+const keyChecked = async <T>(call: Promise<T>): Promise<T> => {
+	try {
+		return await call
+	} catch (err) {
+		const message = err instanceof Error ? err.message : ''
+		if (
+			message.includes('Getting metadata from plugin failed') &&
+			message.includes('DECODER routines')
+		) {
+			throw new SourceMisconfiguredError(
+				'ga4: the private key cannot be read; paste it again from the service account file',
+				{ cause: err }
+			)
+		}
+		throw err
+	}
 }
 
 /** How long one report may take when the adapter is called outside the engine, which sets its own. */
@@ -444,7 +468,7 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 				{ timeout: ctx.timeoutMs, retry: null }
 			)
 			cancelWhenAborted(call, ctx.signal)
-			await call
+			await keyChecked(call)
 		},
 		register(_config, context) {
 			pluginSdk = context?.sdks?.ga4
@@ -547,7 +571,7 @@ export function ga4(config: Ga4Config): AnalyticsAdapter {
 					const timeout = Math.max(1, Math.floor(ctx.remainingMs?.() ?? DEFAULT_REPORT_TIMEOUT_MS))
 					const call = client.runReport(request, { timeout, retry: null })
 					cancelWhenAborted(call, signal)
-					const [response] = await call
+					const [response] = await keyChecked(call)
 					if ((response.metadata?.samplingMetadatas?.length ?? 0) > 0) {
 						sampled = true
 					}
