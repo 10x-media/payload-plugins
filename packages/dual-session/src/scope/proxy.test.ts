@@ -95,3 +95,48 @@ describe('createAuthScopeProxy', () => {
 		expect(headers.has('x-payload-auth-scope')).toBe(false)
 	})
 })
+
+describe('createAuthScopeProxy clearStaleSharedCookie', () => {
+	const encode = (value: unknown) => Buffer.from(JSON.stringify(value)).toString('base64url')
+	const jwt = (collection: string) => `${encode({ alg: 'HS256' })}.${encode({ collection })}.sig`
+
+	const proxy = createAuthScopeProxy({ clearStaleSharedCookie: { collections: ['customers'] } })
+
+	const call = (cookie: string, run = proxy) =>
+		run(new NextRequest('https://site.test/admin', { headers: { Cookie: cookie } }))
+
+	it('drops a stale isolated token from the request and expires it in the browser', () => {
+		const response = call(`payload-token=${jwt('customers')}; payload-customers-token=x`)
+
+		expect(forwardedHeaders(response).get('cookie')).toBe('payload-customers-token=x')
+		const expired = response.cookies.get('payload-token')
+		expect(expired?.value).toBe('')
+		expect(expired?.expires?.valueOf()).toBe(0)
+	})
+
+	it('leaves an admin session in the shared cookie alone', () => {
+		const cookie = `payload-token=${jwt('users')}`
+		const response = call(cookie)
+
+		expect(forwardedHeaders(response).get('cookie')).toBe(cookie)
+		expect(response.cookies.get('payload-token')).toBeUndefined()
+	})
+
+	it('does nothing unless it is asked to', () => {
+		const cookie = `payload-token=${jwt('customers')}`
+		const response = call(cookie, createAuthScopeProxy())
+
+		expect(forwardedHeaders(response).get('cookie')).toBe(cookie)
+		expect(response.cookies.get('payload-token')).toBeUndefined()
+	})
+
+	it('follows a custom cookie prefix', () => {
+		const custom = createAuthScopeProxy({
+			clearStaleSharedCookie: { collections: ['customers'], cookiePrefix: 'shop' },
+		})
+		const response = call(`shop-token=${jwt('customers')}`, custom)
+
+		expect(forwardedHeaders(response).has('cookie')).toBe(false)
+		expect(response.cookies.get('shop-token')?.value).toBe('')
+	})
+})
