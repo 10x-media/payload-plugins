@@ -6,7 +6,7 @@ Alternative edit forms for a Payload collection. A variant is a sequence of step
 
 [![npm](https://img.shields.io/npm/v/@10x-media/form-variants?style=flat-square)](https://www.npmjs.com/package/@10x-media/form-variants)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta until a stable 1.0: `-beta.N` releases on the `latest` dist-tag.
 
 > [!WARNING]
 > **Beta.** This plugin replaces a collection's edit view, which is the largest surface Payload has: every field type, custom field components, drafts, localization, uploads, drawers, and every combination of those. It is covered by unit, integration and end-to-end tests on both Mongo and Postgres, but no suite reaches every combination. Expect gaps, and expect some of Payload's own edit-view features to be missing on a variant. [Open an issue](https://github.com/10x-media/payload-plugins/issues) for anything that renders wrong, saves wrong or is not supported.

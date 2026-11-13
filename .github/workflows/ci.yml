@@ -62,7 +62,7 @@ jobs:
 
   typecheck:
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v6
         with: { fetch-depth: 0 }
@@ -233,7 +233,10 @@ jobs:
     needs: e2e-scope
     if: needs.e2e-scope.outputs.plugins != '[]'
     name: e2e (${{ matrix.plugin }}${{ matrix.dbs && format(', {0}', matrix.dbs) || '' }})
-    runs-on: ubuntu-latest
+    # Pinned: on ubuntu-latest (26.04) `playwright install --with-deps chromium` refuses to
+    # install ("Playwright does not support chromium on ubuntu26.04-x64"). Back to latest once
+    # the catalog's Playwright supports it.
+    runs-on: ubuntu-24.04
     timeout-minutes: 30
     strategy:
       fail-fast: false
