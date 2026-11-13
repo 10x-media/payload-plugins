@@ -10,6 +10,7 @@ const doc = vi.hoisted(() => ({
 	modified: false,
 	hasSavePermission: true,
 	lastUpdateTime: 1,
+	provider: 'plausible',
 }))
 const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
 
@@ -43,6 +44,8 @@ vi.mock('@payloadcms/ui', () => ({
 		hasSavePermission: doc.hasSavePermission,
 		lastUpdateTime: doc.lastUpdateTime,
 	}),
+	useFormFields: <T,>(select: (context: [Record<string, { value: unknown }>]) => T): T =>
+		select([{ provider: { value: doc.provider } }]),
 	useFormModified: () => doc.modified,
 	useTranslation: () => ({
 		i18n: { language: 'en', dateFNS: undefined },
@@ -84,6 +87,7 @@ beforeEach(() => {
 	doc.modified = false
 	doc.hasSavePermission = true
 	doc.lastUpdateTime = 1
+	doc.provider = 'plausible'
 	fetchMock.mockReset()
 	toasts.success.mockReset()
 	toasts.error.mockReset()
@@ -153,6 +157,16 @@ describe('ProviderConnection', () => {
 		expect(statusOf()).toBe(keys.providerConnectionConnected)
 		expect(screen.queryByText('old outage')).toBeNull()
 		expect(screen.queryByText(keys.providerConnectionLastError, { exact: false })).toBeNull()
+	})
+
+	it('names the Region among what to check on a refused PostHog document', async () => {
+		doc.provider = 'posthog'
+		answers({
+			status: { lastErrorAt: '2026-11-09T10:00:00.000Z', errorKind: 'source_misconfigured' },
+		})
+		await renderPanel()
+		expect(screen.getByText(keys.providerConnectionRefusedHelpPosthog)).toBeDefined()
+		expect(screen.queryByText(keys.providerConnectionRefusedHelp)).toBeNull()
 	})
 
 	it('says an outage is unreachable rather than refused', async () => {

@@ -10,6 +10,7 @@ import {
 	toast,
 	useConfig,
 	useDocumentInfo,
+	useFormFields,
 	useFormModified,
 } from '@payloadcms/ui'
 import { formatDate } from '@payloadcms/ui/shared'
@@ -53,6 +54,7 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 	const { config } = useConfig()
 	const { hasSavePermission, id, lastUpdateTime } = useDocumentInfo()
 	const modified = useFormModified()
+	const provider = useFormFields(([fields]) => fields.provider?.value)
 	const { i18n, t } = useTranslation()
 	const [status, setStatus] = useState<ProviderStatus>()
 	const [checking, setChecking] = useState(false)
@@ -115,7 +117,12 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 	]
 	const shown = facts.filter((fact): fact is [TranslationKey, string] => fact[1] !== undefined)
 	const words = failed && status?.errorDetail ? vendorWordsOf(status.errorDetail) : undefined
-	const help = state ? HELP[state] : undefined
+	const help =
+		state === 'refused' && provider === 'posthog'
+			? keys.providerConnectionRefusedHelpPosthog
+			: state
+				? HELP[state]
+				: undefined
 	const blocked =
 		docId === undefined
 			? keys.providerConnectionSaveFirst

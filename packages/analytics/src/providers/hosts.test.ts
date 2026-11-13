@@ -197,6 +197,43 @@ describe('checkDocumentHost', () => {
 	})
 })
 
+describe("validateProviderHost against the install's allow list", () => {
+	const listed = (provider: HostedProvider) =>
+		validateProviderHost(false, {
+			provider,
+			allow: [parseHostPattern('https://*.example.com', false)],
+		})
+
+	it.each([
+		['blank', { provider: 'umami', value: '' }, true],
+		[
+			'an address the allow list names',
+			{ provider: 'umami', value: 'https://umami.example.com' },
+			true,
+		],
+		["the vendor's own cloud", { provider: 'plausible', value: 'https://plausible.io' }, true],
+		['PostHog EU Cloud', { provider: 'posthog', value: 'https://eu.posthog.com' }, true],
+		[
+			'an address outside the allow list',
+			{ provider: 'umami', value: 'https://umami.other.org' },
+			'analytics:providerErrorHostNotAllowed',
+		],
+		[
+			"another vendor's cloud",
+			{ provider: 'umami', value: 'https://plausible.io' },
+			'analytics:providerErrorHostNotAllowed',
+		],
+	] as const)('%s', async (_name, { provider, value }, expected) => {
+		expect(await listed(provider)(value, t)).toBe(expected)
+	})
+
+	it('still answers a malformed address as malformed', async () => {
+		expect(await listed('umami')('https://umami.other.org/?a=1', t)).toBe(
+			'analytics:providerErrorHostFormat'
+		)
+	})
+})
+
 describe('validatePosthogHost', () => {
 	const validate = validatePosthogHost(false)
 
