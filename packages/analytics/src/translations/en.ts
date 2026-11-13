@@ -405,8 +405,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 		'The service account address from the file Google gave you. Add it as a Viewer in the GA4 property’s access settings, or reads are refused.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'The private key from that same Google file, copied exactly. It is stored securely.',
-	[keys.providerFieldProjectIdHelp]:
-		'The project_id in the service account file. Leave it blank to take it from the file.',
+	[keys.providerFieldProjectIdHelp]: 'Optional. The project_id from the service account file.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'The number shown as Project ID in your PostHog project’s settings.',
 	[keys.providerFieldRegionHelp]:

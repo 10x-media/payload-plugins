@@ -410,8 +410,7 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 		'O endereço da conta de serviço do arquivo que o Google forneceu. Adicione-o como Leitor no gerenciamento de acesso da propriedade do GA4, ou as leituras serão recusadas.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'A chave privada desse mesmo arquivo do Google, copiada exatamente como está. É armazenada com segurança.',
-	[keys.providerFieldProjectIdHelp]:
-		'O project_id do arquivo da conta de serviço. Deixe em branco para usar o do arquivo.',
+	[keys.providerFieldProjectIdHelp]: 'Opcional. O project_id do arquivo da conta de serviço.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'O número exibido como Project ID nas configurações do seu projeto PostHog.',
 	[keys.providerFieldRegionHelp]:

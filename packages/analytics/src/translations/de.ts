@@ -410,8 +410,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 		'Die Dienstkonto-Adresse aus der Datei, die du von Google erhalten hast. Füge sie in der Zugriffsverwaltung der GA4-Property als Betrachter hinzu, sonst werden Abfragen abgelehnt.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'Der private Schlüssel aus derselben Google-Datei, exakt kopiert. Er wird sicher gespeichert.',
-	[keys.providerFieldProjectIdHelp]:
-		'Die project_id aus der Dienstkonto-Datei. Leer lassen, um sie aus der Datei zu übernehmen.',
+	[keys.providerFieldProjectIdHelp]: 'Optional. Die project_id aus der Dienstkonto-Datei.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'Die Zahl, die in den Einstellungen deines PostHog-Projekts als Project ID steht.',
 	[keys.providerFieldRegionHelp]:

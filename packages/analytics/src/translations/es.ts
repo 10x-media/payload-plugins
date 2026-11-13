@@ -411,7 +411,7 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldPrivateKeyHelp]:
 		'La clave privada de ese mismo archivo de Google, copiada tal cual. Se guarda de forma segura.',
 	[keys.providerFieldProjectIdHelp]:
-		'El project_id del archivo de la cuenta de servicio. Déjalo vacío para tomarlo del archivo.',
+		'Opcional. El project_id del archivo de la cuenta de servicio.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'El número que aparece como Project ID en la configuración de tu proyecto de PostHog.',
 	[keys.providerFieldRegionHelp]:

@@ -407,7 +407,7 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldPrivateKeyHelp]:
 		'Приватний ключ із того самого файлу Google, скопійований точно. Зберігається надійно.',
 	[keys.providerFieldProjectIdHelp]:
-		'project_id з файлу сервісного облікового запису. Залиште порожнім, щоб узяти його з файлу.',
+		'Необовʼязково. project_id з файлу сервісного облікового запису.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'Число, вказане як Project ID у налаштуваннях проєкту PostHog.',
 	[keys.providerFieldRegionHelp]:

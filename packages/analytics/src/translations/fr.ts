@@ -415,8 +415,7 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 		'L’adresse du compte de service, tirée du fichier fourni par Google. Ajoutez-la comme Lecteur dans la gestion des accès de la propriété GA4, sinon les lectures sont refusées.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'La clé privée figurant dans ce même fichier Google, copiée telle quelle. Elle est enregistrée de façon sécurisée.',
-	[keys.providerFieldProjectIdHelp]:
-		'Le project_id du fichier du compte de service. Laissez vide pour le prendre dans le fichier.',
+	[keys.providerFieldProjectIdHelp]: 'Facultatif. Le project_id du fichier du compte de service.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'Le nombre affiché comme Project ID dans les paramètres de votre projet PostHog.',
 	[keys.providerFieldRegionHelp]:

@@ -408,8 +408,7 @@ export const id: LocaleBundle<'other'> = {
 		'Alamat akun layanan dari file yang diberikan Google. Tambahkan sebagai Viewer di pengelolaan akses properti GA4, atau pembacaan akan ditolak.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'Kunci privat dari berkas Google yang sama, disalin persis. Disimpan dengan aman.',
-	[keys.providerFieldProjectIdHelp]:
-		'project_id dari file akun layanan. Biarkan kosong untuk mengambilnya dari file.',
+	[keys.providerFieldProjectIdHelp]: 'Opsional. project_id dari file akun layanan.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'Angka yang tertera sebagai Project ID di pengaturan proyek PostHog Anda.',
 	[keys.providerFieldRegionHelp]:

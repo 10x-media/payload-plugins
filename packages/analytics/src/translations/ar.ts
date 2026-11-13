@@ -397,8 +397,7 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 		'عنوان حساب الخدمة من الملف الذي قدّمه Google. أضِفه كمُشاهد في إدارة الوصول لموقع GA4، وإلا فستُرفض القراءات.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'المفتاح الخاص من ملف Google نفسه، منسوخًا كما هو تمامًا. يُحفظ بأمان.',
-	[keys.providerFieldProjectIdHelp]:
-		'قيمة project_id من ملف حساب الخدمة. اتركه فارغًا لأخذها من الملف.',
+	[keys.providerFieldProjectIdHelp]: 'اختياري. قيمة project_id من ملف حساب الخدمة.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'الرقم الظاهر باسم Project ID في إعدادات مشروعك في PostHog.',
 	[keys.providerFieldRegionHelp]:
