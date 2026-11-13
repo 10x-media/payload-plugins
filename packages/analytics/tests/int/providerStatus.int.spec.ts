@@ -185,6 +185,33 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		})
 	})
 
+	it(`answers a key that no longer decrypts as a setup to fix, not a server error, on ${db}`, async () => {
+		const doc = await createProvider('alpha', 'undecryptable.example')
+		const { withRawEncrypted } = await import('@10x-media/fields/encrypted')
+		const req = await createLocalReq({}, booted.payload)
+		const raw = (await withRawEncrypted(req, () =>
+			booted.payload.findByID({ collection: PROVIDERS_SLUG, id: doc.id, req, overrideAccess: true })
+		)) as { plausible?: { apiKey?: string } }
+		const stored = raw.plausible?.apiKey
+		if (!stored) throw new Error('expected a stored ciphertext to corrupt')
+		// The same length and charset, so it still parses, but its GCM tag no longer authenticates.
+		const corrupted = `${stored.slice(0, -4)}${stored.endsWith('AAAA') ? 'BBBB' : 'AAAA'}`
+		await withRawEncrypted(req, () =>
+			booted.payload.update({
+				collection: PROVIDERS_SLUG,
+				id: doc.id,
+				data: { plausible: { siteId: 'undecryptable.example', apiKey: corrupted } } as never,
+				req,
+				overrideAccess: true,
+			})
+		)
+		const res = await status('POST', 'alpha', doc.id)
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as ProviderStatusResponse
+		expect(body.checked).toMatchObject({ ok: false, kind: 'source_misconfigured' })
+		expect(body.status).toMatchObject({ errorKind: 'source_misconfigured' })
+	})
+
 	it(`answers a vendor outage as no answer, not as a setup to fix, on ${db}`, async () => {
 		const doc = await createProvider('alpha', 'down-check.example')
 		const body = (await (await status('POST', 'alpha', doc.id)).json()) as ProviderStatusResponse
