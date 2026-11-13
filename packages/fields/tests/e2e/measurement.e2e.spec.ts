@@ -91,6 +91,35 @@ test.describe('measurement field', () => {
 		expect(doc.height).toBeCloseTo(187.96, 1)
 	})
 
+	test('inches typed into an empty ft in field commit as 0 ft on blur', async ({ page }) => {
+		const created = await page.request.post(`/api/${FIXTURES.collection}`, {
+			data: { boundedWeight: 70, title: 'Empty height' },
+		})
+		expect(created.ok()).toBeTruthy()
+		const { doc } = (await created.json()) as { doc: { id: string } }
+		try {
+			await page.goto(`/admin/collections/${FIXTURES.collection}/${doc.id}`)
+			await pickUnit(page, 'height', /^ft in$/i)
+			const inputs = page
+				.locator('.fields-measurement')
+				.filter({ has: page.locator('#field-height') })
+				.locator('input')
+			await expect(inputs).toHaveCount(2)
+			await inputs.nth(1).fill('5')
+			await page.locator('#field-title').click()
+			await expect(inputs.nth(1)).toHaveValue('5')
+			const saved = page.waitForResponse(
+				(r) => r.url().includes(`/api/${FIXTURES.collection}`) && r.request().method() === 'PATCH'
+			)
+			await page.locator('#action-save').click()
+			expect((await saved).ok()).toBeTruthy()
+			const res = await page.request.get(`/api/${FIXTURES.collection}/${doc.id}`)
+			expect(((await res.json()) as { height: number }).height).toBeCloseTo(12.7, 6)
+		} finally {
+			await page.request.delete(`/api/${FIXTURES.collection}/${doc.id}`)
+		}
+	})
+
 	test('the dirty guard: a readable-mode draft can paint truncated, but an untouched input never commits it', async ({
 		page,
 	}) => {

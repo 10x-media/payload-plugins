@@ -367,6 +367,73 @@ describe('commitDrafts', () => {
 		})
 	})
 
+	describe('empty major beside a typed minor', () => {
+		it('commits inches typed into an empty, never-saved ft in field as 0 ft', () => {
+			expect(
+				commitDrafts(
+					{ minor: '5', primary: '' },
+					{
+						dirty: { minor: true, primary: false },
+						displayUnit: 'ft-in',
+						engine,
+						paintedDrafts: { minor: '', primary: '' },
+						storageUnit: 'cm',
+					}
+				)
+			).toBe(12.7)
+		})
+		it('does the same for st lb', () => {
+			expect(
+				commitDrafts(
+					{ minor: '7', primary: '' },
+					{
+						dirty: { minor: true, primary: false },
+						displayUnit: 'st-lb',
+						engine,
+						storageUnit: 'kg',
+					}
+				)
+			).toBe(3.175147)
+		})
+		it('reads a cleared major as zero against a stored value', () => {
+			expect(
+				commitDrafts(
+					{ minor: '11', primary: '' },
+					{
+						dirty: { minor: false, primary: true },
+						displayUnit: 'ft-in',
+						engine,
+						paintedDrafts: { minor: '11', primary: '5' },
+						storageUnit: 'cm',
+						storedValue: 180.34,
+					}
+				)
+			).toBe(27.94)
+		})
+		it('still commits null when both parts are empty', () => {
+			expect(
+				commitDrafts(
+					{ minor: '', primary: '' },
+					{
+						dirty: { minor: true, primary: false },
+						displayUnit: 'ft-in',
+						engine,
+						paintedDrafts: { minor: '5', primary: '' },
+						storageUnit: 'cm',
+					}
+				)
+			).toBeNull()
+		})
+		it('still commits null for an unparseable major', () => {
+			expect(
+				commitDrafts(
+					{ minor: '5', primary: 'abc' },
+					{ displayUnit: 'ft-in', engine, storageUnit: 'cm' }
+				)
+			).toBeNull()
+		})
+	})
+
 	describe('untouched minor fallback with no stored baseline (asymmetry fix)', () => {
 		it('falls back to the painted minor draft, never a bare 0, when both parts are dirty is false and nothing is stored', () => {
 			// A brand new, never-saved field: no storedValue to decompose. Untouched
