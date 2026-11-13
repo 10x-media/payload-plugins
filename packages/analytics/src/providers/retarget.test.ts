@@ -47,6 +47,13 @@ describe('retargetSecrets', () => {
 		expect(group(result, 'posthog').apiKey).toBe(SEALED)
 	})
 
+	it('keeps the key when the host gains or loses a trailing slash, the same address', () => {
+		const data = update((doc) => {
+			group(doc, 'plausible').host = 'https://plausible.example.com/'
+		})
+		expect(group(run(data), 'plausible').apiKey).toBe(SEALED)
+	})
+
 	it('clears a kept key when the site id changes', () => {
 		const result = run(
 			update((doc) => {
