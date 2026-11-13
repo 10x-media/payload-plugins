@@ -1,4 +1,5 @@
 import type { CollectionBeforeChangeHook } from 'payload'
+import { cloudAppHost } from '../adapters/posthog/cloud'
 import { isRecord, valueAt } from '../core/values'
 import type { ProviderId } from './ids'
 import { CONNECTION_PATHS, SECRET_PATHS } from './secrets'
@@ -37,6 +38,22 @@ const withCleared = (doc: Doc, path: string): Doc => {
 	return isRecord(current) ? { ...doc, [group]: { ...current, [field]: null } } : doc
 }
 
+/** The PostHog fields that decide where its reads, and so its personal key, go. */
+const POSTHOG_READ_PATHS = new Set(['posthog.host', 'posthog.region'])
+
+/**
+ * Where PostHog reads with these settings, as the adapter resolves it: the Host, else the Region's
+ * cloud, US when blank. A field the update leaves out keeps its stored value.
+ */
+const posthogReadHost = (data: Doc, originalDoc: Doc): string => {
+	const at = (path: string): string | null => {
+		const next = valueAt(data, path)
+		return comparable(next === undefined ? valueAt(originalDoc, path) : next)
+	}
+	const region = at('posthog.region')
+	return at('posthog.host')?.replace(/\/+$/, '') ?? cloudAppHost(region === 'eu' ? 'eu' : 'us')
+}
+
 /** Which providers an update moves: every one on a new `provider` or scope, else those whose host or id changed. */
 const movedBy = (
 	data: Doc,
@@ -49,9 +66,12 @@ const movedBy = (
 	}
 	const retargeted = new Set<ProviderId>()
 	for (const { provider, path } of CONNECTION_PATHS) {
-		if (provider !== null && moved(path)) {
+		if (provider !== null && !POSTHOG_READ_PATHS.has(path) && moved(path)) {
 			retargeted.add(provider)
 		}
+	}
+	if (posthogReadHost(data, originalDoc) !== posthogReadHost(originalDoc, originalDoc)) {
+		retargeted.add('posthog')
 	}
 	return { everyProvider: moved('provider') || moved(scopeField), retargeted }
 }
