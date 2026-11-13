@@ -24,7 +24,7 @@ Until it runs, reads, saves and deletes of provider documents go on: a connectio
 
 A PostHog provider document with a blank **Host** now reads from its Region's cloud (`https://<region>.posthog.com`), where it used to read from US Cloud whatever the Region said. A document on EU Cloud that was refused with a 403 reads again as it is stored: nothing to migrate, and its key is kept.
 
-A document with a blank Host also needs a Region now. One saved without it keeps reading from US Cloud, and saves again once a Region is picked.
+A document with a blank Host also needs a Region now. One saved without it keeps reading from US Cloud, and saves again once a Region is picked. Picking US keeps its personal API key, because reads still go to US Cloud. Picking EU moves its reads, so the key has to be entered again.
 
 ## Failing sources under `fallback`
 

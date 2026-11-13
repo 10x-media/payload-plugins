@@ -119,6 +119,31 @@ describe('retargetSecrets', () => {
 		}
 	})
 
+	describe("a posthog key goes where its reads go: the Host, else the Region's cloud", () => {
+		const from = (posthog: Doc, changes: Doc): Doc => {
+			const original = { ...stored, posthog: { ...group(stored, 'posthog'), ...posthog } }
+			const data = { ...original, posthog: { ...group(original, 'posthog'), ...changes } }
+			return group(
+				hook({ data, originalDoc: original, operation: 'update', req: {} } as never) as Doc,
+				'posthog'
+			)
+		}
+
+		it('keeps it when a blank Region is set to the US, which it read already', () => {
+			expect(from({ host: null, region: null }, { region: 'us' }).apiKey).toBe(SEALED)
+		})
+
+		it('keeps it when the Region changes under a Host, which reads go to', () => {
+			expect(
+				from({ host: 'https://posthog.example.com', region: null }, { region: 'eu' }).apiKey
+			).toBe(SEALED)
+		})
+
+		it('clears it when a blank Region is set to the EU', () => {
+			expect(from({ host: null, region: null }, { region: 'eu' }).apiKey).toBeNull()
+		})
+	})
+
 	it("clears the other providers' kept secrets when the provider changes", () => {
 		const result = run(
 			update((doc) => {
