@@ -14,6 +14,7 @@ import {
 } from 'payload'
 import { validateMeasurementId } from '../adapters/ga4/measurementId'
 import { validateScriptId } from '../adapters/plausible/scriptId'
+import { validateSiteDomain } from '../adapters/plausible/siteId'
 import { validatePersonalApiKey, validateProjectToken } from '../adapters/posthog/credentials'
 import { optionsObject } from '../core/optionChecks'
 import { isOneOf, kindOf, listOf } from '../core/values'
@@ -24,7 +25,13 @@ import { keys, type SingularKey, type TranslationKey } from '../translations/key
 import { asTranslate, labelForKey } from '../translations/server'
 import { builtInStaticLabel, type StaticLabelFor } from '../translations/staticLabel'
 import { type ProviderAccessArgs, providerCreateAccess, providerRowAccess } from './access'
-import { validatePosthogHost, validatePosthogRegion, validateProviderHost } from './hosts'
+import {
+	type HostedProvider,
+	type HostPattern,
+	validatePosthogHost,
+	validatePosthogRegion,
+	validateProviderHost,
+} from './hosts'
 import { PROVIDER_IDS, PROVIDER_NAMES, type ProviderId } from './ids'
 import { reconnects, retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
@@ -142,6 +149,8 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	isSealed: (value: unknown) => boolean
 	/** `providers.hosts.allowPrivateNetwork`: the `host` fields accept `http://` too. */
 	allowPrivateNetwork?: boolean
+	/** `providers.hosts.allow`: a `host` outside it and its vendor's cloud is refused on save. */
+	allow?: readonly HostPattern[]
 	connectionAccess?: ConnectionFieldAccess
 	/** The provider types a document may be saved with; every type when absent. */
 	types?: readonly ProviderId[]
@@ -179,12 +188,18 @@ const plainSecret: BuildSecretField = (source) => [source]
 const textField = (
 	name: string,
 	label: TranslationKey,
-	opts: { width?: string; help?: TranslationKey; access?: ConnectionFieldAccess } = {}
+	opts: {
+		width?: string
+		help?: TranslationKey
+		access?: ConnectionFieldAccess
+		validate?: TextFieldSingleValidation
+	} = {}
 ): Field => ({
 	name,
 	type: 'text',
 	label: labelForKey(label),
 	...(opts.access ? { access: opts.access } : {}),
+	...(opts.validate ? { validate: opts.validate } : {}),
 	...(opts.width || opts.help
 		? {
 				admin: {
@@ -261,12 +276,15 @@ const scopeField = (include: boolean): Field[] =>
 const hostField = (
 	allowPrivateNetwork: boolean,
 	access: ConnectionFieldAccess | undefined,
-	opts: { validate?: TextFieldSingleValidation } = {}
+	opts: {
+		validate?: TextFieldSingleValidation
+		listed?: { provider: HostedProvider; allow: readonly HostPattern[] }
+	} = {}
 ): Field => ({
 	name: 'host',
 	type: 'text',
 	label: labelForKey(keys.providerFieldHost),
-	validate: opts.validate ?? validateProviderHost(allowPrivateNetwork),
+	validate: opts.validate ?? validateProviderHost(allowPrivateNetwork, opts.listed),
 	...(access ? { access } : {}),
 	admin: { description: labelForKey(keys.providerFieldHostHelp) },
 })
@@ -454,6 +472,8 @@ interface FieldListArgs {
 	types: readonly ProviderId[]
 	/** The `isDefault` checkbox, overridden, placed after `enabled`; only a scoped collection has it. */
 	isDefault?: Field
+	/** `providers.hosts.allow`: a `host` outside it and its vendor's cloud is refused on save. */
+	allow?: readonly HostPattern[]
 }
 
 /**
@@ -476,6 +496,8 @@ const providerFields = (
 		options.connectionAccess
 	)
 	const allowPrivateNetwork = options.allowPrivateNetwork === true
+	const { allow } = list
+	const listedFor = (provider: HostedProvider) => (allow ? { provider, allow } : undefined)
 	const apiKeyField = ({
 		validate,
 		help = keys.providerFieldApiKeyHelp,
@@ -505,6 +527,7 @@ const providerFields = (
 						width: '50%',
 						help: keys.providerFieldSiteIdHelp,
 						access,
+						validate: validateSiteDomain,
 					}),
 					...apiKeyField(),
 				],
@@ -515,6 +538,7 @@ const providerFields = (
 					captureField('domain', keys.providerFieldDomain, {
 						width: '50%',
 						help: keys.providerFieldDomainHelp,
+						validate: validateSiteDomain,
 					}),
 					captureField('scriptId', keys.providerFieldScriptId, {
 						width: '50%',
@@ -524,7 +548,7 @@ const providerFields = (
 				],
 			},
 			currencyField('revenueCurrency', keys.providerFieldRevenueCurrencyHelp),
-			hostField(allowPrivateNetwork, access),
+			hostField(allowPrivateNetwork, access, { listed: listedFor('plausible') }),
 		]),
 		providerGroup('umami', keys.providerNameUmami, [
 			{
@@ -543,7 +567,7 @@ const providerFields = (
 				label: keys.providerFieldToken,
 				help: keys.providerFieldTokenHelp,
 			}),
-			hostField(allowPrivateNetwork, access),
+			hostField(allowPrivateNetwork, access, { listed: listedFor('umami') }),
 		]),
 		providerGroup('ga4', keys.providerNameGa4, [
 			{
@@ -566,6 +590,7 @@ const providerFields = (
 				access,
 			}),
 			captureField('measurementId', keys.providerFieldMeasurementId, {
+				help: keys.providerFieldMeasurementIdHelp,
 				validate: validateMeasurementId,
 			}),
 			currencyField('currency', keys.providerFieldGa4CurrencyHelp),
@@ -582,10 +607,13 @@ const providerFields = (
 				fields: [
 					textField('projectId', keys.providerFieldProjectId, {
 						width: '50%',
-						help: keys.providerFieldProjectIdHelp,
+						help: keys.providerFieldPosthogProjectIdHelp,
 						access,
 					}),
-					...apiKeyField({ validate: validatePersonalApiKey }),
+					...apiKeyField({
+						validate: validatePersonalApiKey,
+						help: keys.providerFieldPosthogApiKeyHelp,
+					}),
 				],
 			},
 			{
@@ -617,7 +645,7 @@ const providerFields = (
 				access,
 			}),
 			hostField(allowPrivateNetwork, access, {
-				validate: validatePosthogHost(allowPrivateNetwork),
+				validate: validatePosthogHost(allowPrivateNetwork, listedFor('posthog')),
 			}),
 		]),
 		overrideField(withoutConsentField(staticLabel), options.fields?.withoutConsent),
@@ -716,6 +744,7 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 				staticLabel,
 				{
 					types: args.types ?? PROVIDER_IDS,
+					...(args.allow ? { allow: args.allow } : {}),
 					// A default is picked per scope: an unscoped install has one site and nothing to pick.
 					...(args.scoped
 						? {

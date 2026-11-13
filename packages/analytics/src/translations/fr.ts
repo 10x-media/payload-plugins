@@ -123,7 +123,8 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldSiteId]: 'ID du site',
 	[keys.providerFieldApiKey]: 'Clé API',
 	[keys.providerFieldHost]: 'Hôte',
-	[keys.providerFieldHostHelp]: "Laissez vide pour utiliser l'adresse par défaut.",
+	[keys.providerFieldHostHelp]:
+		'Uniquement pour une instance auto-hébergée : son adresse. Laissez vide pour utiliser le cloud du fournisseur.',
 	[keys.providerFieldWebsiteId]: 'ID du site web',
 	[keys.providerFieldToken]: 'Jeton API',
 	[keys.providerFieldPropertyId]: 'ID de propriété',
@@ -138,6 +139,8 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldMeasurementId]: 'ID de mesure',
 	[keys.providerFieldCaptureHelp]:
 		'Ceci active le suivi sur votre site. Laissez vide pour le désactiver.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'L’ID de mesure (G-...) de votre flux de données Web, dans l’administration GA4. Il active le suivi de votre site ; laissez vide pour le désactiver.',
 	[keys.providerFieldDomainHelp]:
 		"Le domaine sous lequel le script de suivi enregistre les visites, généralement le même que l'ID du site. Il active le suivi avec le script standard de Plausible et l'emporte sur l'ID du script si les deux sont remplis. Laissez-le vide, ainsi que l'ID du script, pour désactiver le suivi.",
 	[keys.providerFieldScriptIdHelp]:
@@ -149,6 +152,10 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Saisissez uniquement l’adresse, par exemple https://analytics.example.com ou https://example.com/analytics, sans partie commençant par ? ou # et sans nom d’utilisateur ni mot de passe.',
 	[keys.providerErrorHostInsecure]: 'L’adresse doit commencer par https://.',
+	[keys.providerErrorHostNotAllowed]:
+		'Ce site n’autorise pas cette adresse. Demandez à son développeur de l’ajouter.',
+	[keys.providerErrorSiteDomain]:
+		'Saisissez le site tel que Plausible l’affiche, comme example.com ou example.com/blog.',
 	[keys.providerErrorPosthogRegionRequired]: 'Choisissez la région du projet.',
 	[keys.providerErrorPosthogHostRegion]: 'Adresse d’une autre région PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Jeton de projet (phc_), pas une clé API.',
@@ -169,6 +176,8 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerConnectionNoPermission]:
 		'Seule une personne autorisée à modifier ce document peut en tester la connexion.',
 	[keys.providerConnectionRefusedHelp]: 'Vérifiez la clé, les identifiants et l’hôte.',
+	[keys.providerConnectionRefusedHelpPosthog]:
+		'Vérifiez la clé, les identifiants, la région et l’hôte.',
 	[keys.providerConnectionUnreachableHelp]: 'Le service n’a pas répondu. Réessayez plus tard.',
 	[keys.providerConnectionChecked]: 'La connexion fonctionne',
 	[keys.providerConnectionFailed]: 'La connexion a échoué',
@@ -388,7 +397,9 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'Le site mesuré par Plausible, généralement écrit sous la forme yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		"La clé en lecture seule qui sert à consulter vos rapports. Elle est enregistrée de façon sécurisée et n'est plus jamais affichée.",
+		'Une clé Stats API des paramètres de votre compte Plausible, rubrique API Keys. Elle est stockée de façon sécurisée et n’est plus jamais affichée.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'Une clé d’API personnelle (phx_...) avec la portée Query Read, tirée des paramètres de votre compte PostHog. Elle est stockée de façon sécurisée et n’est plus jamais affichée.',
 	[keys.providerFieldUmamiApiKeyHelp]:
 		"Pour Umami Cloud. Avec Umami auto-hébergé, mettez la clé dans Jeton API. Elle est enregistrée de façon sécurisée et n'est plus jamais affichée.",
 	[keys.providerFieldWebsiteIdHelp]:
@@ -398,12 +409,15 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldPropertyIdHelp]:
 		'Le numéro de votre propriété GA4, dans Google Analytics. Sans le mot properties/.',
 	[keys.providerFieldClientEmailHelp]:
-		"L'adresse du compte de service figurant dans le fichier fourni par Google.",
+		'L’adresse du compte de service, tirée du fichier fourni par Google. Ajoutez-la comme Lecteur dans la gestion des accès de la propriété GA4, sinon les lectures sont refusées.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'La clé privée figurant dans ce même fichier Google, copiée telle quelle. Elle est enregistrée de façon sécurisée.',
-	[keys.providerFieldProjectIdHelp]: 'Le projet auquel cela se connecte.',
+	[keys.providerFieldProjectIdHelp]:
+		'Le project_id du fichier du compte de service. Laissez vide pour le prendre dans le fichier.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'Le nombre affiché comme Project ID dans les paramètres de votre projet PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'PostHog Cloud uniquement. Ignorée lorsque Hôte désigne une instance auto-hébergée.',
+		'Le cloud de votre adresse PostHog : US pour us.posthog.com, EU pour eu.posthog.com. Ignoré si Hôte est une instance auto-hébergée.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		"Le code monnaie à 3 lettres de vos objectifs de vente, par exemple USD. Le chiffre d'affaires ne s'affiche pas tant qu'il n'est pas renseigné.",
 	[keys.providerFieldGa4CurrencyHelp]:

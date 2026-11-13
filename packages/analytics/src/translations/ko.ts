@@ -118,7 +118,8 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerFieldSiteId]: '사이트 ID',
 	[keys.providerFieldApiKey]: 'API 키',
 	[keys.providerFieldHost]: '호스트',
-	[keys.providerFieldHostHelp]: '기본 주소를 쓰려면 비워 두세요.',
+	[keys.providerFieldHostHelp]:
+		'자체 호스팅 인스턴스에만 해당: 그 주소입니다. 비워 두면 서비스의 클라우드를 사용합니다.',
 	[keys.providerFieldWebsiteId]: '웹사이트 ID',
 	[keys.providerFieldToken]: 'API 토큰',
 	[keys.providerFieldPropertyId]: '속성 ID',
@@ -132,6 +133,8 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerFieldRevenueCurrency]: '수익 통화',
 	[keys.providerFieldMeasurementId]: '측정 ID',
 	[keys.providerFieldCaptureHelp]: '사이트의 방문 추적을 켭니다. 비워 두면 추적이 꺼집니다.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'GA4 관리의 웹 데이터 스트림 측정 ID(G-...)입니다. 사이트 추적을 켭니다. 비워 두면 추적이 꺼집니다.',
 	[keys.providerFieldDomainHelp]:
 		'추적 스크립트가 방문을 기록할 때 쓰는 도메인으로, 보통 사이트 ID와 같습니다. Plausible 기본 스크립트로 방문 추적을 켜며, 스크립트 ID와 함께 입력하면 이 값이 우선합니다. 이 칸과 스크립트 ID를 모두 비워 두면 추적이 꺼집니다.',
 	[keys.providerFieldScriptIdHelp]:
@@ -141,6 +144,10 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'주소만 입력하세요. 예: https://analytics.example.com 또는 https://example.com/analytics. ? 또는 #로 시작하는 부분과 사용자 이름, 비밀번호는 넣지 마세요.',
 	[keys.providerErrorHostInsecure]: '주소는 https://로 시작해야 합니다.',
+	[keys.providerErrorHostNotAllowed]:
+		'이 사이트는 이 주소를 허용하지 않습니다. 개발자에게 추가를 요청하세요.',
+	[keys.providerErrorSiteDomain]:
+		'Plausible에 표시된 대로 사이트를 입력하세요. 예: example.com 또는 example.com/blog',
 	[keys.providerErrorPosthogRegionRequired]: 'PostHog 프로젝트 지역을 선택하세요.',
 	[keys.providerErrorPosthogHostRegion]: '다른 PostHog 지역의 주소입니다.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'API 키가 아닌 프로젝트 토큰(phc_)입니다.',
@@ -161,6 +168,7 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerConnectionNoPermission]:
 		'이 문서를 수정할 수 있는 사람만 연결을 테스트할 수 있습니다.',
 	[keys.providerConnectionRefusedHelp]: '키, ID, 호스트를 확인하세요.',
+	[keys.providerConnectionRefusedHelpPosthog]: '키, ID, 지역, 호스트를 확인하세요.',
 	[keys.providerConnectionUnreachableHelp]: '서비스가 응답하지 않았습니다. 나중에 다시 시도하세요.',
 	[keys.providerConnectionChecked]: '연결 정상',
 	[keys.providerConnectionFailed]: '연결 실패',
@@ -376,7 +384,9 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'Plausible이 측정하는 웹사이트입니다. 보통 yourdomain.com 형태로 적습니다.',
 	[keys.providerFieldApiKeyHelp]:
-		'보고서를 읽어 오는 데 쓰는 읽기 전용 키입니다. 안전하게 저장되며 다시 표시되지 않습니다.',
+		'Plausible 계정 설정의 API Keys에서 만든 Stats API 키입니다. 안전하게 저장되며 다시 표시되지 않습니다.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'PostHog 계정 설정에서 만든 Query Read 권한의 개인 API 키(phx_...)입니다. 안전하게 저장되며 다시 표시되지 않습니다.',
 	[keys.providerFieldUmamiApiKeyHelp]:
 		'Umami Cloud용입니다. 자체 호스팅 Umami라면 키를 API 토큰에 넣으세요. 안전하게 저장되며 다시 표시되지 않습니다.',
 	[keys.providerFieldWebsiteIdHelp]:
@@ -385,12 +395,16 @@ export const ko: LocaleBundle<'other'> = {
 		'자체 호스팅 Umami용: 설정에서 만든 API 키 또는 로그인 토큰입니다. Umami Cloud라면 API 키를 쓰세요. 안전하게 저장됩니다.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Google Analytics에 있는 GA4 속성 번호입니다. properties/ 라는 단어는 빼세요.',
-	[keys.providerFieldClientEmailHelp]: 'Google에서 받은 파일에 있는 서비스 계정 주소입니다.',
+	[keys.providerFieldClientEmailHelp]:
+		'Google이 준 파일의 서비스 계정 주소입니다. GA4 속성의 액세스 관리에서 뷰어로 추가하세요. 그렇지 않으면 읽기가 거부됩니다.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'같은 Google 파일에 있는 비공개 키를 그대로 복사해 넣으세요. 안전하게 저장됩니다.',
-	[keys.providerFieldProjectIdHelp]: '연결할 프로젝트입니다.',
+	[keys.providerFieldProjectIdHelp]:
+		'서비스 계정 파일의 project_id입니다. 비워 두면 파일에서 가져옵니다.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'PostHog 프로젝트 설정에 Project ID로 표시된 숫자입니다.',
 	[keys.providerFieldRegionHelp]:
-		'PostHog Cloud 전용입니다. 호스트가 자체 호스팅 인스턴스이면 무시됩니다.',
+		'PostHog 주소의 클라우드입니다. us.posthog.com은 US, eu.posthog.com은 EU입니다. 호스트가 자체 호스팅 인스턴스이면 무시됩니다.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'판매 목표에 쓸 3자리 통화 코드입니다. 예: USD. 이 값을 정하기 전에는 매출이 표시되지 않습니다.',
 	[keys.providerFieldGa4CurrencyHelp]:

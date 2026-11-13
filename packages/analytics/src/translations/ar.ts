@@ -118,7 +118,8 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerFieldSiteId]: 'معرّف الموقع',
 	[keys.providerFieldApiKey]: 'مفتاح API',
 	[keys.providerFieldHost]: 'المضيف',
-	[keys.providerFieldHostHelp]: 'اتركه فارغًا لاستخدام العنوان الافتراضي.',
+	[keys.providerFieldHostHelp]:
+		'للنسخة المستضافة ذاتيًا فقط: عنوانها. اتركه فارغًا لاستخدام سحابة المزوّد.',
 	[keys.providerFieldWebsiteId]: 'معرّف الموقع الإلكتروني',
 	[keys.providerFieldToken]: 'رمز API',
 	[keys.providerFieldPropertyId]: 'معرّف الخاصية',
@@ -132,6 +133,8 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerFieldRevenueCurrency]: 'عملة الإيرادات',
 	[keys.providerFieldMeasurementId]: 'معرّف القياس',
 	[keys.providerFieldCaptureHelp]: 'هذا يشغّل التتبّع على موقعك. اتركه فارغًا لإيقاف التتبّع.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'معرّف القياس (G-...) لمصدر بيانات الويب من إدارة GA4. يشغّل التتبع على موقعك؛ اتركه فارغًا لإيقافه.',
 	[keys.providerFieldDomainHelp]:
 		'النطاق الذي يسجّل به سكربت التتبّع الزيارات، وهو عادةً نفس معرّف الموقع. يشغّل التتبّع بسكربت Plausible القياسي، ويُقدَّم على معرّف السكربت إذا مُلئ الحقلان. اترك هذا الحقل ومعرّف السكربت فارغين لإيقاف التتبّع.',
 	[keys.providerFieldScriptIdHelp]:
@@ -142,6 +145,9 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerErrorHostFormat]:
 		'أدخل العنوان فقط، مثل https://analytics.example.com أو https://example.com/analytics، من دون جزء يبدأ بـ ? أو # ومن دون اسم مستخدم أو كلمة مرور.',
 	[keys.providerErrorHostInsecure]: 'يجب أن يبدأ العنوان بـ https://.',
+	[keys.providerErrorHostNotAllowed]: 'هذا الموقع لا يسمح بهذا العنوان. اطلب من مطوّره إضافته.',
+	[keys.providerErrorSiteDomain]:
+		'أدخل الموقع كما يظهر في Plausible، مثل example.com أو example.com/blog.',
 	[keys.providerErrorPosthogRegionRequired]: 'اختر منطقة مشروع PostHog.',
 	[keys.providerErrorPosthogHostRegion]: 'هذا العنوان من منطقة PostHog الأخرى.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'هذا رمز مشروع (phc_XXXX) وليس مفتاح API.',
@@ -161,6 +167,7 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerConnectionUnsaved]: 'احفظ تغييراتك لاختبارها.',
 	[keys.providerConnectionNoPermission]: 'لا يمكن اختبار اتصال هذا المستند إلا لمن يحق له تعديله.',
 	[keys.providerConnectionRefusedHelp]: 'تحقق من المفتاح والمعرّفات والمضيف.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'تحقق من المفتاح والمعرّفات والمنطقة والمضيف.',
 	[keys.providerConnectionUnreachableHelp]: 'لم تستجب الخدمة. حاول لاحقًا.',
 	[keys.providerConnectionChecked]: 'الاتصال يعمل',
 	[keys.providerConnectionFailed]: 'فشل الاتصال',
@@ -374,19 +381,25 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 		'إيقاف هذا يحتفظ بالبيانات المحفوظة لكنه يمنع استخدام هذه الأداة في أي مكان على موقعك.',
 	[keys.providerFieldSiteIdHelp]: 'الموقع الذي يقيسه Plausible، ويُكتب عادةً بالشكل yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'المفتاح للقراءة فقط الذي تُقرأ به تقاريرك. يُحفظ بأمان ولا يُعرض مرة أخرى.',
+		'مفتاح Stats API من إعدادات حسابك في Plausible، ضمن API Keys. يُخزَّن بأمان ولا يُعرض مرة أخرى.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'مفتاح API شخصي (phx_...) بصلاحية Query Read من إعدادات حسابك في PostHog. يُخزَّن بأمان ولا يُعرض مرة أخرى.',
 	[keys.providerFieldUmamiApiKeyHelp]:
 		'لـ Umami Cloud. في Umami المستضاف ذاتيًا ضع المفتاح في رمز API بدلًا من ذلك. يُحفظ بأمان ولا يُعرض مرة أخرى.',
 	[keys.providerFieldWebsiteIdHelp]: 'معرّف موقعك، وتجده في شريط العنوان في لوحة Umami.',
 	[keys.providerFieldTokenHelp]:
 		'لـ Umami المستضاف ذاتيًا: مفتاح API من إعداداته أو رمز تسجيل الدخول. في Umami Cloud استخدم مفتاح API. يُحفظ بأمان.',
 	[keys.providerFieldPropertyIdHelp]: 'رقم خاصية GA4 من Google Analytics. من دون كلمة properties/.',
-	[keys.providerFieldClientEmailHelp]: 'عنوان حساب الخدمة من الملف الذي أعطتك إياه Google.',
+	[keys.providerFieldClientEmailHelp]:
+		'عنوان حساب الخدمة من الملف الذي قدّمه Google. أضِفه كمُشاهد في إدارة الوصول لموقع GA4، وإلا فستُرفض القراءات.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'المفتاح الخاص من ملف Google نفسه، منسوخًا كما هو تمامًا. يُحفظ بأمان.',
-	[keys.providerFieldProjectIdHelp]: 'المشروع الذي يتصل به هذا.',
+	[keys.providerFieldProjectIdHelp]:
+		'قيمة project_id من ملف حساب الخدمة. اتركه فارغًا لأخذها من الملف.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'الرقم الظاهر باسم Project ID في إعدادات مشروعك في PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'لـ PostHog Cloud فقط. يُتجاهَل عندما يكون المضيف نسخة مستضافة ذاتيًا.',
+		'السحابة في عنوان PostHog الخاص بك: US لـ us.posthog.com و EU لـ eu.posthog.com. يُتجاهل إذا كان المضيف نسخة مستضافة ذاتيًا.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'رمز العملة المكوّن من 3 أحرف لأهداف المبيعات، مثل USD. لن تظهر الإيرادات قبل ضبطه.',
 	[keys.providerFieldGa4CurrencyHelp]:

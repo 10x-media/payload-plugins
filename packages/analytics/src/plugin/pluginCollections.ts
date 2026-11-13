@@ -98,6 +98,7 @@ const providersCollectionOf = async (
 		buildSecret,
 		isSealed,
 		allowPrivateNetwork: resolved.providers.hosts.allowPrivateNetwork,
+		allow: resolved.providers.hosts.allow,
 		...(connectionAccess ? { connectionAccess } : {}),
 		...(defaultAccess ? { defaultAccess } : {}),
 		types: providers.types,

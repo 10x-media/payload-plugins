@@ -1198,12 +1198,15 @@ export const keys: {
     readonly providerFieldRevenueCurrency: "analytics:providerFieldRevenueCurrency";
     readonly providerFieldMeasurementId: "analytics:providerFieldMeasurementId";
     readonly providerFieldCaptureHelp: "analytics:providerFieldCaptureHelp";
+    readonly providerFieldMeasurementIdHelp: "analytics:providerFieldMeasurementIdHelp";
     readonly providerFieldDomainHelp: "analytics:providerFieldDomainHelp";
     readonly providerFieldScriptIdHelp: "analytics:providerFieldScriptIdHelp";
     readonly providerErrorMeasurementId: "analytics:providerErrorMeasurementId";
     readonly providerErrorScriptId: "analytics:providerErrorScriptId";
     readonly providerErrorHostFormat: "analytics:providerErrorHostFormat";
     readonly providerErrorHostInsecure: "analytics:providerErrorHostInsecure";
+    readonly providerErrorHostNotAllowed: "analytics:providerErrorHostNotAllowed";
+    readonly providerErrorSiteDomain: "analytics:providerErrorSiteDomain";
     readonly providerErrorPosthogRegionRequired: "analytics:providerErrorPosthogRegionRequired";
     readonly providerErrorPosthogHostRegion: "analytics:providerErrorPosthogHostRegion";
     readonly providerErrorPosthogTokenAsApiKey: "analytics:providerErrorPosthogTokenAsApiKey";
@@ -1223,6 +1226,7 @@ export const keys: {
     readonly providerConnectionUnsaved: "analytics:providerConnectionUnsaved";
     readonly providerConnectionNoPermission: "analytics:providerConnectionNoPermission";
     readonly providerConnectionRefusedHelp: "analytics:providerConnectionRefusedHelp";
+    readonly providerConnectionRefusedHelpPosthog: "analytics:providerConnectionRefusedHelpPosthog";
     readonly providerConnectionUnreachableHelp: "analytics:providerConnectionUnreachableHelp";
     readonly providerConnectionChecked: "analytics:providerConnectionChecked";
     readonly providerConnectionFailed: "analytics:providerConnectionFailed";
@@ -1414,6 +1418,7 @@ export const keys: {
     readonly providerFieldEnabledHelp: "analytics:providerFieldEnabledHelp";
     readonly providerFieldSiteIdHelp: "analytics:providerFieldSiteIdHelp";
     readonly providerFieldApiKeyHelp: "analytics:providerFieldApiKeyHelp";
+    readonly providerFieldPosthogApiKeyHelp: "analytics:providerFieldPosthogApiKeyHelp";
     readonly providerFieldUmamiApiKeyHelp: "analytics:providerFieldUmamiApiKeyHelp";
     readonly providerFieldWebsiteIdHelp: "analytics:providerFieldWebsiteIdHelp";
     readonly providerFieldTokenHelp: "analytics:providerFieldTokenHelp";
@@ -1421,6 +1426,7 @@ export const keys: {
     readonly providerFieldClientEmailHelp: "analytics:providerFieldClientEmailHelp";
     readonly providerFieldPrivateKeyHelp: "analytics:providerFieldPrivateKeyHelp";
     readonly providerFieldProjectIdHelp: "analytics:providerFieldProjectIdHelp";
+    readonly providerFieldPosthogProjectIdHelp: "analytics:providerFieldPosthogProjectIdHelp";
     readonly providerFieldRegionHelp: "analytics:providerFieldRegionHelp";
     readonly providerFieldRevenueCurrencyHelp: "analytics:providerFieldRevenueCurrencyHelp";
     readonly providerFieldGa4CurrencyHelp: "analytics:providerFieldGa4CurrencyHelp";

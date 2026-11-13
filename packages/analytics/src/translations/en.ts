@@ -118,7 +118,8 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldSiteId]: 'Site ID',
 	[keys.providerFieldApiKey]: 'API key',
 	[keys.providerFieldHost]: 'Host',
-	[keys.providerFieldHostHelp]: 'Leave this blank to use the default address.',
+	[keys.providerFieldHostHelp]:
+		'Only for a self-hosted instance: its address. Leave it blank to use the vendor’s cloud.',
 	[keys.providerFieldWebsiteId]: 'Website ID',
 	[keys.providerFieldToken]: 'API token',
 	[keys.providerFieldPropertyId]: 'Property ID',
@@ -133,6 +134,8 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldMeasurementId]: 'Measurement ID',
 	[keys.providerFieldCaptureHelp]:
 		'This turns on tracking for your site. Leave it blank to turn tracking off.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'The measurement ID (G-...) of your web data stream, from the GA4 admin. It turns on tracking for your site; leave it blank to turn tracking off.',
 	[keys.providerFieldDomainHelp]:
 		"The domain the tracking script reports visits under, usually the same as the site ID. It turns on tracking with Plausible's standard script, and wins over the script ID when both are filled in. Leave it and the script ID blank to turn tracking off.",
 	[keys.providerFieldScriptIdHelp]:
@@ -144,6 +147,10 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Enter only the address, for example https://analytics.example.com or https://example.com/analytics, with no part starting with ? or # and no user name or password.',
 	[keys.providerErrorHostInsecure]: 'The address must start with https://.',
+	[keys.providerErrorHostNotAllowed]:
+		'This site does not allow this address. Ask its developer to add it.',
+	[keys.providerErrorSiteDomain]:
+		'Enter the site as Plausible lists it, such as example.com or example.com/blog.',
 	[keys.providerErrorPosthogRegionRequired]: "Pick your PostHog project's region.",
 	[keys.providerErrorPosthogHostRegion]: 'This address is in the other PostHog region.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'A project token (phc_), not an API key.',
@@ -164,6 +171,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionNoPermission]:
 		'Only someone who may edit this document can test its connection.',
 	[keys.providerConnectionRefusedHelp]: 'Check the key, the IDs and the host.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'Check the key, the IDs, the Region and the host.',
 	[keys.providerConnectionUnreachableHelp]: 'The service did not answer. Try again later.',
 	[keys.providerConnectionChecked]: 'Connection works',
 	[keys.providerConnectionFailed]: 'Connection failed',
@@ -379,7 +387,9 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'The website Plausible tracks, usually written as yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'The read-only key for reading your reports. It is stored securely and never shown again.',
+		'A Stats API key from your Plausible account settings, under API keys. It is stored securely and never shown again.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'A personal API key (phx_...) with the Query Read scope, from your PostHog account settings. It is stored securely and never shown again.',
 	[keys.providerFieldUmamiApiKeyHelp]:
 		'For Umami Cloud. On self-hosted Umami, put the key in API token instead. It is stored securely and never shown again.',
 	[keys.providerFieldWebsiteIdHelp]:
@@ -388,12 +398,16 @@ export const en: LocaleBundle<'one' | 'other'> = {
 		'For self-hosted Umami: an API key from its settings, or a login token. On Umami Cloud, use API key instead. It is stored securely.',
 	[keys.providerFieldPropertyIdHelp]:
 		'The number for your GA4 property, from Google Analytics. Leave off the word properties/.',
-	[keys.providerFieldClientEmailHelp]: 'The service account address from the file Google gave you.',
+	[keys.providerFieldClientEmailHelp]:
+		'The service account address from the file Google gave you. Add it as a Viewer in the GA4 property’s access settings, or reads are refused.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'The private key from that same Google file, copied exactly. It is stored securely.',
-	[keys.providerFieldProjectIdHelp]: 'The project this connects to.',
+	[keys.providerFieldProjectIdHelp]:
+		'The project_id in the service account file. Leave it blank to take it from the file.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'The number shown as Project ID in your PostHog project’s settings.',
 	[keys.providerFieldRegionHelp]:
-		'PostHog Cloud only. Ignored when Host is a self-hosted instance.',
+		'The cloud your PostHog address names: US for us.posthog.com, EU for eu.posthog.com. Ignored when Host is a self-hosted instance.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'The 3-letter currency code for your sales goals, for example USD. Revenue will not show until this is set.',
 	[keys.providerFieldGa4CurrencyHelp]:

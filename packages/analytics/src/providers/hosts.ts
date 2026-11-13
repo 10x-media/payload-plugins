@@ -175,23 +175,33 @@ export const checkDocumentHost = (
 	return { ok: false, host: parsed.origin, reason: 'it is not listed in providers.hosts.allow' }
 }
 
+/** The install's `providers.hosts.allow`, for the `host` field of one vendor. */
+export type ListedHosts = { provider: HostedProvider; allow: readonly HostPattern[] }
+
 /**
  * The `validate` of every provider `host` field: blank, or the address of the service with an
  * optional base path and nothing else, over https unless the install allows private networks.
+ * With `listed`, also the vendor's cloud or an address the allow list names, which reads would
+ * otherwise refuse after the save.
  */
 export const validateProviderHost =
-	(allowPrivateNetwork: boolean): TextFieldSingleValidation =>
+	(allowPrivateNetwork: boolean, listed?: ListedHosts): TextFieldSingleValidation =>
 	(value, { req }) => {
 		if (!value || value.trim() === '') {
 			return true
 		}
 		const parsed = parseHostAddress(value, allowPrivateNetwork)
-		if (!('problem' in parsed)) {
-			return true
+		if ('problem' in parsed) {
+			return asTranslate(req.t)(
+				parsed.problem === 'insecure'
+					? keys.providerErrorHostInsecure
+					: keys.providerErrorHostFormat
+			)
 		}
-		return asTranslate(req.t)(
-			parsed.problem === 'insecure' ? keys.providerErrorHostInsecure : keys.providerErrorHostFormat
-		)
+		return listed &&
+			!checkDocumentHost(listed.provider, value, { allow: listed.allow, allowPrivateNetwork }).ok
+			? asTranslate(req.t)(keys.providerErrorHostNotAllowed)
+			: true
 	}
 
 /**
@@ -199,9 +209,9 @@ export const validateProviderHost =
  * its Region names, or capture would go to one region and reads to the other.
  */
 export const validatePosthogHost =
-	(allowPrivateNetwork: boolean): TextFieldSingleValidation =>
+	(allowPrivateNetwork: boolean, listed?: ListedHosts): TextFieldSingleValidation =>
 	(value, args) => {
-		const address = validateProviderHost(allowPrivateNetwork)(value, args)
+		const address = validateProviderHost(allowPrivateNetwork, listed)(value, args)
 		if (address !== true || !value) {
 			return address
 		}
