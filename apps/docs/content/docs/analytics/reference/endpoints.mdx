@@ -383,10 +383,10 @@ POST /api/_x/provider-status?id=<provider document id>
     "lastSuccessAt": "2026-11-09T10:00:00.000Z",
     "lastErrorAt": "2026-11-09T09:58:12.000Z",
     "errorKind": "source_misconfigured", // or "unavailable"
-    "errorDetail": "posthog: HTTP 403 {\"detail\":\"Invalid personal API key.\"}",
+    "errorDetail": "posthog: HTTP 403 Invalid personal API key.",
     "pausedUntil": "2026-11-09T09:58:42.000Z" // while the source rests
   },
-  "checked": { "ok": false, "kind": "source_misconfigured", "detail": "posthog: HTTP 403 ..." } // POST only
+  "checked": { "ok": false, "kind": "source_misconfigured", "detail": "posthog: HTTP 403 Invalid personal API key." } // POST only
 }
 ```
 
