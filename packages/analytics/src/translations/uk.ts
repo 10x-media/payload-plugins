@@ -151,6 +151,7 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 		'Цей сайт не дозволяє цю адресу. Попросіть розробника додати її.',
 	[keys.providerErrorSiteDomain]:
 		'Введіть сайт так, як він вказаний у Plausible, наприклад example.com або example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Введіть лише число, наприклад 123456789.',
 	[keys.providerErrorPosthogRegionRequired]: 'Виберіть регіон проєкту PostHog.',
 	[keys.providerErrorPosthogHostRegion]: 'Ця адреса з іншого регіону PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Токен проєкту (phc_), а не ключ API.',
@@ -172,6 +173,8 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 		'Перевірити підключення може лише той, кому можна редагувати цей документ.',
 	[keys.providerConnectionRefusedHelp]: 'Перевірте ключ, ID і хост.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'Перевірте ключ, ID, регіон і хост.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Перевірте Property ID і ключ, а також що client email доданий читачем ресурсу.',
 	[keys.providerConnectionUnreachableHelp]: 'Сервіс не відповів. Спробуйте пізніше.',
 	[keys.providerConnectionChecked]: 'Підключення працює',
 	[keys.providerConnectionFailed]: 'Підключення не вдалося',

@@ -148,6 +148,7 @@ export const ko: LocaleBundle<'other'> = {
 		'이 사이트는 이 주소를 허용하지 않습니다. 개발자에게 추가를 요청하세요.',
 	[keys.providerErrorSiteDomain]:
 		'Plausible에 표시된 대로 사이트를 입력하세요. 예: example.com 또는 example.com/blog',
+	[keys.providerErrorPropertyId]: '123456789처럼 숫자만 입력하세요.',
 	[keys.providerErrorPosthogRegionRequired]: 'PostHog 프로젝트 지역을 선택하세요.',
 	[keys.providerErrorPosthogHostRegion]: '다른 PostHog 지역의 주소입니다.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'API 키가 아닌 프로젝트 토큰(phc_)입니다.',
@@ -169,6 +170,8 @@ export const ko: LocaleBundle<'other'> = {
 		'이 문서를 수정할 수 있는 사람만 연결을 테스트할 수 있습니다.',
 	[keys.providerConnectionRefusedHelp]: '키, ID, 호스트를 확인하세요.',
 	[keys.providerConnectionRefusedHelpPosthog]: '키, ID, 지역, 호스트를 확인하세요.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'속성 ID와 키를 확인하고, 클라이언트 이메일이 속성의 뷰어인지 확인하세요.',
 	[keys.providerConnectionUnreachableHelp]: '서비스가 응답하지 않았습니다. 나중에 다시 시도하세요.',
 	[keys.providerConnectionChecked]: '연결 정상',
 	[keys.providerConnectionFailed]: '연결 실패',

@@ -144,6 +144,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerErrorHostNotAllowed]: '此网站不允许使用此地址。请让其开发者添加。',
 	[keys.providerErrorSiteDomain]:
 		'按 Plausible 中列出的方式填写站点，例如 example.com 或 example.com/blog。',
+	[keys.providerErrorPropertyId]: '只填写数字，例如 123456789。',
 	[keys.providerErrorPosthogRegionRequired]: '请选择 PostHog 项目的区域。',
 	[keys.providerErrorPosthogHostRegion]: '此地址属于另一个 PostHog 区域。',
 	[keys.providerErrorPosthogTokenAsApiKey]: '这是项目令牌（phc_），不是 API 密钥。',
@@ -164,6 +165,8 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerConnectionNoPermission]: '只有可以编辑此文档的人才能测试它的连接。',
 	[keys.providerConnectionRefusedHelp]: '请检查密钥、ID 和主机。',
 	[keys.providerConnectionRefusedHelpPosthog]: '请检查密钥、ID、区域和主机。',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'请检查媒体资源 ID 和密钥，并确认客户端邮箱是该媒体资源的查看者。',
 	[keys.providerConnectionUnreachableHelp]: '服务没有响应。请稍后再试。',
 	[keys.providerConnectionChecked]: '连接正常',
 	[keys.providerConnectionFailed]: '连接失败',

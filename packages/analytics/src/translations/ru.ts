@@ -155,6 +155,7 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 		'Этот сайт не разрешает этот адрес. Попросите разработчика добавить его.',
 	[keys.providerErrorSiteDomain]:
 		'Введите сайт так, как он указан в Plausible, например example.com или example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Введите только число, например 123456789.',
 	[keys.providerErrorPosthogRegionRequired]: 'Выберите регион проекта PostHog.',
 	[keys.providerErrorPosthogHostRegion]: 'Этот адрес из другого региона PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Токен проекта (phc_), а не ключ API.',
@@ -176,6 +177,8 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 		'Проверить подключение может только тот, кому можно редактировать этот документ.',
 	[keys.providerConnectionRefusedHelp]: 'Проверьте ключ, ID и хост.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'Проверьте ключ, ID, регион и хост.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Проверьте Property ID и ключ, а также что client email добавлен читателем ресурса.',
 	[keys.providerConnectionUnreachableHelp]: 'Сервис не ответил. Попробуйте позже.',
 	[keys.providerConnectionChecked]: 'Подключение работает',
 	[keys.providerConnectionFailed]: 'Подключение не удалось',

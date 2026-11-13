@@ -151,6 +151,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 		'This site does not allow this address. Ask its developer to add it.',
 	[keys.providerErrorSiteDomain]:
 		'Enter the site as Plausible lists it, such as example.com or example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Enter the number alone, as in 123456789.',
 	[keys.providerErrorPosthogRegionRequired]: "Pick your PostHog project's region.",
 	[keys.providerErrorPosthogHostRegion]: 'This address is in the other PostHog region.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'A project token (phc_), not an API key.',
@@ -172,6 +173,8 @@ export const en: LocaleBundle<'one' | 'other'> = {
 		'Only someone who may edit this document can test its connection.',
 	[keys.providerConnectionRefusedHelp]: 'Check the key, the IDs and the host.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'Check the key, the IDs, the Region and the host.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Check the Property ID and the key, and that the client email is a Viewer of the property.',
 	[keys.providerConnectionUnreachableHelp]: 'The service did not answer. Try again later.',
 	[keys.providerConnectionChecked]: 'Connection works',
 	[keys.providerConnectionFailed]: 'Connection failed',
