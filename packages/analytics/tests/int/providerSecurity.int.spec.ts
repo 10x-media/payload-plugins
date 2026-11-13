@@ -12,6 +12,7 @@ import { tenantMembership } from '../../src/access/membership'
 import { analytics } from '../../src/index'
 import { native } from '../../src/native/nativeAdapter'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
+import { getRuntime } from '../../src/plugin/runtime'
 import { PROVIDERS_SLUG } from '../../src/providers/collection'
 import type { TrackerConfig } from '../../src/tracker/config'
 
@@ -190,10 +191,19 @@ describeForDb('analytics provider security: hosts, retargeting and access', {}, 
 			plausible: {
 				siteId: 'beta.test',
 				apiKey: 'beta-plausible-key-5678',
-				host: UNLISTED,
+				host: ALSO_ALLOWED,
 				domain: 'beta.test',
 			},
 		})
+		// A row saved before the allow list narrowed: a save now refuses an unlisted host.
+		const raw = await stored(betaDoc.id)
+		await payload.db.updateOne({
+			collection: PROVIDERS_SLUG,
+			id: betaDoc.id,
+			data: { plausible: { ...raw.plausible, host: UNLISTED } },
+			returning: false,
+		})
+		getRuntime(payload)?.configChanged?.('providers', [String(betaId)])
 	}, 240_000)
 
 	afterAll(async () => {
@@ -270,6 +280,13 @@ describeForDb('analytics provider security: hosts, retargeting and access', {}, 
 		expect(body.error.param).toBe('host')
 		expect(body.error.message).toContain('providers.hosts.allow')
 		expect(body.error.message).not.toContain('unlisted')
+	})
+
+	it(`refuses saving a host outside providers.hosts.allow on ${db}`, async () => {
+		await expect(
+			updateAs(platform, alphaDoc.id, { plausible: { host: UNLISTED } })
+		).rejects.toThrow('Host')
+		expect((await stored(alphaDoc.id)).plausible?.host).toBe(ALLOWED)
 	})
 
 	it(`refuses the capture slot of an unlisted host and fills a listed one on ${db}`, async () => {
@@ -361,7 +378,10 @@ describeForDb('analytics provider security: hosts, retargeting and access', {}, 
 					provider: 'plausible',
 					enabled: false,
 					scope: alphaId,
-					plausible: { siteId: `${name}.test`, apiKey: `${name}-plausible-key-1357` },
+					plausible: {
+						siteId: `${name.toLowerCase().replace(' ', '-')}.test`,
+						apiKey: `${name}-plausible-key-1357`,
+					},
 				},
 				user: platform.user,
 				overrideAccess: false,

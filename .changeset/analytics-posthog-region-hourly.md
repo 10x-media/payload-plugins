@@ -36,6 +36,14 @@
 
 **Additive: a policy function sees which own sources fail.** Each of `ownSources` carries `failing`, true while the source counts as failing for `'fallback'`, so `({ ownSources }) => ownSources.every((source) => source.failing)` reads the shared source while no own source works.
 
+**Fixed (GA4): a private key that cannot be read reads as a setup to fix.** A service account key pasted incompletely answered "The service did not answer. Try again later." It now reads as refused, and the Connection panel says to check the key.
+
+**Behavioral: a provider document's Host outside `providers.hosts.allow` is refused on save.** The form saved an address the plugin then refused to call, and the Connection panel only said to check the key, the IDs and the host. The **Host** field now says the site does not allow the address. A document saved before keeps reading as refused.
+
+**Fixed (Plausible): Site ID and Website address take the site as Plausible stores it.** An address with `https://`, `www.`, a trailing slash or capital letters saved, and every read answered "Invalid API key or site ID". Both fields now refuse it with a field error; a site in a subfolder (`example.com/blog`) is accepted.
+
+**Fixed: provider fields say what to paste and where to find it.** PostHog's **Project ID**, **API key** (a personal `phx_...` key with the Query Read scope) and **Region**, Plausible's **API key** (a Stats API key), GA4's **Project ID**, **Client email** (added as a Viewer on the property) and **Measurement ID**, and every **Host** (only for a self-hosted instance) say so in all 11 locales. A refused PostHog document's Connection panel names the Region among what to check.
+
 **Upgrade actions**
 
 1. On Postgres or SQLite in migrate mode, generate a migration (`pnpm payload migrate:create`), review it and run it: it creates the `analytics-provider-status` table. Push mode and MongoDB need nothing. Until it runs, connection checks and statuses fail while reads, saves and deletes go on, and no source counts as failing ([From 1.0.0-beta.15](https://docs.10xmedia.de/analytics/upgrading/beta-16)).

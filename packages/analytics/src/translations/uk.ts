@@ -119,7 +119,8 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldSiteId]: 'ID сайту',
 	[keys.providerFieldApiKey]: 'Ключ API',
 	[keys.providerFieldHost]: 'Хост',
-	[keys.providerFieldHostHelp]: 'Залиште порожнім, щоб використати адресу за замовчуванням.',
+	[keys.providerFieldHostHelp]:
+		'Лише для власного екземпляра: його адреса. Залиште порожнім, щоб використовувати хмару сервісу.',
 	[keys.providerFieldWebsiteId]: 'ID вебсайту',
 	[keys.providerFieldToken]: 'Токен API',
 	[keys.providerFieldPropertyId]: 'ID ресурсу',
@@ -133,6 +134,8 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldRevenueCurrency]: 'Валюта доходу',
 	[keys.providerFieldMeasurementId]: 'ID вимірювання',
 	[keys.providerFieldCaptureHelp]: 'Це вмикає збір даних на сайті. Залиште порожнім, щоб вимкнути.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'Ідентифікатор потоку (G-...) вашого вебпотоку даних з адміністрування GA4. Вмикає відстеження на сайті; залиште порожнім, щоб вимкнути його.',
 	[keys.providerFieldDomainHelp]:
 		'Домен, під яким скрипт відстеження записує візити, зазвичай такий самий, як ID сайту. Вмикає збір даних стандартним скриптом Plausible і має перевагу над ID скрипта, якщо заповнено обидва поля. Залиште порожніми і це поле, і ID скрипта, щоб вимкнути збір даних.',
 	[keys.providerFieldScriptIdHelp]:
@@ -144,6 +147,10 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Введіть лише адресу, наприклад https://analytics.example.com або https://example.com/analytics, без частини, що починається з ? чи #, і без імені користувача та пароля.',
 	[keys.providerErrorHostInsecure]: 'Адреса має починатися з https://.',
+	[keys.providerErrorHostNotAllowed]:
+		'Цей сайт не дозволяє цю адресу. Попросіть розробника додати її.',
+	[keys.providerErrorSiteDomain]:
+		'Введіть сайт так, як він вказаний у Plausible, наприклад example.com або example.com/blog.',
 	[keys.providerErrorPosthogRegionRequired]: 'Виберіть регіон проєкту PostHog.',
 	[keys.providerErrorPosthogHostRegion]: 'Ця адреса з іншого регіону PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Токен проєкту (phc_), а не ключ API.',
@@ -164,6 +171,7 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionNoPermission]:
 		'Перевірити підключення може лише той, кому можна редагувати цей документ.',
 	[keys.providerConnectionRefusedHelp]: 'Перевірте ключ, ID і хост.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'Перевірте ключ, ID, регіон і хост.',
 	[keys.providerConnectionUnreachableHelp]: 'Сервіс не відповів. Спробуйте пізніше.',
 	[keys.providerConnectionChecked]: 'Підключення працює',
 	[keys.providerConnectionFailed]: 'Підключення не вдалося',
@@ -380,7 +388,9 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'Сайт, який вимірює Plausible, зазвичай у вигляді yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'Ключ лише для читання, яким запитуються ваші звіти. Зберігається надійно і більше не показується.',
+		'Ключ Stats API з налаштувань облікового запису Plausible, розділ API Keys. Зберігається захищено й більше не показується.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'Персональний API-ключ (phx_...) з правом Query Read з налаштувань облікового запису PostHog. Зберігається захищено й більше не показується.',
 	[keys.providerFieldUmamiApiKeyHelp]:
 		'Для Umami Cloud. Для власного сервера Umami вставте ключ у поле «Токен API». Зберігається надійно і більше не показується.',
 	[keys.providerFieldWebsiteIdHelp]:
@@ -390,12 +400,15 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldPropertyIdHelp]:
 		'Номер вашого ресурсу GA4 у Google Analytics. Без слова properties/.',
 	[keys.providerFieldClientEmailHelp]:
-		'Адреса сервісного облікового запису з файлу, який видав Google.',
+		'Адреса сервісного облікового запису з файлу, який видав Google. Додайте її як читача в керуванні доступом ресурсу GA4, інакше читання буде відхилено.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'Приватний ключ із того самого файлу Google, скопійований точно. Зберігається надійно.',
-	[keys.providerFieldProjectIdHelp]: 'Проєкт, до якого відбувається підключення.',
+	[keys.providerFieldProjectIdHelp]:
+		'project_id з файлу сервісного облікового запису. Залиште порожнім, щоб узяти його з файлу.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'Число, вказане як Project ID у налаштуваннях проєкту PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'Лише для PostHog Cloud. Не враховується, якщо Хост вказує на власний екземпляр PostHog.',
+		'Хмара з вашої адреси PostHog: US для us.posthog.com, EU для eu.posthog.com. Не враховується, якщо Хост вказує на власний екземпляр PostHog.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'Трилітерний код валюти для цілей продажів, наприклад USD. Поки його не задано, дохід не показується.',
 	[keys.providerFieldGa4CurrencyHelp]:

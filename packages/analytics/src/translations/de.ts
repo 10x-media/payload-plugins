@@ -120,7 +120,8 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldSiteId]: 'Website-ID',
 	[keys.providerFieldApiKey]: 'API-Schlüssel',
 	[keys.providerFieldHost]: 'Host',
-	[keys.providerFieldHostHelp]: 'Leer lassen, um die Standardadresse zu verwenden.',
+	[keys.providerFieldHostHelp]:
+		'Nur für eine selbst gehostete Instanz: ihre Adresse. Leer lassen, um die Cloud des Anbieters zu verwenden.',
 	[keys.providerFieldWebsiteId]: 'Website-ID',
 	[keys.providerFieldToken]: 'API-Token',
 	[keys.providerFieldPropertyId]: 'Property-ID',
@@ -135,6 +136,8 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldMeasurementId]: 'Mess-ID',
 	[keys.providerFieldCaptureHelp]:
 		'Damit wird die Messung auf deiner Website eingeschaltet. Leer lassen, um sie auszuschalten.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'Die Mess-ID (G-...) deines Web-Datenstreams aus der GA4-Verwaltung. Sie schaltet das Tracking deiner Website ein; leer lassen, um es auszuschalten.',
 	[keys.providerFieldDomainHelp]:
 		'Die Domain, unter der das Messskript Besuche meldet, meist dieselbe wie die Website-ID. Damit wird die Messung mit dem Standardskript von Plausible eingeschaltet; sind beide Felder ausgefüllt, gilt diese Angabe statt der Skript-ID. Lass sie und die Skript-ID leer, um die Messung auszuschalten.',
 	[keys.providerFieldScriptIdHelp]:
@@ -146,6 +149,10 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Gib nur die Adresse ein, zum Beispiel https://analytics.example.com oder https://example.com/analytics, ohne einen Teil mit ? oder # und ohne Benutzername oder Passwort.',
 	[keys.providerErrorHostInsecure]: 'Die Adresse muss mit https:// beginnen.',
+	[keys.providerErrorHostNotAllowed]:
+		'Diese Website erlaubt diese Adresse nicht. Bitten Sie den Entwickler, sie hinzuzufügen.',
+	[keys.providerErrorSiteDomain]:
+		'Geben Sie die Website so ein, wie Plausible sie führt, etwa example.com oder example.com/blog.',
 	[keys.providerErrorPosthogRegionRequired]: 'Wählen Sie die Region des Projekts.',
 	[keys.providerErrorPosthogHostRegion]: 'Adresse aus der anderen PostHog-Region.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Projekt-Token (phc_), kein API-Schlüssel.',
@@ -166,6 +173,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionNoPermission]:
 		'Nur wer dieses Dokument bearbeiten darf, kann seine Verbindung testen.',
 	[keys.providerConnectionRefusedHelp]: 'Prüfen Sie Schlüssel, IDs und Host.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'Prüfen Sie Schlüssel, IDs, Region und Host.',
 	[keys.providerConnectionUnreachableHelp]:
 		'Der Dienst hat nicht geantwortet. Versuchen Sie es später erneut.',
 	[keys.providerConnectionChecked]: 'Verbindung funktioniert',
@@ -384,7 +392,9 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'Die Website, die Plausible misst, meist in der Form yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'Der nur lesende Schlüssel, mit dem deine Berichte abgerufen werden. Er wird sicher gespeichert und nie wieder angezeigt.',
+		'Ein Stats-API-Schlüssel aus deinen Plausible-Kontoeinstellungen unter API Keys. Er wird sicher gespeichert und nie wieder angezeigt.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'Ein persönlicher API-Schlüssel (phx_...) mit dem Bereich Query Read aus deinen PostHog-Kontoeinstellungen. Er wird sicher gespeichert und nie wieder angezeigt.',
 	[keys.providerFieldUmamiApiKeyHelp]:
 		'Für Umami Cloud. Bei selbst gehostetem Umami gehört der Schlüssel stattdessen in API-Token. Er wird sicher gespeichert und nie wieder angezeigt.',
 	[keys.providerFieldWebsiteIdHelp]:
@@ -394,12 +404,15 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldPropertyIdHelp]:
 		'Die Nummer deiner GA4-Property aus Google Analytics. Ohne das Wort properties/ davor.',
 	[keys.providerFieldClientEmailHelp]:
-		'Die Dienstkonto-Adresse aus der Datei, die du von Google erhalten hast.',
+		'Die Dienstkonto-Adresse aus der Datei, die du von Google erhalten hast. Füge sie in der Zugriffsverwaltung der GA4-Property als Betrachter hinzu, sonst werden Abfragen abgelehnt.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'Der private Schlüssel aus derselben Google-Datei, exakt kopiert. Er wird sicher gespeichert.',
-	[keys.providerFieldProjectIdHelp]: 'Das Projekt, mit dem verbunden wird.',
+	[keys.providerFieldProjectIdHelp]:
+		'Die project_id aus der Dienstkonto-Datei. Leer lassen, um sie aus der Datei zu übernehmen.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'Die Zahl, die in den Einstellungen deines PostHog-Projekts als Project ID steht.',
 	[keys.providerFieldRegionHelp]:
-		'Nur für PostHog Cloud. Wird ignoriert, wenn Host eine selbst gehostete Instanz ist.',
+		'Die Cloud in deiner PostHog-Adresse: US für us.posthog.com, EU für eu.posthog.com. Wird ignoriert, wenn Host eine selbst gehostete Instanz ist.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'Der 3-stellige Währungscode für deine Verkaufsziele, zum Beispiel USD. Ohne ihn wird kein Umsatz angezeigt.',
 	[keys.providerFieldGa4CurrencyHelp]:

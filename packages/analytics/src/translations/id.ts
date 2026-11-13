@@ -121,7 +121,8 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerFieldSiteId]: 'ID situs',
 	[keys.providerFieldApiKey]: 'Kunci API',
 	[keys.providerFieldHost]: 'Host',
-	[keys.providerFieldHostHelp]: 'Kosongkan untuk memakai alamat bawaan.',
+	[keys.providerFieldHostHelp]:
+		'Hanya untuk instans yang di-host sendiri: alamatnya. Biarkan kosong untuk memakai cloud penyedia.',
 	[keys.providerFieldWebsiteId]: 'ID situs web',
 	[keys.providerFieldToken]: 'Token API',
 	[keys.providerFieldPropertyId]: 'ID properti',
@@ -136,6 +137,8 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerFieldMeasurementId]: 'ID pengukuran',
 	[keys.providerFieldCaptureHelp]:
 		'Ini menyalakan pelacakan di situs Anda. Kosongkan untuk mematikannya.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'ID pengukuran (G-...) aliran data web Anda, dari admin GA4. Ini menyalakan pelacakan situs Anda; biarkan kosong untuk mematikannya.',
 	[keys.providerFieldDomainHelp]:
 		'Domain yang dipakai skrip pelacakan untuk mencatat kunjungan, biasanya sama dengan ID situs. Ini menyalakan pelacakan dengan skrip standar Plausible dan didahulukan daripada ID skrip jika keduanya diisi. Kosongkan ini dan ID skrip untuk mematikan pelacakan.',
 	[keys.providerFieldScriptIdHelp]:
@@ -147,6 +150,10 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Masukkan alamatnya saja, misalnya https://analytics.example.com atau https://example.com/analytics, tanpa bagian yang diawali ? atau # dan tanpa nama pengguna atau kata sandi.',
 	[keys.providerErrorHostInsecure]: 'Alamat harus diawali dengan https://.',
+	[keys.providerErrorHostNotAllowed]:
+		'Situs ini tidak mengizinkan alamat ini. Minta pengembangnya untuk menambahkannya.',
+	[keys.providerErrorSiteDomain]:
+		'Masukkan situs seperti yang tercantum di Plausible, seperti example.com atau example.com/blog.',
 	[keys.providerErrorPosthogRegionRequired]: 'Pilih wilayah proyek PostHog Anda.',
 	[keys.providerErrorPosthogHostRegion]: 'Alamat ini dari wilayah PostHog lain.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Token proyek (phc_), bukan kunci API.',
@@ -167,6 +174,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerConnectionNoPermission]:
 		'Hanya yang boleh mengubah dokumen ini yang dapat menguji koneksinya.',
 	[keys.providerConnectionRefusedHelp]: 'Periksa kunci, ID, dan host.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'Periksa kunci, ID, wilayah, dan host.',
 	[keys.providerConnectionUnreachableHelp]: 'Layanan tidak menjawab. Coba lagi nanti.',
 	[keys.providerConnectionChecked]: 'Koneksi berfungsi',
 	[keys.providerConnectionFailed]: 'Koneksi gagal',
@@ -383,7 +391,9 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'Situs yang diukur Plausible, biasanya ditulis seperti yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'Kunci baca-saja untuk mengambil laporan Anda. Disimpan dengan aman dan tidak ditampilkan lagi.',
+		'Kunci Stats API dari pengaturan akun Plausible Anda, di bagian API Keys. Disimpan dengan aman dan tidak ditampilkan lagi.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'Kunci API pribadi (phx_...) dengan cakupan Query Read dari pengaturan akun PostHog Anda. Disimpan dengan aman dan tidak ditampilkan lagi.',
 	[keys.providerFieldUmamiApiKeyHelp]:
 		'Untuk Umami Cloud. Pada Umami yang di-host sendiri, isi kuncinya di Token API. Disimpan dengan aman dan tidak ditampilkan lagi.',
 	[keys.providerFieldWebsiteIdHelp]: 'ID situs Anda, terlihat di bilah alamat dasbor Umami.',
@@ -391,12 +401,16 @@ export const id: LocaleBundle<'other'> = {
 		'Untuk Umami yang di-host sendiri: kunci API dari pengaturannya atau token login. Untuk Umami Cloud, gunakan Kunci API. Disimpan dengan aman.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Nomor properti GA4 Anda dari Google Analytics. Tanpa kata properties/.',
-	[keys.providerFieldClientEmailHelp]: 'Alamat akun layanan dari berkas yang diberikan Google.',
+	[keys.providerFieldClientEmailHelp]:
+		'Alamat akun layanan dari file yang diberikan Google. Tambahkan sebagai Viewer di pengelolaan akses properti GA4, atau pembacaan akan ditolak.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'Kunci privat dari berkas Google yang sama, disalin persis. Disimpan dengan aman.',
-	[keys.providerFieldProjectIdHelp]: 'Proyek yang dihubungkan.',
+	[keys.providerFieldProjectIdHelp]:
+		'project_id dari file akun layanan. Biarkan kosong untuk mengambilnya dari file.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'Angka yang tertera sebagai Project ID di pengaturan proyek PostHog Anda.',
 	[keys.providerFieldRegionHelp]:
-		'Hanya untuk PostHog Cloud. Diabaikan jika Host adalah instans yang dihosting sendiri.',
+		'Cloud pada alamat PostHog Anda: US untuk us.posthog.com, EU untuk eu.posthog.com. Diabaikan jika Host adalah instans yang di-host sendiri.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'Kode mata uang 3 huruf untuk sasaran penjualan Anda, misalnya USD. Pendapatan tidak akan tampil sebelum ini diisi.',
 	[keys.providerFieldGa4CurrencyHelp]:
