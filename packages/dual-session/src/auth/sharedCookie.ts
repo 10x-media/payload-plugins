@@ -47,8 +47,11 @@ export const guardSharedCookie = ({
 	}
 
 	const sharedName = getSharedCookieName(payload.config.cookiePrefix)
-	const isolatedWhole = new Set(entries.filter(({ isolate }) => !isolate).map(({ slug }) => slug))
-	const roleSplit = new Map(
+	// Keyed by plain strings: they are looked up by a token's claim, which no type narrows.
+	const isolatedWhole = new Set<string>(
+		entries.filter(({ isolate }) => !isolate).map(({ slug }) => slug)
+	)
+	const roleSplit = new Map<string, (user: TypedUser) => boolean>(
 		entries.flatMap(({ isolate, slug }) => (isolate ? [[slug, isolate] as const] : []))
 	)
 

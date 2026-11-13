@@ -84,7 +84,7 @@ const hasLiveAdminSession = async ({
 	headers: Headers
 	payload: Payload
 }): Promise<boolean> => {
-	const slug = payload.config.admin.user
+	const slug = payload.config.admin.user as CollectionSlug
 	const token = parseCookies(headers).get(getSharedCookieName(payload.config.cookiePrefix))
 
 	if (!token) {
@@ -106,7 +106,7 @@ const hasLiveAdminSession = async ({
 
 		const user = (await payload.findByID({
 			id: claims.id,
-			collection: slug as CollectionSlug,
+			collection: slug,
 			depth: payload.collections[slug]?.config.auth.depth,
 		})) as null | TypedUser
 
