@@ -1,5 +1,11 @@
 # @10x-media/impersonation
 
+## 0.1.0-beta.3
+
+### Patch Changes
+
+- The "Switch to user" drawer now opens on the full list every time. Before, a search typed into it filtered the list on the next open too, while the search input showed empty, so most accounts went missing with nothing on screen to explain why.
+
 ## 0.1.0-beta.2
 
 ### Patch Changes
