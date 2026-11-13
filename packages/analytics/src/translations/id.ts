@@ -147,6 +147,9 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Masukkan alamatnya saja, misalnya https://analytics.example.com atau https://example.com/analytics, tanpa bagian yang diawali ? atau # dan tanpa nama pengguna atau kata sandi.',
 	[keys.providerErrorHostInsecure]: 'Alamat harus diawali dengan https://.',
+	[keys.providerErrorPosthogHostRegion]: 'Alamat ini dari wilayah PostHog lain.',
+	[keys.providerErrorPosthogTokenAsApiKey]: 'Token proyek (phc_), bukan kunci API.',
+	[keys.providerErrorPosthogKeyAsToken]: 'Ini kunci pribadi. Gunakan token phc_.',
 	[keys.providerFieldIsDefault]: 'Bawaan untuk situs ini',
 	[keys.providerFieldIsDefaultHelp]:
 		'Analitik dibuka dengan alat ini kecuali pembaca memilih yang lain. Hanya satu alat per situs yang bisa menjadi bawaan.',

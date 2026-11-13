@@ -142,6 +142,9 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerErrorHostFormat]:
 		'أدخل العنوان فقط، مثل https://analytics.example.com أو https://example.com/analytics، من دون جزء يبدأ بـ ? أو # ومن دون اسم مستخدم أو كلمة مرور.',
 	[keys.providerErrorHostInsecure]: 'يجب أن يبدأ العنوان بـ https://.',
+	[keys.providerErrorPosthogHostRegion]: 'هذا العنوان من منطقة PostHog الأخرى.',
+	[keys.providerErrorPosthogTokenAsApiKey]: 'هذا رمز مشروع (phc_XXXX) وليس مفتاح API.',
+	[keys.providerErrorPosthogKeyAsToken]: 'هذا مفتاح خاص. استخدم رمز phc_XXXX.',
 	[keys.providerFieldIsDefault]: 'الافتراضي لهذا الموقع',
 	[keys.providerFieldIsDefaultHelp]:
 		'تُفتح التحليلات على هذه الأداة ما لم يختر القارئ أداة أخرى. يمكن أن تكون أداة واحدة فقط لكل موقع هي الافتراضية.',

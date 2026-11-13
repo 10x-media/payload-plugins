@@ -7,6 +7,7 @@ import {
 	parseHostAddress,
 	parseHostPattern,
 	resolveHostPolicy,
+	validatePosthogHost,
 	validateProviderHost,
 } from './hosts'
 
@@ -192,5 +193,63 @@ describe('checkDocumentHost', () => {
 			host: 'umami:3000?x',
 			reason: 'it is not an address this install accepts',
 		})
+	})
+})
+
+describe('validatePosthogHost', () => {
+	const validate = validatePosthogHost(false)
+
+	it.each([
+		['blank Host with Region EU', { host: '', region: 'eu' }, true],
+		['a Host of only spaces with Region EU', { host: '   ', region: 'eu' }, true],
+		['EU Cloud with Region EU', { host: 'https://eu.posthog.com', region: 'eu' }, true],
+		[
+			'EU Cloud inside spaces with Region EU',
+			{ host: '  https://eu.posthog.com  ', region: 'eu' },
+			true,
+		],
+		[
+			'the older US address with Region US',
+			{ host: 'https://app.posthog.com', region: 'us' },
+			true,
+		],
+		[
+			'EU Cloud with no Region, which the host decides',
+			{ host: 'https://eu.posthog.com', region: undefined },
+			true,
+		],
+		[
+			'a self-hosted instance with Region EU',
+			{ host: 'https://ph.example.com', region: 'eu' },
+			true,
+		],
+		[
+			'US Cloud with Region EU',
+			{ host: 'https://us.posthog.com', region: 'eu' },
+			'analytics:providerErrorPosthogHostRegion',
+		],
+		[
+			'the older US address with Region EU',
+			{ host: 'https://app.posthog.com', region: 'eu' },
+			'analytics:providerErrorPosthogHostRegion',
+		],
+		[
+			'EU Cloud with Region US',
+			{ host: 'https://eu.posthog.com', region: 'us' },
+			'analytics:providerErrorPosthogHostRegion',
+		],
+		[
+			'plain http, refused as any host is',
+			{ host: 'http://eu.posthog.com', region: 'eu' },
+			'analytics:providerErrorHostInsecure',
+		],
+		[
+			'a space inside the address',
+			{ host: 'https://eu.posthog .com', region: 'eu' },
+			'analytics:providerErrorHostFormat',
+		],
+	] as const)('%s', (_name, { host, region }, expected) => {
+		const args = { req: { t: (key: string) => key }, siblingData: { region } } as never
+		expect(validate(host, args)).toBe(expected)
 	})
 })

@@ -1,4 +1,5 @@
 import type { TextFieldSingleValidation } from 'payload'
+import { cloudRegionOf, POSTHOG_CLOUD_HOSTS } from '../adapters/posthog/cloud'
 import { isRecord, onlyKeys } from '../core/values'
 import { type OriginProblem, parseHttpUrl, parseOrigin } from '../net/origin'
 import { keys } from '../translations/keys'
@@ -14,7 +15,7 @@ export type HostedProvider = 'plausible' | 'umami' | 'posthog'
 export const CLOUD_ORIGINS: Readonly<Record<HostedProvider, readonly string[]>> = {
 	plausible: ['https://plausible.io'],
 	umami: ['https://api.umami.is', 'https://cloud.umami.is'],
-	posthog: ['https://us.posthog.com', 'https://eu.posthog.com', 'https://app.posthog.com'],
+	posthog: Object.keys(POSTHOG_CLOUD_HOSTS).map((hostname) => `https://${hostname}`),
 }
 
 /** One `providers.hosts.allow` entry, parsed. */
@@ -187,4 +188,22 @@ export const validateProviderHost =
 		return asTranslate(req.t)(
 			parsed.problem === 'insecure' ? keys.providerErrorHostInsecure : keys.providerErrorHostFormat
 		)
+	}
+
+/**
+ * A PostHog document's Host, after `validateProviderHost`: a PostHog Cloud address must be the cloud
+ * its Region names, or capture would go to one region and reads to the other.
+ */
+export const validatePosthogHost =
+	(allowPrivateNetwork: boolean): TextFieldSingleValidation =>
+	(value, args) => {
+		const address = validateProviderHost(allowPrivateNetwork)(value, args)
+		if (address !== true || !value) {
+			return address
+		}
+		const region = isRecord(args.siblingData) ? args.siblingData.region : undefined
+		const cloud = cloudRegionOf(value)
+		return cloud && (region === 'us' || region === 'eu') && cloud !== region
+			? asTranslate(args.req.t)(keys.providerErrorPosthogHostRegion)
+			: true
 	}

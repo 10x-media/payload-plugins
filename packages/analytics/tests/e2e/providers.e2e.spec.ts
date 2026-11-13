@@ -63,3 +63,50 @@ test('@narrowed-providers a stored type no longer served opens, shows its type a
 	const stored = await page.request.get(`/api/analytics-providers/${id}?depth=0`)
 	expect(await stored.json()).toMatchObject({ name: RETIRED, provider: 'native' })
 })
+
+/** A new PostHog document's form, named and on its type, before anything is saved. */
+const posthogDraft = async (page: Page, name: string): Promise<void> => {
+	await page.goto(`${COLLECTION}/create`)
+	await expect(page.locator('#field-name')).toBeEditable()
+	await page.locator('#field-name').fill(name)
+	await providerSelect(page).locator('.rs__control').click()
+	await page.locator('.rs__option', { hasText: 'PostHog' }).click()
+	await expect(page.locator('#field-posthog__host')).toBeVisible()
+}
+
+/** A save the form refused, the toast naming the field it refused on. */
+const refused = async (page: Page, field: string): Promise<void> => {
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page.locator('[data-sonner-toast]', { hasText: `PostHog → ${field}` })).toBeVisible()
+	await expect(page).toHaveURL(/\/create$/)
+}
+
+test('a PostHog Host on the other cloud region than its Region is refused, spaces around a matching one are not', async ({
+	page,
+}) => {
+	await login(page.request)
+	await posthogDraft(page, `PostHog region ${Date.now()}`)
+	await page.locator('#field-posthog__region .rs__control').click()
+	await page.locator('.rs__option', { hasText: /^EU$/ }).click()
+
+	await page.locator('#field-posthog__host').fill('https://us.posthog.com')
+	await refused(page, 'Host')
+
+	await page.locator('#field-posthog__host').fill('  https://eu.posthog.com  ')
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
+})
+
+for (const [field, label, value] of [
+	['apiKey', 'API key', '  phc_e2e_token'],
+	['projectToken', 'Project token', 'phx_e2e_key  '],
+] as const) {
+	test(`a PostHog ${label} holding the other kind of key is refused, spaces around it and all`, async ({
+		page,
+	}) => {
+		await login(page.request)
+		await posthogDraft(page, `PostHog ${field} ${Date.now()}`)
+		await page.locator(`#field-posthog__${field}`).fill(value)
+		await refused(page, label)
+	})
+}
