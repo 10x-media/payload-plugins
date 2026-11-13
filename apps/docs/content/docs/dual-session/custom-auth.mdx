@@ -91,6 +91,34 @@ const cookie = generateIsolatedAuthCookie({ collection: 'customers', payload, to
 ;(await cookies()).set(...parseSetCookie(cookie))
 ```
 
+## Resolving the user in server code
+
+A server action or a route handler has no Payload `req`, so it resolves the user itself, and after the split there are two users to choose from. A "current customer" helper that reads only the isolated cookie is right for the website and wrong for anything staff-only that reuses it:
+
+- a server action behind a custom admin view that checks for a staff role gets the customer, or nobody. If it throws `forbidden()` or `unauthorized()`, the whole admin page goes down with it, not just the widget;
+- a draft-preview route lives outside `/admin`, so the proxy scopes it `frontend`, and `payload.auth` resolves the editor's website account instead of their admin session.
+
+Say which session you mean, by setting the scope yourself:
+
+```ts title="lib/auth.ts"
+import { AUTH_SCOPE_HEADER, type AuthScope } from '@10x-media/dual-session'
+import { headers as requestHeaders } from 'next/headers'
+
+const resolveUser = async (scope: AuthScope) => {
+  const headers = new Headers(await requestHeaders())
+  headers.set(AUTH_SCOPE_HEADER, scope)
+  return (await payload.auth({ headers })).user
+}
+
+/** Staff-only code: the admin panel's session, never a website one. */
+export const getAdminUser = () => resolveUser('admin')
+
+/** Website code: the isolated session, or a staff session if that is all there is. */
+export const getWebsiteUser = () => resolveUser('frontend')
+```
+
+`admin` makes every isolated cookie stand down, so what is left is the shared cookie's session. `frontend` lets the isolated cookies answer first, but the shared cookie is never scoped, so a visitor who is only signed in to the admin panel still comes back as that admin: check `user.collection` when the difference matters. Pass your `scopeHeader` instead of `AUTH_SCOPE_HEADER` if you changed it.
+
 ## Logging out
 
 Clear the isolated cookie by name:
@@ -110,7 +138,7 @@ Or just call `POST /api/customers/logout`, which the plugin already shadows and 
 
 **A strategy that reads `payload-token` itself.** If your code parses the shared cookie and authorizes an isolated collection from it, the scopes break and the plugin cannot help: it never sees that decision. Read the isolated cookie instead, or let the plugin's strategy handle cookie auth and keep yours to the out-of-band proof.
 
-**Auth plugins in general.** Anything that writes `generatePayloadCookie` from code you do not control bypasses isolation, and anything declaring its own `/login` on the same collection collides with the endpoint this plugin declares there. If the plugin exposes a hook for setting the cookie, use it with `generateIsolatedAuthCookie`; if it does not, that collection cannot be isolated. [Other plugins that touch auth](/dual-session/limits#other-plugins-that-touch-auth) has the full list of what breaks and how to check.
+**Auth plugins in general.** Anything that writes `generatePayloadCookie` from code you do not control overwrites the admin session with one that does not authenticate, and anything declaring its own `/login` on the same collection collides with the endpoint this plugin declares there. If the plugin exposes a hook for setting the cookie, use it with `generateIsolatedAuthCookie`; if it does not, that collection cannot be isolated. [Other plugins that touch auth](/dual-session/limits#other-plugins-that-touch-auth) has the full list of what breaks and how to check.
 
 ## Where your strategy sits in the chain
 

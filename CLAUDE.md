@@ -191,13 +191,17 @@ Tracked files are compared byte for byte, so they cannot contain `{{placeholder}
 
 ## Release flow
 
-The repo is in beta pre-mode. The flow is currently split, because the npm account is `auth-and-writes` 2FA and pnpm 10 has no OIDC, so CI cannot publish:
+The repo is in beta pre-mode: `main` is the Payload 3 line, every package is `0.x.y-beta.N` (analytics `1.0.0-beta.N`), and it owns the `latest` dist-tag. The `v4` branch is the Payload 4 line on `alpha` and publishes through its own copy of `release.yml`. CI publishes through npm trusted publishing (OIDC, no token):
 
-1. `release.yml` opens or updates a "Version Packages" PR aggregating queued changesets. It no longer publishes.
-2. Merge that PR, then publish each bumped package from `main` with `pnpm publish:plugin <name>` (interactive passkey). The script publishes to npm and pushes the `@10x-media/<name>@<version>` tag.
-3. The tag push triggers `release-notes.yml`, which creates the per-package GitHub release from its `CHANGELOG.md`.
+1. `release.yml`'s `version` job opens or updates a "Version Packages" PR into `main` aggregating queued changesets.
+2. Merging that PR is the release. With no changesets left queued, the `publish` job runs `scripts/publish-unreleased.sh`: every public package whose version is not on npm is built, packed with pnpm and published with npm (pnpm 10 cannot do OIDC) under `latest`. It pushes the `@10x-media/<name>@<version>` tag and dispatches `release-notes.yml`, which creates the GitHub release from the package's `CHANGELOG.md`.
+3. Publishing is idempotent. After a failure, re-run the job or dispatch `release.yml` from `main`: only missing versions go out, and nothing needs a bump. `private` packages (automations) are skipped.
 
-Planned: move to pnpm 11 + npm OIDC trusted publishing so CI publishes and releases again (restore the `publish:` step in `release.yml`). To exit beta: `pnpm changeset pre exit` and add a major-bump changeset for each package going stable.
+Only `latest` moves: OIDC authorizes `npm publish` and nothing else, so CI cannot run `npm dist-tag add`, and the old `beta` dist-tag stays where the last manual release left it.
+
+Each public package's trusted publisher on npmjs.com names this repository and `release.yml`, so renaming the workflow means updating every package. npm only configures one for a package that exists, so a new plugin's first release is manual: `pnpm publish:plugin <name>` (interactive passkey, also `latest`), then `npx npm@12.2.2 trust github @10x-media/<name> --repo 10x-media/payload-plugins --file release.yml --allow-publish --allow-stage-publish` (npm 11 omits the permissions the registry now requires and gets a bare 400; on npmjs.com, tick "Allow npm publish"). The registry marks a new trusted publisher pending until a publish through it validates it, within about 48 hours. `snapshot.yml` cannot publish until it moves into `release.yml`.
+
+To exit beta: `pnpm changeset pre exit` and add a major-bump changeset for each package going stable.
 
 ## Process hygiene
 

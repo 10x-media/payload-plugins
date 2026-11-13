@@ -56,6 +56,16 @@ const parseDraft = (raw: string): number | null => {
 	return Number.isFinite(parsed) ? parsed : null
 }
 
+/**
+ * The major part of a compound draft. An empty major beside a minor that holds a number
+ * reads as zero (`'' ft 5 in` is 5 in), so typing only the minor part commits; with both
+ * parts empty, or an unparseable major, there is nothing to commit.
+ */
+const parseMajorDraft = (drafts: MeasurementDrafts): number | null => {
+	if (drafts.primary.trim() === '' && parseDraft(drafts.minor) !== null) return 0
+	return parseDraft(drafts.primary)
+}
+
 // draftsFor/commitDrafts default to 'faithful'/'free'/ALL_DIRTY when a caller omits
 // them, i.e. the shape of 'exact' mode, not the engine's own 'readable' default: the
 // component always threads its resolved precision explicitly, so these bare defaults
@@ -91,7 +101,7 @@ export const commitDrafts = (drafts: MeasurementDrafts, opts: CommitOptions): nu
 			const exactTotal = exact.major * compound.ratio + exact.minor
 
 			if (dirty.primary) {
-				let typedMajor = parseDraft(drafts.primary)
+				let typedMajor = parseMajorDraft(drafts)
 				if (typedMajor === null) return null
 				if (entry === 'quantize') {
 					typedMajor = roundTo(typedMajor, engine.precisionFor(compound.major, precision))
@@ -125,12 +135,12 @@ export const commitDrafts = (drafts: MeasurementDrafts, opts: CommitOptions): nu
 
 		let major: number | null
 		if (dirty.primary) {
-			major = parseDraft(drafts.primary)
+			major = parseMajorDraft(drafts)
 			if (major !== null && entry === 'quantize') {
 				major = roundTo(major, engine.precisionFor(compound.major, precision))
 			}
 		} else {
-			major = stored ? stored.major : parseDraft(drafts.primary)
+			major = stored ? stored.major : parseMajorDraft(drafts)
 		}
 		if (major === null) return null
 

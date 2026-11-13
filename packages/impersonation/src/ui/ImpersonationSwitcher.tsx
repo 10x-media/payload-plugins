@@ -220,7 +220,10 @@ export const ImpersonationSwitcher = ({
 				className="impersonation-switcher-button"
 				margin={false}
 				onClick={() => {
+					// The drawer mounts a fresh, empty search input on every open, so the query
+					// behind the list has to start empty too.
 					setPage(1)
+					setSearch('')
 					openModal(drawerSlug)
 				}}
 				size="small"

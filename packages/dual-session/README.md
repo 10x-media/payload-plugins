@@ -6,7 +6,7 @@ Give each Payload auth collection its own session cookie, so an admin session an
 
 [![npm](https://img.shields.io/npm/v/@10x-media/dual-session?style=flat-square)](https://www.npmjs.com/package/@10x-media/dual-session)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta until a stable 1.0: `-beta.N` releases on the `latest` dist-tag.
 
 > [!WARNING]
 > **Experimental.** This plugin changes how sessions are established, which is not a place where a subtle bug announces itself. It is covered by unit, integration and end-to-end tests against Payload's real routing on both Mongo and Postgres, but auth surfaces differ a lot between projects and yours may take a path none of those cover. Try it in staging first, and [report anything that looks off](https://github.com/10x-media/payload-plugins/issues).

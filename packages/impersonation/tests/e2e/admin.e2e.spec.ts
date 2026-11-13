@@ -51,6 +51,27 @@ test('staff can switch to a user and return', async ({ page }) => {
 	await expect(page.locator('.impersonation-switcher-button')).toBeVisible()
 })
 
+test('reopening the picker clears the previous search', async ({ page }) => {
+	await loginAdmin(page)
+	const drawer = page.locator('.drawer--is-open')
+	const cards = drawer.locator('.impersonation-card__pick')
+
+	await page.locator('.impersonation-switcher-button').click()
+	await expect(cards.first()).toBeVisible()
+	const unfiltered = await cards.count()
+	expect(unfiltered).toBeGreaterThan(1)
+
+	await drawer.locator('.search-filter input').fill('Dev Editor')
+	await expect(cards).toHaveCount(1)
+
+	await drawer.locator('.drawer__header__close').click()
+	await expect(drawer).toHaveCount(0)
+
+	await page.locator('.impersonation-switcher-button').click()
+	await expect(drawer.locator('.search-filter input')).toHaveValue('')
+	await expect(cards).toHaveCount(unfiltered)
+})
+
 test('bar stays on /admin/unauthorized for a non-staff target', async ({ page }) => {
 	await loginAdmin(page)
 	await startAs(page, 'Dev User')

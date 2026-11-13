@@ -8,7 +8,7 @@ Payload signs every collection's token into one config-wide cookie, `${cookiePre
 `@10x-media/dual-session` moves the collections you name onto cookies of their own, so both sessions live at once.
 
 <Callout type="warn">
-**Experimental.** This plugin changes how sessions are established, which is not a place where a subtle bug announces itself. It is covered by unit, integration and end-to-end tests against Payload's real routing on both Mongo and Postgres, but auth surfaces differ a lot between projects, and yours may take a path none of those cover. It ships under the `beta` dist-tag and the API can still change.
+**Experimental.** This plugin changes how sessions are established, which is not a place where a subtle bug announces itself. It is covered by unit, integration and end-to-end tests against Payload's real routing on both Mongo and Postgres, but auth surfaces differ a lot between projects, and yours may take a path none of those cover. It ships as a beta and the API can still change.
 
 Try it in staging first, and check the thing it exists for: log in to the admin panel and to the website in one browser, and confirm both sessions survive a reload, a refresh and a logout of the other. [Report anything that looks off](https://github.com/10x-media/payload-plugins/issues): edge cases found in real projects are the point of the beta.
 </Callout>
