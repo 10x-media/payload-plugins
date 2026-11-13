@@ -60,10 +60,13 @@ const movedBy = (
 	originalDoc: Doc,
 	scopeField: string
 ): { everyProvider: boolean; retargeted: ReadonlySet<ProviderId> } => {
-	const moved = (path: string): boolean => {
-		const next = valueAt(data, path)
-		return next !== undefined && comparable(next) !== comparable(valueAt(originalDoc, path))
-	}
+	// A host with and without a trailing slash is the same address.
+	const at = (doc: Doc, path: string): string | null =>
+		path.endsWith('.host')
+			? (comparable(valueAt(doc, path))?.replace(/\/+$/, '') ?? null)
+			: comparable(valueAt(doc, path))
+	const moved = (path: string): boolean =>
+		valueAt(data, path) !== undefined && at(data, path) !== at(originalDoc, path)
 	const retargeted = new Set<ProviderId>()
 	for (const { provider, path } of CONNECTION_PATHS) {
 		if (provider !== null && !POSTHOG_READ_PATHS.has(path) && moved(path)) {
