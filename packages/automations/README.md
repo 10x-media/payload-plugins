@@ -6,7 +6,7 @@ A no-code automation engine for Payload v3: editors will compose automations fro
 
 [![npm](https://img.shields.io/npm/v/@10x-media/automations?style=flat-square)](https://www.npmjs.com/package/@10x-media/automations)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta until a stable 1.0: `-beta.N` releases on the `latest` dist-tag.
 
 > Beta scaffold: installing the plugin today registers translations and records the resolved trigger catalog on the config. It adds no collections, no UI, and runs nothing yet.
 

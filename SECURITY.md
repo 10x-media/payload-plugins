@@ -13,4 +13,4 @@ Include the affected package and version, a description of the issue, reproducti
 
 ## Supported versions
 
-The project is in beta; `@10x-media/*` packages publish as `0.x` releases under the `beta` dist-tag. Security fixes land on the latest published version of each package. Older betas are not maintained, so upgrade to the latest release to receive fixes.
+The project is in beta; `@10x-media/*` packages publish as `0.x` beta releases on the `latest` dist-tag. Security fixes land on the latest published version of each package. Older betas are not maintained, so upgrade to the latest release to receive fixes.

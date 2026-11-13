@@ -6,7 +6,7 @@ An end-to-end forms platform for Payload v3: author forms in the admin, validate
 
 [![npm](https://img.shields.io/npm/v/@10x-media/form-builder?style=flat-square)](https://www.npmjs.com/package/@10x-media/form-builder)
 
-Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta: published under the `beta` dist-tag until a stable 1.0.
+Part of the [@10x-media Payload plugins](https://github.com/10x-media/payload-plugins) collection. In beta until a stable 1.0: `-beta.N` releases on the `latest` dist-tag.
 
 ## Features
 
