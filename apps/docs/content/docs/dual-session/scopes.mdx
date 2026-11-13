@@ -29,7 +29,9 @@ Two rules for whoever sets it:
 The scope picks *which of the caller's own sessions* to use. It is not an authorization boundary: forcing `admin` only makes fewer credentials count, and forcing `frontend` only honours a cookie the caller already holds. Do not read it inside your own access control.
 </Callout>
 
-**Scopes govern isolated cookies only.** A session on the shared `${cookiePrefix}-token` is read by core's own strategy, which has never heard of scopes and authenticates every request whatever the header says. That is deliberate: it is what keeps the admin panel reachable, and why an editor browsing the website is still the editor there. On a role-split collection it means the staff half is not scoped at all, and only the website half is.
+**Scopes govern isolated cookies only.** A session on the shared `${cookiePrefix}-token` is read by core's own `local-jwt`, which has never heard of scopes and authenticates every request whatever the header says. That is deliberate: it is what keeps the admin panel reachable, and why an editor browsing the website is still the editor there. On a role-split collection it means the staff half is not scoped at all, and only the website half is.
+
+`local-jwt` is always the last strategy in the chain, so an isolated strategy that stands down does not mean "no user": the request falls through to the shared cookie. That is why the plugin keeps `local-jwt` from honouring a token of an isolated session found there, such as one from before the plugin was deployed. See [Sessions left in the shared cookie](/dual-session/limits#sessions-left-in-the-shared-cookie).
 
 Absent is a state to use, not a failure to avoid. A proxy or middleware that cannot attribute a request should send no scope, and the plugin then answers by checking whether an admin session actually exists.
 

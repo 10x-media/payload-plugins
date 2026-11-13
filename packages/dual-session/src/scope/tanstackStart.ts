@@ -1,4 +1,5 @@
 import { createMiddleware } from '@tanstack/react-start'
+import { findStaleSharedCookie, withoutCookie } from './staleSharedToken'
 import { type AuthScopeRequestOptions, stampAuthScope } from './stampAuthScope'
 
 export type AuthScopeMiddlewareOptions = AuthScopeRequestOptions
@@ -31,8 +32,19 @@ export type AuthScopeMiddlewareOptions = AuthScopeRequestOptions
  * ```
  */
 export const createAuthScopeMiddleware = (options: AuthScopeMiddlewareOptions = {}) =>
-	createMiddleware().server(({ handlerType, next, request }) => {
+	createMiddleware().server(async ({ handlerType, next, request }) => {
 		const url = new URL(request.url)
+		const stale = findStaleSharedCookie(request.headers, options.clearStaleSharedCookie)
+
+		if (stale) {
+			const cookie = withoutCookie(request.headers, stale).get('Cookie')
+
+			if (cookie) {
+				request.headers.set('Cookie', cookie)
+			} else {
+				request.headers.delete('Cookie')
+			}
+		}
 
 		stampAuthScope({
 			headers: request.headers,
@@ -43,5 +55,29 @@ export const createAuthScopeMiddleware = (options: AuthScopeMiddlewareOptions = 
 			request,
 		})
 
-		return next()
+		const result = await next()
+
+		if (!stale) {
+			return result
+		}
+
+		// A handler may return a response whose headers are immutable (a `Response.redirect`, a
+		// proxied `fetch`), so the cookie is expired on a copy.
+		const response = new Response(result.response.body, result.response)
+		response.headers.append(
+			'Set-Cookie',
+			expireCookie(stale, options.clearStaleSharedCookie?.domain)
+		)
+
+		return { ...result, response }
 	})
+
+/** A `Set-Cookie` value that expires `name` in the browser, matching how Payload wrote it. */
+const expireCookie = (name: string, domain: string | undefined): string =>
+	[
+		`${name}=`,
+		...(domain ? [`Domain=${domain}`] : []),
+		'Path=/',
+		'Expires=Thu, 01 Jan 1970 00:00:00 GMT',
+		'HttpOnly',
+	].join('; ')

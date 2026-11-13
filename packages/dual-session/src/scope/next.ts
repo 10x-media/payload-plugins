@@ -1,4 +1,5 @@
 import { type NextRequest, NextResponse } from 'next/server'
+import { findStaleSharedCookie, withoutCookie } from './staleSharedToken'
 import { type AuthScopeRequestOptions, stampAuthScope } from './stampAuthScope'
 
 export type AuthScopeProxyOptions = AuthScopeRequestOptions<NextRequest>
@@ -25,7 +26,8 @@ export type AuthScopeProxyOptions = AuthScopeRequestOptions<NextRequest>
 export const createAuthScopeProxy =
 	(options: AuthScopeProxyOptions = {}) =>
 	(request: NextRequest) => {
-		const headers = new Headers(request.headers)
+		const stale = findStaleSharedCookie(request.headers, options.clearStaleSharedCookie)
+		const headers = stale ? withoutCookie(request.headers, stale) : new Headers(request.headers)
 
 		stampAuthScope({
 			headers,
@@ -35,5 +37,16 @@ export const createAuthScopeProxy =
 			request,
 		})
 
-		return NextResponse.next({ request: { headers } })
+		const response = NextResponse.next({ request: { headers } })
+
+		if (stale) {
+			response.cookies.set(stale, '', {
+				domain: options.clearStaleSharedCookie?.domain,
+				expires: new Date(0),
+				httpOnly: true,
+				path: '/',
+			})
+		}
+
+		return response
 	}

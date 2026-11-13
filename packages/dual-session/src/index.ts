@@ -1,6 +1,7 @@
 import { type CollectionConfig, type Config, definePlugin } from 'payload'
 
 import { buildIsolatedAuthEndpoints } from './auth/endpoints'
+import { guardSharedCookie } from './auth/sharedCookie'
 import { createIsolatedAuthStrategy } from './auth/strategy'
 import { PLUGIN_SLUG } from './plugin/constants'
 import { registerTranslations } from './plugin/registerTranslations'
@@ -37,7 +38,9 @@ declare module 'payload' {
  * 1. shadowing the collection's built-in auth endpoints with replacements that read and
  *    write the scoped cookie (Payload matches collection-declared endpoints before its
  *    own built-ins), and
- * 2. registering an auth strategy on the collection that authenticates from that cookie.
+ * 2. registering an auth strategy on the collection that authenticates from that cookie, and
+ * 3. keeping core's `local-jwt` from honouring a token of an isolated session that was left
+ *    in the shared cookie (see `guardSharedCookie`).
  *
  * The admin collection (`admin.user`) keeps the shared cookie. It may only be listed with
  * an `isolate` predicate, which moves the users it selects onto a second cookie and leaves
@@ -58,12 +61,14 @@ export const dualSession = definePlugin<DualSessionPluginOptions>({
 		const adminSessionPriority = options.adminSessionPriority ?? true
 		const incomingCollections = incomingConfig.collections ?? []
 
+		const adminUserSlug = resolveAdminUserSlug(incomingConfig)
 		const { collections: isolated, warnings } = selectCollections({
-			adminUserSlug: resolveAdminUserSlug(incomingConfig),
+			adminUserSlug,
 			collections: options.collections,
 			cookiePrefix,
 			incoming: incomingCollections,
 		})
+		const adminIsolate = isolated.find(({ slug }) => slug === adminUserSlug)?.isolate
 
 		const collections: CollectionConfig[] = incomingCollections.map((collection) => {
 			const match = isolated.find(({ slug }) => slug === collection.slug)
@@ -73,6 +78,7 @@ export const dualSession = definePlugin<DualSessionPluginOptions>({
 
 			const auth = typeof collection.auth === 'object' ? collection.auth : {}
 			const strategy = createIsolatedAuthStrategy({
+				adminIsolate,
 				adminSessionPriority,
 				cookieName: match.cookieName,
 				// Everything listed before this collection outranks it.
@@ -101,16 +107,17 @@ export const dualSession = definePlugin<DualSessionPluginOptions>({
 
 		const config: Config = { ...incomingConfig, collections }
 
-		if (warnings.length > 0) {
+		const priorOnInit = incomingConfig.onInit
+		config.onInit = async (payload) => {
+			// Core's `local-jwt` only exists once Payload has assembled its strategy chain, which
+			// it does right before onInit.
+			guardSharedCookie({ entries: isolated, payload })
 			// `payload.logger` only exists once Payload has booted, so a config-time problem
 			// has to wait for onInit to be reported through the project's own logger.
-			const priorOnInit = incomingConfig.onInit
-			config.onInit = async (payload) => {
-				for (const warning of warnings) {
-					payload.logger.warn(warning)
-				}
-				await priorOnInit?.(payload)
+			for (const warning of warnings) {
+				payload.logger.warn(warning)
 			}
+			await priorOnInit?.(payload)
 		}
 
 		return config
