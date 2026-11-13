@@ -29,11 +29,13 @@ import { type ProviderAccessArgs, providerCreateAccess, providerRowAccess } from
 import {
 	type HostedProvider,
 	type HostPattern,
+	type ListedHosts,
 	validatePosthogHost,
 	validatePosthogRegion,
 	validateProviderHost,
 } from './hosts'
 import { PROVIDER_IDS, PROVIDER_NAMES, type ProviderId } from './ids'
+import { versionOf } from './probe'
 import { reconnects, retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
 import { stampScope } from './stampScope'
@@ -163,9 +165,18 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	listNotice?: boolean
 	/**
 	 * Forgets a document's last connection result: on its delete, and on a save that changes how
-	 * it connects. Absent without the provider status collection.
+	 * it connects.
 	 */
 	forgetStatus?: (docId: string, req: PayloadRequest) => Promise<void>
+	/**
+	 * Moves a document's last connection result to the version a save gave it, when the save left
+	 * how the document connects as it was.
+	 */
+	carryStatus?: (
+		docId: string,
+		versions: { from: string; to: string },
+		req: PayloadRequest
+	) => Promise<void>
 }
 
 /**
@@ -279,7 +290,7 @@ const hostField = (
 	access: ConnectionFieldAccess | undefined,
 	opts: {
 		validate?: TextFieldSingleValidation
-		listed?: { provider: HostedProvider; allow: readonly HostPattern[] }
+		listed?: ListedHosts
 	} = {}
 ): Field => ({
 	name: 'host',
@@ -713,6 +724,12 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 				async ({ context, doc, operation, previousDoc, req }) => {
 					if (operation === 'update' && reconnectedOf(context).delete(String(doc.id))) {
 						await args.forgetStatus?.(String(doc.id), req)
+					} else if (operation === 'update') {
+						await args.carryStatus?.(
+							String(doc.id),
+							{ from: versionOf(previousDoc.updatedAt), to: versionOf(doc.updatedAt) },
+							req
+						)
 					}
 					await args.onChange(
 						{

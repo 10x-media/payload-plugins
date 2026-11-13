@@ -390,11 +390,11 @@ POST /api/_x/provider-status?id=<provider document id>
 }
 ```
 
-Every field of `status` is absent until it was written, so a document nothing has read yet answers `{ "status": {} }`. Ordinary reads write it as well: a failure at once, a success at most every 15 minutes per instance and at once after a failure. `errorDetail` is the vendor's answer cut to 300 characters; a refused host keeps none.
+Every field of `status` is absent until it was written, so a document nothing has read yet answers `{ "status": {} }`, and so does one whose last result is about its settings before a save that changed how it connects. Ordinary reads write it as well: a failure at once, a success at most every 15 minutes per instance and at once after a failure. `errorDetail` is the vendor's answer cut to 300 characters; a refused host keeps none.
 
 Access is Payload's own for the provider document, asked with the caller's user: `GET` needs read access to it and `POST` update access. A document the caller may not read, another tenant's included, answers `404` exactly like a missing one, and nothing is sent to its vendor.
 
-A check waits 10 seconds for the vendor. A document without its key or ids is refused without asking the vendor. A second `POST` for the same document within 5 seconds on one instance, with no save in between, answers the first one's result without `checked` and asks nothing.
+A check waits 10 seconds for the vendor. A document without its key or ids is refused without asking the vendor. A second `POST` for the same document within 5 seconds on one instance, with no save in between, answers the stored result without `checked` and asks nothing.
 
 ## Goals endpoint
 
@@ -571,7 +571,7 @@ The union is exported as `AnalyticsErrorCode` (with `QueryErrorCode` as an alias
 | `/_x/provider-status` | `401` | `unauthorized` | | no signed-in user |
 | `/_x/provider-status` | `403` | `forbidden` | | a `POST` from a caller who may read the document but not update it |
 | `/_x/provider-status` | `404` | `not_found` | `id` | the document does not exist or the caller may not read it; the two are one answer |
-| `/_x/provider-status` | `500` | `internal` | | the document or its status could not be read or written; logged with the document id |
+| `/_x/provider-status` | `500` | `internal` | | the document, or on a `GET` its status, could not be read; logged with the document id |
 | `/_x/provider-status` | `503` | `unavailable` | | this Payload instance runs without the plugin |
 | `/_x/goals` | `400` | `untrusted_scope` | | the request's own tenant is one `scope.member` says the user does not belong to |
 | `/_x/goals` | `401` | `unauthorized` | | no signed-in user |
