@@ -408,8 +408,7 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 		'Адрес сервисного аккаунта из файла, который выдал Google. Добавьте его читателем в управлении доступом ресурса GA4, иначе чтение будет отклонено.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'Приватный ключ из того же файла Google, скопированный точь-в-точь. Хранится надёжно.',
-	[keys.providerFieldProjectIdHelp]:
-		'project_id из файла сервисного аккаунта. Оставьте пустым, чтобы взять его из файла.',
+	[keys.providerFieldProjectIdHelp]: 'Необязательно. project_id из файла сервисного аккаунта.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'Число, указанное как Project ID в настройках проекта PostHog.',
 	[keys.providerFieldRegionHelp]:

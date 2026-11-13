@@ -402,8 +402,7 @@ export const ko: LocaleBundle<'other'> = {
 		'Google이 준 파일의 서비스 계정 주소입니다. GA4 속성의 액세스 관리에서 뷰어로 추가하세요. 그렇지 않으면 읽기가 거부됩니다.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'같은 Google 파일에 있는 비공개 키를 그대로 복사해 넣으세요. 안전하게 저장됩니다.',
-	[keys.providerFieldProjectIdHelp]:
-		'서비스 계정 파일의 project_id입니다. 비워 두면 파일에서 가져옵니다.',
+	[keys.providerFieldProjectIdHelp]: '선택 사항입니다. 서비스 계정 파일의 project_id입니다.',
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'PostHog 프로젝트 설정에 Project ID로 표시된 숫자입니다.',
 	[keys.providerFieldRegionHelp]:

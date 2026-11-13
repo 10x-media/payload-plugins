@@ -384,7 +384,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerFieldClientEmailHelp]:
 		'Google 提供的文件中的服务账号地址。请在 GA4 媒体资源的访问权限管理中将其添加为查看者，否则读取会被拒绝。',
 	[keys.providerFieldPrivateKeyHelp]: '同一个 Google 文件中的私钥，原样复制。会被安全保存。',
-	[keys.providerFieldProjectIdHelp]: '服务账号文件中的 project_id。留空则从文件中读取。',
+	[keys.providerFieldProjectIdHelp]: '可选。服务账号文件中的 project_id。',
 	[keys.providerFieldPosthogProjectIdHelp]: 'PostHog 项目设置中显示为 Project ID 的数字。',
 	[keys.providerFieldRegionHelp]:
 		'你的 PostHog 地址所在的云：us.posthog.com 选 US，eu.posthog.com 选 EU。主机为自托管实例时忽略。',
