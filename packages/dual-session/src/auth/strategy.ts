@@ -4,6 +4,7 @@ import {
 	type CollectionSlug,
 	JWT_AUTH_VERSION,
 	type Payload,
+	type User,
 } from 'payload'
 import { parseCookies } from 'payload/shared'
 import type { AuthScope, AuthStrategy } from '../types'
@@ -121,12 +122,66 @@ const hasValidSessionCookie = async ({
 }
 
 /**
+ * True when the shared cookie holds a live admin session: a signature-valid token of
+ * `admin.user` whose user is not one the role-split predicate moves onto its own cookie.
+ *
+ * Without a predicate the `collection` claim settles it with no database read, as before.
+ * With one, a website user of the admin collection carries the same claim as an admin, so
+ * only the user can tell them apart: a stale pre-deploy session of theirs in the shared
+ * cookie would otherwise pass for an admin and keep their new isolated session standing
+ * down for good.
+ */
+const hasLiveAdminSession = async ({
+	adminIsolate,
+	headers,
+	payload,
+}: {
+	adminIsolate?: (user: User) => boolean
+	headers: Headers
+	payload: Payload
+}): Promise<boolean> => {
+	const slug = payload.config.admin.user as CollectionSlug
+	const token = parseCookies(headers).get(getSharedCookieName(payload.config.cookiePrefix))
+
+	if (!token) {
+		return false
+	}
+
+	try {
+		const claims = await verifyToken({ payload, token })
+
+		if (claims.collection !== slug) {
+			return false
+		}
+		if (!adminIsolate) {
+			return true
+		}
+		if (!claims.id) {
+			return false
+		}
+
+		const user = (await payload.findByID({
+			id: claims.id,
+			collection: slug,
+			depth: payload.collections[slug]?.config.auth.depth,
+			// The token already proves who this is; the user's own read access must not hide them.
+			overrideAccess: true,
+		})) as null | User
+
+		return user !== null && !adminIsolate(user)
+	} catch {
+		return false
+	}
+}
+
+/**
  * Authenticates a request against a collection-scoped cookie instead of the shared
  * `${cookiePrefix}-token`. Mirrors Payload's built-in JWT strategy (verification,
  * email verification gate, session `sid` check) so an isolated collection behaves
  * exactly like a normal auth collection. It just reads a different cookie.
  */
 export const createIsolatedAuthStrategy = ({
+	adminIsolate,
 	adminSessionPriority,
 	cookieName,
 	higherPriority,
@@ -134,6 +189,8 @@ export const createIsolatedAuthStrategy = ({
 	scopes,
 	slug,
 }: {
+	/** The `isolate` predicate of the admin collection, when it is role-split. */
+	adminIsolate?: (user: User) => boolean
 	adminSessionPriority: boolean
 	cookieName: string
 	/**
@@ -190,12 +247,7 @@ export const createIsolatedAuthStrategy = ({
 				}
 			} else if (
 				adminSessionPriority &&
-				(await hasValidSessionCookie({
-					collectionSlug: payload.config.admin.user,
-					cookieName: getSharedCookieName(payload.config.cookiePrefix),
-					headers,
-					payload,
-				}))
+				(await hasLiveAdminSession({ adminIsolate, headers, payload }))
 			) {
 				// No proxy installed. Never let a frontend session shadow a live admin
 				// session, or the admin panel becomes unreachable.

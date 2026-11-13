@@ -1,5 +1,6 @@
 import type { AuthScope } from '../types'
 import { AUTH_SCOPE_HEADER, resolveAuthScope } from './resolveAuthScope'
+import type { ClearStaleSharedCookieOptions } from './staleSharedToken'
 
 /** Options shared by the framework adapters that stamp a request with its scope. */
 export type AuthScopeRequestOptions<TRequest extends Request = Request> = {
@@ -7,6 +8,15 @@ export type AuthScopeRequestOptions<TRequest extends Request = Request> = {
 	adminRoute?: string
 	/** Payload REST/GraphQL route prefix. @default '/api' */
 	apiRoute?: string
+	/**
+	 * Drop a token of an isolated collection from the shared `${cookiePrefix}-token`: it is
+	 * removed from the forwarded request and expired in the browser. The plugin already
+	 * refuses to authenticate such a token; this stops it lingering.
+	 *
+	 * The adapter cannot read the Payload config, so the collections are listed here.
+	 * @default off
+	 */
+	clearStaleSharedCookie?: ClearStaleSharedCookieOptions
 	/** Override the default rule entirely. Return `undefined` to fall back to it. */
 	resolveScope?: (request: TRequest) => AuthScope | undefined
 	/** Header to write the resolved scope into. @default 'x-payload-auth-scope' */

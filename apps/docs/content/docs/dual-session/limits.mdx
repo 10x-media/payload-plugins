@@ -9,7 +9,7 @@ The plugin replaces REST endpoints. Payload's GraphQL resolvers for `login`, `re
 
 So on an isolated collection:
 
-- a GraphQL `login` writes the **shared** cookie, overwriting the admin session
+- a GraphQL `login` writes the **shared** cookie, overwriting the admin session, and the session it writes there does not authenticate anything (see [Sessions left in the shared cookie](#sessions-left-in-the-shared-cookie))
 - a GraphQL `me` reads the shared cookie, so it only ever sees the admin session
 - sessions minted through REST are invisible to GraphQL, because they live in a cookie it does not read
 
@@ -58,11 +58,35 @@ For `payload.auth({ headers })` in a server component, pass the incoming headers
 
 A cached page that calls `payload.auth()` freezes whichever user rendered it. That is true without this plugin too, but two parallel sessions make it likelier to bite. Mark auth-dependent pages `export const dynamic = 'force-dynamic'`.
 
-## The first deploy logs isolated users out
+## Sessions left in the shared cookie
 
-Sessions move from `payload-token` to `payload-customers-token`, and the browser's old cookie no longer matches a name anything reads. Every isolated session ends once, at the deploy. Admin sessions are untouched.
+Every browser that signed in on the website before the plugin was deployed still carries that session in `payload-token`. Nothing deletes it at the deploy, and core's `local-jwt`, last in the strategy chain and blind to scopes, would go on authenticating it everywhere: as the website visitor in the admin panel, which then sends them from `/admin` to `/admin/unauthorized` and back from `/admin/login`, with no way out short of clearing the cookie.
 
-The same happens if you change `cookieName` later. Toggling `disabled` looks the same from the browser but is not: those sessions are only unreadable while it is on, not revoked, and they come back if you flip it off before they expire.
+The plugin keeps `local-jwt` from honouring those tokens. When the shared cookie holds a token of a collection isolated whole, or of a user a role-split `isolate` predicate claims, core reads the request as if that cookie were not there. An `Authorization` header and `autoLogin` still work as they do in core, and admin sessions are untouched.
+
+So the first deploy signs isolated users out once, whatever the scope, and they sign in again, into their own cookie this time. The same state arises whenever something writes the shared cookie for an isolated collection, a GraphQL `login` or a plugin calling `generatePayloadCookie`, and it ends the same way.
+
+The token itself stays in the browser until it expires. To clear it, let the proxy (or the TanStack Start middleware) drop it from every request it matches and expire it:
+
+```ts title="proxy.ts"
+export default createAuthScopeProxy({
+  clearStaleSharedCookie: { collections: ['customers'] },
+})
+```
+
+```ts title="src/start.ts"
+createAuthScopeMiddleware({
+  clearStaleSharedCookie: { collections: ['customers'] },
+})
+```
+
+List the collections you isolate whole, and pass `cookiePrefix` and `domain` if your config changes them. A role-split collection cannot be listed: its admins live in the same cookie, and only the user tells them apart, which the proxy does not have. A proxy or middleware of your own can do the same with `isStaleSharedToken` and `withoutCookie`, exported from both `@10x-media/dual-session/next` and `@10x-media/dual-session/tanstack-start`.
+
+The plugin's guard is installed from `onInit`, so a Payload started with `disableOnInit` runs without it.
+
+## Changing `cookieName` logs isolated users out
+
+Sessions in the old cookie name are not read by anything after the change, so they end once. Toggling `disabled` looks the same from the browser but is not: those sessions are only unreadable while it is on, not revoked, and they come back if you flip it off before they expire.
 
 ## Other plugins that touch auth
 
@@ -88,7 +112,7 @@ Third-party plugins that also write cookies or shadow `/login` on the same colle
 
 ### A plugin that writes the cookie
 
-This is the common one. An OAuth or magic-link callback ends by minting a token and calling `generatePayloadCookie`, which writes the shared `${cookiePrefix}-token`. On an isolated collection that both bypasses the isolation and overwrites whatever admin session the visitor was holding, the exact bug this plugin exists to fix.
+This is the common one. An OAuth or magic-link callback ends by minting a token and calling `generatePayloadCookie`, which writes the shared `${cookiePrefix}-token`. On an isolated collection that overwrites whatever admin session the visitor was holding, the exact bug this plugin exists to fix, and the session it writes does not authenticate anything, because the plugin refuses isolated tokens found in the shared cookie.
 
 Nothing here can intercept it. The call happens inside the other plugin's route, which this plugin never sees.
 
