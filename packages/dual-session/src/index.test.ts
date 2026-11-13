@@ -149,7 +149,7 @@ describe('dualSession factory', () => {
 
 		// `payload.logger` does not exist while the config is built, so the warning has to
 		// wait for onInit rather than go to the console.
-		await config.onInit?.({ logger: { warn } } as unknown as Payload)
+		await config.onInit?.({ authStrategies: [], logger: { warn } } as unknown as Payload)
 
 		expect(warn).toHaveBeenCalledWith(expect.stringMatching(/is not in the config/))
 	})
@@ -160,16 +160,26 @@ describe('dualSession factory', () => {
 			buildConfig({ onInit: priorOnInit })
 		) as Config
 
-		await config.onInit?.({ logger: { warn: vi.fn() } } as unknown as Payload)
+		await config.onInit?.({ authStrategies: [], logger: { warn: vi.fn() } } as unknown as Payload)
 
 		expect(priorOnInit).toHaveBeenCalledOnce()
 	})
 
-	it('leaves onInit alone when there is nothing to report', () => {
-		const incoming = buildConfig()
-		const config = dualSession({ collections: [slug('customers')] })(incoming) as Config
+	it('guards core’s local-jwt from onInit, and warns about nothing when nothing is wrong', async () => {
+		const authenticate = vi.fn()
+		const warn = vi.fn()
+		const payload = {
+			authStrategies: [{ name: 'local-jwt', authenticate }],
+			config: { cookiePrefix: 'payload' },
+			logger: { warn },
+		} as unknown as Payload
+		const config = dualSession({ collections: [slug('customers')] })(buildConfig()) as Config
 
-		expect(config.onInit).toBe(incoming.onInit)
+		await config.onInit?.(payload)
+
+		expect(payload.authStrategies[0]?.name).toBe('local-jwt')
+		expect(payload.authStrategies[0]?.authenticate).not.toBe(authenticate)
+		expect(warn).not.toHaveBeenCalled()
 	})
 
 	it('finds the admin collection the way sanitizeConfig does when `admin.user` is unset', () => {

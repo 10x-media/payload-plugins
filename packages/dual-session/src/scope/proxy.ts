@@ -1,12 +1,35 @@
 import { type NextRequest, NextResponse } from 'next/server'
 import type { AuthScope } from '../types'
 import { AUTH_SCOPE_HEADER, resolveAuthScope } from './resolveAuthScope'
+import { isStaleSharedToken, withoutCookie } from './staleSharedToken'
+
+export type ClearStaleSharedCookieOptions = {
+	/**
+	 * The collections isolated whole, as listed in the plugin's `collections`. Leave out a
+	 * role-split collection (one with an `isolate` predicate): its admins live in the shared
+	 * cookie legitimately, and the proxy has no user to ask.
+	 */
+	collections: readonly string[]
+	/** Payload's `cookiePrefix`. @default 'payload' */
+	cookiePrefix?: string
+	/** The `auth.cookies.domain` the shared cookie was written with, if any. */
+	domain?: string
+}
 
 export type AuthScopeProxyOptions = {
 	/** Admin panel route prefix. @default '/admin' */
 	adminRoute?: string
 	/** Payload REST/GraphQL route prefix. @default '/api' */
 	apiRoute?: string
+	/**
+	 * Drop a token of an isolated collection from the shared `${cookiePrefix}-token`: it is
+	 * removed from the forwarded request and expired in the browser. The plugin already
+	 * refuses to authenticate such a token; this stops it lingering.
+	 *
+	 * The proxy cannot read the Payload config, so the collections are listed here.
+	 * @default off
+	 */
+	clearStaleSharedCookie?: ClearStaleSharedCookieOptions
 	/** Override the default rule entirely. Return `undefined` to fall back to it. */
 	resolveScope?: (request: NextRequest) => AuthScope | undefined
 	/** Header to write the resolved scope into. @default 'x-payload-auth-scope' */
@@ -36,7 +59,13 @@ export type AuthScopeProxyOptions = {
 export const createAuthScopeProxy =
 	(options: AuthScopeProxyOptions = {}) =>
 	(request: NextRequest) => {
-		const { adminRoute, apiRoute, resolveScope, scopeHeader = AUTH_SCOPE_HEADER } = options
+		const {
+			adminRoute,
+			apiRoute,
+			clearStaleSharedCookie,
+			resolveScope,
+			scopeHeader = AUTH_SCOPE_HEADER,
+		} = options
 
 		const scope =
 			resolveScope?.(request) ??
@@ -49,7 +78,14 @@ export const createAuthScopeProxy =
 				secFetchSite: request.headers.get('Sec-Fetch-Site'),
 			})
 
-		const headers = new Headers(request.headers)
+		const sharedName = `${clearStaleSharedCookie?.cookiePrefix ?? 'payload'}-token`
+		const stale =
+			clearStaleSharedCookie !== undefined &&
+			isStaleSharedToken(request.cookies.get(sharedName)?.value, clearStaleSharedCookie.collections)
+
+		const headers = stale
+			? withoutCookie(request.headers, sharedName)
+			: new Headers(request.headers)
 
 		// An unattributable request carries no scope at all. Stamping a guess here would
 		// override `adminSessionPriority`, which answers the same question better by
@@ -60,8 +96,20 @@ export const createAuthScopeProxy =
 			headers.delete(scopeHeader)
 		}
 
-		return NextResponse.next({ request: { headers } })
+		const response = NextResponse.next({ request: { headers } })
+
+		if (stale) {
+			response.cookies.set(sharedName, '', {
+				domain: clearStaleSharedCookie?.domain,
+				expires: new Date(0),
+				httpOnly: true,
+				path: '/',
+			})
+		}
+
+		return response
 	}
 
 export type { AuthScope } from '../types'
 export { AUTH_SCOPE_HEADER, resolveAuthScope } from './resolveAuthScope'
+export { isStaleSharedToken, withoutCookie } from './staleSharedToken'

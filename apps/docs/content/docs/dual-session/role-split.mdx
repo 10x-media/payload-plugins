@@ -27,7 +27,7 @@ This is the only way to list the collection named by `admin.user`. Without a pre
 
 ## The admin half is untouched
 
-The shared cookie the plugin writes for a staff login is the same string `generatePayloadCookie` would have written: same name, same attributes, same expiry rule. The admin panel reads it through core's own `local-jwt` strategy, exactly as it does in a project without this plugin.
+The shared cookie the plugin writes for a staff login is the same string `generatePayloadCookie` would have written: same name, same attributes, same expiry rule. The admin panel reads it through core's own `local-jwt` strategy, exactly as it does in a project without this plugin. The one thing the plugin refuses there is a token of a user the predicate claims, such as a website session from before the deploy ([Sessions left in the shared cookie](/dual-session/limits#sessions-left-in-the-shared-cookie)).
 
 Nothing is layered over the admin session. The plugin only adds a second slot next to it.
 
