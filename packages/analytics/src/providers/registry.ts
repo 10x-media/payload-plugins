@@ -489,7 +489,16 @@ const collectionRegistry = (
 					req,
 				})
 			)
-			return isRecord(raw) ? fromDocument(await decrypted(raw, decryptFieldValue)) : null
+			if (!isRecord(raw)) {
+				return null
+			}
+			// As in adapterOf: a corrupt or key-rotated ciphertext stands in as a failing source, so
+			// Test connection says to check the keys rather than answering a server error.
+			try {
+				return fromDocument(await decrypted(raw, decryptFieldValue))
+			} catch (err) {
+				return standInFor(raw, err, fromDocument)
+			}
 		},
 		close: () => pool.close(),
 	}
