@@ -1,5 +1,13 @@
 # @10x-media/webhooks-dev
 
+## 0.0.1-beta.8
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/fields@0.1.0-beta.10
+  - @10x-media/webhooks@0.1.0-beta.6
+
 ## 0.0.1-beta.7
 
 ### Patch Changes
