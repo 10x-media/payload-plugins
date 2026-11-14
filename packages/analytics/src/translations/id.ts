@@ -178,6 +178,10 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerConnectionRefusedHelpPosthog]: 'Periksa kunci, ID, wilayah, dan host.',
 	[keys.providerConnectionRefusedHelpGa4]:
 		'Periksa ID properti dan kunci, serta pastikan email klien adalah Viewer properti.',
+	[keys.providerConnectionIncompleteHelp]:
+		'Kunci atau ID yang diperlukan pemeriksaan ini masih kosong. Isi, simpan, lalu uji lagi.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'Layanan tidak mengenal situs ini. Salin ID-nya dari pengaturan layanan tersebut.',
 	[keys.providerConnectionUnreachableHelp]: 'Layanan tidak menjawab. Coba lagi nanti.',
 	[keys.providerConnectionChecked]: 'Koneksi berfungsi',
 	[keys.providerConnectionFailed]: 'Koneksi gagal',

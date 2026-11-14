@@ -177,6 +177,10 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionRefusedHelpPosthog]: 'Prüfen Sie Schlüssel, IDs, Region und Host.',
 	[keys.providerConnectionRefusedHelpGa4]:
 		'Prüfen Sie die Property-ID und den Schlüssel und ob die Client-E-Mail Betrachter der Property ist.',
+	[keys.providerConnectionIncompleteHelp]:
+		'Ein Schlüssel oder eine ID, die diese Prüfung braucht, ist leer. Tragen Sie sie ein, speichern Sie und prüfen Sie erneut.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'Der Dienst kennt diese Website nicht. Kopieren Sie ihre ID aus den Einstellungen des Dienstes.',
 	[keys.providerConnectionUnreachableHelp]:
 		'Der Dienst hat nicht geantwortet. Versuchen Sie es später erneut.',
 	[keys.providerConnectionChecked]: 'Verbindung funktioniert',

@@ -178,6 +178,33 @@ describe('ProviderConnection', () => {
 		expect(screen.getByText(keys.providerConnectionRefusedHelpGa4)).toBeDefined()
 	})
 
+	it('says what the reason of a refusal means, in place of the vendor advice', async () => {
+		doc.provider = 'posthog'
+		answers({
+			status: {
+				lastErrorAt: '2026-11-09T10:00:00.000Z',
+				errorKind: 'source_misconfigured',
+				errorReason: 'incomplete',
+			},
+		})
+		await renderPanel()
+		expect(screen.getByText(keys.providerConnectionIncompleteHelp)).toBeDefined()
+		expect(screen.queryByText(keys.providerConnectionRefusedHelpPosthog)).toBeNull()
+	})
+
+	it('says a site the vendor does not know is the cause', async () => {
+		doc.provider = 'umami'
+		answers({
+			status: {
+				lastErrorAt: '2026-11-09T10:00:00.000Z',
+				errorKind: 'source_misconfigured',
+				errorReason: 'unknownSite',
+			},
+		})
+		await renderPanel()
+		expect(screen.getByText(keys.providerConnectionUnknownSiteHelp)).toBeDefined()
+	})
+
 	it('says an outage is unreachable rather than refused', async () => {
 		answers({ status: { lastErrorAt: '2026-11-09T10:00:00.000Z', errorKind: 'unavailable' } })
 		await renderPanel()

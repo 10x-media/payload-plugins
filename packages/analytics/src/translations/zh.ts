@@ -167,6 +167,9 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerConnectionRefusedHelpPosthog]: '请检查密钥、ID、区域和主机。',
 	[keys.providerConnectionRefusedHelpGa4]:
 		'请检查媒体资源 ID 和密钥，并确认客户端邮箱是该媒体资源的查看者。',
+	[keys.providerConnectionIncompleteHelp]:
+		'此检查所需的密钥或 ID 为空。请填写并保存，然后重新测试。',
+	[keys.providerConnectionUnknownSiteHelp]: '该服务不认识此站点。请从该服务自己的设置中复制其 ID。',
 	[keys.providerConnectionUnreachableHelp]: '服务没有响应。请稍后再试。',
 	[keys.providerConnectionChecked]: '连接正常',
 	[keys.providerConnectionFailed]: '连接失败',

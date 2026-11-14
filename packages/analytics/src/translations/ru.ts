@@ -179,6 +179,10 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionRefusedHelpPosthog]: 'Проверьте ключ, ID, регион и хост.',
 	[keys.providerConnectionRefusedHelpGa4]:
 		'Проверьте Property ID и ключ, а также что client email добавлен читателем ресурса.',
+	[keys.providerConnectionIncompleteHelp]:
+		'Не заполнен ключ или ID, нужный для проверки. Заполните, сохраните и проверьте снова.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'Сервис не знает этот сайт. Скопируйте его ID из настроек самого сервиса.',
 	[keys.providerConnectionUnreachableHelp]: 'Сервис не ответил. Попробуйте позже.',
 	[keys.providerConnectionChecked]: 'Подключение работает',
 	[keys.providerConnectionFailed]: 'Подключение не удалось',

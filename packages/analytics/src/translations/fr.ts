@@ -181,6 +181,10 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 		'Vérifiez la clé, les identifiants, la région et l’hôte.',
 	[keys.providerConnectionRefusedHelpGa4]:
 		'Vérifiez l’ID de propriété et la clé, et que l’e-mail client est Lecteur de la propriété.',
+	[keys.providerConnectionIncompleteHelp]:
+		'Une clé ou un ID nécessaire à ce test est vide. Saisissez-le, enregistrez, puis testez à nouveau.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'Le service ne connaît pas ce site. Copiez son ID depuis les paramètres du service.',
 	[keys.providerConnectionUnreachableHelp]: 'Le service n’a pas répondu. Réessayez plus tard.',
 	[keys.providerConnectionChecked]: 'La connexion fonctionne',
 	[keys.providerConnectionFailed]: 'La connexion a échoué',

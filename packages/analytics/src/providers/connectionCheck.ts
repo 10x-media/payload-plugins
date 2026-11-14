@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import type { AnalyticsAdapter } from '../core/contract'
+import { isUnknownSite } from '../core/sourceErrors'
 import { classifyError, vendorAnswerOf } from '../surfacing/classifyError'
 import type { ConnectionOutcome } from './connectionState'
 import type { ProviderStatusStore } from './status'
@@ -17,6 +18,7 @@ const checkFailureOf = (err: unknown): ConnectionOutcome => {
 	return {
 		ok: false,
 		kind: failure.kind === 'unavailable' ? 'unavailable' : 'source_misconfigured',
+		...(isUnknownSite(err) ? { reason: 'unknownSite' } : {}),
 		...(vendorAnswer === undefined ? {} : { detail: vendorAnswer }),
 	}
 }
@@ -27,7 +29,7 @@ export const checkConnectionOf = async (
 	adapter: AnalyticsAdapter
 ): Promise<ConnectionOutcome> => {
 	if (!adapter.isConfigured()) {
-		return { ok: false, kind: 'source_misconfigured' }
+		return { ok: false, kind: 'source_misconfigured', reason: 'incomplete' }
 	}
 	try {
 		await adapter.checkConnection?.({

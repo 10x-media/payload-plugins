@@ -172,6 +172,10 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerConnectionRefusedHelpPosthog]: '키, ID, 지역, 호스트를 확인하세요.',
 	[keys.providerConnectionRefusedHelpGa4]:
 		'속성 ID와 키를 확인하고, 클라이언트 이메일이 속성의 뷰어인지 확인하세요.',
+	[keys.providerConnectionIncompleteHelp]:
+		'이 확인에 필요한 키나 ID가 비어 있습니다. 입력하고 저장한 뒤 다시 테스트하세요.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'서비스가 이 사이트를 알지 못합니다. 서비스 자체 설정에서 ID를 복사하세요.',
 	[keys.providerConnectionUnreachableHelp]: '서비스가 응답하지 않았습니다. 나중에 다시 시도하세요.',
 	[keys.providerConnectionChecked]: '연결 정상',
 	[keys.providerConnectionFailed]: '연결 실패',
