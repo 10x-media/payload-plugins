@@ -271,7 +271,7 @@ describe('adapterFromProviderDoc', () => {
 	it('sends a Plausible pageview to every site its Website address lists', () => {
 		const adapter = build({
 			provider: 'plausible',
-			plausible: { siteId: 's', apiKey: 'k', domain: ' site.test, rollup.test ' },
+			plausible: { siteId: 's', apiKey: 'k', domain: ' site.test, rollup.test, site.test ' },
 		})
 		expect(adapter?.capture?.snippet({ path: '/pl' }).scripts[0]?.attrs?.['data-domain']).toBe(
 			'site.test,rollup.test'

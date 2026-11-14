@@ -157,10 +157,7 @@ const buildBaseAdapter = (
 					apiKey: trimmed(cfg.apiKey),
 					host,
 					domain: orUndefined(
-						cfg.domain
-							?.split(',')
-							.map((site) => site.trim())
-							.join(',')
+						cfg.domain && [...new Set(cfg.domain.split(',').map((site) => site.trim()))].join(',')
 					),
 					scriptId: orUndefined(cfg.scriptId),
 					revenueCurrency: orUndefined(cfg.revenueCurrency),

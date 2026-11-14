@@ -242,6 +242,13 @@ describe('providerStatusStore', () => {
 		expect(await b.read('5')).toEqual({ lastSuccessAt: '2026-11-09T10:01:00.000Z' })
 	})
 
+	it('reads a row once for the requests that ask for it at the same moment', async () => {
+		const { payload, gets } = fakePayload()
+		const store = providerStatusStore(payload, clock())
+		await Promise.all([store.readMany(['5', '6']), store.readMany(['5', '6'])])
+		expect(gets).toHaveLength(2)
+	})
+
 	it('answers the reads every request makes from memory for a few seconds', async () => {
 		const { payload, gets } = fakePayload()
 		const time = clock()

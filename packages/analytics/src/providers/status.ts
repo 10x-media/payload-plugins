@@ -131,7 +131,10 @@ export const providerStatusStore = (
 	const now = options.now ?? currentDate
 	const successWrittenAt = new Map<string, number>()
 	const queues = new Map<string, Promise<void>>()
-	const memo = new Map<string, { row: Record<string, unknown> | undefined; until: number }>()
+	const memo = new Map<
+		string,
+		{ row: Promise<Record<string, unknown> | undefined>; until: number }
+	>()
 
 	const rowOf = async (id: string): Promise<Record<string, unknown> | undefined> => {
 		const row: unknown = await payload.kv.get(providerStatusKey(id))
@@ -217,12 +220,15 @@ export const providerStatusStore = (
 			const entries = await Promise.all(
 				docIds.map(async (id): Promise<[string, ProviderStatus] | undefined> => {
 					const at = now().getTime()
-					const held = memo.get(id)
-					const row = held && held.until > at ? held.row : await rowOf(id)
+					let held = memo.get(id)
 					if (!held || held.until <= at) {
-						memo.set(id, { row, until: at + STATUS_MEMO_MS })
+						// Held before it answers, so requests arriving together share one read.
+						const reading = { row: rowOf(id), until: at + STATUS_MEMO_MS }
+						reading.row.catch(() => memo.get(id) === reading && memo.delete(id))
+						memo.set(id, reading)
+						held = reading
 					}
-					const status = seen(id, row, versionOf?.(id))
+					const status = seen(id, await held.row, versionOf?.(id))
 					return status ? [id, status] : undefined
 				})
 			)

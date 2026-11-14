@@ -133,7 +133,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerFieldMeasurementIdHelp]:
 		'GA4 管理中网站数据流的衡量 ID（G-...）。它会开启网站跟踪；留空则关闭跟踪。',
 	[keys.providerFieldDomainHelp]:
-		'跟踪脚本记录访问时使用的域名，通常与站点 ID 相同。填写后会用 Plausible 的标准脚本开启访问统计；若同时填写了脚本 ID，以此项为准。将此项和脚本 ID 都留空即可关闭统计。',
+		'跟踪脚本记录访问时使用的域名，通常与站点 ID 相同。填写后会用 Plausible 的标准脚本开启访问统计；若同时填写了脚本 ID，以此项为准。将此项和脚本 ID 都留空即可关闭统计。如需在多个站点统计访问，请用逗号分隔。',
 	[keys.providerFieldScriptIdHelp]:
 		'适用于使用 Plausible 新版按站点脚本的网站：脚本地址中的 ID，即 pa-XXXX.js 中 pa- 之后的部分。填写后会用该脚本开启访问统计。将此项和网站地址都留空即可关闭统计。',
 	[keys.providerErrorMeasurementId]: '只能使用字母、数字和连字符，例如 G-AB12CD34。',
@@ -369,7 +369,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.filterHintGoal]: '目标的简短代号，例如 newsletter-signup',
 	[keys.filterHintCurrency]: '三位货币代码，例如 EUR',
 	[keys.providersCollectionDescription]:
-		'每连接一个分析工具就添加一条记录。您的密钥会被安全保存且不再显示；只保留最后四位可见，方便分辨保存的是哪一个。更改已保存记录的主机、ID 或区域会清除其密钥：请在同一次保存中重新输入。',
+		'每连接一个分析工具就添加一条记录。您的密钥会被安全保存且不再显示；只保留最后四位可见，方便分辨保存的是哪一个。更改已保存记录的连接目标（主机、区域、读取所用的 ID、客户端邮箱或站点标识）会清除其密钥：请在同一次保存中重新输入。',
 	[keys.providerFieldNameHelp]: '在任何选择数据源的地方显示。',
 	[keys.providerFieldProviderHelp]: '这是为哪个分析工具设置的。下方的字段会随您的选择而变化。',
 	[keys.providerFieldEnabledHelp]: '关闭后会保留已保存的信息，但网站上任何位置都不再使用这个工具。',

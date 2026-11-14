@@ -137,7 +137,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldMeasurementIdHelp]:
 		'The measurement ID (G-...) of your web data stream, from the GA4 admin. It turns on tracking for your site; leave it blank to turn tracking off.',
 	[keys.providerFieldDomainHelp]:
-		"The domain the tracking script reports visits under, usually the same as the site ID. It turns on tracking with Plausible's standard script, and wins over the script ID when both are filled in. Leave it and the script ID blank to turn tracking off.",
+		"The domain the tracking script reports visits under, usually the same as the site ID. It turns on tracking with Plausible's standard script, and wins over the script ID when both are filled in. Leave it and the script ID blank to turn tracking off. To count visits on several sites, separate them with commas.",
 	[keys.providerFieldScriptIdHelp]:
 		"For a site using Plausible's newer per-site script: the ID in its address, the part after pa- in pa-XXXX.js. It turns on tracking with that script. Leave it and the website address blank to turn tracking off.",
 	[keys.providerErrorMeasurementId]:
@@ -387,7 +387,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.filterHintGoal]: 'Goal short code, for example newsletter-signup',
 	[keys.filterHintCurrency]: 'Three-letter currency code, for example EUR',
 	[keys.providersCollectionDescription]:
-		'Add one entry for each analytics tool you connect. Your keys are stored securely and never shown again; only the last four characters stay visible so you can tell which one is saved. Changing the Host, an ID or the Region of a saved entry clears its keys: enter them again in the same save.',
+		'Add one entry for each analytics tool you connect. Your keys are stored securely and never shown again; only the last four characters stay visible so you can tell which one is saved. Changing where a saved entry connects (its Host, its Region, an ID it reads with, the Client email or the Site label) clears its keys: enter them again in the same save.',
 	[keys.providerFieldNameHelp]: 'Shown wherever you choose a data source.',
 	[keys.providerFieldProviderHelp]:
 		'Which analytics tool this is for. The fields below change with your choice.',

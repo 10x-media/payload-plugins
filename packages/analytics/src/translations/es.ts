@@ -141,7 +141,7 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldMeasurementIdHelp]:
 		'El ID de medición (G-...) de tu flujo de datos web, del administrador de GA4. Activa el seguimiento de tu sitio; déjalo vacío para desactivarlo.',
 	[keys.providerFieldDomainHelp]:
-		'El dominio con el que el script de seguimiento registra las visitas, normalmente el mismo que el ID del sitio. Activa el seguimiento con el script estándar de Plausible y tiene prioridad sobre el ID del script si rellenas ambos. Déjalo vacío, junto con el ID del script, para desactivar el seguimiento.',
+		'El dominio con el que el script de seguimiento registra las visitas, normalmente el mismo que el ID del sitio. Activa el seguimiento con el script estándar de Plausible y tiene prioridad sobre el ID del script si rellenas ambos. Déjalo vacío, junto con el ID del script, para desactivar el seguimiento. Para contar las visitas en varios sitios, sepáralos con comas.',
 	[keys.providerFieldScriptIdHelp]:
 		'Para un sitio que usa el script más reciente de Plausible, propio de cada sitio: el ID de su dirección, la parte después de pa- en pa-XXXX.js. Activa el seguimiento con ese script. Déjalo vacío, junto con la dirección web, para desactivar el seguimiento.',
 	[keys.providerErrorMeasurementId]: 'Usa solo letras, dígitos y guiones, por ejemplo G-AB12CD34.',
@@ -392,7 +392,7 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.filterHintGoal]: 'Código corto del objetivo, por ejemplo newsletter-signup',
 	[keys.filterHintCurrency]: 'Código de moneda de tres letras, por ejemplo EUR',
 	[keys.providersCollectionDescription]:
-		'Añade una entrada por cada herramienta de analítica que conectes. Tus claves se guardan de forma segura y no vuelven a mostrarse; solo quedan visibles los últimos cuatro caracteres para que sepas cuál está guardada. Cambiar el Host, un ID o la región de una entrada guardada borra sus claves: vuelve a introducirlas al guardar.',
+		'Añade una entrada por cada herramienta de analítica que conectes. Tus claves se guardan de forma segura y no vuelven a mostrarse; solo quedan visibles los últimos cuatro caracteres para que sepas cuál está guardada. Cambiar adónde se conecta una entrada guardada (el Host, la región, un ID con el que lee, el Email del cliente o la Etiqueta del sitio) borra sus claves: vuelve a introducirlas al guardar.',
 	[keys.providerFieldNameHelp]: 'Se muestra allí donde eliges una fuente de datos.',
 	[keys.providerFieldProviderHelp]:
 		'Para qué herramienta de analítica es. Los campos de abajo cambian según tu elección.',

@@ -1,4 +1,4 @@
-import { HttpResponse, http } from 'msw'
+import { delay, HttpResponse, http } from 'msw'
 import { setupServer } from 'msw/node'
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { filterableDimensions, filterOperatorsFor, metricReaches } from '../../core/capabilities'
@@ -893,6 +893,29 @@ describe('umami reads of a website Umami does not know', () => {
 		await adapter.query(q(), {})
 		await adapter.query(q(), {})
 		expect(lookups).toBe(1)
+	})
+
+	it('keeps a read going when another read of the adapter is cancelled during the lookup', async () => {
+		let lookups = 0
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w', async () => {
+				lookups++
+				if (lookups === 1) {
+					await delay('infinite')
+				}
+				return HttpResponse.json({ id: 'w' })
+			}),
+			http.get('https://api.umami.is/v1/websites/w/stats', () =>
+				HttpResponse.json({ pageviews: 1, visitors: 1, visits: 1, bounces: 0, totaltime: 0 })
+			)
+		)
+		const adapter = umami({ websiteId: 'w', apiKey: 'k' })
+		const cancelled = new AbortController()
+		const first = adapter.query(q(), { signal: cancelled.signal })
+		const second = adapter.query(q(), {})
+		cancelled.abort(new Error('the first read timed out'))
+		await expect(first).rejects.toThrow()
+		await expect(second).resolves.toMatchObject({ rows: expect.any(Array) })
 	})
 })
 
