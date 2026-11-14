@@ -103,6 +103,8 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 				toast.success(t(keys.providerConnectionChecked))
 			} else if (answer.checked || state !== 'unchecked') {
 				toast.error(t(keys.providerConnectionFailed))
+			} else {
+				toast.info(t(keys.providerConnectionCheckRunning))
 			}
 		} catch {
 			toast.error(t(keys.providerConnectionFailed))

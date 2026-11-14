@@ -4,7 +4,7 @@ import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/paylo
 import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter } from '../../src/core/contract'
-import type { OwnSource, SourcePolicy } from '../../src/core/sourcePolicy'
+import type { SourcePolicy } from '../../src/core/sourcePolicy'
 import { analytics } from '../../src/index'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
 import { getRuntime } from '../../src/plugin/runtime'
@@ -487,7 +487,7 @@ describeForDb('analytics source policy: a function sees which own sources fail',
 	let booted: BootedPayload
 	let alpha: unknown
 	let vendor: Awaited<ReturnType<typeof startPlausible>>
-	const seen: OwnSource[][] = []
+	const seen: Array<Array<{ docId: string; failing: boolean }>> = []
 
 	beforeAll(async () => {
 		vendor = await startPlausible()
@@ -506,9 +506,15 @@ describeForDb('analytics source policy: a function sees which own sources fail',
 				access: { crossScope: ({ req }) => readerOf(req)?.platform === true },
 				sources: {
 					shared: {
-						tenants: ({ ownSources }) => {
-							seen.push(ownSources)
-							return ownSources.every((source) => source.failing)
+						tenants: async ({ ownSources }) => {
+							const read = await Promise.all(
+								ownSources.map(async (source) => ({
+									docId: source.docId,
+									failing: await source.failing(),
+								}))
+							)
+							seen.push(read)
+							return read.every((source) => source.failing)
 						},
 					},
 				},

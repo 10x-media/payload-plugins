@@ -178,6 +178,8 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerConnectionUnreachableHelp]: 'لم تستجب الخدمة. حاول لاحقًا.',
 	[keys.providerConnectionChecked]: 'الاتصال يعمل',
 	[keys.providerConnectionFailed]: 'فشل الاتصال',
+	[keys.providerConnectionCheckRunning]:
+		'يجري فحص هذه الإعدادات بالفعل. اختبر مرة أخرى بعد بضع ثوانٍ.',
 	[keys.providerFieldIsDefault]: 'الافتراضي لهذا الموقع',
 	[keys.providerFieldIsDefaultHelp]:
 		'تُفتح التحليلات على هذه الأداة ما لم يختر القارئ أداة أخرى. يمكن أن تكون أداة واحدة فقط لكل موقع هي الافتراضية.',

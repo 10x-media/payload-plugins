@@ -179,6 +179,8 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerConnectionUnreachableHelp]: '서비스가 응답하지 않았습니다. 나중에 다시 시도하세요.',
 	[keys.providerConnectionChecked]: '연결 정상',
 	[keys.providerConnectionFailed]: '연결 실패',
+	[keys.providerConnectionCheckRunning]:
+		'이 설정을 이미 확인하고 있습니다. 몇 초 후에 다시 테스트하세요.',
 	[keys.providerFieldIsDefault]: '이 사이트의 기본값',
 	[keys.providerFieldIsDefaultHelp]:
 		'독자가 다른 도구를 고르지 않으면 분석이 이 도구로 열립니다. 사이트마다 기본 도구는 하나만 둘 수 있습니다.',
