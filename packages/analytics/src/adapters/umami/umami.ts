@@ -339,8 +339,9 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			throw new UnknownSiteError(`umami: no website ${config.websiteId}; check the Website ID`)
 		}
 	}
-	// Asked once per adapter: a save of its document builds a new one.
-	let websiteChecked: Promise<void> | undefined
+	// Remembered once Umami answers: a failed lookup is the asking read's alone. A new adapter (a save
+	// of its document, or a `providers.resolve` that builds one per read) asks again.
+	let websiteKnown = false
 
 	return {
 		id: 'umami',
@@ -415,18 +416,17 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			}
 			const getJson = async <T>(endpoint: string, params: URLSearchParams): Promise<T> => {
 				// Inside the lane, so the lane records an unknown website as a refusal, not a success.
-				websiteChecked ??= upstream(ctx, (signal) =>
-					fetchJson<unknown>(websiteUrl, {
-						headers,
-						provider: 'umami',
-						signal,
-						...(config.fetch ? { fetch: config.fetch } : {}),
-					}).then(requireWebsite)
-				).catch((err: unknown) => {
-					websiteChecked = undefined
-					throw err
-				})
-				await websiteChecked
+				if (!websiteKnown) {
+					await upstream(ctx, (signal) =>
+						fetchJson<unknown>(websiteUrl, {
+							headers,
+							provider: 'umami',
+							signal,
+							...(config.fetch ? { fetch: config.fetch } : {}),
+						}).then(requireWebsite)
+					)
+					websiteKnown = true
+				}
 				return upstreamJson<T>(ctx, `${websiteUrl}/${endpoint}?${params.toString()}`, {
 					headers,
 					provider: 'umami',

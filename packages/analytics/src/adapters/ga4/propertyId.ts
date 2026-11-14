@@ -9,7 +9,9 @@ import { asTranslate } from '../../translations/server'
 const PROPERTY_ID_PATTERN = /^\d+$/
 
 /** Empty is allowed: the field is optional. */
-export const validatePropertyId: TextFieldSingleValidation = (value, { req }) =>
-	!value || PROPERTY_ID_PATTERN.test(value.trim())
+export const validatePropertyId: TextFieldSingleValidation = (value, { req }) => {
+	const id = value?.trim()
+	return !id || PROPERTY_ID_PATTERN.test(id)
 		? true
 		: asTranslate(req.t)(keys.providerErrorPropertyId)
+}
