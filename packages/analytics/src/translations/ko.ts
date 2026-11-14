@@ -136,7 +136,7 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerFieldMeasurementIdHelp]:
 		'GA4 관리의 웹 데이터 스트림 측정 ID(G-...)입니다. 사이트 추적을 켭니다. 비워 두면 추적이 꺼집니다.',
 	[keys.providerFieldDomainHelp]:
-		'추적 스크립트가 방문을 기록할 때 쓰는 도메인으로, 보통 사이트 ID와 같습니다. Plausible 기본 스크립트로 방문 추적을 켜며, 스크립트 ID와 함께 입력하면 이 값이 우선합니다. 이 칸과 스크립트 ID를 모두 비워 두면 추적이 꺼집니다.',
+		'추적 스크립트가 방문을 기록할 때 쓰는 도메인으로, 보통 사이트 ID와 같습니다. Plausible 기본 스크립트로 방문 추적을 켜며, 스크립트 ID와 함께 입력하면 이 값이 우선합니다. 이 칸과 스크립트 ID를 모두 비워 두면 추적이 꺼집니다. 여러 사이트에서 방문을 집계하려면 쉼표로 구분해 입력하세요.',
 	[keys.providerFieldScriptIdHelp]:
 		'사이트별 새 Plausible 스크립트를 쓰는 사이트용입니다. 스크립트 주소에서 pa-XXXX.js의 pa- 뒤 부분이 ID입니다. 이 스크립트로 방문 추적을 켭니다. 이 칸과 웹사이트 주소를 모두 비워 두면 추적이 꺼집니다.',
 	[keys.providerErrorMeasurementId]: '영문자, 숫자, 하이픈만 사용하세요. 예: G-AB12CD34',
@@ -384,7 +384,7 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.filterHintGoal]: '목표의 짧은 코드, 예: newsletter-signup',
 	[keys.filterHintCurrency]: '세 자리 통화 코드, 예: EUR',
 	[keys.providersCollectionDescription]:
-		'연결하는 분석 도구마다 항목을 하나씩 추가하세요. 키는 안전하게 저장되고 다시 표시되지 않습니다. 어떤 키가 저장되었는지 알 수 있도록 마지막 네 글자만 보입니다. 저장된 항목의 호스트, ID 또는 지역을 바꾸면 키가 지워집니다. 같은 저장에서 키를 다시 입력하세요.',
+		'연결하는 분석 도구마다 항목을 하나씩 추가하세요. 키는 안전하게 저장되고 다시 표시되지 않습니다. 어떤 키가 저장되었는지 알 수 있도록 마지막 네 글자만 보입니다. 저장된 항목이 연결되는 곳(호스트, 지역, 읽기에 쓰는 ID, 클라이언트 이메일 또는 사이트 라벨)을 바꾸면 키가 지워집니다. 같은 저장에서 키를 다시 입력하세요.',
 	[keys.providerFieldNameHelp]: '데이터 소스를 고르는 곳마다 표시됩니다.',
 	[keys.providerFieldProviderHelp]:
 		'어떤 분석 도구를 위한 설정인지 고르세요. 아래 항목은 선택에 따라 달라집니다.',

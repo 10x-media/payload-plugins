@@ -141,7 +141,7 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldMeasurementIdHelp]:
 		'O ID de métricas (G-...) do seu fluxo de dados da Web, no administrador do GA4. Ele ativa o rastreamento do seu site; deixe em branco para desativá-lo.',
 	[keys.providerFieldDomainHelp]:
-		'O domínio com que o script de rastreamento registra as visitas, normalmente o mesmo do ID do site. Ativa o rastreamento com o script padrão do Plausible e tem prioridade sobre o ID do script quando os dois estão preenchidos. Deixe-o vazio, junto com o ID do script, para desativar o rastreamento.',
+		'O domínio com que o script de rastreamento registra as visitas, normalmente o mesmo do ID do site. Ativa o rastreamento com o script padrão do Plausible e tem prioridade sobre o ID do script quando os dois estão preenchidos. Deixe-o vazio, junto com o ID do script, para desativar o rastreamento. Para contar as visitas em vários sites, separe-os por vírgulas.',
 	[keys.providerFieldScriptIdHelp]:
 		'Para um site que usa o script mais novo do Plausible, próprio de cada site: o ID no endereço dele, a parte depois de pa- em pa-XXXX.js. Ativa o rastreamento com esse script. Deixe-o vazio, junto com o endereço do site, para desativar o rastreamento.',
 	[keys.providerErrorMeasurementId]: 'Use apenas letras, dígitos e hifens, por exemplo G-AB12CD34.',
@@ -392,7 +392,7 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.filterHintGoal]: 'Código curto do objetivo, por exemplo newsletter-signup',
 	[keys.filterHintCurrency]: 'Código de moeda de três letras, por exemplo EUR',
 	[keys.providersCollectionDescription]:
-		'Adicione uma entrada para cada ferramenta de análise que você conectar. Suas chaves são armazenadas com segurança e nunca mais são exibidas; só os últimos quatro caracteres ficam visíveis, para você saber qual está salva. Mudar o Host, um ID ou a região de uma entrada salva apaga as chaves dela: digite-as de novo no mesmo salvamento.',
+		'Adicione uma entrada para cada ferramenta de análise que você conectar. Suas chaves são armazenadas com segurança e nunca mais são exibidas; só os últimos quatro caracteres ficam visíveis, para você saber qual está salva. Mudar para onde uma entrada salva se conecta (o Host, a região, um ID usado na leitura, o E-mail do cliente ou o Rótulo do site) apaga as chaves dela: digite-as de novo no mesmo salvamento.',
 	[keys.providerFieldNameHelp]: 'Aparece onde você escolhe uma fonte de dados.',
 	[keys.providerFieldProviderHelp]:
 		'Para qual ferramenta de análise é esta entrada. Os campos abaixo mudam conforme a sua escolha.',

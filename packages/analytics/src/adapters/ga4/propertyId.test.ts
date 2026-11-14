@@ -6,6 +6,7 @@ const args = { req: { t: (key: string) => key } } as never
 describe('validatePropertyId', () => {
 	it.each([
 		['blank', '', true],
+		['spaces alone', '   ', true],
 		['a property number', '564235994', true],
 		['a number with spaces around it', '  564235994  ', true],
 		['the API resource name', 'properties/564235994', 'analytics:providerErrorPropertyId'],

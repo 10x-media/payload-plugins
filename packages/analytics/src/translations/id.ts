@@ -140,7 +140,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerFieldMeasurementIdHelp]:
 		'ID pengukuran (G-...) aliran data web Anda, dari admin GA4. Ini menyalakan pelacakan situs Anda; biarkan kosong untuk mematikannya.',
 	[keys.providerFieldDomainHelp]:
-		'Domain yang dipakai skrip pelacakan untuk mencatat kunjungan, biasanya sama dengan ID situs. Ini menyalakan pelacakan dengan skrip standar Plausible dan didahulukan daripada ID skrip jika keduanya diisi. Kosongkan ini dan ID skrip untuk mematikan pelacakan.',
+		'Domain yang dipakai skrip pelacakan untuk mencatat kunjungan, biasanya sama dengan ID situs. Ini menyalakan pelacakan dengan skrip standar Plausible dan didahulukan daripada ID skrip jika keduanya diisi. Kosongkan ini dan ID skrip untuk mematikan pelacakan. Untuk menghitung kunjungan di beberapa situs, pisahkan dengan koma.',
 	[keys.providerFieldScriptIdHelp]:
 		'Untuk situs yang memakai skrip Plausible versi baru per situs: ID dalam alamatnya, bagian setelah pa- di pa-XXXX.js. Ini menyalakan pelacakan dengan skrip tersebut. Kosongkan ini dan alamat situs untuk mematikan pelacakan.',
 	[keys.providerErrorMeasurementId]:
@@ -391,7 +391,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.filterHintGoal]: 'Kode singkat sasaran, misalnya newsletter-signup',
 	[keys.filterHintCurrency]: 'Kode mata uang tiga huruf, misalnya EUR',
 	[keys.providersCollectionDescription]:
-		'Tambahkan satu entri untuk setiap alat analitik yang Anda hubungkan. Kunci Anda disimpan dengan aman dan tidak ditampilkan lagi; hanya empat karakter terakhir yang tetap terlihat agar Anda tahu kunci mana yang tersimpan. Mengubah Host, ID, atau Wilayah pada entri yang tersimpan akan menghapus kuncinya: masukkan lagi dalam penyimpanan yang sama.',
+		'Tambahkan satu entri untuk setiap alat analitik yang Anda hubungkan. Kunci Anda disimpan dengan aman dan tidak ditampilkan lagi; hanya empat karakter terakhir yang tetap terlihat agar Anda tahu kunci mana yang tersimpan. Mengubah tujuan koneksi entri yang tersimpan (Host, Wilayah, ID yang dipakai untuk membaca, Email klien, atau Label situs) akan menghapus kuncinya: masukkan lagi dalam penyimpanan yang sama.',
 	[keys.providerFieldNameHelp]: 'Tampil di mana pun Anda memilih sumber data.',
 	[keys.providerFieldProviderHelp]:
 		'Untuk alat analitik yang mana. Kolom di bawah berubah sesuai pilihan Anda.',

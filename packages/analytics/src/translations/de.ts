@@ -139,7 +139,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldMeasurementIdHelp]:
 		'Die Mess-ID (G-...) deines Web-Datenstreams aus der GA4-Verwaltung. Sie schaltet das Tracking deiner Website ein; leer lassen, um es auszuschalten.',
 	[keys.providerFieldDomainHelp]:
-		'Die Domain, unter der das Messskript Besuche meldet, meist dieselbe wie die Website-ID. Damit wird die Messung mit dem Standardskript von Plausible eingeschaltet; sind beide Felder ausgefüllt, gilt diese Angabe statt der Skript-ID. Lass sie und die Skript-ID leer, um die Messung auszuschalten.',
+		'Die Domain, unter der das Messskript Besuche meldet, meist dieselbe wie die Website-ID. Damit wird die Messung mit dem Standardskript von Plausible eingeschaltet; sind beide Felder ausgefüllt, gilt diese Angabe statt der Skript-ID. Lass sie und die Skript-ID leer, um die Messung auszuschalten. Sollen Besuche auf mehreren Websites gezählt werden, trenne sie durch Kommas.',
 	[keys.providerFieldScriptIdHelp]:
 		'Für eine Website mit dem neueren Plausible-Skript pro Website: die ID in seiner Adresse, der Teil nach pa- in pa-XXXX.js. Damit wird die Messung mit diesem Skript eingeschaltet. Lass sie und die Webadresse leer, um die Messung auszuschalten.',
 	[keys.providerErrorMeasurementId]:
@@ -392,7 +392,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.filterHintGoal]: 'Kurzcode des Ziels, zum Beispiel newsletter-signup',
 	[keys.filterHintCurrency]: 'Dreistelliger Währungscode, zum Beispiel EUR',
 	[keys.providersCollectionDescription]:
-		'Lege für jedes verbundene Analyse-Tool einen Eintrag an. Deine Schlüssel werden sicher gespeichert und nie wieder angezeigt; sichtbar bleiben nur die letzten vier Zeichen, damit erkennbar ist, welcher gespeichert ist. Wenn du Host, eine ID oder die Region eines gespeicherten Eintrags änderst, werden seine Schlüssel gelöscht: gib sie beim selben Speichern erneut ein.',
+		'Lege für jedes verbundene Analyse-Tool einen Eintrag an. Deine Schlüssel werden sicher gespeichert und nie wieder angezeigt; sichtbar bleiben nur die letzten vier Zeichen, damit erkennbar ist, welcher gespeichert ist. Wenn du änderst, womit sich ein gespeicherter Eintrag verbindet (Host, Region, eine ID, mit der er liest, Client-E-Mail oder Website-Kennzeichnung), werden seine Schlüssel gelöscht: gib sie beim selben Speichern erneut ein.',
 	[keys.providerFieldNameHelp]: 'Wird überall dort angezeigt, wo du eine Datenquelle auswählst.',
 	[keys.providerFieldProviderHelp]:
 		'Für welches Analyse-Tool das gilt. Die Felder unten richten sich nach deiner Auswahl.',

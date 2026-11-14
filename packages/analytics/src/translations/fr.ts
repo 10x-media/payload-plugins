@@ -142,7 +142,7 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldMeasurementIdHelp]:
 		'L’ID de mesure (G-...) de votre flux de données Web, dans l’administration GA4. Il active le suivi de votre site ; laissez vide pour le désactiver.',
 	[keys.providerFieldDomainHelp]:
-		"Le domaine sous lequel le script de suivi enregistre les visites, généralement le même que l'ID du site. Il active le suivi avec le script standard de Plausible et l'emporte sur l'ID du script si les deux sont remplis. Laissez-le vide, ainsi que l'ID du script, pour désactiver le suivi.",
+		"Le domaine sous lequel le script de suivi enregistre les visites, généralement le même que l'ID du site. Il active le suivi avec le script standard de Plausible et l'emporte sur l'ID du script si les deux sont remplis. Laissez-le vide, ainsi que l'ID du script, pour désactiver le suivi. Pour compter les visites sur plusieurs sites, séparez-les par des virgules.",
 	[keys.providerFieldScriptIdHelp]:
 		"Pour un site qui utilise le nouveau script Plausible propre à chaque site : l'ID dans son adresse, la partie après pa- dans pa-XXXX.js. Il active le suivi avec ce script. Laissez-le vide, ainsi que l'adresse du site, pour désactiver le suivi.",
 	[keys.providerErrorMeasurementId]:
@@ -397,7 +397,7 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.filterHintGoal]: "Code court de l'objectif, par exemple newsletter-signup",
 	[keys.filterHintCurrency]: 'Code monnaie à trois lettres, par exemple EUR',
 	[keys.providersCollectionDescription]:
-		"Ajoutez une entrée par outil d'analyse que vous connectez. Vos clés sont enregistrées de façon sécurisée et ne sont plus jamais affichées ; seuls les quatre derniers caractères restent visibles pour savoir laquelle est enregistrée. Modifier l'Hôte, un ID ou la région d'une entrée enregistrée efface ses clés : saisissez-les à nouveau dans le même enregistrement.",
+		"Ajoutez une entrée par outil d'analyse que vous connectez. Vos clés sont enregistrées de façon sécurisée et ne sont plus jamais affichées ; seuls les quatre derniers caractères restent visibles pour savoir laquelle est enregistrée. Modifier l'endroit où se connecte une entrée enregistrée (l'Hôte, la région, un ID utilisé pour la lecture, l'E-mail du client ou l'Étiquette du site) efface ses clés : saisissez-les à nouveau dans le même enregistrement.",
 	[keys.providerFieldNameHelp]: 'Affiché partout où vous choisissez une source de données.',
 	[keys.providerFieldProviderHelp]:
 		"L'outil d'analyse concerné. Les champs ci-dessous changent selon votre choix.",
