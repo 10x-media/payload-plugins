@@ -318,6 +318,14 @@ At every boot, while `capture.gate` holds a slot and `capture.withoutConsent` is
 
 Decide what your site does without consent and set the option: `'cookieless'` keeps the default, `'off'` sends nothing until consent. Any value ends the line ([Measuring without consent](/analytics/consent#measuring-without-consent)).
 
+### `analytics: Payload's job controls the config left unset ...`
+
+```
+analytics: Payload's job controls the config left unset now admit users of the "users" collection only: jobs.access.run, queue and cancel. Set jobs.access, and access in jobs.jobsCollectionOverrides, in your Payload config to choose who may run, queue, cancel and read jobs.
+```
+
+At every boot, while the Payload config leaves those job controls unset. The plugin registers jobs, so it closes them to anyone outside the admin user collection rather than leaving Payload's open default. Set `jobs.access` and the jobs collection's `access` in your Payload config to end the line ([Who may run jobs](/analytics/native#who-may-run-jobs)).
+
 ### `analytics: <host> is refused: <reason>`
 
 Part of the line a failed read logs, such as `analytics: query read failed for adapter "<provider>:<id>" (scope "<scope>"): ...`. The query endpoint answers `502 source_misconfigured` with `param: 'host'` and the message `analytics: this source's host is not one the install allows; list it in providers.hosts.allow, or set providers.hosts.allowPrivateNetwork for a private or http address`. Editors see "This data source uses a web address your site is not allowed to contact."
