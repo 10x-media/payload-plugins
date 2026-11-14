@@ -890,7 +890,7 @@ describe('umami checkConnection', () => {
 				token: 't',
 				host: 'https://umami.example.com',
 			}).checkConnection?.(ctx())
-		).rejects.toMatchObject({ name: 'SourceMisconfiguredError' })
+		).rejects.toMatchObject({ name: 'UnknownSiteError' })
 	})
 
 	it('puts the website id in the address as one path segment', async () => {

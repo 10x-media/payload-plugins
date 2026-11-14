@@ -383,6 +383,7 @@ POST /api/_x/provider-status?id=<provider document id>
     "lastSuccessAt": "2026-11-09T10:00:00.000Z",
     "lastErrorAt": "2026-11-09T09:58:12.000Z",
     "errorKind": "source_misconfigured", // or "unavailable"
+    "errorReason": "incomplete", // or "unknownSite", when the plugin knows why
     "errorDetail": "posthog: HTTP 403 Invalid personal API key.",
     "pausedUntil": "2026-11-09T09:58:42.000Z" // while the source rests
   },

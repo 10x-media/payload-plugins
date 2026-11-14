@@ -164,6 +164,8 @@ export const keys = {
 	providerConnectionRefusedHelp: 'analytics:providerConnectionRefusedHelp',
 	providerConnectionRefusedHelpPosthog: 'analytics:providerConnectionRefusedHelpPosthog',
 	providerConnectionRefusedHelpGa4: 'analytics:providerConnectionRefusedHelpGa4',
+	providerConnectionIncompleteHelp: 'analytics:providerConnectionIncompleteHelp',
+	providerConnectionUnknownSiteHelp: 'analytics:providerConnectionUnknownSiteHelp',
 	providerConnectionUnreachableHelp: 'analytics:providerConnectionUnreachableHelp',
 	providerConnectionChecked: 'analytics:providerConnectionChecked',
 	providerConnectionFailed: 'analytics:providerConnectionFailed',

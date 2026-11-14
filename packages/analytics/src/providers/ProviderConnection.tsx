@@ -23,6 +23,7 @@ import { useTranslation } from '../translations/useTranslation'
 import { isAbortError, requestShaped } from '../ui/data/request'
 import { viewerNow } from '../ui/viewerClock'
 import {
+	type ConnectionFailureReason,
 	type ConnectionState,
 	connectionStateOf,
 	isProviderStatusResponse,
@@ -42,6 +43,11 @@ const STATE_LABEL: Readonly<Record<ConnectionState, TranslationKey>> = {
 const HELP: Partial<Record<ConnectionState, TranslationKey>> = {
 	refused: keys.providerConnectionRefusedHelp,
 	unreachable: keys.providerConnectionUnreachableHelp,
+}
+
+const REASON_HELP: Record<ConnectionFailureReason, TranslationKey> = {
+	incomplete: keys.providerConnectionIncompleteHelp,
+	unknownSite: keys.providerConnectionUnknownSiteHelp,
 }
 
 /**
@@ -120,14 +126,17 @@ export function ProviderConnection({ path }: UIFieldClientProps) {
 	]
 	const shown = facts.filter((fact): fact is [TranslationKey, string] => fact[1] !== undefined)
 	const words = failed && status?.errorDetail ? vendorWordsOf(status.errorDetail) : undefined
+	const reasonHelp =
+		state === 'refused' && status?.errorReason ? REASON_HELP[status.errorReason] : undefined
 	const help =
-		state === 'refused' && provider === 'posthog'
+		reasonHelp ??
+		(state === 'refused' && provider === 'posthog'
 			? keys.providerConnectionRefusedHelpPosthog
 			: state === 'refused' && provider === 'ga4'
 				? keys.providerConnectionRefusedHelpGa4
 				: state
 					? HELP[state]
-					: undefined
+					: undefined)
 	const blocked =
 		docId === undefined
 			? keys.providerConnectionSaveFirst

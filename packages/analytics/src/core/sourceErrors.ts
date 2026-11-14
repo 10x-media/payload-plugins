@@ -6,6 +6,8 @@ const MISCONFIGURED: unique symbol = Symbol.for('@10x-media/analytics/sourceMisc
 
 const HOST_REFUSED: unique symbol = Symbol.for('@10x-media/analytics/hostRefused')
 
+const UNKNOWN_SITE: unique symbol = Symbol.for('@10x-media/analytics/unknownSite')
+
 const UNSUPPORTED_FILTER: unique symbol = Symbol.for('@10x-media/analytics/unsupportedFilter')
 
 const INVALID_QUERY: unique symbol = Symbol.for('@10x-media/analytics/invalidQuery')
@@ -35,6 +37,16 @@ export class HostRefusedError extends SourceMisconfiguredError {
 	}
 }
 
+/** A site, website or property ID the vendor answered that it does not know. */
+export class UnknownSiteError extends SourceMisconfiguredError {
+	readonly [UNKNOWN_SITE] = true
+
+	constructor(message: string) {
+		super(message)
+		this.name = 'UnknownSiteError'
+	}
+}
+
 /** How deep a cause chain is searched; a cyclic or runaway chain ends here. */
 const MAX_CAUSE_DEPTH = 5
 
@@ -60,6 +72,10 @@ export const isSourceMisconfigured = (err: unknown): boolean =>
 /** True for a {@link HostRefusedError} anywhere in an error's cause chain. */
 export const isHostRefused = (err: unknown): boolean =>
 	brandedCause(err, HOST_REFUSED) !== undefined
+
+/** True for an {@link UnknownSiteError} anywhere in an error's cause chain. */
+export const isUnknownSite = (err: unknown): boolean =>
+	brandedCause(err, UNKNOWN_SITE) !== undefined
 
 /**
  * A read carrying a filter its source does not apply. The source would answer without it, and

@@ -171,6 +171,10 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerConnectionRefusedHelpPosthog]: 'تحقق من المفتاح والمعرّفات والمنطقة والمضيف.',
 	[keys.providerConnectionRefusedHelpGa4]:
 		'تحقق من معرّف الموقع والمفتاح، ومن أن بريد العميل مُضاف كمُشاهد للموقع.',
+	[keys.providerConnectionIncompleteHelp]:
+		'مفتاح أو معرّف يحتاجه هذا الفحص فارغ. أدخله واحفظ ثم اختبر مرة أخرى.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'الخدمة لا تعرف هذا الموقع. انسخ معرّفه من إعدادات الخدمة نفسها.',
 	[keys.providerConnectionUnreachableHelp]: 'لم تستجب الخدمة. حاول لاحقًا.',
 	[keys.providerConnectionChecked]: 'الاتصال يعمل',
 	[keys.providerConnectionFailed]: 'فشل الاتصال',

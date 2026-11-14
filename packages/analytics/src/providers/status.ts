@@ -3,7 +3,12 @@ import { currentDate } from '../core/clock'
 import { isRecord } from '../core/values'
 import { type ReadFailureKind, vendorAnswerOf } from '../surfacing/classifyError'
 import type { LaneHealth, LaneOutcome } from '../surfacing/lanes'
-import { type ConnectionOutcome, connectionStateOf, type ProviderStatus } from './connectionState'
+import {
+	type ConnectionOutcome,
+	connectionFailureReasonOf,
+	connectionStateOf,
+	type ProviderStatus,
+} from './connectionState'
 
 /**
  * How long the rows a scope's reads look up (`readMany`) are answered from this instance's memory;
@@ -65,11 +70,13 @@ const statusOf = (row: Record<string, unknown>): ProviderStatus => {
 	const lastErrorAt = isoOf(row.lastErrorAt)
 	const pausedUntil = isoOf(row.pausedUntil)
 	const errorKind = READ_FAILURE_KINDS.find((kind) => kind === row.errorKind)
+	const errorReason = connectionFailureReasonOf(row.errorReason)
 	const errorDetail = typeof row.errorDetail === 'string' ? row.errorDetail : undefined
 	return {
 		...(lastSuccessAt ? { lastSuccessAt } : {}),
 		...(lastErrorAt ? { lastErrorAt } : {}),
 		...(errorKind ? { errorKind } : {}),
+		...(errorReason ? { errorReason } : {}),
 		...(errorDetail ? { errorDetail } : {}),
 		...(pausedUntil ? { pausedUntil } : {}),
 	}
@@ -172,6 +179,7 @@ export const providerStatusStore = (
 			: {
 					lastErrorAt: at.toISOString(),
 					errorKind: outcome.kind,
+					errorReason: outcome.reason ?? null,
 					errorDetail: outcome.detail ? outcome.detail.slice(0, DETAIL_MAX) : null,
 					pausedUntil:
 						outcome.pausedForMs && outcome.pausedForMs > 0

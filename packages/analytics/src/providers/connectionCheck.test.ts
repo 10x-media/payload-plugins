@@ -1,6 +1,6 @@
 import type { Payload } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { HostRefusedError } from '../core/sourceErrors'
+import { HostRefusedError, UnknownSiteError } from '../core/sourceErrors'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { checkConnectionOf, createConnectionRecheck } from './connectionCheck'
 import type { ConnectionOutcome } from './connectionState'
@@ -29,6 +29,31 @@ describe('checkConnectionOf', () => {
 		expect(await checkConnectionOf(payload, adapter)).toEqual({
 			ok: false,
 			kind: 'source_misconfigured',
+		})
+	})
+
+	it('names an incomplete document as the reason it is refused, without asking the vendor', async () => {
+		const checkConnection = vi.fn(async () => {})
+		const adapter = { ...memoryAdapter(), isConfigured: () => false, checkConnection }
+		expect(await checkConnectionOf(payload, adapter)).toEqual({
+			ok: false,
+			kind: 'source_misconfigured',
+			reason: 'incomplete',
+		})
+		expect(checkConnection).not.toHaveBeenCalled()
+	})
+
+	it('names a site the vendor does not know as the reason it is refused', async () => {
+		const adapter = {
+			...memoryAdapter(),
+			checkConnection: async () => {
+				throw new UnknownSiteError('umami: no website w; check the Website ID')
+			},
+		}
+		expect(await checkConnectionOf(payload, adapter)).toEqual({
+			ok: false,
+			kind: 'source_misconfigured',
+			reason: 'unknownSite',
 		})
 	})
 })

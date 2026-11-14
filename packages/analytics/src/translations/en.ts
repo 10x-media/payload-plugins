@@ -175,6 +175,10 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerConnectionRefusedHelpPosthog]: 'Check the key, the IDs, the Region and the host.',
 	[keys.providerConnectionRefusedHelpGa4]:
 		'Check the Property ID and the key, and that the client email is a Viewer of the property.',
+	[keys.providerConnectionIncompleteHelp]:
+		'A key or an ID this check needs is empty. Enter it and save, then test again.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		"The service does not know this site. Copy its ID from the service's own settings.",
 	[keys.providerConnectionUnreachableHelp]: 'The service did not answer. Try again later.',
 	[keys.providerConnectionChecked]: 'Connection works',
 	[keys.providerConnectionFailed]: 'Connection failed',

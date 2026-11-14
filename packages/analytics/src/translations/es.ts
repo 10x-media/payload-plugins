@@ -178,6 +178,10 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerConnectionRefusedHelpPosthog]: 'Revisa la clave, los ID, la región y el host.',
 	[keys.providerConnectionRefusedHelpGa4]:
 		'Revisa el ID de propiedad y la clave, y que el correo del cliente sea Lector de la propiedad.',
+	[keys.providerConnectionIncompleteHelp]:
+		'Falta una clave o un ID que esta comprobación necesita. Introdúcelo, guarda y vuelve a probar.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'El servicio no conoce este sitio. Copia su ID desde la configuración del propio servicio.',
 	[keys.providerConnectionUnreachableHelp]: 'El servicio no respondió. Inténtalo más tarde.',
 	[keys.providerConnectionChecked]: 'La conexión funciona',
 	[keys.providerConnectionFailed]: 'La conexión falló',
