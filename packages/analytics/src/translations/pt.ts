@@ -390,7 +390,7 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.filterHintGoal]: 'Código curto do objetivo, por exemplo newsletter-signup',
 	[keys.filterHintCurrency]: 'Código de moeda de três letras, por exemplo EUR',
 	[keys.providersCollectionDescription]:
-		'Adicione uma entrada para cada ferramenta de análise que você conectar. Suas chaves são armazenadas com segurança e nunca mais são exibidas; só os últimos quatro caracteres ficam visíveis, para você saber qual está salva.',
+		'Adicione uma entrada para cada ferramenta de análise que você conectar. Suas chaves são armazenadas com segurança e nunca mais são exibidas; só os últimos quatro caracteres ficam visíveis, para você saber qual está salva. Mudar o Host, um ID ou a região de uma entrada salva apaga as chaves dela: digite-as de novo no mesmo salvamento.',
 	[keys.providerFieldNameHelp]: 'Aparece onde você escolhe uma fonte de dados.',
 	[keys.providerFieldProviderHelp]:
 		'Para qual ferramenta de análise é esta entrada. Os campos abaixo mudam conforme a sua escolha.',
@@ -418,7 +418,7 @@ export const pt: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'O número exibido como Project ID nas configurações do seu projeto PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'A nuvem do seu endereço PostHog: US para us.posthog.com, EU para eu.posthog.com. Ignorado quando Host é uma instância própria.',
+		'A nuvem do seu endereço PostHog: US para us.posthog.com, EU para eu.posthog.com. Ignorado quando Host é uma instância própria. Obrigatório quando Host está vazio.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'O código de moeda de 3 letras dos seus objetivos de venda, por exemplo USD. A receita só aparece depois que você o definir.',
 	[keys.providerFieldGa4CurrencyHelp]:
