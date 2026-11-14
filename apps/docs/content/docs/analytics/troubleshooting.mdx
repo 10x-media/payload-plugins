@@ -131,7 +131,7 @@ The vendor answered that it has no site with this ID. Self-hosted Umami answers 
 
 The plugin could not read with these settings. For a PostHog document the advice reads "Check the key, the IDs, the Region and the host.", for a GA4 document "Check the Property ID and the key, and that the client email is a Viewer of the property." Under it, the panel shows what the vendor answered, when it answered in words. The sections below cover the answers seen most.
 
-With no vendor answer under the advice, the host is refused. The developer finds the reason in the server log line `analytics: <host> is refused: <reason>` ([Server log and boot](#server-log-and-boot)).
+With no vendor answer under the advice, the host is refused or a stored key could not be decrypted. The developer finds which in the server log: `analytics: <host> is refused: <reason>` or `analytics: provider document "<id>" (<provider>) could not be read, ...` ([Server log and boot](#server-log-and-boot)).
 
 To fix a document:
 
@@ -339,9 +339,11 @@ The reason says which check refused the host:
 | Reason | What to do |
 |---|---|
 | `it is not listed in providers.hosts.allow` | Add the host's origin to `providers.hosts.allow`, or correct the document's **Host**. |
+| `it uses http, which needs providers.hosts.allowPrivateNetwork` | Use the vendor's https address, or set `providers.hosts.allowPrivateNetwork: true` for a vendor on your own network. |
+| `it is not an address this install accepts` | Correct the document's **Host**: an address with only a scheme, a host and an optional path. |
 | `it resolves to a private or reserved address` | For a vendor on your own network, set `providers.hosts.allowPrivateNetwork: true`. Otherwise correct the **Host**. |
 | `it is a private or reserved address` | The same. |
-| `http: is not https` | Use the vendor's https address, or set `providers.hosts.allowPrivateNetwork: true` for an http one. |
+| `http: is not https` | The vendor redirected to an http address. Use its https address, or set `providers.hosts.allowPrivateNetwork: true`. |
 
 See [Where a document may connect](/analytics/providers#where-a-document-may-connect).
 

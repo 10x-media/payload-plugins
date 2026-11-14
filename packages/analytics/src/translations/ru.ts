@@ -178,7 +178,7 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionRefusedHelp]: 'Проверьте ключ, ID и хост.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'Проверьте ключ, ID, регион и хост.',
 	[keys.providerConnectionRefusedHelpGa4]:
-		'Проверьте Property ID и ключ, а также что client email добавлен читателем ресурса.',
+		'Проверьте ID ресурса и ключ, а также что Email клиента добавлен читателем ресурса.',
 	[keys.providerConnectionIncompleteHelp]:
 		'Не заполнен ключ или ID, нужный для проверки. Заполните, сохраните и проверьте снова.',
 	[keys.providerConnectionUnknownSiteHelp]:

@@ -96,7 +96,7 @@ If tenants manage their own conversion goals, do the same for the goals collecti
 
 If tenants may pick GA4, install `@google-analytics/data` and pass it in as `sdks: { ga4: { BetaAnalyticsDataClient } }` ([GA4](/analytics/providers#ga4)).
 
-If tenants run Plausible or Umami on their own server, list those addresses in `providers.hosts.allow`. The **Host** field refuses any other address but the vendors' clouds ([Where a document may connect](/analytics/providers#where-a-document-may-connect)).
+If tenants run Plausible, Umami or PostHog on their own server, list those addresses in `providers.hosts.allow`. The **Host** field refuses any other address but the vendors' clouds ([Where a document may connect](/analytics/providers#where-a-document-may-connect)).
 
 Before production, give the stored keys a key ring of their own: `providers.collection.encryption.keys`, or the `encrypted.keys` of the `@10x-media/fields` plugin. Without either, the ring derives from the Payload secret, which suits development only.
 
@@ -181,7 +181,7 @@ Until the types are regenerated, TypeScript refuses `'analytics-providers'` in t
 
 ## 8. Check it as a tenant admin
 
-1. Start the app. The first boot logs two notices that name the option ending each: `capture.withoutConsent is unset` and Payload's job controls ([Server log and boot](/analytics/troubleshooting#server-log-and-boot)). Sign in as a user who belongs to one tenant. Pick that tenant in the tenant selector.
+1. Start the app. Every boot logs two notices until the options they name are set: `capture.withoutConsent is unset` and one about Payload's job controls ([Server log and boot](/analytics/troubleshooting#server-log-and-boot)). Sign in as a user who belongs to one tenant. Pick that tenant in the tenant selector.
 2. Open **Analytics providers** (in the **Analytics settings** group of the nav) and create a document. Pick the **Provider**, fill in what its fields ask for, and save.
 3. In the sidebar's **Connection** panel, press **Test connection**. It should read **Connected**. Any other answer: [Troubleshooting](/analytics/troubleshooting#connection-panel).
 4. Open **Analytics** (`/admin/analytics`). The view reads the new provider, and its caption reads `Showing:` followed by the tenant.
