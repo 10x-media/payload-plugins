@@ -676,7 +676,7 @@ describe('the default-for-this-site flag', () => {
 
 	const reqWith = (docs: unknown[]) => {
 		const find = vi.fn(async (_args: { where: unknown; pagination?: boolean }) => ({ docs }))
-		return { find, req: { t: (key: string) => key, payload: { find } } }
+		return { find, req: { t: (key: string) => key, i18n: { language: 'en' }, payload: { find } } }
 	}
 
 	it('is a sidebar checkbox after enabled, off by default, on a scoped install only', () => {
@@ -710,6 +710,8 @@ describe('the default-for-this-site flag', () => {
 		await expect(
 			hookOf(scoped())({ data: { isDefault: true }, operation: 'create', req })
 		).rejects.toMatchObject({
+			// The toast names the field by its label, not its path.
+			message: expect.stringContaining(keys.providerFieldIsDefault),
 			data: { errors: [{ path: 'isDefault', message: keys.providerErrorDefaultTaken }] },
 		})
 		const call = find.mock.calls[0]?.[0]

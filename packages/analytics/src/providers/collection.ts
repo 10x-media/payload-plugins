@@ -437,16 +437,20 @@ const checkSingleDefault = (args: BuildProvidersCollectionArgs): CollectionBefor
 			return data
 		}
 		if (await takenInScope(args, { data, originalDoc, req }, { isDefault: { equals: true } })) {
-			throw new ValidationError({
-				collection: args.slug,
-				errors: [
-					{
-						label: labelForKey(keys.providerFieldIsDefault),
-						message: asTranslate(req.t)(keys.providerErrorDefaultTaken),
-						path: 'isDefault',
-					},
-				],
-			})
+			throw new ValidationError(
+				{
+					collection: args.slug,
+					errors: [
+						{
+							label: labelForKey(keys.providerFieldIsDefault),
+							message: asTranslate(req.t)(keys.providerErrorDefaultTaken),
+							path: 'isDefault',
+						},
+					],
+					req,
+				},
+				req.t
+			)
 		}
 		return data
 	}

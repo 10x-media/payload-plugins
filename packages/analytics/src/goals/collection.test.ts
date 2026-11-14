@@ -37,7 +37,7 @@ const groupFields = (fields: Field[] | undefined, name: string): Field[] => {
 
 /** A request double carrying only what the collection's hooks and validators read. */
 const fakeReq = (find?: (args: { where: Where; pagination?: boolean }) => unknown) =>
-	({ t: (key: string) => key, payload: { find } }) as never
+	({ t: (key: string) => key, i18n: { language: 'en' }, payload: { find } }) as never
 
 const unscopedArgs: Omit<BuildGoalsCollectionArgs, 'slug' | 'onChange'> = {
 	scoped: false,
@@ -273,6 +273,7 @@ describe('goals collection slug uniqueness', () => {
 			hookFor()({ data: { slug: 'demo' }, operation: 'create', req: fakeReq(find) } as never)
 			// A ValidationError, so the admin shows the message on the slug field itself.
 		).rejects.toMatchObject({
+			message: expect.stringContaining('analytics:goalFieldSlug'),
 			data: { errors: [{ path: 'slug', message: 'analytics:goalErrorSlugTaken' }] },
 		})
 	})
