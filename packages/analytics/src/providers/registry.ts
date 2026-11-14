@@ -378,10 +378,9 @@ const collectionRegistry = (
 			const doc: PooledDocument = { id: String(raw.id), version: versionOf(raw.updatedAt), scope }
 			const outcome = await adapterOf(raw, decryptFieldValue)
 			if (outcome.ok) {
-				built.set(
-					doc.id,
-					stamped(pool.put(doc, outcome.adapter, raw.provider !== 'native'), doc.version)
-				)
+				const pooled = pool.put(doc, outcome.adapter, raw.provider !== 'native')
+				// A newer version pooled by an overlapping build keeps the version it was stamped with.
+				built.set(doc.id, pool.get(doc) === pooled ? stamped(pooled, doc.version) : pooled)
 			} else {
 				built.set(doc.id, stamped(outcome.standIn, doc.version))
 				failed = true
