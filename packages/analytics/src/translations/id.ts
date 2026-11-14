@@ -389,7 +389,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.filterHintGoal]: 'Kode singkat sasaran, misalnya newsletter-signup',
 	[keys.filterHintCurrency]: 'Kode mata uang tiga huruf, misalnya EUR',
 	[keys.providersCollectionDescription]:
-		'Tambahkan satu entri untuk setiap alat analitik yang Anda hubungkan. Kunci Anda disimpan dengan aman dan tidak ditampilkan lagi; hanya empat karakter terakhir yang tetap terlihat agar Anda tahu kunci mana yang tersimpan.',
+		'Tambahkan satu entri untuk setiap alat analitik yang Anda hubungkan. Kunci Anda disimpan dengan aman dan tidak ditampilkan lagi; hanya empat karakter terakhir yang tetap terlihat agar Anda tahu kunci mana yang tersimpan. Mengubah Host, ID, atau Region pada entri yang tersimpan akan menghapus kuncinya: masukkan lagi dalam penyimpanan yang sama.',
 	[keys.providerFieldNameHelp]: 'Tampil di mana pun Anda memilih sumber data.',
 	[keys.providerFieldProviderHelp]:
 		'Untuk alat analitik yang mana. Kolom di bawah berubah sesuai pilihan Anda.',
@@ -416,7 +416,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'Angka yang tertera sebagai Project ID di pengaturan proyek PostHog Anda.',
 	[keys.providerFieldRegionHelp]:
-		'Cloud pada alamat PostHog Anda: US untuk us.posthog.com, EU untuk eu.posthog.com. Diabaikan jika Host adalah instans yang di-host sendiri.',
+		'Cloud pada alamat PostHog Anda: US untuk us.posthog.com, EU untuk eu.posthog.com. Diabaikan jika Host adalah instans yang di-host sendiri. Wajib jika Host kosong.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'Kode mata uang 3 huruf untuk sasaran penjualan Anda, misalnya USD. Pendapatan tidak akan tampil sebelum ini diisi.',
 	[keys.providerFieldGa4CurrencyHelp]:

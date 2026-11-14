@@ -395,7 +395,7 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.filterHintGoal]: "Code court de l'objectif, par exemple newsletter-signup",
 	[keys.filterHintCurrency]: 'Code monnaie à trois lettres, par exemple EUR',
 	[keys.providersCollectionDescription]:
-		"Ajoutez une entrée par outil d'analyse que vous connectez. Vos clés sont enregistrées de façon sécurisée et ne sont plus jamais affichées ; seuls les quatre derniers caractères restent visibles pour savoir laquelle est enregistrée.",
+		"Ajoutez une entrée par outil d'analyse que vous connectez. Vos clés sont enregistrées de façon sécurisée et ne sont plus jamais affichées ; seuls les quatre derniers caractères restent visibles pour savoir laquelle est enregistrée. Modifier l'Hôte, un ID ou la région d'une entrée enregistrée efface ses clés : saisissez-les à nouveau dans le même enregistrement.",
 	[keys.providerFieldNameHelp]: 'Affiché partout où vous choisissez une source de données.',
 	[keys.providerFieldProviderHelp]:
 		"L'outil d'analyse concerné. Les champs ci-dessous changent selon votre choix.",
@@ -423,7 +423,7 @@ export const fr: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'Le nombre affiché comme Project ID dans les paramètres de votre projet PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'Le cloud de votre adresse PostHog : US pour us.posthog.com, EU pour eu.posthog.com. Ignoré si Hôte est une instance auto-hébergée.',
+		'Le cloud de votre adresse PostHog : US pour us.posthog.com, EU pour eu.posthog.com. Ignoré si Hôte est une instance auto-hébergée. Obligatoire si Hôte est vide.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		"Le code monnaie à 3 lettres de vos objectifs de vente, par exemple USD. Le chiffre d'affaires ne s'affiche pas tant qu'il n'est pas renseigné.",
 	[keys.providerFieldGa4CurrencyHelp]:

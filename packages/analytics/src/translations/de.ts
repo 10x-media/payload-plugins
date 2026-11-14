@@ -390,7 +390,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.filterHintGoal]: 'Kurzcode des Ziels, zum Beispiel newsletter-signup',
 	[keys.filterHintCurrency]: 'Dreistelliger Währungscode, zum Beispiel EUR',
 	[keys.providersCollectionDescription]:
-		'Lege für jedes verbundene Analyse-Tool einen Eintrag an. Deine Schlüssel werden sicher gespeichert und nie wieder angezeigt; sichtbar bleiben nur die letzten vier Zeichen, damit erkennbar ist, welcher gespeichert ist.',
+		'Lege für jedes verbundene Analyse-Tool einen Eintrag an. Deine Schlüssel werden sicher gespeichert und nie wieder angezeigt; sichtbar bleiben nur die letzten vier Zeichen, damit erkennbar ist, welcher gespeichert ist. Wenn du Host, eine ID oder die Region eines gespeicherten Eintrags änderst, werden seine Schlüssel gelöscht: gib sie beim selben Speichern erneut ein.',
 	[keys.providerFieldNameHelp]: 'Wird überall dort angezeigt, wo du eine Datenquelle auswählst.',
 	[keys.providerFieldProviderHelp]:
 		'Für welches Analyse-Tool das gilt. Die Felder unten richten sich nach deiner Auswahl.',
@@ -418,7 +418,7 @@ export const de: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'Die Zahl, die in den Einstellungen deines PostHog-Projekts als Project ID steht.',
 	[keys.providerFieldRegionHelp]:
-		'Die Cloud in deiner PostHog-Adresse: US für us.posthog.com, EU für eu.posthog.com. Wird ignoriert, wenn Host eine selbst gehostete Instanz ist.',
+		'Die Cloud in deiner PostHog-Adresse: US für us.posthog.com, EU für eu.posthog.com. Wird ignoriert, wenn Host eine selbst gehostete Instanz ist. Pflicht, wenn Host leer ist.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'Der 3-stellige Währungscode für deine Verkaufsziele, zum Beispiel USD. Ohne ihn wird kein Umsatz angezeigt.',
 	[keys.providerFieldGa4CurrencyHelp]:

@@ -381,7 +381,7 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.filterHintGoal]: 'الرمز المختصر للهدف، مثل newsletter-signup',
 	[keys.filterHintCurrency]: 'رمز عملة من ثلاثة أحرف، مثل EUR',
 	[keys.providersCollectionDescription]:
-		'أضف مدخلًا واحدًا لكل أداة تحليلات تربطها. تُحفظ مفاتيحك بأمان ولا تُعرض مرة أخرى؛ تبقى الأحرف الأربعة الأخيرة ظاهرة فقط لتعرف أيّها محفوظ.',
+		'أضف مدخلًا واحدًا لكل أداة تحليلات تربطها. تُحفظ مفاتيحك بأمان ولا تُعرض مرة أخرى؛ تبقى الأحرف الأربعة الأخيرة ظاهرة فقط لتعرف أيّها محفوظ. تغيير المضيف أو أحد المعرّفات أو المنطقة في مدخل محفوظ يمسح مفاتيحه، فأدخلها مجددًا في الحفظ نفسه.',
 	[keys.providerFieldNameHelp]: 'يظهر في كل مكان تختار فيه مصدر بيانات.',
 	[keys.providerFieldProviderHelp]: 'أي أداة تحليلات يخصّها هذا. تتغيّر الحقول أدناه حسب اختيارك.',
 	[keys.providerFieldEnabledHelp]:
@@ -405,7 +405,7 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'الرقم الظاهر باسم Project ID في إعدادات مشروعك في PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'السحابة في عنوان PostHog الخاص بك: US لـ us.posthog.com و EU لـ eu.posthog.com. يُتجاهل إذا كان المضيف نسخة مستضافة ذاتيًا.',
+		'السحابة في عنوان PostHog الخاص بك: US لـ us.posthog.com و EU لـ eu.posthog.com. يُتجاهل إذا كان المضيف نسخة مستضافة ذاتيًا. مطلوب إذا كان المضيف فارغًا.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'رمز العملة المكوّن من 3 أحرف لأهداف المبيعات، مثل USD. لن تظهر الإيرادات قبل ضبطه.',
 	[keys.providerFieldGa4CurrencyHelp]:

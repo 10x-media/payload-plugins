@@ -385,7 +385,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.filterHintGoal]: 'Goal short code, for example newsletter-signup',
 	[keys.filterHintCurrency]: 'Three-letter currency code, for example EUR',
 	[keys.providersCollectionDescription]:
-		'Add one entry for each analytics tool you connect. Your keys are stored securely and never shown again; only the last four characters stay visible so you can tell which one is saved.',
+		'Add one entry for each analytics tool you connect. Your keys are stored securely and never shown again; only the last four characters stay visible so you can tell which one is saved. Changing the Host, an ID or the Region of a saved entry clears its keys: enter them again in the same save.',
 	[keys.providerFieldNameHelp]: 'Shown wherever you choose a data source.',
 	[keys.providerFieldProviderHelp]:
 		'Which analytics tool this is for. The fields below change with your choice.',
@@ -413,7 +413,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'The number shown as Project ID in your PostHog project’s settings.',
 	[keys.providerFieldRegionHelp]:
-		'The cloud your PostHog address names: US for us.posthog.com, EU for eu.posthog.com. Ignored when Host is a self-hosted instance.',
+		'The cloud your PostHog address names: US for us.posthog.com, EU for eu.posthog.com. Ignored when Host is a self-hosted instance. Required when Host is blank.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'The 3-letter currency code for your sales goals, for example USD. Revenue will not show until this is set.',
 	[keys.providerFieldGa4CurrencyHelp]:

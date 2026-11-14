@@ -368,7 +368,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.filterHintGoal]: '目标的简短代号，例如 newsletter-signup',
 	[keys.filterHintCurrency]: '三位货币代码，例如 EUR',
 	[keys.providersCollectionDescription]:
-		'每连接一个分析工具就添加一条记录。您的密钥会被安全保存且不再显示；只保留最后四位可见，方便分辨保存的是哪一个。',
+		'每连接一个分析工具就添加一条记录。您的密钥会被安全保存且不再显示；只保留最后四位可见，方便分辨保存的是哪一个。更改已保存记录的主机、ID 或区域会清除其密钥：请在同一次保存中重新输入。',
 	[keys.providerFieldNameHelp]: '在任何选择数据源的地方显示。',
 	[keys.providerFieldProviderHelp]: '这是为哪个分析工具设置的。下方的字段会随您的选择而变化。',
 	[keys.providerFieldEnabledHelp]: '关闭后会保留已保存的信息，但网站上任何位置都不再使用这个工具。',
@@ -390,7 +390,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerFieldProjectIdHelp]: '可选。服务账号文件中的 project_id。',
 	[keys.providerFieldPosthogProjectIdHelp]: 'PostHog 项目设置中显示为 Project ID 的数字。',
 	[keys.providerFieldRegionHelp]:
-		'你的 PostHog 地址所在的云：us.posthog.com 选 US，eu.posthog.com 选 EU。主机为自托管实例时忽略。',
+		'你的 PostHog 地址所在的云：us.posthog.com 选 US，eu.posthog.com 选 EU。主机为自托管实例时忽略。主机为空时必填。',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'销售目标使用的 3 位货币代码，例如 USD。未设置前不会显示收入。',
 	[keys.providerFieldGa4CurrencyHelp]:

@@ -389,7 +389,7 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.filterHintGoal]: 'Короткий код цели, например newsletter-signup',
 	[keys.filterHintCurrency]: 'Трёхбуквенный код валюты, например EUR',
 	[keys.providersCollectionDescription]:
-		'Добавьте по одной записи на каждый подключённый сервис аналитики. Ключи хранятся надёжно и больше не показываются; видимыми остаются только последние четыре символа, чтобы понять, какой ключ сохранён.',
+		'Добавьте по одной записи на каждый подключённый сервис аналитики. Ключи хранятся надёжно и больше не показываются; видимыми остаются только последние четыре символа, чтобы понять, какой ключ сохранён. Смена хоста, ID или региона у сохранённой записи стирает её ключи: введите их заново в том же сохранении.',
 	[keys.providerFieldNameHelp]: 'Показывается везде, где вы выбираете источник данных.',
 	[keys.providerFieldProviderHelp]:
 		'Для какого сервиса аналитики это настройка. Поля ниже меняются в зависимости от выбора.',
@@ -416,7 +416,7 @@ export const ru: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldPosthogProjectIdHelp]:
 		'Число, указанное как Project ID в настройках проекта PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'Облако из вашего адреса PostHog: US для us.posthog.com, EU для eu.posthog.com. Не учитывается, если Хост указывает на собственный экземпляр PostHog.',
+		'Облако из вашего адреса PostHog: US для us.posthog.com, EU для eu.posthog.com. Не учитывается, если Хост указывает на собственный экземпляр PostHog. Обязательно, если Хост пуст.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'Трёхбуквенный код валюты для целей продаж, например USD. Пока он не задан, выручка не показывается.',
 	[keys.providerFieldGa4CurrencyHelp]:
