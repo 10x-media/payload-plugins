@@ -4,7 +4,7 @@ import { PROVIDER_IDS, type ProviderId } from './ids'
 
 /**
  * Why a check was refused, when the plugin knows: `incomplete`, the document lacks a key or an ID
- * the check needs; `unknownSite`, the vendor does not know the site, website or property ID.
+ * the check needs; `unknownSite`, the vendor does not know the site ID (self-hosted Umami).
  */
 export type ConnectionFailureReason = 'incomplete' | 'unknownSite'
 

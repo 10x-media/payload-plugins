@@ -1,5 +1,6 @@
 import type { Payload } from 'payload'
 import { currentDate } from '../core/clock'
+import { isUnknownSite } from '../core/sourceErrors'
 import { isRecord } from '../core/values'
 import { type ReadFailureKind, vendorAnswerOf } from '../surfacing/classifyError'
 import type { LaneHealth, LaneOutcome } from '../surfacing/lanes'
@@ -43,6 +44,7 @@ export const connectionOutcomeOf = (
 	return {
 		ok: false,
 		kind: failure.kind,
+		...(isUnknownSite(error) ? { reason: 'unknownSite' } : {}),
 		...(vendorAnswer === undefined ? {} : { detail: vendorAnswer }),
 		...(health.retryAfterMs ? { pausedForMs: health.retryAfterMs } : {}),
 	}

@@ -1,6 +1,7 @@
 import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
 import { ProviderHttpError } from '../adapters/http/fetchJson'
+import { UnknownSiteError } from '../core/sourceErrors'
 import { vendorWordsOf } from './connectionState'
 import {
 	connectionOutcomeOf,
@@ -67,6 +68,16 @@ describe('connectionOutcomeOf', () => {
 			detail: 'posthog: HTTP 403 {"detail":"Invalid personal API key."}',
 			pausedForMs: 30_000,
 		})
+	})
+
+	it('names a site the vendor does not know as the reason a read was refused', () => {
+		const error = new UnknownSiteError('umami: no website w; check the Website ID')
+		expect(
+			connectionOutcomeOf(
+				{ ok: false, failure: { kind: 'source_misconfigured' }, error },
+				{ open: false }
+			)
+		).toEqual({ ok: false, kind: 'source_misconfigured', reason: 'unknownSite' })
 	})
 
 	it('keeps no detail the vendor did not say: the plugin’s own refusal and a network error', () => {
