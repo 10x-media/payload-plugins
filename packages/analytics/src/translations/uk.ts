@@ -182,6 +182,8 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionUnreachableHelp]: 'Сервіс не відповів. Спробуйте пізніше.',
 	[keys.providerConnectionChecked]: 'Підключення працює',
 	[keys.providerConnectionFailed]: 'Підключення не вдалося',
+	[keys.providerConnectionCheckRunning]:
+		'Перевірка цих налаштувань уже триває. Повторіть за кілька секунд.',
 	[keys.providerFieldIsDefault]: 'За замовчуванням для цього сайту',
 	[keys.providerFieldIsDefaultHelp]:
 		'Аналітика відкривається в цьому інструменті, якщо читач не вибере інший. За замовчуванням на сайті може бути лише один інструмент.',

@@ -12,7 +12,7 @@ const doc = vi.hoisted(() => ({
 	lastUpdateTime: 1,
 	provider: 'plausible',
 }))
-const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }))
+const toasts = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn(), info: vi.fn() }))
 
 vi.mock('@payloadcms/ui', () => ({
 	Banner: ({ children, type }: { children?: ReactNode; type?: string }) => (
@@ -91,6 +91,7 @@ beforeEach(() => {
 	fetchMock.mockReset()
 	toasts.success.mockReset()
 	toasts.error.mockReset()
+	toasts.info.mockReset()
 	vi.stubGlobal('fetch', fetchMock)
 })
 
@@ -228,6 +229,17 @@ describe('ProviderConnection', () => {
 		})
 		expect(toasts.success).toHaveBeenCalledWith(keys.providerConnectionChecked)
 		expect(screen.getByText(keys.providerConnectionConnected)).toBeDefined()
+	})
+
+	it('says a check is already running when one started a moment ago has no result yet', async () => {
+		answers({ status: {} }, { status: {} })
+		await renderPanel()
+		await act(async () => {
+			fireEvent.click(testButton())
+		})
+		expect(toasts.info).toHaveBeenCalledWith(keys.providerConnectionCheckRunning)
+		expect(toasts.success).not.toHaveBeenCalled()
+		expect(toasts.error).not.toHaveBeenCalled()
 	})
 
 	it('toasts a check the debounce answered from the one before it', async () => {

@@ -19,10 +19,11 @@ export interface OwnSource {
 	label: string
 	docId: string
 	/**
-	 * True while the document's connection is failing, as the `fallback` policy reads it: refused,
-	 * or a vendor that did not answer while its reads rest.
+	 * Whether the document's connection is failing, as the `fallback` policy reads it: refused, or a
+	 * vendor that did not answer while its reads rest. The statuses are read on the first call, once
+	 * per request, so a policy that never asks costs no read.
 	 */
-	failing: boolean
+	failing(): Promise<boolean>
 }
 
 /**

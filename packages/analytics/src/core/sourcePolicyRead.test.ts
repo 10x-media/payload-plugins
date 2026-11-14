@@ -181,8 +181,42 @@ describe('sources.<id>.tenants', () => {
 			req,
 			scope: 'alpha',
 			adapterId: 'posthog',
-			ownSources: [{ id: 'plausible:doc-1', label: 'Own site', docId: 'doc-1', failing: false }],
+			ownSources: [
+				{ id: 'plausible:doc-1', label: 'Own site', docId: 'doc-1', failing: expect.any(Function) },
+			],
 		})
+	})
+
+	it('reads no connection status for a policy function that never asks whether a source fails', async () => {
+		const readMany = vi.fn(async () => new Map())
+		const store = {
+			record: async () => {},
+			read: async () => undefined,
+			readMany,
+			forget: async () => {},
+			carry: async () => {},
+			idle: async () => {},
+		}
+		const { req } = readerReq(['doc-1'])
+		await visibleRegistryFor({
+			runtime: runtimeWith(() => true, { providerStatus: store }),
+			req,
+			resolved: withOwn(),
+			scope: 'alpha',
+		})
+		expect(readMany).not.toHaveBeenCalled()
+
+		const asking = vi.fn(
+			async ({ ownSources }: { ownSources: Array<{ failing: () => Promise<boolean> }> }) =>
+				(await Promise.all(ownSources.map((source) => source.failing()))).every(Boolean)
+		)
+		await visibleRegistryFor({
+			runtime: runtimeWith(asking, { providerStatus: store }),
+			req: readerReq(['doc-1']).req,
+			resolved: withOwn(),
+			scope: 'alpha',
+		})
+		expect(readMany).toHaveBeenCalledTimes(1)
 	})
 
 	it('counts a policy function that throws as no, and says so', async () => {

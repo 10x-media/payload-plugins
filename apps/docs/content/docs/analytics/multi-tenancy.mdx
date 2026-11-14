@@ -444,7 +444,7 @@ The last result is the one the document's [Connection panel](/analytics/provider
 
 #### A function
 
-`({ req, scope, adapterId, ownSources }) => boolean`, which may return a promise. `ownSources` lists the reader's own sources as `{ id, label, docId, failing }`, `failing` being true while the source counts as failing for the [`fallback` policy](#fallback). Unlike `'fallback'`, a function only decides whether members read the adapter: the default source stays the one [A tenant's default source](#a-tenants-default-source) picks, and the listing carries no notice. Members read the adapter when it answers `true`; any other answer, or a throw, denies, and a throw is logged. It is asked at most once per request, scope and adapter.
+`({ req, scope, adapterId, ownSources }) => boolean`, which may return a promise. `ownSources` lists the reader's own sources as `{ id, label, docId, failing }`. `failing()` resolves to true while the source counts as failing for the [`fallback` policy](#fallback); the statuses are read on its first call, so a function that never calls it costs no read. Unlike `'fallback'`, a function only decides whether members read the adapter: the default source stays the one [A tenant's default source](#a-tenants-default-source) picks, and the listing carries no notice. Members read the adapter when it answers `true`; any other answer, or a throw, denies, and a throw is logged. It is asked at most once per request, scope and adapter.
 
 ```ts
 import type { SourcePolicyFunction } from '@10x-media/analytics'
@@ -458,8 +458,8 @@ With `sources: { posthog: { tenants: untilOwnVendor } }`, Alpha's and Gamma's ed
 
 ```ts
 // The platform's numbers while the tenant has no source of its own that works.
-export const untilOneWorks: SourcePolicyFunction = ({ ownSources }) =>
-  ownSources.every((source) => source.failing)
+export const untilOneWorks: SourcePolicyFunction = async ({ ownSources }) =>
+  (await Promise.all(ownSources.map((source) => source.failing()))).every(Boolean)
 ```
 
 #### What a policy leaves alone

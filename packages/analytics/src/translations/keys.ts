@@ -169,6 +169,7 @@ export const keys = {
 	providerConnectionUnreachableHelp: 'analytics:providerConnectionUnreachableHelp',
 	providerConnectionChecked: 'analytics:providerConnectionChecked',
 	providerConnectionFailed: 'analytics:providerConnectionFailed',
+	providerConnectionCheckRunning: 'analytics:providerConnectionCheckRunning',
 	providerFieldIsDefault: 'analytics:providerFieldIsDefault',
 	providerFieldIsDefaultHelp: 'analytics:providerFieldIsDefaultHelp',
 	providerErrorDefaultTaken: 'analytics:providerErrorDefaultTaken',

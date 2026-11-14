@@ -1408,6 +1408,7 @@ export const keys: {
     readonly providerConnectionUnreachableHelp: "analytics:providerConnectionUnreachableHelp";
     readonly providerConnectionChecked: "analytics:providerConnectionChecked";
     readonly providerConnectionFailed: "analytics:providerConnectionFailed";
+    readonly providerConnectionCheckRunning: "analytics:providerConnectionCheckRunning";
     readonly providerFieldIsDefault: "analytics:providerFieldIsDefault";
     readonly providerFieldIsDefaultHelp: "analytics:providerFieldIsDefaultHelp";
     readonly providerErrorDefaultTaken: "analytics:providerErrorDefaultTaken";
@@ -1692,7 +1693,7 @@ export type OrderSignatureMode = 'required' | 'optional';
 export interface OwnSource {
     // (undocumented)
     docId: string;
-    failing: boolean;
+    failing(): Promise<boolean>;
     // (undocumented)
     id: string;
     // (undocumented)
