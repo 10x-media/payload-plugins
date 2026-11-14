@@ -54,10 +54,10 @@ export type ProviderDoc = {
 	} | null
 }
 
-/** A stored blank reads as unset. */
-/** A stored text value as an adapter takes it: an admin's paste keeps spaces around it. */
+/** A stored text value without the spaces a paste can leave around it. */
 const trimmed = (value: string | null | undefined): string => value?.trim() ?? ''
 
+/** A stored blank reads as unset. */
 const orUndefined = (value: string | null | undefined): string | undefined =>
 	trimmed(value) || undefined
 
@@ -154,9 +154,14 @@ const buildBaseAdapter = (
 			return onDocumentHost(checkDocumentHost('plausible', cfg.host, ctx.hosts), (host) =>
 				plausible({
 					siteId: trimmed(cfg.siteId),
-					apiKey: cfg.apiKey ?? '',
+					apiKey: trimmed(cfg.apiKey),
 					host,
-					domain: orUndefined(cfg.domain),
+					domain: orUndefined(
+						cfg.domain
+							?.split(',')
+							.map((site) => site.trim())
+							.join(',')
+					),
 					scriptId: orUndefined(cfg.scriptId),
 					revenueCurrency: orUndefined(cfg.revenueCurrency),
 					fetch: ctx.fetch,
@@ -197,7 +202,7 @@ const buildBaseAdapter = (
 			return onDocumentHost(checkDocumentHost('posthog', cfg.host, ctx.hosts), (host) =>
 				posthog({
 					projectId: trimmed(cfg.projectId),
-					apiKey: cfg.apiKey ?? '',
+					apiKey: trimmed(cfg.apiKey),
 					host,
 					projectToken: orUndefined(cfg.projectToken),
 					region: posthogRegion(cfg.region),
