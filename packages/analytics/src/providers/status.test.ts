@@ -129,6 +129,20 @@ describe('providerStatusStore', () => {
 		})
 	})
 
+	it('keeps the reason of the last failure, which a failure without one clears', async () => {
+		const { payload } = fakePayload()
+		const time = clock()
+		const store = providerStatusStore(payload, time)
+		await store.record('7', { ok: false, kind: 'source_misconfigured', reason: 'unknownSite' })
+		expect((await store.read('7'))?.errorReason).toBe('unknownSite')
+		time.advance(1000)
+		await store.record('7', { ok: true })
+		expect((await store.read('7'))?.errorReason).toBe('unknownSite')
+		time.advance(1000)
+		await store.record('7', { ok: false, kind: 'source_misconfigured' })
+		expect((await store.read('7'))?.errorReason).toBeUndefined()
+	})
+
 	it('clears the pause on a success and keeps the last failure beside it', async () => {
 		const { payload } = fakePayload()
 		const time = clock()

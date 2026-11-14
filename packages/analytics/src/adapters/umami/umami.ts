@@ -22,7 +22,7 @@ import {
 	type MetricValues,
 } from '../../core/contract'
 import type { FetchLike } from '../../core/fetch'
-import { SourceMisconfiguredError } from '../../core/sourceErrors'
+import { UnknownSiteError } from '../../core/sourceErrors'
 import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
 import { isRecord } from '../../core/values'
 import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
@@ -349,9 +349,7 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 			)
 			// Self-hosted Umami answers a website id it does not know with 200 and a `null` body.
 			if (!isRecord(website)) {
-				throw new SourceMisconfiguredError(
-					`umami: no website ${config.websiteId}; check the Website ID`
-				)
+				throw new UnknownSiteError(`umami: no website ${config.websiteId}; check the Website ID`)
 			}
 		},
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {

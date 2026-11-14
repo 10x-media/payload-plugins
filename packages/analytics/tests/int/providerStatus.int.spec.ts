@@ -223,6 +223,25 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 		expect(body.status).toMatchObject({ errorKind: 'source_misconfigured' })
 	})
 
+	it(`answers a document without its key as incomplete, without asking the vendor, on ${db}`, async () => {
+		const doc = await booted.payload.create({
+			collection: PROVIDERS_SLUG,
+			data: {
+				name: 'keyless Plausible',
+				provider: 'plausible',
+				enabled: true,
+				scope: 'alpha',
+				plausible: { siteId: 'keyless.example', host: vendor.origin },
+			},
+			user: userOf('alpha'),
+			overrideAccess: true,
+		})
+		const body = (await (await status('POST', 'alpha', doc.id)).json()) as ProviderStatusResponse
+		expect(body.checked).toEqual({ ok: false, kind: 'source_misconfigured', reason: 'incomplete' })
+		expect(body.status.errorReason).toBe('incomplete')
+		expect(vendor.asked).not.toContain('keyless.example')
+	})
+
 	it(`answers a vendor outage as no answer, not as a setup to fix, on ${db}`, async () => {
 		const doc = await createProvider('alpha', 'down-check.example')
 		const body = (await (await status('POST', 'alpha', doc.id)).json()) as ProviderStatusResponse

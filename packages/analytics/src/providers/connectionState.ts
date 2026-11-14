@@ -2,11 +2,25 @@ import { isRecord } from '../core/values'
 import type { ReadFailureKind } from '../surfacing/classifyError'
 import { PROVIDER_IDS, type ProviderId } from './ids'
 
+/**
+ * Why a check was refused, when the plugin knows: `incomplete`, the document lacks a key or an ID
+ * the check needs; `unknownSite`, the vendor does not know the site, website or property ID.
+ */
+export type ConnectionFailureReason = 'incomplete' | 'unknownSite'
+
+const CONNECTION_FAILURE_REASONS: readonly ConnectionFailureReason[] = ['incomplete', 'unknownSite']
+
+/** A stored reason as the type it names, or undefined for any other value. */
+export const connectionFailureReasonOf = (value: unknown): ConnectionFailureReason | undefined =>
+	CONNECTION_FAILURE_REASONS.find((reason) => reason === value)
+
 /** One provider document's status row, its dates as ISO strings. */
 export interface ProviderStatus {
 	lastSuccessAt?: string
 	lastErrorAt?: string
 	errorKind?: ReadFailureKind
+	/** Why the last failure happened, when the plugin knows. */
+	errorReason?: ConnectionFailureReason
 	errorDetail?: string
 	pausedUntil?: string
 }
@@ -17,6 +31,7 @@ export type ConnectionOutcome =
 	| {
 			ok: false
 			kind: ReadFailureKind
+			reason?: ConnectionFailureReason
 			/** The vendor's own words. */
 			detail?: string
 			/** How long the source rests from now, when it does. */
@@ -66,8 +81,8 @@ const isOptionalString = (value: unknown): boolean =>
 export const isProviderStatusResponse = (value: unknown): value is ProviderStatusResponse =>
 	isRecord(value) &&
 	isRecord(value.status) &&
-	['lastSuccessAt', 'lastErrorAt', 'errorKind', 'errorDetail', 'pausedUntil'].every((key) =>
-		isOptionalString(isRecord(value.status) ? value.status[key] : undefined)
+	['lastSuccessAt', 'lastErrorAt', 'errorKind', 'errorReason', 'errorDetail', 'pausedUntil'].every(
+		(key) => isOptionalString(isRecord(value.status) ? value.status[key] : undefined)
 	) &&
 	(value.checked === undefined ||
 		(isRecord(value.checked) && typeof value.checked.ok === 'boolean'))

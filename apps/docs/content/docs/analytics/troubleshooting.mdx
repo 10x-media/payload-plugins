@@ -119,15 +119,19 @@ Under **Test connection**, for a reader without update access to the document. A
 
 Nothing has read or checked this document yet, or a save changed how it connects. Press **Test connection**.
 
+### "Not connected" with "A key or an ID this check needs is empty."
+
+The document lacks a key or an ID its vendor needs, so the plugin did not ask the vendor. A save that changed the host, an ID or the PostHog Region without the key in it cleared the key. Fill in the empty fields, enter the key again, save and press **Test connection**.
+
+### "Not connected" with "The service does not know this site."
+
+The vendor answered that it has no site with this ID. Self-hosted Umami answers an unknown **Website ID** this way. Copy the ID again from the vendor's own settings (in Umami, the address bar of the website's dashboard), save and press **Test connection**.
+
 ### "Not connected" with "Check the key, the IDs and the host."
 
 The plugin could not read with these settings. For a PostHog document the advice reads "Check the key, the IDs, the Region and the host.", for a GA4 document "Check the Property ID and the key, and that the client email is a Viewer of the property." Under it, the panel shows what the vendor answered, when it answered in words. The sections below cover the answers seen most.
 
-With no vendor answer under the advice, one of these is the cause:
-
-- The document lacks a key or an ID the check needs, so the plugin did not ask the vendor. Fill in every field the provider's form asks for.
-- The host is refused. The developer finds the reason in the server log line `analytics: <host> is refused: <reason>` ([Server log and boot](#server-log-and-boot)).
-- The vendor answered without words. Self-hosted Umami answers an unknown **Website ID** this way: copy it again from the address bar of the Umami dashboard.
+With no vendor answer under the advice, the host is refused. The developer finds the reason in the server log line `analytics: <host> is refused: <reason>` ([Server log and boot](#server-log-and-boot)).
 
 To fix a document:
 
