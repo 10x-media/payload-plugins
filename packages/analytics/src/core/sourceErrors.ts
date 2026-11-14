@@ -37,7 +37,7 @@ export class HostRefusedError extends SourceMisconfiguredError {
 	}
 }
 
-/** A site, website or property ID the vendor answered that it does not know. */
+/** A site ID the vendor answered it does not know, such as self-hosted Umami's Website ID. */
 export class UnknownSiteError extends SourceMisconfiguredError {
 	readonly [UNKNOWN_SITE] = true
 
