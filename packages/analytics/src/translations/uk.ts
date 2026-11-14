@@ -119,7 +119,8 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldSiteId]: 'ID сайту',
 	[keys.providerFieldApiKey]: 'Ключ API',
 	[keys.providerFieldHost]: 'Хост',
-	[keys.providerFieldHostHelp]: 'Залиште порожнім, щоб використати адресу за замовчуванням.',
+	[keys.providerFieldHostHelp]:
+		'Лише для власного екземпляра: його адреса. Залиште порожнім, щоб використовувати хмару сервісу.',
 	[keys.providerFieldWebsiteId]: 'ID вебсайту',
 	[keys.providerFieldToken]: 'Токен API',
 	[keys.providerFieldPropertyId]: 'ID ресурсу',
@@ -133,8 +134,10 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldRevenueCurrency]: 'Валюта доходу',
 	[keys.providerFieldMeasurementId]: 'ID вимірювання',
 	[keys.providerFieldCaptureHelp]: 'Це вмикає збір даних на сайті. Залиште порожнім, щоб вимкнути.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'Ідентифікатор потоку (G-...) вашого вебпотоку даних з адміністрування GA4. Вмикає відстеження на сайті; залиште порожнім, щоб вимкнути його.',
 	[keys.providerFieldDomainHelp]:
-		'Домен, під яким скрипт відстеження записує візити, зазвичай такий самий, як ID сайту. Вмикає збір даних стандартним скриптом Plausible і має перевагу над ID скрипта, якщо заповнено обидва поля. Залиште порожніми і це поле, і ID скрипта, щоб вимкнути збір даних.',
+		'Домен, під яким скрипт відстеження записує візити, зазвичай такий самий, як ID сайту. Вмикає збір даних стандартним скриптом Plausible і має перевагу над ID скрипта, якщо заповнено обидва поля. Залиште порожніми і це поле, і ID скрипта, щоб вимкнути збір даних. Щоб рахувати візити на кількох сайтах, перелічіть їх через кому.',
 	[keys.providerFieldScriptIdHelp]:
 		'Для сайту з новим скриптом Plausible для кожного сайту: ID у його адресі, частина після pa- у pa-XXXX.js. Вмикає збір даних цим скриптом. Залиште порожніми і це поле, і адресу сайту, щоб вимкнути збір даних.',
 	[keys.providerErrorMeasurementId]:
@@ -144,9 +147,43 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Введіть лише адресу, наприклад https://analytics.example.com або https://example.com/analytics, без частини, що починається з ? чи #, і без імені користувача та пароля.',
 	[keys.providerErrorHostInsecure]: 'Адреса має починатися з https://.',
+	[keys.providerErrorHostNotAllowed]:
+		'Цей сайт не дозволяє цю адресу. Попросіть розробника додати її.',
+	[keys.providerErrorSiteDomain]:
+		'Введіть сайт так, як він вказаний у Plausible, наприклад example.com або example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Введіть лише число, наприклад 123456789.',
+	[keys.providerErrorPosthogRegionRequired]: 'Виберіть регіон проєкту PostHog.',
 	[keys.providerErrorPosthogHostRegion]: 'Ця адреса з іншого регіону PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Токен проєкту (phc_), а не ключ API.',
 	[keys.providerErrorPosthogKeyAsToken]: 'Приватний ключ. Потрібен токен phc_.',
+	[keys.providerConnectionLabel]: 'Підключення',
+	[keys.providerConnectionStatus]: 'Статус',
+	[keys.providerConnectionTest]: 'Перевірити підключення',
+	[keys.providerConnectionConnected]: 'Підключено',
+	[keys.providerConnectionNotConnected]: 'Не підключено',
+	[keys.providerConnectionNoAnswer]: 'Немає відповіді',
+	[keys.providerConnectionUnchecked]: 'Не перевірено',
+	[keys.providerConnectionLastSuccess]: 'Останній успіх',
+	[keys.providerConnectionLastError]: 'Остання помилка',
+	[keys.providerConnectionPaused]: 'Читання призупинено до {{date}}',
+	[keys.providerConnectionResumes]: 'Читання відновиться',
+	[keys.providerConnectionSaveFirst]: 'Збережіть документ, щоб перевірити його.',
+	[keys.providerConnectionUnsaved]: 'Збережіть зміни, щоб перевірити їх.',
+	[keys.providerConnectionNoPermission]:
+		'Перевірити підключення може лише той, кому можна редагувати цей документ.',
+	[keys.providerConnectionRefusedHelp]: 'Перевірте ключ, ID і хост.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'Перевірте ключ, ID, регіон і хост.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Перевірте ID ресурсу і ключ, а також що Email клієнта доданий читачем ресурсу.',
+	[keys.providerConnectionIncompleteHelp]:
+		'Не заповнено ключ або ID, потрібний для перевірки. Заповніть, збережіть і перевірте знову.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'Сервіс не знає цей сайт. Скопіюйте його ID з налаштувань самого сервісу.',
+	[keys.providerConnectionUnreachableHelp]: 'Сервіс не відповів. Спробуйте пізніше.',
+	[keys.providerConnectionChecked]: 'Підключення працює',
+	[keys.providerConnectionFailed]: 'Підключення не вдалося',
+	[keys.providerConnectionCheckRunning]:
+		'Перевірка цих налаштувань уже триває. Повторіть за кілька секунд.',
 	[keys.providerFieldIsDefault]: 'За замовчуванням для цього сайту',
 	[keys.providerFieldIsDefaultHelp]:
 		'Аналітика відкривається в цьому інструменті, якщо читач не вибере інший. За замовчуванням на сайті може бути лише один інструмент.',
@@ -351,7 +388,7 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.filterHintGoal]: 'Короткий код цілі, наприклад newsletter-signup',
 	[keys.filterHintCurrency]: 'Трилітерний код валюти, наприклад EUR',
 	[keys.providersCollectionDescription]:
-		'Додайте по одному запису на кожен підключений сервіс аналітики. Ключі зберігаються надійно і більше не показуються; видимими лишаються лише останні чотири символи, щоб було зрозуміло, який ключ збережено.',
+		'Додайте по одному запису на кожен підключений сервіс аналітики. Ключі зберігаються надійно і більше не показуються; видимими лишаються лише останні чотири символи, щоб було зрозуміло, який ключ збережено. Зміна того, куди підключається збережений запис (хост, регіон, ID для читання, Email клієнта або Мітка сайту), стирає його ключі: введіть їх знову в тому самому збереженні.',
 	[keys.providerFieldNameHelp]: 'Показується скрізь, де ви обираєте джерело даних.',
 	[keys.providerFieldProviderHelp]:
 		'Для якого сервісу аналітики це налаштування. Поля нижче змінюються залежно від вибору.',
@@ -360,20 +397,27 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'Сайт, який вимірює Plausible, зазвичай у вигляді yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'Ключ лише для читання, яким запитуються ваші звіти. Зберігається надійно і більше не показується.',
+		'Ключ Stats API з налаштувань облікового запису Plausible, розділ API Keys. Зберігається захищено й більше не показується.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'Персональний API-ключ (phx_...) з правом Query Read з налаштувань облікового запису PostHog. Зберігається захищено й більше не показується.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'Для Umami Cloud. Для власного сервера Umami вставте ключ у поле «Токен API». Зберігається надійно і більше не показується.',
 	[keys.providerFieldWebsiteIdHelp]:
 		'Ідентифікатор сайту; він є в адресному рядку вашої панелі Umami.',
 	[keys.providerFieldTokenHelp]:
-		'Токен Umami Cloud, який використовується замість логіна й пароля. Зберігається надійно.',
+		'Для власного сервера Umami: ключ API з його налаштувань або токен входу. Для Umami Cloud використовуйте «Ключ API». Зберігається надійно.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Номер вашого ресурсу GA4 у Google Analytics. Без слова properties/.',
 	[keys.providerFieldClientEmailHelp]:
-		'Адреса сервісного облікового запису з файлу, який видав Google.',
+		'Адреса сервісного облікового запису з файлу, який видав Google. Додайте її як читача в керуванні доступом ресурсу GA4, інакше читання буде відхилено.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'Приватний ключ із того самого файлу Google, скопійований точно. Зберігається надійно.',
-	[keys.providerFieldProjectIdHelp]: 'Проєкт, до якого відбувається підключення.',
+	[keys.providerFieldProjectIdHelp]:
+		'Необовʼязково. project_id з файлу сервісного облікового запису.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'Число, вказане як Project ID у налаштуваннях проєкту PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'Лише для PostHog Cloud. Не враховується, якщо Хост вказує на власний екземпляр PostHog.',
+		'Хмара з вашої адреси PostHog: US для us.posthog.com, EU для eu.posthog.com. Не враховується, якщо Хост вказує на власний екземпляр PostHog. Обовʼязково, якщо Хост порожній.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'Трилітерний код валюти для цілей продажів, наприклад USD. Поки його не задано, дохід не показується.',
 	[keys.providerFieldGa4CurrencyHelp]:
@@ -416,6 +460,8 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.panelNoViews]: 'У цьому діапазоні дат показів немає.',
 	[keys.sourcesPlatformFallback]:
 		'Ці цифри беруться із сервісу аналітики платформи, доки сайт не додасть власний. Щойно ви його додасте, дані братимуться з нього.',
+	[keys.sourcesOwnSourceFailing]:
+		'Власний сервіс аналітики сайту не працює, тому ці цифри беруться із сервісу платформи. Щойно його підключення знову запрацює, дані знову братимуться з нього.',
 	[keys.stateSourceSubstituted]:
 		'Збережене джерело даних більше недоступне, тому показано джерело за замовчуванням.',
 	[keys.statePosthogCookielessDropped]:

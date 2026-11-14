@@ -132,6 +132,12 @@ const GRPC_TIMEOUT: ReadonlySet<number> = new Set([1, 4])
 /** RESOURCE_EXHAUSTED: the quota is spent, which a retry a second later only spends again. */
 const GRPC_QUOTA = 8
 
+/**
+ * Codes the gRPC client sets itself when no answer came (CANCELLED, DEADLINE_EXCEEDED,
+ * UNAVAILABLE), with its own words, which can name the address it tried.
+ */
+const GRPC_CLIENT_SIDE: ReadonlySet<number> = new Set([...GRPC_TIMEOUT, 14])
+
 /** What a gRPC status code means for the read; anything not named above is an outage. */
 export const grpcCodeKind = (code: number): ReadFailureKind => {
 	if (GRPC_INVALID.has(code)) return 'invalid_param'
@@ -271,6 +277,21 @@ const retryAfterOf = (value: object): { retryAfterMs: number } | Record<string, 
 		: {}
 }
 
+/** A link's HTTP status, when it carries one. */
+const httpStatusAt = (link: object): number | undefined => {
+	const status = numberAt(link, 'status')
+	return status !== undefined && status >= 100 && status < 600 ? status : undefined
+}
+
+/**
+ * A link's gRPC status code, as GA4's client rejects with; Node's own network errors carry string
+ * codes, and a DOMException's legacy numeric code means nothing here.
+ */
+const grpcCodeAt = (link: object): number | undefined => {
+	const code = link instanceof DOMException ? undefined : numberAt(link, 'code')
+	return code !== undefined && Number.isInteger(code) && code >= 1 && code <= 16 ? code : undefined
+}
+
 /** Links of an error's cause chain {@link classifyError} reads at most. */
 const MAX_CAUSE_DEPTH = 5
 
@@ -308,18 +329,16 @@ const classifyLink = (link: object): ReadFailure | null => {
 			...(Reflect.get(link, 'refused') === true ? { refused: true as const } : {}),
 		}
 	}
-	const status = numberAt(link, 'status')
-	if (status !== undefined && status >= 100 && status < 600) {
+	const status = httpStatusAt(link)
+	if (status !== undefined) {
 		return { kind: httpStatusKind(status), ...retryAfterOf(link) }
 	}
 	const database = databaseFailure(link)
 	if (database) {
 		return database
 	}
-	// GA4's client rejects with a GoogleError whose numeric `code` is the gRPC status; Node's own
-	// network errors carry string codes, and a DOMException's legacy numeric code means nothing here.
-	const code = link instanceof DOMException ? undefined : numberAt(link, 'code')
-	if (code !== undefined && Number.isInteger(code) && code >= 1 && code <= 16) {
+	const code = grpcCodeAt(link)
+	if (code !== undefined) {
 		return {
 			kind: grpcCodeKind(code),
 			...(GRPC_TIMEOUT.has(code) ? { timeout: true as const } : {}),
@@ -362,6 +381,27 @@ export const classifyError = (err: unknown): ReadFailure => {
 		current = Reflect.get(current, 'cause')
 	}
 	return { kind: 'unavailable' }
+}
+
+/**
+ * What the vendor itself said about a failure: the message of the first link in the cause chain
+ * that carries an HTTP status or a gRPC code. The plugin's own refusals and the runtime's network
+ * errors are not the vendor's words, so a surface shows its own translated text for them instead.
+ */
+export const vendorAnswerOf = (err: unknown): string | undefined => {
+	let current: unknown = err
+	for (let depth = 0; depth < MAX_CAUSE_DEPTH && isRecord(current); depth++) {
+		const code = grpcCodeAt(current)
+		const message: unknown = Reflect.get(current, 'message')
+		if (
+			typeof message === 'string' &&
+			(httpStatusAt(current) !== undefined || (code !== undefined && !GRPC_CLIENT_SIDE.has(code)))
+		) {
+			return message
+		}
+		current = Reflect.get(current, 'cause')
+	}
+	return undefined
 }
 
 /**

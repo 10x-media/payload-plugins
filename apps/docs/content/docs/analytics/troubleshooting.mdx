@@ -1,0 +1,407 @@
+---
+title: Troubleshooting
+description: What each error and notice of @10x-media/analytics means and what to do about it, listed by the text you see.
+---
+
+Find the text you see on this page. Each section says who sees it and where, what it means, and what to do. UI text is quoted as it appears in English; server log lines are in code. Parts in angle brackets, such as `<id>`, stand for values of your install.
+
+## Provider form
+
+These appear under a field of an **Analytics providers** document when its editor saves it, usually a tenant admin. The document is not saved until the field is fixed.
+
+### "Enter only the address, for example https://analytics.example.com or https://example.com/analytics, with no part starting with ? or # and no user name or password."
+
+Under **Host** (Plausible, Umami, PostHog). The value is not a plain address: it holds a query (`?`), a fragment (`#`) or a user name and password, or it is not an address at all.
+
+Enter the address of the self-hosted instance alone, such as `https://plausible.example.com`, with the base path when the vendor runs under one, such as `https://example.com/umami`. For the vendor's own cloud, leave **Host** blank.
+
+### "The address must start with https://."
+
+Under **Host**. The address starts with `http://`, and the install reaches vendors over https only.
+
+1. Enter the instance's https address.
+2. If the vendor runs on a private network beside the app (Umami on the same Docker network, say), the developer sets `providers.hosts.allowPrivateNetwork: true`. The field then takes `http://` too ([Private networks](/analytics/providers#private-networks)).
+
+### "This site does not allow this address. Ask its developer to add it."
+
+Under **Host**. The address is neither the vendor's own cloud nor an origin the install lists in `providers.hosts.allow`.
+
+1. A tenant admin sends the address to the site's developer.
+2. The developer adds its origin to `providers.hosts.allow`. An entry is a scheme, a host and an optional port, with no path. `https://*.example.com` matches every subdomain of example.com, but not example.com itself.
+3. Once the new config is deployed, the tenant admin saves the document again.
+
+```ts
+import type { ProvidersOptions } from '@10x-media/analytics'
+
+export const providers: ProvidersOptions = {
+  collection: { scopeField: 'tenant' },
+  hosts: { allow: ['https://plausible.example.com'] },
+}
+```
+
+The vendors' clouds are always allowed: `https://plausible.io`, `https://cloud.umami.is`, `https://api.umami.is`, `https://us.posthog.com`, `https://eu.posthog.com` and `https://app.posthog.com` ([Where a document may connect](/analytics/providers#where-a-document-may-connect)).
+
+### "Enter the site as Plausible lists it, such as example.com or example.com/blog."
+
+The Plausible **Site ID** or **Website address** is not written the way Plausible stores the site: it has `https://`, `www.`, a trailing slash, capital letters, a port or a query. Copy the site's name from the Plausible dashboard, such as `example.com`, or `example.com/blog` for a site in a subfolder.
+
+### "Use letters, digits, hyphens and underscores only, as in pa-XXXX.js."
+
+Under Plausible's **Script ID**. The value holds a character other than letters, digits, `-` and `_`, or is longer than 64 characters.
+
+Enter only the part of the script's address after `pa-`, without `.js`. For `pa-AbC123.js`, enter `AbC123`.
+
+### "Use a three-letter currency code, for example EUR."
+
+Under **Revenue currency** (Plausible, GA4). The value is not three upper-case letters.
+
+Enter the ISO 4217 code in upper case, such as `EUR` or `USD`.
+
+### "Use letters, digits and hyphens only, for example G-AB12CD34."
+
+Under GA4's **Measurement ID**. Enter the measurement ID of the web data stream as the GA4 admin shows it, such as `G-AB12CD34`.
+
+### "Enter the number alone, as in 123456789."
+
+The GA4 **Property ID** holds more than the number, such as `properties/123456789`. Copy the number under **Admin**, **Property details** in Google Analytics.
+
+### "Pick your PostHog project's region."
+
+Under PostHog's **Region**, while **Host** is blank. With no Host, Region alone decides which PostHog Cloud the plugin reads from.
+
+Pick the cloud your PostHog address names: **US** for us.posthog.com, **EU** for eu.posthog.com.
+
+### "This address is in the other PostHog region."
+
+Under PostHog's **Host**. Host names one PostHog Cloud (`us.posthog.com`, `eu.posthog.com` or `app.posthog.com`) and **Region** names the other.
+
+Clear **Host**: PostHog Cloud needs none. Then pick the **Region** your project lives in.
+
+### "A project token (phc_), not an API key."
+
+Under PostHog's **API key**. The value starts with `phc_`, so it is the project token.
+
+1. Move the `phc_` value to **Project token**.
+2. In **API key**, enter a personal API key (`phx_...`) with the Query Read scope, from your PostHog account settings.
+
+### "A private key: use the phc_ token."
+
+Under PostHog's **Project token**. The value starts with `phx_` or `phs_`, so it is a private key. The project token is served to every visitor's browser, so a private key must never go there.
+
+1. Move the private key to **API key**, if it is the personal API key you read with.
+2. In **Project token**, enter the project's public token (`phc_...`).
+
+### "This website cannot use this analytics tool. Choose another one."
+
+Under **Provider**. The install does not serve that provider type: `providers.collection.types` leaves it out, or the type is **Payload** and the install has no `native()` adapter. Pick another provider, or ask the developer to offer this one.
+
+### "Another analytics tool is already the default for this site. Untick it there first."
+
+On **Default for this site**. A tenant has at most one default provider document. Untick **Default for this site** on the other document, save it, then save this one.
+
+## Connection panel
+
+The **Connection** panel sits in the sidebar of a Plausible, Umami, GA4 or PostHog document. Everyone who may read the document sees it. **Test connection** checks the saved settings with the vendor's cheapest read and waits 10 seconds for an answer ([Checking a connection](/analytics/providers#checking-a-connection)).
+
+### "Save the document to test it."
+
+Under **Test connection**, on a new document. Save the document, then press **Test connection**.
+
+### "Save your changes to test them."
+
+Under **Test connection**, while the form has unsaved changes. The button checks the saved settings only. Save, then press it.
+
+### "Only someone who may edit this document can test its connection."
+
+Under **Test connection**, for a reader without update access to the document. Ask someone who may edit the document to press it, or read the status the panel already shows.
+
+### "Not checked"
+
+Nothing has read or checked this document yet, or a save changed how it connects. Press **Test connection**.
+
+### "Not connected" with "A key or an ID this check needs is empty."
+
+The document lacks a key or an ID its vendor needs, so the plugin did not ask the vendor. A save that changed the host, an ID or the PostHog Region without the key in it cleared the key. Fill in the empty fields, enter the key again, save and press **Test connection**.
+
+### "Not connected" with "The service does not know this site."
+
+The vendor answered that it has no site with this ID. Self-hosted Umami answers an unknown **Website ID** this way. Copy the ID again from the vendor's own settings (in Umami, the address bar of the website's dashboard), save and press **Test connection**.
+
+### "Not connected" with "Check the key, the IDs and the host."
+
+The plugin could not read with these settings. For a PostHog document the advice reads "Check the key, the IDs, the Region and the host.", for a GA4 document "Check the Property ID and the key, and that the client email is a Viewer of the property." Under it, the panel shows what the vendor answered, when it answered in words. The sections below cover the answers seen most.
+
+With no vendor answer under the advice, the host is refused or a stored key could not be decrypted. The developer finds which in the server log: `analytics: <host> is refused: <reason>` or `analytics: provider document "<id>" (<provider>) could not be read, ...` ([Server log and boot](#server-log-and-boot)).
+
+To fix a document:
+
+1. Correct the fields the answer points at.
+2. Save. A save that changes the host, an ID or the PostHog Region clears the stored key, so enter the key again in the same save.
+3. Press **Test connection**.
+
+A tenant admin can change the key on a saved document, but not its host, IDs or Region: those fields are read-only for them by default. Ask platform staff to change them, or delete the document and create it again ([Who may change a connection](/analytics/providers#who-may-change-a-connection)).
+
+### PostHog: "Personal API key found in request Authorization header is invalid."
+
+PostHog refused the **API key** on the cloud the plugin asked. Two causes give these same words:
+
+- **The Region is wrong.** A key from EU Cloud sent to US Cloud, or the other way round, is refused as invalid. Pick the **Region** your PostHog address names, and enter the key again in the same save.
+- **The key is wrong.** It is mistyped, revoked or not a personal API key. Create a personal API key (`phx_...`) with the Query Read scope in your PostHog account settings, and paste it into **API key**.
+
+### PostHog: "Project not found."
+
+PostHog does not know the **Project ID** under this key and Region. Copy the number shown as Project ID in your PostHog project's settings, check the **Region**, and enter the key again in the same save.
+
+### Umami: "Unauthorized"
+
+The self-hosted Umami refused the key. The usual cause: a self-hosted key is in **API key**, which is for Umami Cloud. When both hold a value, **API key** is used.
+
+1. Remove the key from **API key**.
+2. Paste it into **API token**.
+3. Save and press **Test connection**.
+
+### Umami: "Invalid API key."
+
+Umami Cloud refused the key. **Host** is blank, so the plugin asked Umami Cloud.
+
+- For self-hosted Umami, enter its address in **Host**, the one its dashboard opens on, and keep the key in **API token**.
+- For Umami Cloud, create a new API key in Umami Cloud and paste it into **API key**.
+
+### Plausible: "Invalid API key or site ID. Please make sure you're using a valid API key with access to the site you've requested."
+
+Plausible refused the key, or the key has no access to the **Site ID**. Plausible gives these words for both.
+
+1. Check **Site ID**: the domain exactly as Plausible lists the site, such as `example.com`.
+2. Check **API key**: a Stats API key from your Plausible account settings, under API keys, of an account with access to the site.
+3. For a self-hosted Plausible, check that **Host** is that instance's address.
+
+### "2 UNKNOWN: Getting metadata from plugin failed with error: error:1E08010C:DECODER routines::unsupported"
+
+GA4 could not use the **Private key**: it was pasted incomplete or changed. The error code before `DECODER` can differ.
+
+1. Open the JSON key file Google gave you for the service account.
+2. Copy the whole `private_key` value, from `-----BEGIN PRIVATE KEY-----` to `-----END PRIVATE KEY-----`. The `\n` sequences in it may stay as they are.
+3. Paste it into **Private key**. The field shows nothing after a save, so always paste the whole key.
+4. Check that **Client email** is the `client_email` of the same file.
+5. Save and press **Test connection**.
+
+### GA4: "7 PERMISSION_DENIED: User does not have sufficient permissions for this property."
+
+The service account cannot read the property, or **Property ID** names a property it has no access to.
+
+1. In Google Analytics, open **Admin**, then **Property access management** of the property.
+2. Add the **Client email** as a user with the **Viewer** role. Access can take a minute to apply.
+3. Check **Property ID**: the number under **Admin**, **Property details**.
+4. Press **Test connection**.
+
+### GA4: "16 UNAUTHENTICATED: Request had invalid authentication credentials."
+
+Google refused the key: it was deleted in Google Cloud, or **Client email** is not the account the key belongs to.
+
+1. In Google Cloud, open **IAM and admin**, **Service accounts**, the account, then **Keys**.
+2. Add a key of type JSON. Google downloads a new file.
+3. Paste its `client_email` into **Client email** and its whole `private_key` into **Private key**.
+4. Save and press **Test connection**.
+
+### "No answer" with "The service did not answer. Try again later."
+
+The vendor did not answer within 10 seconds, or answered with an outage (a timeout, HTTP 408, 429 or 5xx). While reads rest after failures, the panel shows **Reads resume** with a time.
+
+1. Wait, then press **Test connection** again.
+2. For a self-hosted vendor, check that the instance runs and that the app's server can reach it.
+3. If it stays, the developer reads the server log. On a development machine, a line naming `198.18.0.0/15` means a local proxy's fake-IP mode ([Server log and boot](#server-log-and-boot)).
+
+## Analytics view
+
+These appear in the analytics view, and the source errors also on dashboard widgets and a document's analytics panel. Editors and every other reader of the tenant see them.
+
+### "This data source is not set up correctly. Check its settings, or ask the person who connected it."
+
+The source cannot work as it is set up: the vendor refused its key or IDs, or its stored key will not decrypt. Retrying does not help. A reader who may read the provider document also sees, under the message, what the vendor answered, "Reads paused until" a time, and when it last worked.
+
+1. Open the provider document in **Analytics providers** and read its **Connection** panel.
+2. Fix it as [Connection panel](#connection-panel) says for that answer.
+3. Without access to the document, ask the person who connected it.
+
+### "This data source uses a web address your site is not allowed to contact. Ask your developer to correct the address or to allow it."
+
+The provider document's **Host** is refused: it is not listed in `providers.hosts.allow`, it is not https, or it resolves to a private or reserved address. The document captures nothing either.
+
+1. A tenant admin checks the **Host** of the document, and sends it to the developer if it is right.
+2. The developer reads the server log line `analytics: <host> is refused: <reason>` and fixes what it names ([Server log and boot](#server-log-and-boot)).
+
+### "The analytics tool is busy right now."
+
+The vendor is down, slow or rate-limited, or reads rest after repeated failures. "Try again in" a time follows when the vendor or the plugin knows how long.
+
+1. Press **Try again** after that time.
+2. If it stays, open the provider document's **Connection** panel.
+
+### "These numbers come from the platform's analytics tool until this site adds its own. Adding one switches to it."
+
+In the view and above the **Analytics providers** list, for a tenant's own users, on an install whose shared source has `sources.<id>.tenants: 'fallback'`. The tenant has no provider document of its own that works, so its users read the platform's source, narrowed to their tenant.
+
+Nothing is broken. To read the tenant's own tool, add a provider document with its credentials. The next request switches to it ([Letting tenants read a shared source](/analytics/multi-tenancy#fallback)).
+
+### "This site's own analytics tool is not working, so these numbers come from the platform's. The view switches back once its connection works again."
+
+Same place and policy as above. Every provider document of the tenant is failing: its last result is a refusal, or no answer while its reads rest. Documents failing for more than 10 minutes are checked again in the background, at most once every 10 minutes.
+
+1. Open **Analytics providers** and find the documents whose **Connection** panel does not read **Connected**.
+2. Fix one as [Connection panel](#connection-panel) says, and press **Test connection**.
+3. Once it reads **Connected**, the next request reads the tenant's own tool again.
+
+### "No data source is available here."
+
+With "Connect an analytics tool to start seeing reports." The tenant has no source this reader may read.
+
+1. Check that the tenant has an enabled provider document holding its key and IDs. A document missing one is not a source.
+2. For a `native` document, check that the install's `adapters` holds `native()`.
+3. If the documents exist, the developer checks `providers.collection.sourceAccess`, or the collection's read access when it is unset: they decide which readers read through a document ([Who reads through a document](/analytics/providers#who-reads-through-a-document)).
+
+### "Choose a site to see its numbers."
+
+In the view, widgets and document panels. The request resolves no tenant, and the reader may not read every tenant at once.
+
+1. Pick a tenant in the tenant selector.
+2. If the selector already names a tenant, the developer checks the `admin` branch of `scope.resolve` ([Resolve the tenant and its members](/analytics/multi-tenant-quick-start#2-resolve-the-tenant-and-its-members)).
+
+### "The saved data source is no longer available, so the default one is shown."
+
+On a dashboard widget or a document panel. Its stored data source is one this reader can no longer read, such as the platform's source after the tenant switched to its own tool. It shows the tenant's default source instead. To store another choice, edit the widget and pick a **Data source**.
+
+### "PostHog is dropping visits counted without consent: enable Cookieless tracking in the project's Web analytics settings."
+
+On a PostHog source. The plugin sends visits counted without cookies before consent, and the PostHog project drops them, because its cookieless tracking setting is off.
+
+- Turn on Cookieless tracking in the PostHog project's Web analytics settings.
+- Or send nothing without consent: set the provider document's **Without consent** to **Send nothing**, or the developer sets `capture.withoutConsent: 'off'` ([Consent](/analytics/consent#measuring-without-consent)).
+
+## Server log and boot
+
+These lines reach the developer in the server log. Boot lines print when the server that serves requests starts, not while `next build` collects page data.
+
+### `analytics: a request came through two or more proxies ...`
+
+```
+analytics: a request came through two or more proxies (its x-forwarded-for header lists several addresses), but neither trustedProxyHops nor trustedPlatform is set, so the plugin used the first address, which the visitor can write. Set trustedProxyHops to the number of proxies in front of the app, or trustedPlatform to "vercel" or "cloudflare". Logged once.
+```
+
+Logged once per instance, on the first such request. The plugin read the leftmost `x-forwarded-for` entry, which a visitor can write. Geo, the native visitor hash and cookieless counting all rest on that address.
+
+1. On Vercel or behind Cloudflare, set `trustedPlatform: 'vercel'` or `'cloudflare'`.
+2. Otherwise count the proxies in front of the app and set `trustedProxyHops`: one reverse proxy is `1`, a CDN in front of it is `2`.
+3. Set one of the two, never both: the boot fails with both.
+4. If your proxy sets only `x-real-ip` and no `x-forwarded-for`, leave `trustedProxyHops` unset.
+
+See [Trusted proxies](/analytics/proxy#trusted-proxies).
+
+### `analytics: visitor IP addresses and countries can be spoofed on this install. ...`
+
+```
+analytics: visitor IP addresses and countries can be spoofed on this install. Neither trustedProxyHops nor trustedPlatform is set, so the plugin reads them from request headers a visitor can write. Set trustedPlatform to 'vercel' or 'cloudflare' when the app runs behind one, or trustedProxyHops to the number of proxies in front of it.
+```
+
+At boot, in production, on an install that takes visits or runs the providers collection, while neither option is set. Set one as in the section above.
+
+### `analytics: a held capture slot counts visitors cookielessly, ...`
+
+```
+analytics: a held capture slot counts visitors cookielessly, telling them apart by a hash of the client IP address, yet neither trustedProxyHops nor trustedPlatform is set. Behind a proxy, a missing or wrong hop count hashes the proxy's address instead and collapses every visitor into one. Set trustedPlatform to 'vercel' or 'cloudflare', or trustedProxyHops to the number of proxies in front of the app.
+```
+
+At boot, in production, when a slot `capture.gate` holds counts without cookies. Set one option as in the first section of this group. Setting either ends the line; it cannot tell whether the count is right.
+
+### `analytics: capture.withoutConsent is unset, ...`
+
+```
+analytics: capture.withoutConsent is unset, so held slots measure cookielessly before consent and after a refusal. Set it to 'off' to send nothing without consent.
+```
+
+At every boot, while `capture.gate` holds a slot and `capture.withoutConsent` is unset. It is a notice, not an error: it names the default in effect.
+
+Decide what your site does without consent and set the option: `'cookieless'` keeps the default, `'off'` sends nothing until consent. Any value ends the line ([Measuring without consent](/analytics/consent#measuring-without-consent)).
+
+### `analytics: Payload's job controls the config left unset ...`
+
+```
+analytics: Payload's job controls the config left unset now admit users of the "users" collection only: jobs.access.run, queue and cancel. Set jobs.access, and access in jobs.jobsCollectionOverrides, in your Payload config to choose who may run, queue, cancel and read jobs.
+```
+
+At every boot, while the Payload config leaves those job controls unset. The plugin registers jobs, so it closes them to anyone outside the admin user collection rather than leaving Payload's open default. Set `jobs.access` and the jobs collection's `access` in your Payload config to end the line ([Who may run jobs](/analytics/native#who-may-run-jobs)).
+
+### `analytics: <host> is refused: <reason>`
+
+Part of the line a failed read logs, such as `analytics: query read failed for adapter "<provider>:<id>" (scope "<scope>"): ...`. The query endpoint answers `502 source_misconfigured` with `param: 'host'` and the message `analytics: this source's host is not one the install allows; list it in providers.hosts.allow, or set providers.hosts.allowPrivateNetwork for a private or http address`. Editors see "This data source uses a web address your site is not allowed to contact."
+
+The reason says which check refused the host:
+
+| Reason | What to do |
+|---|---|
+| `it is not listed in providers.hosts.allow` | Add the host's origin to `providers.hosts.allow`, or correct the document's **Host**. |
+| `it uses http, which needs providers.hosts.allowPrivateNetwork` | Use the vendor's https address, or set `providers.hosts.allowPrivateNetwork: true` for a vendor on your own network. |
+| `it is not an address this install accepts` | Correct the document's **Host**: an address with only a scheme, a host and an optional path. |
+| `it resolves to a private or reserved address` | For a vendor on your own network, set `providers.hosts.allowPrivateNetwork: true`. Otherwise correct the **Host**. |
+| `it is a private or reserved address` | The same. |
+| `http: is not https` | The vendor redirected to an http address. Use its https address, or set `providers.hosts.allowPrivateNetwork: true`. |
+
+See [Where a document may connect](/analytics/providers#where-a-document-may-connect).
+
+### `analytics: <hostname> is refused because it resolves to <address>, in 198.18.0.0/15, ...`
+
+```
+analytics: <hostname> is refused because it resolves to <address>, in 198.18.0.0/15, which looks like a local proxy's fake-IP mode (Clash, Surge). In development, set providers.hosts.allowPrivateNetwork to reach it through the proxy. Logged at most once a minute.
+```
+
+On a development machine behind a local proxy in fake-IP mode. Every vendor resolves to an address in 198.18.0.0/15, so every read and check of a provider document is refused.
+
+Set `providers.hosts.allowPrivateNetwork: true` in development only.
+
+### `analytics: peer "@google-analytics/data" will load at runtime for a GA4 source ...`
+
+```
+analytics: peer "@google-analytics/data" will load at runtime for a GA4 source because sdks.ga4 is not set, and standalone and serverless builds only ship the packages the app imports itself, so a package the plugin loads at runtime is missing there. Import it and pass it in: import { BetaAnalyticsDataClient } from '@google-analytics/data', then sdks: { ga4: { BetaAnalyticsDataClient } }.
+```
+
+In production, once: at boot for a GA4 adapter in `adapters`, or when the first GA4 provider document is read. Without the package in the build, GA4 reads fail with `analytics: peer "@google-analytics/data" could not be loaded, and a GA4 source needs it. ...`.
+
+1. Install the package: `pnpm add @google-analytics/data`.
+2. Pass it in:
+
+```ts
+import { BetaAnalyticsDataClient } from '@google-analytics/data'
+
+analytics({
+  adapters: [native()],
+  capture: { gate: 'all' },
+  sdks: { ga4: { BetaAnalyticsDataClient } },
+})
+```
+
+3. List it in `serverExternalPackages` in `next.config` ([GA4](/analytics/providers#ga4)).
+
+### `analytics: provider document "<id>" (<provider>) could not be read, its reads fail until it can: ...`
+
+A stored credential will not decrypt, because the key ring that sealed it changed, or the document's settings do not build an adapter. The document stays listed as a source that fails, and editors see "This data source is not set up correctly." The plugin reads the document again a minute later, and at once when it is saved.
+
+1. If the key ring changed, restore the key that sealed the document to the ring.
+2. Otherwise open the document, enter its key again, and save.
+
+### `analytics: scope.member is required with scope.resolve. ...`
+
+At boot. `scope.resolve` is set and `scope.member` is not. Pass `member: tenantMembership({ userHasAccessToAllTenants })` with `@payloadcms/plugin-multi-tenant` ([Resolve the tenant and its members](/analytics/multi-tenant-quick-start#2-resolve-the-tenant-and-its-members)).
+
+### `analytics: capture.gate is required: ...`
+
+At boot, when a capture slot can fill and `capture.gate` is unset. Set `capture.gate` to `'all'`, `'off'`, a list of slots or a function ([Consent](/analytics/consent)).
+
+### `analytics: providers.collection.scopeField "tenant" does not exist on analytics-providers; ...`
+
+```
+analytics: providers.collection.scopeField "tenant" does not exist on analytics-providers; register the collection with your tenant plugin or use the default scope field
+```
+
+At boot. Nothing added a `tenant` field to the providers collection. The same line names `goals.collection.scopeField` and `analytics-goals` for the goals collection.
+
+1. Add `'analytics-providers': {}` (and `'analytics-goals': {}` for goals) to the multi-tenant plugin's `collections`.
+2. Put `analytics()` before `multiTenantPlugin()` in `plugins`, so the collection exists when the multi-tenant plugin looks for it.

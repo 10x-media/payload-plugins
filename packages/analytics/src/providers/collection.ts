@@ -13,7 +13,9 @@ import {
 	validations,
 } from 'payload'
 import { validateMeasurementId } from '../adapters/ga4/measurementId'
+import { validatePropertyId } from '../adapters/ga4/propertyId'
 import { validateScriptId } from '../adapters/plausible/scriptId'
+import { validateSiteDomain, validateSiteDomains } from '../adapters/plausible/siteId'
 import { validatePersonalApiKey, validateProjectToken } from '../adapters/posthog/credentials'
 import { optionsObject } from '../core/optionChecks'
 import { isOneOf, kindOf, listOf } from '../core/values'
@@ -24,9 +26,17 @@ import { keys, type SingularKey, type TranslationKey } from '../translations/key
 import { asTranslate, labelForKey } from '../translations/server'
 import { builtInStaticLabel, type StaticLabelFor } from '../translations/staticLabel'
 import { type ProviderAccessArgs, providerCreateAccess, providerRowAccess } from './access'
-import { PROVIDER_IDS, type ProviderId } from './factory'
-import { validatePosthogHost, validateProviderHost } from './hosts'
-import { retargetSecrets } from './retarget'
+import {
+	type HostedProvider,
+	type HostPattern,
+	type ListedHosts,
+	validatePosthogHost,
+	validatePosthogRegion,
+	validateProviderHost,
+} from './hosts'
+import { PROVIDER_IDS, PROVIDER_NAMES, type ProviderId } from './ids'
+import { versionOf } from './probe'
+import { reconnects, retargetSecrets } from './retarget'
 import { takenInScope } from './scopeUnique'
 import { stampScope } from './stampScope'
 
@@ -34,6 +44,7 @@ export const PROVIDERS_SLUG = 'analytics-providers'
 
 /** The list's note to a tenant reading the platform's source in `fallback`. */
 export const PROVIDERS_LIST_NOTICE_COMPONENT = '@10x-media/analytics/client#ProvidersListNotice'
+const PROVIDER_CONNECTION_COMPONENT = '@10x-media/analytics/client#ProviderConnection'
 
 /** Builds the sealed variant of a secret source field; injected so the fields peer stays lazy. */
 export type BuildSecretField = (source: TextField | TextareaField) => Field[]
@@ -141,6 +152,8 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	isSealed: (value: unknown) => boolean
 	/** `providers.hosts.allowPrivateNetwork`: the `host` fields accept `http://` too. */
 	allowPrivateNetwork?: boolean
+	/** `providers.hosts.allow`: a `host` outside it and its vendor's cloud is refused on save. */
+	allow?: readonly HostPattern[]
 	connectionAccess?: ConnectionFieldAccess
 	/** The provider types a document may be saved with; every type when absent. */
 	types?: readonly ProviderId[]
@@ -150,6 +163,36 @@ export interface BuildProvidersCollectionArgs extends ProviderAccessArgs {
 	staticLabel?: StaticLabelFor
 	/** Mount the list's note on the platform fallback, for an install with a `fallback` policy. */
 	listNotice?: boolean
+	/**
+	 * Forgets a document's last connection result: on its delete, and on a save that changes how
+	 * it connects.
+	 */
+	forgetStatus?: (docId: string, req: PayloadRequest) => Promise<void>
+	/**
+	 * Moves a document's last connection result to the version a save gave it, when the save left
+	 * how the document connects as it was.
+	 */
+	carryStatus?: (
+		docId: string,
+		versions: { from: string; to: string },
+		req: PayloadRequest
+	) => Promise<void>
+}
+
+/**
+ * The ids of the documents whose update changes how they connect, kept on `req.context` for their
+ * afterChange: a bulk update hands every document the same context.
+ */
+const RECONNECTED_KEY = '__analyticsReconnected'
+
+const reconnectedOf = (context: Record<string, unknown>): Set<string> => {
+	const existing = context[RECONNECTED_KEY]
+	if (existing instanceof Set) {
+		return existing
+	}
+	const created = new Set<string>()
+	context[RECONNECTED_KEY] = created
+	return created
 }
 
 const plainSecret: BuildSecretField = (source) => [source]
@@ -157,12 +200,18 @@ const plainSecret: BuildSecretField = (source) => [source]
 const textField = (
 	name: string,
 	label: TranslationKey,
-	opts: { width?: string; help?: TranslationKey; access?: ConnectionFieldAccess } = {}
+	opts: {
+		width?: string
+		help?: TranslationKey
+		access?: ConnectionFieldAccess
+		validate?: TextFieldSingleValidation
+	} = {}
 ): Field => ({
 	name,
 	type: 'text',
 	label: labelForKey(label),
 	...(opts.access ? { access: opts.access } : {}),
+	...(opts.validate ? { validate: opts.validate } : {}),
 	...(opts.width || opts.help
 		? {
 				admin: {
@@ -174,15 +223,15 @@ const textField = (
 })
 
 /**
- * A sealed credential. Its help is a string per locale: Payload drops a function description from
- * the client field, which the write-only editor renders.
+ * A sealed credential. Its label and help are a string per locale: Payload drops a function label
+ * and description from the client field, which the write-only editor renders.
  */
 const secretField = (
 	buildSecret: BuildSecretField,
 	staticLabel: StaticLabelFor,
 	opts: {
 		name: string
-		label: TranslationKey
+		label: SingularKey
 		help: SingularKey
 		width?: string
 		validate?: TextFieldSingleValidation
@@ -191,7 +240,7 @@ const secretField = (
 	buildSecret({
 		name: opts.name,
 		type: 'text',
-		label: labelForKey(opts.label),
+		label: staticLabel(opts.label),
 		...(opts.validate ? { validate: opts.validate } : {}),
 		admin: {
 			description: staticLabel(opts.help),
@@ -239,12 +288,15 @@ const scopeField = (include: boolean): Field[] =>
 const hostField = (
 	allowPrivateNetwork: boolean,
 	access: ConnectionFieldAccess | undefined,
-	opts: { validate?: TextFieldSingleValidation } = {}
+	opts: {
+		validate?: TextFieldSingleValidation
+		listed?: ListedHosts
+	} = {}
 ): Field => ({
 	name: 'host',
 	type: 'text',
 	label: labelForKey(keys.providerFieldHost),
-	validate: opts.validate ?? validateProviderHost(allowPrivateNetwork),
+	validate: opts.validate ?? validateProviderHost(allowPrivateNetwork, opts.listed),
 	...(access ? { access } : {}),
 	admin: { description: labelForKey(keys.providerFieldHostHelp) },
 })
@@ -286,14 +338,6 @@ const nameField = (): Field => ({
 	label: labelForKey(keys.providerFieldName),
 	admin: { description: labelForKey(keys.providerFieldNameHelp) },
 })
-
-const PROVIDER_NAMES: Record<ProviderId, TranslationKey> = {
-	native: keys.providerNameNative,
-	plausible: keys.providerNamePlausible,
-	umami: keys.providerNameUmami,
-	ga4: keys.providerNameGa4,
-	posthog: keys.providerNamePosthog,
-}
 
 /**
  * Names the refusal of a stored type the install no longer serves (native() removed, `types`
@@ -393,16 +437,20 @@ const checkSingleDefault = (args: BuildProvidersCollectionArgs): CollectionBefor
 			return data
 		}
 		if (await takenInScope(args, { data, originalDoc, req }, { isDefault: { equals: true } })) {
-			throw new ValidationError({
-				collection: args.slug,
-				errors: [
-					{
-						label: labelForKey(keys.providerFieldIsDefault),
-						message: asTranslate(req.t)(keys.providerErrorDefaultTaken),
-						path: 'isDefault',
-					},
-				],
-			})
+			throw new ValidationError(
+				{
+					collection: args.slug,
+					errors: [
+						{
+							label: labelForKey(keys.providerFieldIsDefault),
+							message: asTranslate(req.t)(keys.providerErrorDefaultTaken),
+							path: 'isDefault',
+						},
+					],
+					req,
+				},
+				req.t
+			)
 		}
 		return data
 	}
@@ -440,6 +488,8 @@ interface FieldListArgs {
 	types: readonly ProviderId[]
 	/** The `isDefault` checkbox, overridden, placed after `enabled`; only a scoped collection has it. */
 	isDefault?: Field
+	/** `providers.hosts.allow`: a `host` outside it and its vendor's cloud is refused on save. */
+	allow?: readonly HostPattern[]
 }
 
 /**
@@ -462,11 +512,19 @@ const providerFields = (
 		options.connectionAccess
 	)
 	const allowPrivateNetwork = options.allowPrivateNetwork === true
-	const apiKeyField = (validate?: TextFieldSingleValidation): Field[] =>
+	const { allow } = list
+	const listedFor = (provider: HostedProvider) => (allow ? { provider, allow } : undefined)
+	const apiKeyField = ({
+		validate,
+		help = keys.providerFieldApiKeyHelp,
+	}: {
+		validate?: TextFieldSingleValidation
+		help?: SingularKey
+	} = {}): Field[] =>
 		secretField(buildSecret, staticLabel, {
 			name: 'apiKey',
 			label: keys.providerFieldApiKey,
-			help: keys.providerFieldApiKeyHelp,
+			help,
 			width: '50%',
 			...(validate ? { validate } : {}),
 		})
@@ -485,6 +543,7 @@ const providerFields = (
 						width: '50%',
 						help: keys.providerFieldSiteIdHelp,
 						access,
+						validate: validateSiteDomain,
 					}),
 					...apiKeyField(),
 				],
@@ -495,6 +554,7 @@ const providerFields = (
 					captureField('domain', keys.providerFieldDomain, {
 						width: '50%',
 						help: keys.providerFieldDomainHelp,
+						validate: validateSiteDomains,
 					}),
 					captureField('scriptId', keys.providerFieldScriptId, {
 						width: '50%',
@@ -504,7 +564,7 @@ const providerFields = (
 				],
 			},
 			currencyField('revenueCurrency', keys.providerFieldRevenueCurrencyHelp),
-			hostField(allowPrivateNetwork, access),
+			hostField(allowPrivateNetwork, access, { listed: listedFor('plausible') }),
 		]),
 		providerGroup('umami', keys.providerNameUmami, [
 			{
@@ -515,7 +575,7 @@ const providerFields = (
 						help: keys.providerFieldWebsiteIdHelp,
 						access,
 					}),
-					...apiKeyField(),
+					...apiKeyField({ help: keys.providerFieldUmamiApiKeyHelp }),
 				],
 			},
 			...secretField(buildSecret, staticLabel, {
@@ -523,7 +583,7 @@ const providerFields = (
 				label: keys.providerFieldToken,
 				help: keys.providerFieldTokenHelp,
 			}),
-			hostField(allowPrivateNetwork, access),
+			hostField(allowPrivateNetwork, access, { listed: listedFor('umami') }),
 		]),
 		providerGroup('ga4', keys.providerNameGa4, [
 			{
@@ -533,6 +593,7 @@ const providerFields = (
 						width: '50%',
 						help: keys.providerFieldPropertyIdHelp,
 						access,
+						validate: validatePropertyId,
 					}),
 					textField('projectId', keys.providerFieldProjectId, {
 						width: '50%',
@@ -546,13 +607,14 @@ const providerFields = (
 				access,
 			}),
 			captureField('measurementId', keys.providerFieldMeasurementId, {
+				help: keys.providerFieldMeasurementIdHelp,
 				validate: validateMeasurementId,
 			}),
 			currencyField('currency', keys.providerFieldGa4CurrencyHelp),
 			...buildSecret({
 				name: 'privateKey',
 				type: 'textarea',
-				label: labelForKey(keys.providerFieldPrivateKey),
+				label: staticLabel(keys.providerFieldPrivateKey),
 				admin: { description: staticLabel(keys.providerFieldPrivateKeyHelp) },
 			}),
 		]),
@@ -562,10 +624,13 @@ const providerFields = (
 				fields: [
 					textField('projectId', keys.providerFieldProjectId, {
 						width: '50%',
-						help: keys.providerFieldProjectIdHelp,
+						help: keys.providerFieldPosthogProjectIdHelp,
 						access,
 					}),
-					...apiKeyField(validatePersonalApiKey),
+					...apiKeyField({
+						validate: validatePersonalApiKey,
+						help: keys.providerFieldPosthogApiKeyHelp,
+					}),
 				],
 			},
 			{
@@ -579,6 +644,7 @@ const providerFields = (
 						name: 'region',
 						type: 'select',
 						label: labelForKey(keys.providerFieldRegion),
+						validate: validatePosthogRegion,
 						options: [
 							{ label: 'US', value: 'us' },
 							{ label: 'EU', value: 'eu' },
@@ -596,11 +662,22 @@ const providerFields = (
 				access,
 			}),
 			hostField(allowPrivateNetwork, access, {
-				validate: validatePosthogHost(allowPrivateNetwork),
+				validate: validatePosthogHost(allowPrivateNetwork, listedFor('posthog')),
 			}),
 		]),
 		overrideField(withoutConsentField(staticLabel), options.fields?.withoutConsent),
 	]
+}
+
+/** The sidebar's Connection panel of a vendor document, its Test connection button inside. */
+const connectionField: Field = {
+	name: 'connection',
+	type: 'ui',
+	admin: {
+		position: 'sidebar',
+		components: { Field: PROVIDER_CONNECTION_COMPONENT },
+		condition: (data) => isOneOf(PROVIDER_IDS, data?.provider) && data?.provider !== 'native',
+	},
 }
 
 /**
@@ -634,10 +711,30 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			...(args.scoped ? { beforeValidate: [checkSingleDefault(args)] } : {}),
 			beforeChange: [
 				stampScope(args),
+				// Only notes the change: field validation runs after this hook, and a save it refuses
+				// keeps the status. afterChange forgets it.
+				({ context, data, operation, originalDoc }) => {
+					if (
+						operation === 'update' &&
+						reconnects({ scopeField: args.scopeField, isSealed: args.isSealed, data, originalDoc })
+					) {
+						reconnectedOf(context).add(String(originalDoc?.id))
+					}
+					return data
+				},
 				retargetSecrets({ scopeField: args.scopeField, isSealed: args.isSealed }),
 			],
 			afterChange: [
-				async ({ doc, operation, previousDoc, req }) => {
+				async ({ context, doc, operation, previousDoc, req }) => {
+					if (operation === 'update' && reconnectedOf(context).delete(String(doc.id))) {
+						await args.forgetStatus?.(String(doc.id), req)
+					} else if (operation === 'update') {
+						await args.carryStatus?.(
+							String(doc.id),
+							{ from: versionOf(previousDoc.updatedAt), to: versionOf(doc.updatedAt) },
+							req
+						)
+					}
 					await args.onChange(
 						{
 							scope: docScope(doc, args.scopeField),
@@ -651,31 +748,39 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 				},
 			],
 			afterDelete: [
-				async ({ doc, req }) => {
+				async ({ doc, id, req }) => {
+					await args.forgetStatus?.(String(id), req)
 					await args.onChange({ scope: docScope(doc, args.scopeField) }, req)
 					return doc
 				},
 			],
 		},
-		fields: providerFields(
-			{
-				buildSecret: args.buildSecret,
-				...(args.fields ? { fields: args.fields } : {}),
-				scopeField: args.scopeField === 'scope',
-				allowPrivateNetwork: args.allowPrivateNetwork === true,
-				...(args.connectionAccess ? { connectionAccess: args.connectionAccess } : {}),
-			},
-			staticLabel,
-			{
-				types: args.types ?? PROVIDER_IDS,
-				// A default is picked per scope: an unscoped install has one site and nothing to pick.
-				...(args.scoped
-					? {
-							isDefault: overrideField(isDefaultField(args.defaultAccess), args.fields?.isDefault),
-						}
-					: {}),
-			}
-		),
+		fields: [
+			...providerFields(
+				{
+					buildSecret: args.buildSecret,
+					...(args.fields ? { fields: args.fields } : {}),
+					scopeField: args.scopeField === 'scope',
+					allowPrivateNetwork: args.allowPrivateNetwork === true,
+					...(args.connectionAccess ? { connectionAccess: args.connectionAccess } : {}),
+				},
+				staticLabel,
+				{
+					types: args.types ?? PROVIDER_IDS,
+					...(args.allow ? { allow: args.allow } : {}),
+					// A default is picked per scope: an unscoped install has one site and nothing to pick.
+					...(args.scoped
+						? {
+								isDefault: overrideField(
+									isDefaultField(args.defaultAccess),
+									args.fields?.isDefault
+								),
+							}
+						: {}),
+				}
+			),
+			connectionField,
+		],
 	}
 	return args.overrides ? args.overrides(collection) : collection
 }

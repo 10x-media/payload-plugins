@@ -13,6 +13,7 @@ import {
 	type AnalyticsQuery,
 	type AnalyticsResult,
 	type AnalyticsRow,
+	type ConnectionCheckContext,
 	DIMENSION_KEYS,
 	type DimensionKey,
 	type FilterOperator,
@@ -21,15 +22,18 @@ import {
 	type MetricValues,
 } from '../../core/contract'
 import type { FetchLike } from '../../core/fetch'
+import { UnknownSiteError } from '../../core/sourceErrors'
 import { type AdapterLabelOption, adapterLabel } from '../../core/sourceLabel'
+import { isRecord } from '../../core/values'
 import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
 import type { WithoutConsentLevel } from '../../tracker/config'
 import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { hostnameOf, withoutTrailingSlash } from '../http/baseUrl'
+import { fetchJson } from '../http/fetchJson'
 import { declaredFilters, everyOperatorOn, firstMapped, mappedKeys } from '../mapping'
 import { readTime } from '../readTime'
 import { dayIso } from '../series'
-import { upstreamJson } from '../upstream'
+import { upstream, upstreamJson } from '../upstream'
 
 export interface UmamiConfig {
 	/**
@@ -327,12 +331,34 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 				? { authorization: `Bearer ${config.token}` }
 				: {}
 
+	const websiteUrl = `${endpoints.api}/websites/${encodeURIComponent(config.websiteId)}`
+	// Self-hosted Umami answers a website id it does not know with 200 and a `null` body, and that
+	// id's stats with zeros, so a read would pass for a working source.
+	const requireWebsite = (website: unknown): void => {
+		if (!isRecord(website)) {
+			throw new UnknownSiteError(`umami: no website ${config.websiteId}; check the Website ID`)
+		}
+	}
+	// Remembered once Umami answers: a failed lookup is the asking read's alone. A new adapter (a save
+	// of its document, or a `providers.resolve` that builds one per read) asks again.
+	let websiteKnown = false
+
 	return {
 		id: 'umami',
 		...adapterLabel(config.label, 'Umami', 'umami({ label })'),
 		capabilities,
 		capture: buildCapture(config, endpoints),
 		isConfigured: () => Boolean(config.websiteId && (config.apiKey || config.token)),
+		async checkConnection(ctx: ConnectionCheckContext): Promise<void> {
+			requireWebsite(
+				await fetchJson<unknown>(websiteUrl, {
+					headers: authHeaders(),
+					provider: 'umami',
+					signal: ctx.signal,
+					...(config.fetch ? { fetch: config.fetch } : {}),
+				})
+			)
+		},
 		async query(q: AnalyticsQuery, ctx: AdapterContext): Promise<AnalyticsResult> {
 			const fetchedAt = readTime(ctx)
 			const headers = authHeaders()
@@ -388,12 +414,25 @@ export function umami(config: UmamiConfig): AnalyticsAdapter {
 				}
 				return params
 			}
-			const getJson = <T>(endpoint: string, params: URLSearchParams): Promise<T> =>
-				upstreamJson<T>(
-					ctx,
-					`${endpoints.api}/websites/${config.websiteId}/${endpoint}?${params.toString()}`,
-					{ headers, provider: 'umami', fetch: config.fetch }
-				)
+			const getJson = async <T>(endpoint: string, params: URLSearchParams): Promise<T> => {
+				// Inside the lane, so the lane records an unknown website as a refusal, not a success.
+				if (!websiteKnown) {
+					await upstream(ctx, (signal) =>
+						fetchJson<unknown>(websiteUrl, {
+							headers,
+							provider: 'umami',
+							signal,
+							...(config.fetch ? { fetch: config.fetch } : {}),
+						}).then(requireWebsite)
+					)
+					websiteKnown = true
+				}
+				return upstreamJson<T>(ctx, `${websiteUrl}/${endpoint}?${params.toString()}`, {
+					headers,
+					provider: 'umami',
+					fetch: config.fetch,
+				})
+			}
 
 			/**
 			 * The goal rows for the hint, narrowed to it again on the way back so nothing the API

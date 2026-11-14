@@ -118,7 +118,8 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerFieldSiteId]: '사이트 ID',
 	[keys.providerFieldApiKey]: 'API 키',
 	[keys.providerFieldHost]: '호스트',
-	[keys.providerFieldHostHelp]: '기본 주소를 쓰려면 비워 두세요.',
+	[keys.providerFieldHostHelp]:
+		'자체 호스팅 인스턴스에만 해당: 그 주소입니다. 비워 두면 서비스의 클라우드를 사용합니다.',
 	[keys.providerFieldWebsiteId]: '웹사이트 ID',
 	[keys.providerFieldToken]: 'API 토큰',
 	[keys.providerFieldPropertyId]: '속성 ID',
@@ -132,8 +133,10 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerFieldRevenueCurrency]: '수익 통화',
 	[keys.providerFieldMeasurementId]: '측정 ID',
 	[keys.providerFieldCaptureHelp]: '사이트의 방문 추적을 켭니다. 비워 두면 추적이 꺼집니다.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'GA4 관리의 웹 데이터 스트림 측정 ID(G-...)입니다. 사이트 추적을 켭니다. 비워 두면 추적이 꺼집니다.',
 	[keys.providerFieldDomainHelp]:
-		'추적 스크립트가 방문을 기록할 때 쓰는 도메인으로, 보통 사이트 ID와 같습니다. Plausible 기본 스크립트로 방문 추적을 켜며, 스크립트 ID와 함께 입력하면 이 값이 우선합니다. 이 칸과 스크립트 ID를 모두 비워 두면 추적이 꺼집니다.',
+		'추적 스크립트가 방문을 기록할 때 쓰는 도메인으로, 보통 사이트 ID와 같습니다. Plausible 기본 스크립트로 방문 추적을 켜며, 스크립트 ID와 함께 입력하면 이 값이 우선합니다. 이 칸과 스크립트 ID를 모두 비워 두면 추적이 꺼집니다. 여러 사이트에서 방문을 집계하려면 쉼표로 구분해 입력하세요.',
 	[keys.providerFieldScriptIdHelp]:
 		'사이트별 새 Plausible 스크립트를 쓰는 사이트용입니다. 스크립트 주소에서 pa-XXXX.js의 pa- 뒤 부분이 ID입니다. 이 스크립트로 방문 추적을 켭니다. 이 칸과 웹사이트 주소를 모두 비워 두면 추적이 꺼집니다.',
 	[keys.providerErrorMeasurementId]: '영문자, 숫자, 하이픈만 사용하세요. 예: G-AB12CD34',
@@ -141,9 +144,43 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'주소만 입력하세요. 예: https://analytics.example.com 또는 https://example.com/analytics. ? 또는 #로 시작하는 부분과 사용자 이름, 비밀번호는 넣지 마세요.',
 	[keys.providerErrorHostInsecure]: '주소는 https://로 시작해야 합니다.',
+	[keys.providerErrorHostNotAllowed]:
+		'이 사이트는 이 주소를 허용하지 않습니다. 개발자에게 추가를 요청하세요.',
+	[keys.providerErrorSiteDomain]:
+		'Plausible에 표시된 대로 사이트를 입력하세요. 예: example.com 또는 example.com/blog',
+	[keys.providerErrorPropertyId]: '123456789처럼 숫자만 입력하세요.',
+	[keys.providerErrorPosthogRegionRequired]: 'PostHog 프로젝트 지역을 선택하세요.',
 	[keys.providerErrorPosthogHostRegion]: '다른 PostHog 지역의 주소입니다.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'API 키가 아닌 프로젝트 토큰(phc_)입니다.',
 	[keys.providerErrorPosthogKeyAsToken]: '비공개 키입니다. phc_ 토큰을 쓰세요.',
+	[keys.providerConnectionLabel]: '연결',
+	[keys.providerConnectionStatus]: '상태',
+	[keys.providerConnectionTest]: '연결 테스트',
+	[keys.providerConnectionConnected]: '연결됨',
+	[keys.providerConnectionNotConnected]: '연결 안 됨',
+	[keys.providerConnectionNoAnswer]: '응답 없음',
+	[keys.providerConnectionUnchecked]: '확인 안 됨',
+	[keys.providerConnectionLastSuccess]: '마지막 성공',
+	[keys.providerConnectionLastError]: '마지막 실패',
+	[keys.providerConnectionPaused]: '{{date}}까지 읽기 일시 중지',
+	[keys.providerConnectionResumes]: '읽기 재개',
+	[keys.providerConnectionSaveFirst]: '테스트하려면 문서를 저장하세요.',
+	[keys.providerConnectionUnsaved]: '테스트하려면 변경 사항을 저장하세요.',
+	[keys.providerConnectionNoPermission]:
+		'이 문서를 수정할 수 있는 사람만 연결을 테스트할 수 있습니다.',
+	[keys.providerConnectionRefusedHelp]: '키, ID, 호스트를 확인하세요.',
+	[keys.providerConnectionRefusedHelpPosthog]: '키, ID, 지역, 호스트를 확인하세요.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'속성 ID와 키를 확인하고, 클라이언트 이메일이 속성의 뷰어인지 확인하세요.',
+	[keys.providerConnectionIncompleteHelp]:
+		'이 확인에 필요한 키나 ID가 비어 있습니다. 입력하고 저장한 뒤 다시 테스트하세요.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'서비스가 이 사이트를 알지 못합니다. 서비스 자체 설정에서 ID를 복사하세요.',
+	[keys.providerConnectionUnreachableHelp]: '서비스가 응답하지 않았습니다. 나중에 다시 시도하세요.',
+	[keys.providerConnectionChecked]: '연결 정상',
+	[keys.providerConnectionFailed]: '연결 실패',
+	[keys.providerConnectionCheckRunning]:
+		'이 설정을 이미 확인하고 있습니다. 몇 초 후에 다시 테스트하세요.',
 	[keys.providerFieldIsDefault]: '이 사이트의 기본값',
 	[keys.providerFieldIsDefaultHelp]:
 		'독자가 다른 도구를 고르지 않으면 분석이 이 도구로 열립니다. 사이트마다 기본 도구는 하나만 둘 수 있습니다.',
@@ -347,7 +384,7 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.filterHintGoal]: '목표의 짧은 코드, 예: newsletter-signup',
 	[keys.filterHintCurrency]: '세 자리 통화 코드, 예: EUR',
 	[keys.providersCollectionDescription]:
-		'연결하는 분석 도구마다 항목을 하나씩 추가하세요. 키는 안전하게 저장되고 다시 표시되지 않습니다. 어떤 키가 저장되었는지 알 수 있도록 마지막 네 글자만 보입니다.',
+		'연결하는 분석 도구마다 항목을 하나씩 추가하세요. 키는 안전하게 저장되고 다시 표시되지 않습니다. 어떤 키가 저장되었는지 알 수 있도록 마지막 네 글자만 보입니다. 저장된 항목이 연결되는 곳(호스트, 지역, 읽기에 쓰는 ID, 클라이언트 이메일 또는 사이트 라벨)을 바꾸면 키가 지워집니다. 같은 저장에서 키를 다시 입력하세요.',
 	[keys.providerFieldNameHelp]: '데이터 소스를 고르는 곳마다 표시됩니다.',
 	[keys.providerFieldProviderHelp]:
 		'어떤 분석 도구를 위한 설정인지 고르세요. 아래 항목은 선택에 따라 달라집니다.',
@@ -356,19 +393,26 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'Plausible이 측정하는 웹사이트입니다. 보통 yourdomain.com 형태로 적습니다.',
 	[keys.providerFieldApiKeyHelp]:
-		'보고서를 읽어 오는 데 쓰는 읽기 전용 키입니다. 안전하게 저장되며 다시 표시되지 않습니다.',
+		'Plausible 계정 설정의 API Keys에서 만든 Stats API 키입니다. 안전하게 저장되며 다시 표시되지 않습니다.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'PostHog 계정 설정에서 만든 Query Read 권한의 개인 API 키(phx_...)입니다. 안전하게 저장되며 다시 표시되지 않습니다.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'Umami Cloud용입니다. 자체 호스팅 Umami라면 키를 API 토큰에 넣으세요. 안전하게 저장되며 다시 표시되지 않습니다.',
 	[keys.providerFieldWebsiteIdHelp]:
 		'웹사이트 ID입니다. Umami 대시보드의 주소창에서 확인할 수 있습니다.',
 	[keys.providerFieldTokenHelp]:
-		'사용자 이름과 비밀번호 대신 쓰는 Umami Cloud 토큰입니다. 안전하게 저장됩니다.',
+		'자체 호스팅 Umami용: 설정에서 만든 API 키 또는 로그인 토큰입니다. Umami Cloud라면 API 키를 쓰세요. 안전하게 저장됩니다.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Google Analytics에 있는 GA4 속성 번호입니다. properties/ 라는 단어는 빼세요.',
-	[keys.providerFieldClientEmailHelp]: 'Google에서 받은 파일에 있는 서비스 계정 주소입니다.',
+	[keys.providerFieldClientEmailHelp]:
+		'Google이 준 파일의 서비스 계정 주소입니다. GA4 속성의 액세스 관리에서 뷰어로 추가하세요. 그렇지 않으면 읽기가 거부됩니다.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'같은 Google 파일에 있는 비공개 키를 그대로 복사해 넣으세요. 안전하게 저장됩니다.',
-	[keys.providerFieldProjectIdHelp]: '연결할 프로젝트입니다.',
+	[keys.providerFieldProjectIdHelp]: '선택 사항입니다. 서비스 계정 파일의 project_id입니다.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'PostHog 프로젝트 설정에 Project ID로 표시된 숫자입니다.',
 	[keys.providerFieldRegionHelp]:
-		'PostHog Cloud 전용입니다. 호스트가 자체 호스팅 인스턴스이면 무시됩니다.',
+		'PostHog 주소의 클라우드입니다. us.posthog.com은 US, eu.posthog.com은 EU입니다. 호스트가 자체 호스팅 인스턴스이면 무시됩니다. 호스트가 비어 있으면 필수입니다.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'판매 목표에 쓸 3자리 통화 코드입니다. 예: USD. 이 값을 정하기 전에는 매출이 표시되지 않습니다.',
 	[keys.providerFieldGa4CurrencyHelp]:
@@ -410,6 +454,8 @@ export const ko: LocaleBundle<'other'> = {
 	[keys.panelNoViews]: '이 날짜 범위에는 노출이 없습니다.',
 	[keys.sourcesPlatformFallback]:
 		'이 사이트가 자체 분석 도구를 추가하기 전까지는 플랫폼의 분석 도구에서 가져온 수치입니다. 도구를 추가하면 그 도구로 전환됩니다.',
+	[keys.sourcesOwnSourceFailing]:
+		'이 사이트의 자체 분석 도구가 작동하지 않아 플랫폼의 분석 도구에서 가져온 수치입니다. 연결이 다시 작동하면 원래 도구로 돌아갑니다.',
 	[keys.stateSourceSubstituted]:
 		'저장된 데이터 소스를 더 이상 사용할 수 없어 기본 데이터 소스를 표시합니다.',
 	[keys.statePosthogCookielessDropped]:

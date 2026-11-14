@@ -13,6 +13,7 @@ import { NumberFieldClientProps } from 'payload';
 import { ReactNode } from 'react';
 import { SelectFieldClientProps } from 'payload';
 import { TextFieldClientProps } from 'payload';
+import { UIFieldClientProps } from 'payload';
 
 // @public
 export const ANALYTICS_ERROR_CODES: readonly ["invalid_param", "unsupported_metric", "unsupported_dimension", "unsupported_filter", "unsupported_operator", "unsupported_granularity", "range_too_long", "unknown_source", "untrusted_scope", "not_found", "payload_too_large", "unauthorized", "forbidden", "rate_limited", "source_misconfigured", "unavailable", "internal"];
@@ -517,7 +518,10 @@ export type MetricValue = number | null;
 export type MetricValues = Partial<Record<MetricKey, MetricValue>>;
 
 // @beta
-export function ProvidersListNotice(): JSX.Element;
+export function ProviderConnection(input: UIFieldClientProps): JSX.Element;
+
+// @beta
+export function ProvidersListNotice(): JSX.Element | null;
 
 // @public
 export class QueryFetchError extends Error {
@@ -750,6 +754,7 @@ export interface RoutePaths {
     goals: string;
     ingest: string;
     live: string;
+    providerStatus: string;
     proxy: string;
     proxyPattern: string;
     query: string;
@@ -803,7 +808,7 @@ export type SourceErrorKind = 'misconfigured' | 'host-refused';
 export const SourceSelectField: (props: SelectFieldClientProps) => JSX_2.Element;
 
 // @public
-export type SourcesNotice = 'platformFallback';
+export type SourcesNotice = 'platformFallback' | 'ownSourceFailing';
 
 // @public (undocumented)
 export interface SourcesResponse {
@@ -909,6 +914,7 @@ export interface ViewContextValue {
 export interface ViewEndpoints {
     // (undocumented)
     live: string;
+    providerStatus?: string;
     // (undocumented)
     query: string;
     // (undocumented)

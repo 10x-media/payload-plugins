@@ -4,8 +4,8 @@ import {
 	type ProviderCollectionFieldOverrides,
 	servedProviderTypes,
 } from '../providers/collection'
-import { PROVIDER_IDS, type ProviderId } from '../providers/factory'
 import { resolveHostPolicy } from '../providers/hosts'
+import { PROVIDER_IDS, type ProviderId } from '../providers/ids'
 import { resolveScopedCollection } from './collectionOption'
 import { keysOf, optionalFunction, optionalList, optionsObject } from './optionChecks'
 import type { ProvidersCollectionOptions, ProvidersOptions, ResolvedOptions } from './options'

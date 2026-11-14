@@ -15,6 +15,7 @@ import {
 	type ProviderFactoryContext,
 } from './factory'
 import { DEFAULT_HOST_POLICY, resolveHostPolicy } from './hosts'
+import { documentAdapterId, documentIdOf } from './ids'
 
 /** The context every document adapter is built with: a fetch, and the vendors' clouds alone. */
 const guarded: ProviderFactoryContext = {
@@ -122,6 +123,58 @@ describe('adapterFromProviderDoc', () => {
 		expect(urls).toEqual(['https://eu.posthog.com/api/projects/1/query/'])
 	})
 
+	it('reads with the ids a document stores, spaces around them left out', async () => {
+		const asked: string[] = []
+		const fetch: FetchLike = async (input, init?: FetchInit) => {
+			asked.push(`${String(input)} ${typeof init?.body === 'string' ? init.body : ''}`)
+			return Response.json({ results: [], pageviews: { value: 0 } })
+		}
+		const query: AnalyticsQuery = {
+			metrics: ['pageviews'],
+			dateRange: { start: new Date('2026-01-01T00:00:00Z'), end: new Date('2026-01-02T00:00:00Z') },
+		}
+		await build(
+			{ provider: 'plausible', plausible: { siteId: '  example.com  ', apiKey: 'key' } },
+			{ fetch }
+		)
+			?.query(query, {})
+			.catch(() => {})
+		await build({ provider: 'umami', umami: { websiteId: '  site-1  ', apiKey: 'key' } }, { fetch })
+			?.query(query, {})
+			.catch(() => {})
+		expect(asked.find((line) => line.includes('plausible'))).toContain('"site_id":"example.com"')
+		expect(asked.find((line) => line.includes('/stats'))).toContain('/websites/site-1/')
+	})
+
+	it('reads with the keys a document stores, spaces around them left out', async () => {
+		const auth: string[] = []
+		const fetch: FetchLike = async (_input, init?: FetchInit) => {
+			auth.push(String(new Headers(init?.headers).get('authorization')))
+			return Response.json({ results: [], columns: [], types: [] })
+		}
+		const query: AnalyticsQuery = {
+			metrics: ['pageviews'],
+			dateRange: { start: new Date('2026-01-01T00:00:00Z'), end: new Date('2026-01-02T00:00:00Z') },
+		}
+		for (const doc of [
+			{ provider: 'plausible', plausible: { siteId: 'example.com', apiKey: '  key  ' } },
+			{ provider: 'posthog', posthog: { projectId: '1', apiKey: '  phx_key  ', region: 'eu' } },
+		] satisfies ProviderDoc[]) {
+			await build(doc, { fetch })
+				?.query(query, {})
+				.catch(() => {})
+		}
+		expect(auth).toEqual(['Bearer key', 'Bearer phx_key'])
+	})
+
+	it('captures with the public ids a document stores, spaces around them left out', () => {
+		const adapter = build({
+			provider: 'posthog',
+			posthog: { projectId: '1', apiKey: 'phx_x', projectToken: '  phc_public  ', region: 'eu' },
+		})
+		expect(adapter?.capture?.client).toEqual({ kind: 'posthog', token: 'phc_public' })
+	})
+
 	it('passes the public posthog capture fields through to the adapter', () => {
 		const adapter = build({
 			provider: 'posthog',
@@ -215,6 +268,16 @@ describe('adapterFromProviderDoc', () => {
 		expect(adapter?.capture).toBeUndefined()
 	})
 
+	it('sends a Plausible pageview to every site its Website address lists', () => {
+		const adapter = build({
+			provider: 'plausible',
+			plausible: { siteId: 's', apiKey: 'k', domain: ' site.test, rollup.test, site.test ' },
+		})
+		expect(adapter?.capture?.snippet({ path: '/pl' }).scripts[0]?.attrs?.['data-domain']).toBe(
+			'site.test,rollup.test'
+		)
+	})
+
 	it('passes the public plausible capture fields through to the adapter', () => {
 		const domain = build({
 			provider: 'plausible',
@@ -282,6 +345,22 @@ describe('adapterFromProviderDoc', () => {
 			plausible: { siteId: 's', apiKey: 'k', host: '' },
 		})
 		expect(adapter?.isConfigured()).toBe(true)
+	})
+})
+
+describe('documentIdOf', () => {
+	it('gives back the document id documentAdapterId put in, a Mongo ObjectId or a Postgres number', () => {
+		expect(documentIdOf(documentAdapterId('posthog', '6650f1c2a9e4b3d2c1a09f87'))).toBe(
+			'6650f1c2a9e4b3d2c1a09f87'
+		)
+		expect(documentIdOf(documentAdapterId('ga4', 5))).toBe('5')
+		expect(documentIdOf('umami:a:b')).toBe('a:b')
+	})
+
+	it('names no document for a config adapter’s id', () => {
+		for (const id of ['posthog', 'native', 'posthog:', ':5', 'custom:5', '']) {
+			expect(documentIdOf(id), id).toBeUndefined()
+		}
 	})
 })
 
@@ -497,7 +576,7 @@ describe('adapterFromProviderDoc under a host policy', () => {
 		] satisfies Array<[ProviderDoc, string]>) {
 			const { fetch, urls } = recording()
 			await build(doc, { hosts, fetch })?.query(query, {})
-			expect(urls[0]?.split('?')[0]).toBe(url)
+			expect(urls.at(-1)?.split('?')[0]).toBe(url)
 		}
 	})
 
@@ -511,7 +590,7 @@ describe('adapterFromProviderDoc under a host policy', () => {
 			{ hosts, fetch }
 		)
 		await adapter?.query(query, {})
-		expect(urls[0]?.split('?')[0]).toBe('https://a.umami.example.net/api/websites/w/stats')
+		expect(urls.at(-1)?.split('?')[0]).toBe('https://a.umami.example.net/api/websites/w/stats')
 		expect(adapter?.capture?.proxy.routes.map((route) => route.upstream)).toEqual([
 			'https://a.umami.example.net/script.js',
 			'https://a.umami.example.net/api/send',
@@ -542,7 +621,7 @@ describe('adapterFromProviderDoc under a host policy', () => {
 				{ provider: 'umami', umami: { websiteId: 'w', token: 't', host } },
 				{ hosts, fetch }
 			)?.query(query, {})
-			expect(urls[0]?.split('?')[0]).toBe(url)
+			expect(urls.at(-1)?.split('?')[0]).toBe(url)
 		}
 	})
 

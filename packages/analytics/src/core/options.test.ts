@@ -616,7 +616,12 @@ describe('resolveOptions providers', () => {
 			scope,
 			capture: { gate: 'all' },
 			providers: {
-				collection: { slug: 'tenant-analytics', scopeField: 'tenant', overrides, access },
+				collection: {
+					slug: 'tenant-analytics',
+					scopeField: 'tenant',
+					overrides,
+					access,
+				},
 			},
 		}).providers
 		expect(p.collection).toEqual({

@@ -69,6 +69,7 @@ export {
 	type RoutesConfigSource,
 	routePaths,
 } from '../plugin/routes'
+export { ProviderConnection } from '../providers/ProviderConnection'
 export { ProvidersListNotice } from '../providers/ProvidersListNotice'
 export {
 	buildQueryUrl,

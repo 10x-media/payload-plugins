@@ -2,7 +2,7 @@ import type { Payload, PayloadRequest } from 'payload'
 import { itemCollectionsOf } from '../binding/report'
 import { resolveTrackerConfig } from '../capture/trackerConfig'
 import { currentDate, currentTime } from '../core/clock'
-import type { AnalyticsResult } from '../core/contract'
+import type { AnalyticsAdapter, AnalyticsResult } from '../core/contract'
 import { TASK_SLUGS } from '../core/jobs'
 import { monotonicMs } from '../core/monotonic'
 import {
@@ -19,7 +19,7 @@ import {
 } from '../core/options'
 import { type AdapterRegistry, withoutRevenue } from '../core/registry'
 import { describeWithCauses } from '../core/sourceErrors'
-import { throttled } from '../core/throttle'
+import { throttled, WARN_EVERY_MS } from '../core/throttle'
 import { isRecord } from '../core/values'
 import { hostHoldsWriteLock, sqliteTransactionsNotice } from '../db/detachedWrite'
 import { configGoalsResolver, createGoalsResolver, type GoalsResolver } from '../goals/resolver'
@@ -28,9 +28,17 @@ import { stateLease, stateStoreOf } from '../maintenance/lease'
 import { trackServerEvent } from '../native/ingest/serverTrack'
 import { NATIVE_ADAPTER_ID } from '../native/nativeAdapter'
 import { createGuardedFetch } from '../net/guardedFetch'
+import { createConnectionRecheck } from '../providers/connectionCheck'
+import { documentIdOf } from '../providers/ids'
 import { configTokenBackend } from '../providers/refresh'
 import { createProviderRegistry, type ProviderPlan } from '../providers/registry'
+import {
+	connectionOutcomeOf,
+	type ProviderStatusStore,
+	providerStatusStore,
+} from '../providers/status'
 import { emptyTrackerConfig, type TrackerConfigSource } from '../site/getTrackerConfig'
+import { BREAKER_MAX_MS } from '../surfacing/breaker'
 import { createCacheSweeper, SWEEP_LEASE, SWEEP_LEASE_MS } from '../surfacing/cacheSweep'
 import { collectionCacheStore } from '../surfacing/collectionCacheStore'
 import { type CacheOperation, createEngine } from '../surfacing/engine'
@@ -46,9 +54,6 @@ import { isProductionBuild } from './peers'
 import { assertRoutesReachable } from './routeChecks'
 import { type AnalyticsRuntime, getRuntime, type RuntimeFactory } from './runtime'
 import { validateScopeField } from './scopeFieldBoot'
-
-/** How often a failing read cache, or a throwing `hooks.afterRead`, is reported, at most. */
-const CACHE_WARN_EVERY_MS = 60_000
 
 /** node-postgres' own default for the pool's `max`. */
 const PG_DEFAULT_POOL_MAX = 10
@@ -119,9 +124,25 @@ const goalsResolverFor = (
  * Native reads stay out of the global cap, so a slow vendor never queues them; on a scoped install
  * every config adapter serves all scopes, so one scope holds at most half of its lane.
  */
-const lanesFor = (payload: Payload, resolved: ResolvedOptions, plan: ProviderPlan) => {
+const lanesFor = (
+	payload: Payload,
+	resolved: ResolvedOptions,
+	{
+		plan,
+		status,
+		statusWarning,
+		versionOf,
+	}: {
+		plan: ProviderPlan
+		status: ProviderStatusStore | undefined
+		statusWarning: (message: string) => void
+		/** The saved version of the provider document a pooled adapter was built from. */
+		versionOf: ((adapter: AnalyticsAdapter) => string | undefined) | undefined
+	}
+) => {
 	const { concurrency } = resolved.cache
 	const configAdapters = new Set(resolved.adapters)
+	const configIds = new Set(resolved.adapters.map((adapter) => adapter.id))
 	const poolMax = postgresPoolMax(payload)
 	return createLanes({
 		global: concurrency.global,
@@ -136,6 +157,24 @@ const lanesFor = (payload: Payload, resolved: ResolvedOptions, plan: ProviderPla
 			payload.logger?.warn(
 				`analytics: a request to the "${adapter.id}" source ignored its abort signal and was still out ${ABANDON_AFTER_MS / 1000} seconds after its read gave up, so its slot was given back and it counts as a timeout. An adapter must pass ctx.signal (or the signal ctx.upstream hands it) to every request it sends; this is said once per source.`
 			),
+		...(status
+			? {
+					onOutcome: (adapter, outcome, health) => {
+						const docId = configIds.has(adapter.id) ? undefined : documentIdOf(adapter.id)
+						const told = connectionOutcomeOf(outcome, health)
+						if (docId === undefined || told === undefined) {
+							return
+						}
+						const version = versionOf?.(adapter)
+						const options = version === undefined ? { throttle: true } : { throttle: true, version }
+						status.record(docId, told, options).catch((err: unknown) => {
+							statusWarning(
+								`analytics: the connection status of provider document "${docId}" could not be saved, reads go on without it: ${String(err)}`
+							)
+						})
+					},
+				}
+			: {}),
 	})
 }
 
@@ -278,8 +317,10 @@ export const createRuntimeFactory = (
 						})
 					: undefined
 			const epoch = createEpochStore(payload)
+			const providerStatus = plan.kind === 'collection' ? providerStatusStore(payload) : undefined
 			const now = currentTime
 			const warn = (message: string) => payload.logger?.warn(message)
+			const providerStatusWarning = throttled(warn, { now: monotonicMs, intervalMs: WARN_EVERY_MS })
 			const registry = createProviderRegistry({
 				payload,
 				plan,
@@ -300,6 +341,18 @@ export const createRuntimeFactory = (
 					: {}),
 				now,
 			})
+			const providerRecheck =
+				providerStatus && registry.documentAdapter
+					? createConnectionRecheck({
+							payload,
+							store: providerStatus,
+							adapterFor: registry.documentAdapter,
+							...(registry.versionOf ? { versionOf: registry.versionOf } : {}),
+							now: monotonicMs,
+							cooldownMs: BREAKER_MAX_MS,
+							warn,
+						})
+					: undefined
 			const goals = goalsResolverFor(payload, resolved, now)
 			// Only where something can change at runtime; an install configured in code keys every read
 			// on the fixed epoch.
@@ -336,7 +389,7 @@ export const createRuntimeFactory = (
 							warn,
 						})
 					: undefined
-			const cacheWarning = throttled(warn, { now: monotonicMs, intervalMs: CACHE_WARN_EVERY_MS })
+			const cacheWarning = throttled(warn, { now: monotonicMs, intervalMs: WARN_EVERY_MS })
 			const onStoreError = (err: unknown, operation: CacheOperation) => {
 				cacheWarning(
 					`analytics: the read cache failed to ${operation}, reads go on without it: ${String(err)}`
@@ -348,20 +401,27 @@ export const createRuntimeFactory = (
 				warn,
 			})
 			const afterRead = resolved.hooks.afterRead
-			const hookWarning = throttled(warn, { now: monotonicMs, intervalMs: CACHE_WARN_EVERY_MS })
+			const hookWarning = throttled(warn, { now: monotonicMs, intervalMs: WARN_EVERY_MS })
 			const engine = createEngine({
 				payload,
 				store,
 				memo,
-				lanes: lanesFor(payload, resolved, plan),
+				lanes: lanesFor(payload, resolved, {
+					plan,
+					status: providerStatus,
+					statusWarning: providerStatusWarning,
+					versionOf: registry.versionOf,
+				}),
 				coldReadsPerScope: resolved.cache.concurrency.perScope,
 				ttl: resolved.cache.ttl,
 				timeoutMs: resolved.cache.timeoutMs,
 				epoch,
 				...(configEpoch ? { configEpoch } : {}),
 				now,
-				onError: (err, adapterId) => {
-					warn(`analytics: read failed for adapter "${adapterId}": ${describeWithCauses(err)}`)
+				onError: (err, adapterId, scope) => {
+					warn(
+						`analytics: read failed for adapter "${adapterId}" (${scope === null ? 'install-wide' : `scope "${scope}"`}): ${describeWithCauses(err)}`
+					)
 				},
 				onStoreError,
 				onWrite: () => sweeper.maybeSweep(),
@@ -390,9 +450,19 @@ export const createRuntimeFactory = (
 				listGoals: goals.listReadable,
 				listGoalsAcross: goals.listAcross,
 				...(providerConnections ? { providerFetch: providerConnections.fetch } : {}),
+				...(providerStatus ? { providerStatus, providerStatusWarning } : {}),
+				...(registry.documentAdapter ? { providerAdapter: registry.documentAdapter } : {}),
+				...(registry.versionOf ? { providerVersionOf: registry.versionOf } : {}),
+				...(providerRecheck ? { providerRecheck } : {}),
 				// Refreshes and sweeps still running write to the database, which closes after this.
 				close: async () => {
-					await Promise.all([engine.close(), sweeper.idle(), syncWatch?.idle()])
+					await Promise.all([
+						engine.close(),
+						sweeper.idle(),
+						syncWatch?.idle(),
+						providerRecheck?.idle(),
+					])
+					await providerStatus?.idle()
 					await registry.close()
 					await providerConnections?.close()
 				},

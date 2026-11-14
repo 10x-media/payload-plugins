@@ -118,7 +118,8 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerFieldSiteId]: 'معرّف الموقع',
 	[keys.providerFieldApiKey]: 'مفتاح API',
 	[keys.providerFieldHost]: 'المضيف',
-	[keys.providerFieldHostHelp]: 'اتركه فارغًا لاستخدام العنوان الافتراضي.',
+	[keys.providerFieldHostHelp]:
+		'للنسخة المستضافة ذاتيًا فقط: عنوانها. اتركه فارغًا لاستخدام سحابة المزوّد.',
 	[keys.providerFieldWebsiteId]: 'معرّف الموقع الإلكتروني',
 	[keys.providerFieldToken]: 'رمز API',
 	[keys.providerFieldPropertyId]: 'معرّف الخاصية',
@@ -132,8 +133,10 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerFieldRevenueCurrency]: 'عملة الإيرادات',
 	[keys.providerFieldMeasurementId]: 'معرّف القياس',
 	[keys.providerFieldCaptureHelp]: 'هذا يشغّل التتبّع على موقعك. اتركه فارغًا لإيقاف التتبّع.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'معرّف القياس (G-...) لمصدر بيانات الويب من إدارة GA4. يشغّل التتبع على موقعك؛ اتركه فارغًا لإيقافه.',
 	[keys.providerFieldDomainHelp]:
-		'النطاق الذي يسجّل به سكربت التتبّع الزيارات، وهو عادةً نفس معرّف الموقع. يشغّل التتبّع بسكربت Plausible القياسي، ويُقدَّم على معرّف السكربت إذا مُلئ الحقلان. اترك هذا الحقل ومعرّف السكربت فارغين لإيقاف التتبّع.',
+		'النطاق الذي يسجّل به سكربت التتبّع الزيارات، وهو عادةً نفس معرّف الموقع. يشغّل التتبّع بسكربت Plausible القياسي، ويُقدَّم على معرّف السكربت إذا مُلئ الحقلان. اترك هذا الحقل ومعرّف السكربت فارغين لإيقاف التتبّع. لاحتساب الزيارات في عدة مواقع، افصل بينها بفواصل.',
 	[keys.providerFieldScriptIdHelp]:
 		'للمواقع التي تستخدم سكربت Plausible الأحدث الخاص بكل موقع: المعرّف الموجود في عنوانه، أي الجزء بعد pa- في pa-XXXX.js. يشغّل التتبّع بهذا السكربت. اترك هذا الحقل وعنوان الموقع فارغين لإيقاف التتبّع.',
 	[keys.providerErrorMeasurementId]: 'استخدم الأحرف والأرقام والشرطات فقط، مثل G-AB12CD34.',
@@ -142,9 +145,41 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerErrorHostFormat]:
 		'أدخل العنوان فقط، مثل https://analytics.example.com أو https://example.com/analytics، من دون جزء يبدأ بـ ? أو # ومن دون اسم مستخدم أو كلمة مرور.',
 	[keys.providerErrorHostInsecure]: 'يجب أن يبدأ العنوان بـ https://.',
+	[keys.providerErrorHostNotAllowed]: 'هذا الموقع لا يسمح بهذا العنوان. اطلب من مطوّره إضافته.',
+	[keys.providerErrorSiteDomain]:
+		'أدخل الموقع كما يظهر في Plausible، مثل example.com أو example.com/blog.',
+	[keys.providerErrorPropertyId]: 'أدخل الرقم فقط، مثل 123456789.',
+	[keys.providerErrorPosthogRegionRequired]: 'اختر منطقة مشروع PostHog.',
 	[keys.providerErrorPosthogHostRegion]: 'هذا العنوان من منطقة PostHog الأخرى.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'هذا رمز مشروع (phc_XXXX) وليس مفتاح API.',
 	[keys.providerErrorPosthogKeyAsToken]: 'هذا مفتاح خاص. استخدم رمز phc_XXXX.',
+	[keys.providerConnectionLabel]: 'الاتصال',
+	[keys.providerConnectionStatus]: 'الحالة',
+	[keys.providerConnectionTest]: 'اختبار الاتصال',
+	[keys.providerConnectionConnected]: 'متصل',
+	[keys.providerConnectionNotConnected]: 'غير متصل',
+	[keys.providerConnectionNoAnswer]: 'لا رد',
+	[keys.providerConnectionUnchecked]: 'لم يُفحص',
+	[keys.providerConnectionLastSuccess]: 'آخر نجاح',
+	[keys.providerConnectionLastError]: 'آخر فشل',
+	[keys.providerConnectionPaused]: 'القراءة متوقفة حتى {{date}}',
+	[keys.providerConnectionResumes]: 'تُستأنف القراءة',
+	[keys.providerConnectionSaveFirst]: 'احفظ المستند لاختباره.',
+	[keys.providerConnectionUnsaved]: 'احفظ تغييراتك لاختبارها.',
+	[keys.providerConnectionNoPermission]: 'لا يمكن اختبار اتصال هذا المستند إلا لمن يحق له تعديله.',
+	[keys.providerConnectionRefusedHelp]: 'تحقق من المفتاح والمعرّفات والمضيف.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'تحقق من المفتاح والمعرّفات والمنطقة والمضيف.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'تحقق من معرّف الخاصية والمفتاح، ومن أن البريد الإلكتروني للعميل مُضاف كمُشاهد للخاصية.',
+	[keys.providerConnectionIncompleteHelp]:
+		'مفتاح أو معرّف يحتاجه هذا الفحص فارغ. أدخله واحفظ ثم اختبر مرة أخرى.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'الخدمة لا تعرف هذا الموقع. انسخ معرّفه من إعدادات الخدمة نفسها.',
+	[keys.providerConnectionUnreachableHelp]: 'لم تستجب الخدمة. حاول لاحقًا.',
+	[keys.providerConnectionChecked]: 'الاتصال يعمل',
+	[keys.providerConnectionFailed]: 'فشل الاتصال',
+	[keys.providerConnectionCheckRunning]:
+		'يجري فحص هذه الإعدادات بالفعل. اختبر مرة أخرى بعد بضع ثوانٍ.',
 	[keys.providerFieldIsDefault]: 'الافتراضي لهذا الموقع',
 	[keys.providerFieldIsDefaultHelp]:
 		'تُفتح التحليلات على هذه الأداة ما لم يختر القارئ أداة أخرى. يمكن أن تكون أداة واحدة فقط لكل موقع هي الافتراضية.',
@@ -348,24 +383,31 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.filterHintGoal]: 'الرمز المختصر للهدف، مثل newsletter-signup',
 	[keys.filterHintCurrency]: 'رمز عملة من ثلاثة أحرف، مثل EUR',
 	[keys.providersCollectionDescription]:
-		'أضف مدخلًا واحدًا لكل أداة تحليلات تربطها. تُحفظ مفاتيحك بأمان ولا تُعرض مرة أخرى؛ تبقى الأحرف الأربعة الأخيرة ظاهرة فقط لتعرف أيّها محفوظ.',
+		'أضف مدخلًا واحدًا لكل أداة تحليلات تربطها. تُحفظ مفاتيحك بأمان ولا تُعرض مرة أخرى؛ تبقى الأحرف الأربعة الأخيرة ظاهرة فقط لتعرف أيّها محفوظ. تغيير الجهة التي يتصل بها مدخل محفوظ (المضيف أو المنطقة أو معرّف يُستخدم في القراءة أو البريد الإلكتروني للعميل أو تسمية الموقع) يمسح مفاتيحه، فأدخلها مجددًا في الحفظ نفسه.',
 	[keys.providerFieldNameHelp]: 'يظهر في كل مكان تختار فيه مصدر بيانات.',
 	[keys.providerFieldProviderHelp]: 'أي أداة تحليلات يخصّها هذا. تتغيّر الحقول أدناه حسب اختيارك.',
 	[keys.providerFieldEnabledHelp]:
 		'إيقاف هذا يحتفظ بالبيانات المحفوظة لكنه يمنع استخدام هذه الأداة في أي مكان على موقعك.',
 	[keys.providerFieldSiteIdHelp]: 'الموقع الذي يقيسه Plausible، ويُكتب عادةً بالشكل yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'المفتاح للقراءة فقط الذي تُقرأ به تقاريرك. يُحفظ بأمان ولا يُعرض مرة أخرى.',
+		'مفتاح Stats API من إعدادات حسابك في Plausible، ضمن API Keys. يُخزَّن بأمان ولا يُعرض مرة أخرى.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'مفتاح API شخصي (phx_...) بصلاحية Query Read من إعدادات حسابك في PostHog. يُخزَّن بأمان ولا يُعرض مرة أخرى.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'لـ Umami Cloud. في Umami المستضاف ذاتيًا ضع المفتاح في رمز API بدلًا من ذلك. يُحفظ بأمان ولا يُعرض مرة أخرى.',
 	[keys.providerFieldWebsiteIdHelp]: 'معرّف موقعك، وتجده في شريط العنوان في لوحة Umami.',
 	[keys.providerFieldTokenHelp]:
-		'رمز Umami Cloud الخاص بك، ويُستخدم بدل اسم المستخدم وكلمة المرور. يُحفظ بأمان.',
+		'لـ Umami المستضاف ذاتيًا: مفتاح API من إعداداته أو رمز تسجيل الدخول. في Umami Cloud استخدم مفتاح API. يُحفظ بأمان.',
 	[keys.providerFieldPropertyIdHelp]: 'رقم خاصية GA4 من Google Analytics. من دون كلمة properties/.',
-	[keys.providerFieldClientEmailHelp]: 'عنوان حساب الخدمة من الملف الذي أعطتك إياه Google.',
+	[keys.providerFieldClientEmailHelp]:
+		'عنوان حساب الخدمة من الملف الذي قدّمه Google. أضِفه كمُشاهد في إدارة الوصول لخاصية GA4، وإلا فستُرفض القراءات.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'المفتاح الخاص من ملف Google نفسه، منسوخًا كما هو تمامًا. يُحفظ بأمان.',
-	[keys.providerFieldProjectIdHelp]: 'المشروع الذي يتصل به هذا.',
+	[keys.providerFieldProjectIdHelp]: 'اختياري. قيمة project_id من ملف حساب الخدمة.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'الرقم الظاهر باسم Project ID في إعدادات مشروعك في PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'لـ PostHog Cloud فقط. يُتجاهَل عندما يكون المضيف نسخة مستضافة ذاتيًا.',
+		'السحابة في عنوان PostHog الخاص بك: US لـ us.posthog.com و EU لـ eu.posthog.com. يُتجاهل إذا كان المضيف نسخة مستضافة ذاتيًا. مطلوب إذا كان المضيف فارغًا.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'رمز العملة المكوّن من 3 أحرف لأهداف المبيعات، مثل USD. لن تظهر الإيرادات قبل ضبطه.',
 	[keys.providerFieldGa4CurrencyHelp]:
@@ -407,6 +449,8 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.panelNoViews]: 'لا توجد مشاهدات في نطاق التاريخ هذا.',
 	[keys.sourcesPlatformFallback]:
 		'تأتي هذه الأرقام من أداة التحليلات الخاصة بالمنصة إلى أن يضيف هذا الموقع أداته الخاصة. عند إضافتها يتم التحويل إليها.',
+	[keys.sourcesOwnSourceFailing]:
+		'أداة التحليلات الخاصة بهذا الموقع لا تعمل، لذلك تأتي هذه الأرقام من أداة المنصة. يعود العرض إليها عندما يعمل اتصالها مجددًا.',
 	[keys.stateSourceSubstituted]: 'مصدر البيانات المحفوظ لم يعد متاحًا، لذا يُعرض المصدر الافتراضي.',
 	[keys.statePosthogCookielessDropped]:
 		'يتجاهل PostHog الزيارات المحسوبة دون موافقة: فعّل «Cookieless tracking» في إعدادات Web analytics للمشروع.',

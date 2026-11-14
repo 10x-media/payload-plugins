@@ -12,6 +12,12 @@ const RETIRED = 'Retired provider'
 
 const providerSelect = (page: Page) => page.locator('#field-provider')
 
+/** A PostHog document's Region, which a blank Host makes required. */
+const pickRegion = async (page: Page, region: 'US' | 'EU'): Promise<void> => {
+	await page.locator('#field-posthog__region .rs__control').click()
+	await page.locator('.rs__option', { hasText: new RegExp(`^${region}$`) }).click()
+}
+
 const offeredNames = async (page: Page): Promise<string[]> => {
 	await providerSelect(page).locator('.rs__control').click()
 	const names = await page.locator('.rs__option').allTextContents()
@@ -39,6 +45,7 @@ test('@narrowed-providers the create and edit views open on a narrowed select an
 	await expect(page.locator('#field-name')).toBeEditable()
 	expect(await offeredNames(page)).toEqual(OFFERED)
 	await page.locator('#field-name').fill(name)
+	await pickRegion(page, 'EU')
 	await page.getByRole('button', { name: 'Save' }).click()
 	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
 
@@ -64,14 +71,21 @@ test('@narrowed-providers a stored type no longer served opens, shows its type a
 	expect(await stored.json()).toMatchObject({ name: RETIRED, provider: 'native' })
 })
 
-/** A new PostHog document's form, named and on its type, before anything is saved. */
-const posthogDraft = async (page: Page, name: string): Promise<void> => {
+/** A new PostHog document's form, named, on its type and in a region unless told none. */
+const posthogDraft = async (
+	page: Page,
+	name: string,
+	region: 'EU' | null = 'EU'
+): Promise<void> => {
 	await page.goto(`${COLLECTION}/create`)
 	await expect(page.locator('#field-name')).toBeEditable()
 	await page.locator('#field-name').fill(name)
 	await providerSelect(page).locator('.rs__control').click()
 	await page.locator('.rs__option', { hasText: 'PostHog' }).click()
 	await expect(page.locator('#field-posthog__host')).toBeVisible()
+	if (region) {
+		await pickRegion(page, region)
+	}
 }
 
 /** A save the form refused, the toast naming the field it refused on. */
@@ -86,13 +100,24 @@ test('a PostHog Host on the other cloud region than its Region is refused, space
 }) => {
 	await login(page.request)
 	await posthogDraft(page, `PostHog region ${Date.now()}`)
-	await page.locator('#field-posthog__region .rs__control').click()
-	await page.locator('.rs__option', { hasText: /^EU$/ }).click()
 
 	await page.locator('#field-posthog__host').fill('https://us.posthog.com')
 	await refused(page, 'Host')
 
 	await page.locator('#field-posthog__host').fill('  https://eu.posthog.com  ')
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
+})
+
+test('a PostHog document with a blank Host, spaces and all, is refused until it has a Region', async ({
+	page,
+}) => {
+	await login(page.request)
+	await posthogDraft(page, `PostHog no region ${Date.now()}`, null)
+	await page.locator('#field-posthog__host').fill('   ')
+	await refused(page, 'Region')
+
+	await pickRegion(page, 'EU')
 	await page.getByRole('button', { name: 'Save' }).click()
 	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
 })
@@ -110,3 +135,56 @@ for (const [field, label, value] of [
 		await refused(page, label)
 	})
 }
+
+// No vendor is reached: a document without its key is refused before anything is sent, which is
+// the panel's whole round trip through the production build, the endpoint and the status rows.
+test('a new provider document checks its saved connection from the sidebar, and keeps the result', async ({
+	page,
+}) => {
+	await login(page.request)
+	await page.goto(`${COLLECTION}/create`)
+	const panel = page.locator('.analytics-provider-connection')
+	const button = panel.getByRole('button', { name: 'Test connection' })
+	const status = panel.locator('.analytics-provider-connection__facts li').first()
+	await page.locator('#field-name').fill(`Umami check ${Date.now()}`)
+	await providerSelect(page).locator('.rs__control').click()
+	await page.locator('.rs__option', { hasText: 'Umami' }).click()
+	await page.locator('#field-umami__websiteId').fill('  e2e-website  ')
+	await expect(button).toBeDisabled()
+	await expect(panel).toContainText('Save the document to test it.')
+
+	await page.getByRole('button', { name: 'Save' }).click()
+	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
+	const id = page.url().split('/').pop() ?? ''
+	await expect(status).toHaveText('Status:\u00a0Not checked')
+	await expect(button).toBeEnabled()
+
+	await button.click()
+	await expect(page.locator('[data-sonner-toast]', { hasText: 'Connection failed' })).toBeVisible()
+	await expect(status).toHaveText('Status:\u00a0Not connected')
+	await expect(panel).toContainText('Check the key, the IDs and the host.')
+
+	const stored = await page.request.get(`/api/_x/provider-status?id=${encodeURIComponent(id)}`)
+	expect(stored.ok()).toBeTruthy()
+	expect(((await stored.json()) as { status: { errorKind?: string } }).status.errorKind).toBe(
+		'source_misconfigured'
+	)
+
+	await page.reload()
+	await expect(status).toHaveText('Status:\u00a0Not connected')
+	await page.locator('#field-name').fill('Umami check, edited')
+	await expect(button).toBeDisabled()
+	await expect(panel).toContainText('Save your changes to test them.')
+})
+
+test('a native document has no Connection panel', async ({ page }) => {
+	await login(page.request)
+	await page.goto(`${COLLECTION}/create`)
+	await providerSelect(page).locator('.rs__control').click()
+	await page.locator('.rs__option', { hasText: 'Umami' }).click()
+	await expect(page.locator('.analytics-provider-connection')).toHaveCount(1)
+	await providerSelect(page).locator('.rs__control').click()
+	// The native engine's type, named after Payload in the select.
+	await page.locator('.rs__option', { hasText: /^Payload$/ }).click()
+	await expect(page.locator('.analytics-provider-connection')).toHaveCount(0)
+})

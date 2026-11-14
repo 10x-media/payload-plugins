@@ -71,6 +71,41 @@ describe('fetchJson', () => {
 		)
 	})
 
+	it("names the vendor's own message from a JSON error body, the way each vendor nests it", async () => {
+		const bodies: Array<[Record<string, unknown>, string]> = [
+			[
+				{
+					type: 'authentication_error',
+					code: 'authentication_failed',
+					detail: 'Personal API key found in request Authorization header is invalid.',
+				},
+				'posthog: HTTP 401 Personal API key found in request Authorization header is invalid.',
+			],
+			[{ error: 'Invalid API key or site ID' }, 'posthog: HTTP 401 Invalid API key or site ID'],
+			[{ error: { message: 'Unauthorized', code: 401 } }, 'posthog: HTTP 401 Unauthorized'],
+			[{ message: '  Site not found  ' }, 'posthog: HTTP 401 Site not found'],
+			[{ status: 'error' }, 'posthog: HTTP 401 {"status":"error"}'],
+		]
+		for (const [body, message] of bodies) {
+			server.use(http.get('https://x.test/refused', () => HttpResponse.json(body, { status: 401 })))
+			await expect(fetchJson('https://x.test/refused', { provider: 'posthog' })).rejects.toThrow(
+				message
+			)
+		}
+	})
+
+	it('keeps a text error body as it is, cut to 200 characters', async () => {
+		server.use(
+			http.get('https://x.test/html', () =>
+				HttpResponse.text(`  <html>${'x'.repeat(400)}</html>`, { status: 502 })
+			)
+		)
+		const error = await fetchJson('https://x.test/html', { provider: 'umami' }).catch(
+			(err: unknown) => err
+		)
+		expect(error instanceof Error && error.message).toBe(`umami: HTTP 502 <html>${'x'.repeat(194)}`)
+	})
+
 	it("carries the vendor's Retry-After on the error, in milliseconds", async () => {
 		server.use(
 			http.get('https://x.test/busy', () =>

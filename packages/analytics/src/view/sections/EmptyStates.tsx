@@ -1,6 +1,7 @@
 'use client'
 
 import { Banner, Button, ShimmerEffect } from '@payloadcms/ui'
+import type { ReactNode } from 'react'
 import { AnalyticsEmptyState } from '../../fields/emptyState'
 import { formatDuration } from '../../fields/format'
 import { askedAboutNoGoals, type QueryResponse } from '../../query/response'
@@ -18,6 +19,8 @@ export interface SectionErrorProps {
 	/** Absent reads as a failure nothing more is known about. */
 	error?: RequestFailure | undefined
 	onRetry: () => void
+	/** More about the failure, inside the banner after its message. */
+	note?: ReactNode
 }
 
 const UNKNOWN: RequestFailure = { code: 'failed' }
@@ -87,7 +90,7 @@ export function RetryAfter({
  * How a section reports a failed read: unsupported is an empty state; refused, denied, vanished or
  * misconfigured is final; outage, rate limit or unknown is transient and offers a retry.
  */
-export function SectionError({ error = UNKNOWN, onRetry }: SectionErrorProps) {
+export function SectionError({ error = UNKNOWN, onRetry, note }: SectionErrorProps) {
 	const { t } = useTranslation()
 	if (error.code === 'unsupported') {
 		return <AnalyticsEmptyState isNew={false}>{t(keys.viewSectionUnavailable)}</AnalyticsEmptyState>
@@ -95,7 +98,10 @@ export function SectionError({ error = UNKNOWN, onRetry }: SectionErrorProps) {
 	const { message, retry, retryAfter } = wordingOf(error)
 	return (
 		<div className="analytics-view__error">
-			<Banner type="error">{t(message)}</Banner>
+			<Banner type="error">
+				{t(message)}
+				{note}
+			</Banner>
 			<RetryAfter className="analytics-view__caption" seconds={retryAfter} />
 			{retry ? (
 				<Button buttonStyle="secondary" onClick={onRetry} size="small">
@@ -107,9 +113,9 @@ export function SectionError({ error = UNKNOWN, onRetry }: SectionErrorProps) {
 }
 
 /** A section's {@link SectionError} while its latest read failed, above any answer it kept. */
-export function QueryError({ query }: { query: QueryState<unknown> }) {
+export function QueryError({ query, note }: { query: QueryState<unknown>; note?: ReactNode }) {
 	return query.status === 'error' ? (
-		<SectionError error={query.error} onRetry={query.refetch} />
+		<SectionError error={query.error} note={note} onRetry={query.refetch} />
 	) : null
 }
 

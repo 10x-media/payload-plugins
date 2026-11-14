@@ -1,4 +1,8 @@
-import type { TextFieldSingleValidation } from 'payload'
+import {
+	type SelectFieldSingleValidation,
+	type TextFieldSingleValidation,
+	validations,
+} from 'payload'
 import { cloudRegionOf, POSTHOG_CLOUD_HOSTS } from '../adapters/posthog/cloud'
 import { isRecord, onlyKeys } from '../core/values'
 import { type OriginProblem, parseHttpUrl, parseOrigin } from '../net/origin'
@@ -171,23 +175,33 @@ export const checkDocumentHost = (
 	return { ok: false, host: parsed.origin, reason: 'it is not listed in providers.hosts.allow' }
 }
 
+/** The install's `providers.hosts.allow`, for the `host` field of one vendor. */
+export type ListedHosts = { provider: HostedProvider; allow: readonly HostPattern[] }
+
 /**
  * The `validate` of every provider `host` field: blank, or the address of the service with an
  * optional base path and nothing else, over https unless the install allows private networks.
+ * With `listed`, also the vendor's cloud or an address the allow list names, which reads would
+ * otherwise refuse after the save.
  */
 export const validateProviderHost =
-	(allowPrivateNetwork: boolean): TextFieldSingleValidation =>
+	(allowPrivateNetwork: boolean, listed?: ListedHosts): TextFieldSingleValidation =>
 	(value, { req }) => {
 		if (!value || value.trim() === '') {
 			return true
 		}
 		const parsed = parseHostAddress(value, allowPrivateNetwork)
-		if (!('problem' in parsed)) {
-			return true
+		if ('problem' in parsed) {
+			return asTranslate(req.t)(
+				parsed.problem === 'insecure'
+					? keys.providerErrorHostInsecure
+					: keys.providerErrorHostFormat
+			)
 		}
-		return asTranslate(req.t)(
-			parsed.problem === 'insecure' ? keys.providerErrorHostInsecure : keys.providerErrorHostFormat
-		)
+		return listed &&
+			!checkDocumentHost(listed.provider, value, { allow: listed.allow, allowPrivateNetwork }).ok
+			? asTranslate(req.t)(keys.providerErrorHostNotAllowed)
+			: true
 	}
 
 /**
@@ -195,9 +209,9 @@ export const validateProviderHost =
  * its Region names, or capture would go to one region and reads to the other.
  */
 export const validatePosthogHost =
-	(allowPrivateNetwork: boolean): TextFieldSingleValidation =>
+	(allowPrivateNetwork: boolean, listed?: ListedHosts): TextFieldSingleValidation =>
 	(value, args) => {
-		const address = validateProviderHost(allowPrivateNetwork)(value, args)
+		const address = validateProviderHost(allowPrivateNetwork, listed)(value, args)
 		if (address !== true || !value) {
 			return address
 		}
@@ -207,3 +221,14 @@ export const validatePosthogHost =
 			? asTranslate(args.req.t)(keys.providerErrorPosthogHostRegion)
 			: true
 	}
+
+/**
+ * A PostHog document's Region, required while Host is blank: then it alone decides where reads and
+ * capture go, and an unset one would read from US Cloud without anyone choosing it.
+ */
+export const validatePosthogRegion: SelectFieldSingleValidation = (value, options) => {
+	const host = isRecord(options.siblingData) ? options.siblingData.host : undefined
+	return !value && (typeof host !== 'string' || host.trim() === '')
+		? asTranslate(options.req.t)(keys.providerErrorPosthogRegionRequired)
+		: validations.select(value, options)
+}

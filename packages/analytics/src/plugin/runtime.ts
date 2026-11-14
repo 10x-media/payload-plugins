@@ -32,6 +32,8 @@ import { isRecord } from '../core/values'
 import type { GoalsResolver, ResolvedGoal } from '../goals/resolver'
 import type { Goal } from '../goals/types'
 import type { TrustedPlatform } from '../net/platform'
+import type { ConnectionRecheck } from '../providers/connectionCheck'
+import type { ProviderStatusStore } from '../providers/status'
 import type { CacheStore } from '../surfacing/cacheStore'
 import type { CacheSweeper } from '../surfacing/cacheSweep'
 import type { Engine } from '../surfacing/engine'
@@ -121,6 +123,19 @@ export interface AnalyticsRuntime {
 	 * `providers.hosts.allowPrivateNetwork`.
 	 */
 	providerFetch?: FetchLike
+	/** Each provider document's last connection result, kept while the providers collection runs. */
+	providerStatus?: ProviderStatusStore
+	/** A fresh adapter of one stored provider document, for its Test connection button. */
+	providerAdapter?: (id: string) => Promise<AnalyticsAdapter | null>
+	/** The saved version of the provider document an adapter was built from, if it was. */
+	providerVersionOf?: (adapter: AnalyticsAdapter) => string | undefined
+	/**
+	 * Background checks of a scope's failing provider documents, under a `fallback` policy or a
+	 * policy function.
+	 */
+	providerRecheck?: ConnectionRecheck
+	/** Reports a provider status row that could not be read, written or cleared, at most once a minute. */
+	providerStatusWarning?: (message: string) => void
 	/**
 	 * Releases what the runtime itself holds once it is retired: the adapters built from provider
 	 * documents, then the connections they reached their vendors through.

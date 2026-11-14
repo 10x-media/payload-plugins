@@ -26,10 +26,11 @@ export interface RequestSource extends QuerySourceRef {
 }
 
 /**
- * What a listing tells its reader about itself: `platformFallback` when a shared source is listed
- * only because the scope has no source of its own yet (`sources.<id>.tenants: 'fallback'`).
+ * What a listing tells its reader about itself, when a shared source is listed only by
+ * `sources.<id>.tenants: 'fallback'`: `platformFallback` because the scope has no source of its own
+ * yet, `ownSourceFailing` because every one it has is failing.
  */
-export type SourcesNotice = 'platformFallback'
+export type SourcesNotice = 'platformFallback' | 'ownSourceFailing'
 
 interface RequestSources {
 	/** Wire rows for the resolved scope, in registry order; empty when none resolve. */
@@ -152,7 +153,7 @@ export const resolveSourcesForRequest = async (
 			req,
 			scope: resolvableScope(scope),
 		})
-		const { registry, fallbackAdmitted } = await visibleSourcesFor({
+		const { registry, fallbackAdmitted, ownFailing } = await visibleSourcesFor({
 			runtime,
 			req,
 			resolved,
@@ -164,7 +165,7 @@ export const resolveSourcesForRequest = async (
 		}
 		const listed = narrowToScope(runtime, await fromRegistry({ runtime, req, registry, scope }))
 		return listed.sources.some((source) => fallbackAdmitted.has(source.id))
-			? { ...listed, notice: 'platformFallback' }
+			? { ...listed, notice: ownFailing ? 'ownSourceFailing' : 'platformFallback' }
 			: listed
 	} catch (err) {
 		req.payload.logger?.warn(`analytics: source resolution failed: ${String(err)}`)

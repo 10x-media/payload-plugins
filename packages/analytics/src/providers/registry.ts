@@ -12,7 +12,7 @@ import {
 } from '../core/registry'
 import type { AnalyticsSdks } from '../core/sdks'
 import { SourceMisconfiguredError } from '../core/sourceErrors'
-import { throttled } from '../core/throttle'
+import { throttled, WARN_EVERY_MS } from '../core/throttle'
 import { isRecord, valueAt } from '../core/values'
 import { loadEncrypted } from '../plugin/encrypted'
 import { GA4_SDK_WARNING, isProductionBuild } from '../plugin/peers'
@@ -21,14 +21,12 @@ import { createEpochFallback, type EpochStore, FIXED_CONFIG_EPOCH } from '../sur
 import { createAdapterPool, type PooledDocument } from './adapterPool'
 import {
 	adapterFromProviderDoc,
-	documentAdapterId,
 	failingAdapter,
-	PROVIDER_IDS,
 	type ProviderDoc,
 	type ProviderFactoryContext,
-	type ProviderId,
 } from './factory'
 import type { ProviderHostPolicy } from './hosts'
+import { documentAdapterId, PROVIDER_IDS, type ProviderId } from './ids'
 import { createCollectionProbe, type Probe, type ProbeRow, scopeOf, versionOf } from './probe'
 import {
 	combineRegistries,
@@ -38,9 +36,6 @@ import {
 	type RegistryBase,
 } from './resolver'
 import { SECRET_PATHS } from './secrets'
-
-/** How often a failing probe is reported, at most. */
-const WARN_EVERY_MS = 60_000
 
 /**
  * How long a document whose adapter could not be built (its secrets did not decrypt, its settings
@@ -100,6 +95,16 @@ interface ProviderRegistry {
 	changed(scopes: Iterable<string | null>): void
 	/** Retires the scope's cached reads on every instance: `refreshProviders()`. */
 	refresh(scope: string | null): Promise<void>
+	/**
+	 * A fresh adapter of one stored document, disabled ones included, for its Test connection
+	 * button: null when there is no such document or it builds none. Only on the providers collection.
+	 */
+	documentAdapter?(id: string): Promise<AnalyticsAdapter | null>
+	/**
+	 * The saved version (`updatedAt`) of the document an adapter of this registry was built from,
+	 * which the connection results it gives are stamped with.
+	 */
+	versionOf?(adapter: AnalyticsAdapter): string | undefined
 	close(): Promise<void>
 }
 
@@ -281,6 +286,14 @@ const collectionRegistry = (
 		return (custom ?? payload.db.defaultIDType) === 'number' && /^\d+$/.test(id) ? Number(id) : id
 	}
 
+	const versions = new WeakMap<AnalyticsAdapter, string>()
+	const stamped = (adapter: AnalyticsAdapter | null, version: string): AnalyticsAdapter | null => {
+		if (adapter) {
+			versions.set(adapter, version)
+		}
+		return adapter
+	}
+
 	const fromDocument = (doc: Record<string, unknown>): AnalyticsAdapter | null =>
 		// A row of the providers collection, whose fields `ProviderDoc` mirrors.
 		adapterFromProviderDoc(doc as ProviderDoc, {
@@ -291,17 +304,25 @@ const collectionRegistry = (
 			...options.withoutConsent,
 		})
 
+	/** A stored document with its secrets decrypted in a copy. */
+	const decrypted = async (
+		raw: Record<string, unknown>,
+		decrypt: DecryptFieldValue
+	): Promise<Record<string, unknown>> => {
+		const doc = structuredClone(raw)
+		for (const { path, value } of storedSecrets(doc)) {
+			const plain = await decrypt(payload, { collection: slug, path, value })
+			setAtPath(doc, path, typeof plain === 'string' ? plain : '')
+		}
+		return doc
+	}
+
 	const adapterOf = async (
 		raw: Record<string, unknown>,
 		decrypt: DecryptFieldValue
 	): Promise<Built> => {
 		try {
-			const doc = structuredClone(raw)
-			for (const { path, value } of storedSecrets(doc)) {
-				const plain = await decrypt(payload, { collection: slug, path, value })
-				setAtPath(doc, path, typeof plain === 'string' ? plain : '')
-			}
-			const adapter = fromDocument(doc)
+			const adapter = fromDocument(await decrypted(raw, decrypt))
 			// The first GA4 document is the earliest this install shows it reads GA4 at all.
 			if (raw.provider === 'ga4' && !options.sdks.ga4 && !warnedGa4 && isProductionBuild()) {
 				warnedGa4 = true
@@ -357,9 +378,11 @@ const collectionRegistry = (
 			const doc: PooledDocument = { id: String(raw.id), version: versionOf(raw.updatedAt), scope }
 			const outcome = await adapterOf(raw, decryptFieldValue)
 			if (outcome.ok) {
-				built.set(doc.id, pool.put(doc, outcome.adapter, raw.provider !== 'native'))
+				const pooled = pool.put(doc, outcome.adapter, raw.provider !== 'native')
+				// A newer version pooled by an overlapping build keeps the version it was stamped with.
+				built.set(doc.id, pool.get(doc) === pooled ? stamped(pooled, doc.version) : pooled)
 			} else {
-				built.set(doc.id, outcome.standIn)
+				built.set(doc.id, stamped(outcome.standIn, doc.version))
 				failed = true
 			}
 		}
@@ -384,8 +407,16 @@ const collectionRegistry = (
 		}
 		pool.retain(scope, new Set(docs.map((doc) => doc.id)))
 		const combined = combineRegistries(options.base, extras)
+		const narrowed = options.narrow(combined.registry)
+		// Reads reach the narrowed copy (an install without `revenue`), so it carries the version too.
+		for (const adapter of narrowed.all()) {
+			const version = versions.get(combined.registry.get(adapter.id))
+			if (version !== undefined) {
+				versions.set(adapter, version)
+			}
+		}
 		return {
-			registry: { ...combined, registry: options.narrow(combined.registry) },
+			registry: { ...combined, registry: narrowed },
 			failed: read?.failed === true,
 		}
 	}
@@ -464,6 +495,36 @@ const collectionRegistry = (
 		},
 		changed: (scopes) => probe.expedite(scopes),
 		refresh: async (scope) => probe.expedite([scope]),
+		documentAdapter: async (id) => {
+			if (!isCollectionSlug(payload, slug)) {
+				return null
+			}
+			const { decryptFieldValue, withRawEncrypted } = await loadEncrypted()
+			// Never the caller's, as in buildDocuments.
+			const req = await createLocalReq({}, payload)
+			const raw: unknown = await withRawEncrypted(req, () =>
+				payload.findByID({
+					collection: slug,
+					id: idOf(id),
+					depth: 0,
+					overrideAccess: true,
+					disableErrors: true,
+					req,
+				})
+			)
+			if (!isRecord(raw)) {
+				return null
+			}
+			// As in adapterOf: a corrupt or key-rotated ciphertext stands in as a failing source, so
+			// Test connection says to check the keys rather than answering a server error.
+			const version = versionOf(raw.updatedAt)
+			try {
+				return stamped(fromDocument(await decrypted(raw, decryptFieldValue)), version)
+			} catch (err) {
+				return stamped(standInFor(raw, err, fromDocument), version)
+			}
+		},
+		versionOf: (adapter) => versions.get(adapter),
 		close: () => pool.close(),
 	}
 }

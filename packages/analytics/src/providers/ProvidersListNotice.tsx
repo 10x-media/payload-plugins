@@ -1,6 +1,6 @@
 'use client'
 
-import { useConfig } from '@payloadcms/ui'
+import { Gutter, useConfig } from '@payloadcms/ui'
 import { useEffect, useState } from 'react'
 import { requestSources, type SourcesNotice } from '../fields/config/fetchSources'
 import { apiPath } from '../plugin/apiPath'
@@ -33,5 +33,11 @@ export function ProvidersListNotice() {
 		return () => controller.abort()
 	}, [url, scope])
 
-	return <SourcesNoticeBanner notice={read?.scope === scope ? read.notice : undefined} />
+	const notice = read?.scope === scope ? read.notice : undefined
+	// Payload renders `beforeList` outside the list's Gutter, so the note brings its own.
+	return notice ? (
+		<Gutter>
+			<SourcesNoticeBanner notice={notice} />
+		</Gutter>
+	) : null
 }

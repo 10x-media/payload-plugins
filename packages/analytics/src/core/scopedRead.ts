@@ -19,7 +19,10 @@ import {
 	type ScopeGates,
 	scopeGates,
 } from '../plugin/runtime'
+import { isFailingConnection, type ProviderStatus } from '../providers/connectionState'
 import { MAX_SCOPE_LENGTH } from '../query/limits'
+import { BREAKER_MAX_MS } from '../surfacing/breaker'
+import { currentDate } from './clock'
 import { type AnalyticsAdapter, PLATFORM_SCOPE } from './contract'
 import {
 	type AdapterRegistry,
@@ -196,6 +199,8 @@ export interface VisibleSources {
 	registry: AdapterRegistry | null
 	/** Shared adapters listed only because a `fallback` policy let a member of the scope in. */
 	fallbackAdmitted: ReadonlySet<string>
+	/** True when the scope has sources of its own, all failing, so a `fallback` policy stands in for them. */
+	ownFailing: boolean
 }
 
 const NONE_ADMITTED: ReadonlySet<string> = new Set()
@@ -204,6 +209,58 @@ const NONE_ADMITTED: ReadonlySet<string> = new Set()
 interface Granted {
 	adapter: AnalyticsAdapter
 	docId: string
+}
+
+/**
+ * The scope's own documents whose source is failing (`isFailingConnection`), which a `fallback`
+ * policy stands in for and a policy function reads as `failing`; empty unless the install has
+ * either. A document failing for longer than the breaker's longest rest is checked again in the
+ * background, since nothing else reads a source its scope no longer opens on. Rows that cannot be
+ * read count as no failure, so the reads go on.
+ */
+const failingOwnDocs = async (
+	runtime: AnalyticsRuntime,
+	own: readonly Granted[]
+): Promise<ReadonlySet<string>> => {
+	const store = runtime.providerStatus
+	if (
+		!store ||
+		own.length === 0 ||
+		![...(runtime.sourcePolicies?.values() ?? [])].some(
+			(policy) => policy === 'fallback' || typeof policy === 'function'
+		)
+	) {
+		return NONE_ADMITTED
+	}
+	let statuses: Map<string, ProviderStatus>
+	try {
+		// A config adapter lent to a document (native) writes no status: any row it has is stale.
+		const checked = own.filter((granted) => !runtime.configAdapterIds.has(granted.adapter.id))
+		const versions = new Map(
+			checked.map((granted) => [granted.docId, runtime.providerVersionOf?.(granted.adapter)])
+		)
+		statuses = await store.readMany(
+			checked.map((granted) => granted.docId),
+			(docId) => versions.get(docId)
+		)
+	} catch (err) {
+		runtime.providerStatusWarning?.(
+			`analytics: provider connection statuses could not be read, so no source counts as failing: ${String(err)}`
+		)
+		return NONE_ADMITTED
+	}
+	const at = currentDate().getTime()
+	const failing = new Set<string>()
+	for (const [docId, status] of statuses) {
+		if (!isFailingConnection(status, at)) {
+			continue
+		}
+		failing.add(docId)
+		if (at - Date.parse(status.lastErrorAt ?? '') >= BREAKER_MAX_MS) {
+			runtime.providerRecheck?.request(docId)
+		}
+	}
+	return failing
 }
 
 /**
@@ -216,8 +273,10 @@ const policyAdmits = async (args: {
 	scope: string
 	adapter: AnalyticsAdapter
 	own: readonly Granted[]
+	/** The ids of `own`'s documents whose connection is failing, read when a policy asks. */
+	failing: () => Promise<ReadonlySet<string>>
 }): Promise<boolean> => {
-	const { runtime, req, scope, adapter, own } = args
+	const { runtime, req, scope, adapter, own, failing } = args
 	const policy = runtime.sourcePolicies?.get(adapter.id)
 	// The boot refuses a policy on an adapter that cannot narrow; a tenant must never read totals
 	// spanning every tenant, so a runtime built any other way is held to it too.
@@ -237,7 +296,8 @@ const policyAdmits = async (args: {
 				return true
 			}
 			if (policy === 'fallback') {
-				return own.length === 0
+				const failed = await failing()
+				return own.every((granted) => failed.has(granted.docId))
 			}
 			try {
 				const ownSources = await Promise.all(
@@ -245,6 +305,7 @@ const policyAdmits = async (args: {
 						id: granted.adapter.id,
 						label: await sourceLabelFor(granted.adapter, { req, scope }),
 						docId: granted.docId,
+						failing: async () => (await failing()).has(granted.docId),
 					}))
 				)
 				return (await policy({ req, scope, adapterId: adapter.id, ownSources })) === true
@@ -353,7 +414,7 @@ export const visibleSourcesFor = async (args: VisibleArgs): Promise<VisibleSourc
 	const { runtime, req, resolved, scope } = args
 	const { registry, grants } = resolved
 	if (runtime.scoped !== true || scope === null || scope === PLATFORM_SCOPE) {
-		return { registry, fallbackAdmitted: NONE_ADMITTED }
+		return { registry, fallbackAdmitted: NONE_ADMITTED, ownFailing: false }
 	}
 	if (args.principal === SYSTEM) {
 		const visible = filterRegistry(
@@ -363,6 +424,7 @@ export const visibleSourcesFor = async (args: VisibleArgs): Promise<VisibleSourc
 		return {
 			registry: await withScopeDefault({ runtime, req, resolved, scope, visible }),
 			fallbackAdmitted: NONE_ADMITTED,
+			ownFailing: false,
 		}
 	}
 	const gates = args.gates ?? scopeGates(runtime, req)
@@ -375,6 +437,11 @@ export const visibleSourcesFor = async (args: VisibleArgs): Promise<VisibleSourc
 		}
 	}
 	const keep = new Set(own.map((granted) => granted.adapter.id))
+	let failingRead: Promise<ReadonlySet<string>> | undefined
+	const failing = () => {
+		failingRead ??= failingOwnDocs(runtime, own)
+		return failingRead
+	}
 	const fallbackAdmitted = new Set<string>()
 	for (const adapter of registry.all()) {
 		if (grants.has(adapter.id)) {
@@ -388,7 +455,7 @@ export const visibleSourcesFor = async (args: VisibleArgs): Promise<VisibleSourc
 			keep.add(adapter.id)
 			continue
 		}
-		if (await policyAdmits({ runtime, req, scope, adapter, own })) {
+		if (await policyAdmits({ runtime, req, scope, adapter, own, failing })) {
 			keep.add(adapter.id)
 			if (runtime.sourcePolicies?.get(adapter.id) === 'fallback') {
 				fallbackAdmitted.add(adapter.id)
@@ -396,9 +463,17 @@ export const visibleSourcesFor = async (args: VisibleArgs): Promise<VisibleSourc
 		}
 	}
 	const visible = filterRegistry(registry, (adapter) => keep.has(adapter.id))
+	const scoped = await withScopeDefault({ runtime, req, resolved, scope, visible })
+	const ownFailing = own.length > 0 && fallbackAdmitted.size > 0
+	const defaultDoc = scoped ? resolved.grants.get(scoped.default().id) : undefined
+	const standIn =
+		ownFailing && defaultDoc !== undefined && (await failing()).has(defaultDoc)
+			? [...fallbackAdmitted][0]
+			: undefined
 	return {
-		registry: await withScopeDefault({ runtime, req, resolved, scope, visible }),
+		registry: scoped && standIn !== undefined ? createRegistry(scoped.all(), standIn) : scoped,
 		fallbackAdmitted,
+		ownFailing,
 	}
 }
 

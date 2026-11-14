@@ -179,7 +179,7 @@ export const makeQueryHandler = (): PayloadHandler => async (req) => {
 			comparison = previous && askedResult(previous, aliased)
 		} catch (err) {
 			req.payload.logger?.warn(
-				`analytics: query read failed for adapter "${adapter.id}": ${describeWithCauses(err)}`
+				`analytics: query read failed for adapter "${adapter.id}" (${ownScope === null ? 'install-wide' : `scope "${ownScope}"`}): ${describeWithCauses(err)}`
 			)
 			return readFailureResponse(err)
 		}

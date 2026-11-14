@@ -1,0 +1,195 @@
+---
+title: Multi-tenant quick start
+description: Let each tenant of a multi-tenant Payload app connect its own analytics tool, from install to the first numbers.
+---
+
+This path is for an app that already runs Payload with `@payloadcms/plugin-multi-tenant`. At the end, a tenant admin adds their own provider (PostHog, Plausible, Umami, GA4 or Payload's own native engine) in the admin, tests the connection and reads the tenant's numbers in the analytics view. Each step has the minimum code and links to the page with the rest. [Multi-tenancy](/analytics/multi-tenancy) is the full reference. The commands use pnpm; with npm run `npx payload ...`, with yarn `yarn payload ...`.
+
+## 1. Install
+
+```bash
+pnpm add @10x-media/analytics @10x-media/fields
+```
+
+`@10x-media/fields` is a required peer: provider documents store their keys in its encrypted fields.
+
+## 2. Resolve the tenant and its members
+
+The plugin asks two questions about every request:
+
+- **Which tenant is this request for?** `scope.resolve` answers. A visit (the `capture` call site) resolves from the host it arrived on. A signed-in reader (the `admin` call site) resolves from the tenant selector.
+- **Does the user belong to that tenant?** `scope.member` answers. `tenantMembership()` reads the user's tenants the way the multi-tenant plugin stores them.
+
+The boot fails when `scope.resolve` is set without `scope.member`.
+
+```ts title="src/analytics/scope.ts"
+import { type ScopeResolver, tenantMembership } from '@10x-media/analytics'
+import { getTenantFromCookie } from '@payloadcms/plugin-multi-tenant/utilities'
+import type { PayloadRequest, TypedUser } from 'payload'
+
+/** Staff who belong to every tenant. The multi-tenant plugin gets the same function. */
+export const userHasAccessToAllTenants = (user: TypedUser): boolean =>
+  (user.roles ?? []).some((role: string) => role === 'admin')
+
+/** The tenant whose stored domain matches the host a visit arrived on. */
+const tenantByHost = async (req: PayloadRequest): Promise<string | null> => {
+  const host = req.headers.get('host')?.split(':')[0]?.toLowerCase()
+  if (!host) {
+    return null
+  }
+  const { docs } = await req.payload.find({
+    collection: 'tenants',
+    where: { domain: { equals: host } },
+    limit: 1,
+    depth: 0,
+    overrideAccess: true,
+  })
+  return docs[0] ? String(docs[0].id) : null
+}
+
+export const resolveTenant: ScopeResolver = async ({ req, callSite }) => {
+  if (callSite === 'capture') {
+    return tenantByHost(req)
+  }
+  const selected = getTenantFromCookie(req.headers, req.payload.db.defaultIDType)
+  return selected === null ? null : String(selected)
+}
+
+export const member = tenantMembership({ userHasAccessToAllTenants })
+```
+
+Use your own role check and your tenants' own domain field. Match the host against stored domains rather than parsing it: the `capture` call site is public. More: [Resolve the tenant, and say who belongs to it](/analytics/multi-tenancy#1-resolve-the-tenant-and-say-who-belongs-to-it) and [Capture slots per tenant](/analytics/multi-tenancy#capture-slots-per-tenant).
+
+## 3. Add the providers collection per tenant
+
+Turn on the providers collection, point it at the multi-tenant plugin's `tenant` field, and register it with that plugin. `analytics()` goes first in `plugins`, so its collections exist when the multi-tenant plugin looks for them.
+
+```ts
+import { analytics, type ScopeMemberAccess, type ScopeResolver } from '@10x-media/analytics'
+import { native } from '@10x-media/analytics/adapters/native'
+import { multiTenantPlugin } from '@payloadcms/plugin-multi-tenant'
+import type { TypedUser } from 'payload'
+
+declare const resolveTenant: ScopeResolver
+declare const member: ScopeMemberAccess
+declare const userHasAccessToAllTenants: (user: TypedUser) => boolean
+
+export const plugins = [
+  analytics({
+    adapters: [native()],
+    scope: { resolve: resolveTenant, member },
+    providers: { collection: { scopeField: 'tenant' } },
+    capture: { gate: 'all' }, // step 5
+  }),
+  multiTenantPlugin({
+    collections: { 'analytics-providers': {} },
+    userHasAccessToAllTenants,
+  }),
+]
+```
+
+- **`native()`** offers **Payload** as a provider type. A tenant stores and reads its own visits only once it has a `native` document of its own.
+- **`scopeField: 'tenant'`** is required here: the collection's own default is `scope`. When the field is missing at boot, the boot fails with `providers.collection.scopeField "tenant" does not exist on analytics-providers`.
+- **Keep the collection a normal one**, not `isGlobal`: a tenant often holds a `native` document beside a vendor one.
+
+If tenants manage their own conversion goals, do the same for the goals collection: `goals: { collection: { scopeField: 'tenant' } }` in `analytics()`, and `'analytics-goals': {}` in the multi-tenant plugin's `collections` ([Register goals with the tenant plugin](/analytics/multi-tenancy#register-goals-with-the-tenant-plugin)).
+
+If tenants may pick GA4, install `@google-analytics/data` and pass it in as `sdks: { ga4: { BetaAnalyticsDataClient } }` ([GA4](/analytics/providers#ga4)).
+
+If tenants run Plausible, Umami or PostHog on their own server, list those addresses in `providers.hosts.allow`. The **Host** field refuses any other address but the vendors' clouds ([Where a document may connect](/analytics/providers#where-a-document-may-connect)).
+
+Before production, give the stored keys a key ring of their own: `providers.collection.encryption.keys`, or the `encrypted.keys` of the `@10x-media/fields` plugin. Without either, the ring derives from the Payload secret, which suits development only.
+
+## 4. Decide who reads and who manages
+
+Two settings decide who sees what. Both are functions of the request's user.
+
+```ts
+import type { CrossScopeAccess, ProvidersOptions } from '@10x-media/analytics'
+import type { Access, TypedUser } from 'payload'
+
+declare const userHasAccessToAllTenants: (user: TypedUser) => boolean
+declare const isTenantAdmin: Access
+
+// Pass as access: { crossScope } in analytics().
+export const crossScope: CrossScopeAccess = ({ req }) =>
+  req.user ? userHasAccessToAllTenants(req.user) : false
+
+export const providers: ProvidersOptions = {
+  collection: {
+    scopeField: 'tenant',
+    access: { read: isTenantAdmin },
+    sourceAccess: ({ req }) => Boolean(req.user),
+  },
+}
+```
+
+- **`access.crossScope`** lets platform staff past their own tenant: name another tenant, read every tenant at once, and read through a shared platform source. On a scoped install all three are denied until you set it, for platform admins too. A function grants all three; an object grants each one on its own ([Who sees what](/analytics/multi-tenancy#4-who-sees-what)).
+- **`providers.collection.sourceAccess`** decides who reads the tenant's numbers through its provider documents. Unset, the collection's own read access decides. So when you narrow who may open the collection, as `access: { read: isTenantAdmin }` does above, set `sourceAccess` to keep editors reading their tenant's numbers ([Who reads through a document](/analytics/providers#who-reads-through-a-document)). An `access` override replaces the plugin's default for its operation, the scope check included, so keep the tenant check in it.
+
+A tenant admin sets a document's provider, host and IDs when creating it. Changing them on a saved document takes `access.crossScope.named`, unless `providers.collection.connectionAccess` says otherwise ([Who may change a connection](/analytics/providers#who-may-change-a-connection)).
+
+## 5. Capture visits
+
+1. Set `capture.gate`. The boot fails without it. `'all'` holds every capture slot until your consent manager calls `setGate`; `'off'` captures without waiting ([Consent](/analytics/consent)).
+2. In production, say where the visitor's address comes from. Set `trustedPlatform: 'vercel'` or `'cloudflare'` on those platforms. Otherwise set `trustedProxyHops` to the number of proxies in front of the app: one reverse proxy is `1`, a CDN in front of it is `2` ([Trusted proxies](/analytics/proxy#trusted-proxies)). Without either, the boot warns that addresses can be spoofed.
+3. Render the tracker in the frontend's root layout:
+
+```tsx title="src/app/(frontend)/layout.tsx"
+import { AnalyticsScripts, getTrackerConfig } from '@10x-media/analytics/site'
+import config from '@payload-config'
+import { headers } from 'next/headers'
+import { getPayload } from 'payload'
+import React from 'react'
+
+export default async function RootLayout(props: { children: React.ReactNode }) {
+  const payload = await getPayload({ config })
+  const tracker = await getTrackerConfig(payload, { headers: await headers() })
+
+  return (
+    <html lang="en">
+      <body>
+        {props.children}
+        <AnalyticsScripts config={tracker} />
+      </body>
+    </html>
+  )
+}
+```
+
+A tenant's pages then capture into the tenant's own provider, once its document holds the public capture fields (PostHog's project token, Plausible's website address or script ID, Umami's website ID, GA4's measurement ID) or is a `native` document ([Capture slots per tenant](/analytics/multi-tenancy#capture-slots-per-tenant)).
+
+## 6. Migrate the database
+
+On MongoDB, or Postgres and SQLite in push mode, skip this step.
+
+On Postgres or SQLite in migrate mode:
+
+1. Generate a migration: `pnpm payload migrate:create`.
+2. Review it. It creates the plugin's tables.
+3. Run it: `pnpm payload migrate`.
+
+
+## 7. Regenerate the import map and types
+
+```bash
+pnpm payload generate:importmap
+pnpm payload generate:types
+```
+
+Until the types are regenerated, TypeScript refuses `'analytics-providers'` in the multi-tenant plugin's `collections`. `next dev` regenerates both on its own.
+
+## 8. Check it as a tenant admin
+
+1. Start the app. Every boot logs two notices until the options they name are set: `capture.withoutConsent is unset` and one about Payload's job controls ([Server log and boot](/analytics/troubleshooting#server-log-and-boot)). Sign in as a user who belongs to one tenant. Pick that tenant in the tenant selector.
+2. Open **Analytics providers** (in the **Analytics settings** group of the nav) and create a document. Pick the **Provider**, fill in what its fields ask for, and save.
+3. In the sidebar's **Connection** panel, press **Test connection**. It should read **Connected**. Any other answer: [Troubleshooting](/analytics/troubleshooting#connection-panel).
+4. Open **Analytics** (`/admin/analytics`). The view reads the new provider, and its caption reads `Showing:` followed by the tenant.
+
+## Where to go next
+
+- Share one platform PostHog across tenants, or show the platform's numbers until a tenant connects its own: [Multi-tenancy](/analytics/multi-tenancy#letting-tenants-read-a-shared-source).
+- Name tenants instead of ids in the view: `scope.label` ([One scope authority](/analytics/multi-tenancy#one-scope-authority)).
+- What each provider needs and serves: [Providers](/analytics/providers).
+- Wire `capture.gate` to your consent manager: [Consent](/analytics/consent).
+- An error or a notice you do not recognize: [Troubleshooting](/analytics/troubleshooting).

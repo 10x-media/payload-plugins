@@ -1,4 +1,4 @@
-import type { ProviderId } from './factory'
+import type { ProviderId } from './ids'
 
 /**
  * Every credential path in the providers collection; `collection.test.ts` holds it to the

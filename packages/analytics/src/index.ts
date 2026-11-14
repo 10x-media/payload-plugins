@@ -13,6 +13,7 @@ import {
 	type ScopeCallSite,
 } from './core/options'
 import { createRegistry, withoutRevenue } from './core/registry'
+import { afterTransaction, openTransactionOf } from './db/openTransaction'
 import { CURRENCY_PATTERN } from './goals/currency'
 import { makeGoalsHandler } from './goals/goalsEndpoint'
 import { applyConfigRevenueVisibility } from './goals/moneyFields'
@@ -31,6 +32,7 @@ import {
 	configCollections,
 	syncCollectionOf,
 } from './plugin/pluginCollections'
+import { makeProviderStatusHandler } from './plugin/providerStatusEndpoint'
 import { makeQueryHandler } from './plugin/queryEndpoint'
 import { makeRealtimeHandler } from './plugin/realtimeEndpoint'
 import { makeRefreshHandler } from './plugin/refreshEndpoint'
@@ -49,6 +51,7 @@ import { changedScopes, type ScopeChange } from './plugin/scopeChange'
 import { makeSourcesHandler } from './plugin/sourcesEndpoint'
 import { fillUnbundledLanguages, unbundledLanguages } from './plugin/unbundledLanguages'
 import { warmTask } from './plugin/warmTask'
+import type { ProviderStatusStore } from './providers/status'
 import { syncTask } from './sync/syncTask'
 import { createStrictTimezoneResolver, createTimezoneResolver } from './timeframe/reportingTimezone'
 import { keys } from './translations/keys'
@@ -71,6 +74,48 @@ const configChanged =
 	(change: ScopeChange, req: PayloadRequest): void => {
 		getRuntime(req.payload)?.configChanged?.(collection, changedScopes(change))
 	}
+
+/**
+ * Runs a status write of a saved or deleted provider document once the save's own transaction is
+ * over: a write outside it would wait on the locks it holds. The save goes on whatever happens
+ * here; the next read or check writes the row again.
+ */
+const afterProviderSave = async (
+	req: PayloadRequest,
+	{
+		docId,
+		failed,
+		write,
+	}: { docId: string; failed: string; write: (store: ProviderStatusStore) => Promise<void> }
+): Promise<void> => {
+	const runtime = getRuntime(req.payload)
+	const store = runtime?.providerStatus
+	if (!runtime || !store) {
+		return
+	}
+	const run = () =>
+		write(store).catch((err: unknown) => {
+			runtime.providerStatusWarning?.(
+				`analytics: the connection status of provider document "${docId}" could not be ${failed}: ${String(err)}`
+			)
+		})
+	const open = await openTransactionOf(req.payload, req)
+	if (!open) {
+		await run()
+		return
+	}
+	runtime.engine.keep?.(afterTransaction(open, run))
+}
+
+const forgetProviderStatus = (docId: string, req: PayloadRequest): Promise<void> =>
+	afterProviderSave(req, { docId, failed: 'cleared', write: (store) => store.forget(docId) })
+
+const carryProviderStatus = (
+	docId: string,
+	{ from, to }: { from: string; to: string },
+	req: PayloadRequest
+): Promise<void> =>
+	afterProviderSave(req, { docId, failed: 'kept', write: (store) => store.carry(docId, from, to) })
 
 const addEndpoints = (config: Config, ...endpoints: Endpoint[]): void => {
 	config.endpoints = [...(config.endpoints ?? []), ...endpoints]
@@ -102,7 +147,7 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 		}
 		const collections = await configCollections(
 			resolved,
-			{ resolveAdminScope, onChange: configChanged },
+			{ resolveAdminScope, onChange: configChanged, forgetProviderStatus, carryProviderStatus },
 			context
 		)
 		const sync = syncCollectionOf(resolved, resolveAdminScope, context)
@@ -243,6 +288,14 @@ export const analytics = definePlugin<AnalyticsPluginOptions>({
 			{ method: 'get', path: routes.query, handler: makeQueryHandler() },
 			{ method: 'post', path: routes.refresh, handler: makeRefreshHandler() }
 		)
+		if (resolved.providers.collection.enabled) {
+			const providerStatus = makeProviderStatusHandler()
+			addEndpoints(
+				config,
+				{ method: 'get', path: routes.providerStatus, handler: providerStatus },
+				{ method: 'post', path: routes.providerStatus, handler: providerStatus }
+			)
+		}
 		if (resolved.capture.exclusion) {
 			addEndpoints(config, {
 				method: 'get',
@@ -575,10 +628,11 @@ export type {
 	ProviderFieldsOptions,
 } from './providers/collection'
 export { analyticsProviderFields, PROVIDERS_SLUG } from './providers/collection'
-export type { ProviderDoc, ProviderFactoryContext, ProviderId } from './providers/factory'
-export { adapterFromProviderDoc, PROVIDER_IDS } from './providers/factory'
+export type { ProviderDoc, ProviderFactoryContext } from './providers/factory'
+export { adapterFromProviderDoc } from './providers/factory'
 export type { HostPattern } from './providers/hosts'
 export { type ProviderHostPolicy, resolveHostPolicy } from './providers/hosts'
+export { PROVIDER_IDS, type ProviderId } from './providers/ids'
 export { type RefreshProvidersOptions, refreshProviders } from './providers/refresh'
 export { CONNECTION_PATHS, SECRET_PATHS } from './providers/secrets'
 export type { QueryError, QueryErrorCode } from './query/errors'

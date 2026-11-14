@@ -86,16 +86,20 @@ const validatePattern: TextFieldSingleValidation = (value, { req }) =>
 		: true
 
 const slugError = (collection: string, req: PayloadRequest, key: TranslationKey) =>
-	new ValidationError({
-		collection,
-		errors: [
-			{
-				label: labelForKey(keys.goalFieldSlug),
-				message: asTranslate(req.t)(key),
-				path: 'slug',
-			},
-		],
-	})
+	new ValidationError(
+		{
+			collection,
+			errors: [
+				{
+					label: labelForKey(keys.goalFieldSlug),
+					message: asTranslate(req.t)(key),
+					path: 'slug',
+				},
+			],
+			req,
+		},
+		req.t
+	)
 
 /**
  * Slug shape and per-scope uniqueness at collection level, so a replaced slug field without its own
