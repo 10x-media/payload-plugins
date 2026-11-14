@@ -18,3 +18,20 @@ export const validateSiteDomain: TextFieldSingleValidation = (value, { req }) =>
 		? true
 		: asTranslate(req.t)(keys.providerErrorSiteDomain)
 }
+
+/**
+ * The Website address the tracker sends to: one site, or several separated by commas, each counting
+ * the pageview on its own dashboard. Each one follows {@link validateSiteDomain}.
+ */
+export const validateSiteDomains: TextFieldSingleValidation = (value, args) => {
+	if (!value?.trim()) {
+		return true
+	}
+	for (const site of value.split(',')) {
+		const valid = site.trim() !== '' && validateSiteDomain(site, args)
+		if (valid !== true) {
+			return valid || asTranslate(args.req.t)(keys.providerErrorSiteDomain)
+		}
+	}
+	return true
+}

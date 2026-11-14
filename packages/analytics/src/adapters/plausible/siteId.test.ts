@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { validateSiteDomain } from './siteId'
+import { validateSiteDomain, validateSiteDomains } from './siteId'
 
 const args = { req: { t: (key: string) => key } } as never
 
@@ -21,5 +21,22 @@ describe('validateSiteDomain', () => {
 		['two words', 'example com', 'analytics:providerErrorSiteDomain'],
 	] as const)('%s', (_name, value, expected) => {
 		expect(validateSiteDomain(value, args)).toBe(expected)
+	})
+})
+
+describe('validateSiteDomains', () => {
+	it.each([
+		['blank', '', true],
+		['one site', 'example.com', true],
+		['sites for several dashboards', 'example.com,rollup.example', true],
+		['spaces around the commas', 'example.com, rollup.example', true],
+		[
+			'one site of the list pasted as an address',
+			'example.com,https://rollup.example',
+			'analytics:providerErrorSiteDomain',
+		],
+		['an empty entry', 'example.com,,rollup.example', 'analytics:providerErrorSiteDomain'],
+	] as const)('%s', (_name, value, expected) => {
+		expect(validateSiteDomains(value, args)).toBe(expected)
 	})
 })

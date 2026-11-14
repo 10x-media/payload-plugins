@@ -15,7 +15,7 @@ import {
 import { validateMeasurementId } from '../adapters/ga4/measurementId'
 import { validatePropertyId } from '../adapters/ga4/propertyId'
 import { validateScriptId } from '../adapters/plausible/scriptId'
-import { validateSiteDomain } from '../adapters/plausible/siteId'
+import { validateSiteDomain, validateSiteDomains } from '../adapters/plausible/siteId'
 import { validatePersonalApiKey, validateProjectToken } from '../adapters/posthog/credentials'
 import { optionsObject } from '../core/optionChecks'
 import { isOneOf, kindOf, listOf } from '../core/values'
@@ -554,7 +554,7 @@ const providerFields = (
 					captureField('domain', keys.providerFieldDomain, {
 						width: '50%',
 						help: keys.providerFieldDomainHelp,
-						validate: validateSiteDomain,
+						validate: validateSiteDomains,
 					}),
 					captureField('scriptId', keys.providerFieldScriptId, {
 						width: '50%',
