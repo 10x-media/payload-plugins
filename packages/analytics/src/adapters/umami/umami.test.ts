@@ -6,7 +6,8 @@ import type { AnalyticsQuery } from '../../core/contract'
 import type { FetchLike } from '../../core/fetch'
 import { umami, umamiEndpoints } from './umami'
 
-const server = setupServer()
+// Every read first asks for the website once; tests that care answer it themselves.
+const server = setupServer(http.get('*/websites/:id', () => HttpResponse.json({ id: 'w' })))
 beforeAll(() => server.listen({ onUnhandledRequest: 'error' }))
 afterEach(() => server.resetHandlers())
 afterAll(() => server.close())
@@ -698,7 +699,10 @@ describe('umami fetch', () => {
 		const adapter = umami({ websiteId: 'w', apiKey: 'k', fetch })
 		const result = await adapter.query(q(), {})
 		expect(result.totals?.pageviews).toBe(9)
-		expect(urls).toEqual(['https://api.umami.is/v1/websites/w/stats'])
+		expect(urls).toEqual([
+			'https://api.umami.is/v1/websites/w',
+			'https://api.umami.is/v1/websites/w/stats',
+		])
 		expect(adapter.capture?.proxy.fetch).toBe(fetch)
 		expect(umami({ websiteId: 'w', apiKey: 'k' }).capture?.proxy.fetch).toBeUndefined()
 	})
@@ -833,6 +837,62 @@ describe('umami host', () => {
 			{}
 		)
 		expect(urls).toHaveLength(1)
+	})
+})
+
+describe('umami reads of a website Umami does not know', () => {
+	// Self-hosted Umami 3 answers an unknown website with `null` and its stats with zeros.
+	it('fails the read rather than answering zeros', async () => {
+		let statsAsked = false
+		server.use(
+			http.get('https://umami.example.com/api/websites/unknown', () => HttpResponse.json(null)),
+			http.get('https://umami.example.com/api/websites/unknown/stats', () => {
+				statsAsked = true
+				return HttpResponse.json({ pageviews: 0, visitors: 0, visits: 0, bounces: 0, totaltime: 0 })
+			})
+		)
+		const adapter = umami({ websiteId: 'unknown', token: 't', host: 'https://umami.example.com' })
+		await expect(adapter.query(q(), {})).rejects.toMatchObject({ name: 'UnknownSiteError' })
+		expect(statsAsked).toBe(false)
+	})
+
+	it('fails inside the read lane, so the lane records a refusal rather than a success', async () => {
+		server.use(
+			http.get('https://umami.example.com/api/websites/unknown', () => HttpResponse.json(null))
+		)
+		const outcomes: string[] = []
+		const upstream = async <T>(fn: (signal?: AbortSignal) => Promise<T>): Promise<T> => {
+			try {
+				const answer = await fn()
+				outcomes.push('ok')
+				return answer
+			} catch (err) {
+				outcomes.push(err instanceof Error ? err.name : 'failed')
+				throw err
+			}
+		}
+		const adapter = umami({ websiteId: 'unknown', token: 't', host: 'https://umami.example.com' })
+		await expect(adapter.query(q(), { upstream })).rejects.toMatchObject({
+			name: 'UnknownSiteError',
+		})
+		expect(outcomes).toEqual(['UnknownSiteError'])
+	})
+
+	it('asks for a known website once per adapter', async () => {
+		let lookups = 0
+		server.use(
+			http.get('https://api.umami.is/v1/websites/w', () => {
+				lookups++
+				return HttpResponse.json({ id: 'w' })
+			}),
+			http.get('https://api.umami.is/v1/websites/w/stats', () =>
+				HttpResponse.json({ pageviews: 1, visitors: 1, visits: 1, bounces: 0, totaltime: 0 })
+			)
+		)
+		const adapter = umami({ websiteId: 'w', apiKey: 'k' })
+		await adapter.query(q(), {})
+		await adapter.query(q(), {})
+		expect(lookups).toBe(1)
 	})
 })
 
