@@ -300,13 +300,12 @@ const policyAdmits = async (args: {
 				return own.every((granted) => failed.has(granted.docId))
 			}
 			try {
-				const failed = await failing()
 				const ownSources = await Promise.all(
 					own.map(async (granted) => ({
 						id: granted.adapter.id,
 						label: await sourceLabelFor(granted.adapter, { req, scope }),
 						docId: granted.docId,
-						failing: failed.has(granted.docId),
+						failing: async () => (await failing()).has(granted.docId),
 					}))
 				)
 				return (await policy({ req, scope, adapterId: adapter.id, ownSources })) === true
