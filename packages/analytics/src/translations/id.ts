@@ -389,7 +389,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.filterHintGoal]: 'Kode singkat sasaran, misalnya newsletter-signup',
 	[keys.filterHintCurrency]: 'Kode mata uang tiga huruf, misalnya EUR',
 	[keys.providersCollectionDescription]:
-		'Tambahkan satu entri untuk setiap alat analitik yang Anda hubungkan. Kunci Anda disimpan dengan aman dan tidak ditampilkan lagi; hanya empat karakter terakhir yang tetap terlihat agar Anda tahu kunci mana yang tersimpan. Mengubah Host, ID, atau Region pada entri yang tersimpan akan menghapus kuncinya: masukkan lagi dalam penyimpanan yang sama.',
+		'Tambahkan satu entri untuk setiap alat analitik yang Anda hubungkan. Kunci Anda disimpan dengan aman dan tidak ditampilkan lagi; hanya empat karakter terakhir yang tetap terlihat agar Anda tahu kunci mana yang tersimpan. Mengubah Host, ID, atau Wilayah pada entri yang tersimpan akan menghapus kuncinya: masukkan lagi dalam penyimpanan yang sama.',
 	[keys.providerFieldNameHelp]: 'Tampil di mana pun Anda memilih sumber data.',
 	[keys.providerFieldProviderHelp]:
 		'Untuk alat analitik yang mana. Kolom di bawah berubah sesuai pilihan Anda.',

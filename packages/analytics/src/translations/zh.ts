@@ -390,7 +390,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerFieldProjectIdHelp]: '可选。服务账号文件中的 project_id。',
 	[keys.providerFieldPosthogProjectIdHelp]: 'PostHog 项目设置中显示为 Project ID 的数字。',
 	[keys.providerFieldRegionHelp]:
-		'你的 PostHog 地址所在的云：us.posthog.com 选 US，eu.posthog.com 选 EU。主机为自托管实例时忽略。主机为空时必填。',
+		'您的 PostHog 地址所在的云：us.posthog.com 选 US，eu.posthog.com 选 EU。主机为自托管实例时忽略。主机为空时必填。',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'销售目标使用的 3 位货币代码，例如 USD。未设置前不会显示收入。',
 	[keys.providerFieldGa4CurrencyHelp]:

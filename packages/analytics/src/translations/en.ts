@@ -119,7 +119,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldApiKey]: 'API key',
 	[keys.providerFieldHost]: 'Host',
 	[keys.providerFieldHostHelp]:
-		'Only for a self-hosted instance: its address. Leave it blank to use the vendor’s cloud.',
+		"Only for a self-hosted instance: its address. Leave it blank to use the vendor's cloud.",
 	[keys.providerFieldWebsiteId]: 'Website ID',
 	[keys.providerFieldToken]: 'API token',
 	[keys.providerFieldPropertyId]: 'Property ID',
@@ -406,12 +406,12 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldPropertyIdHelp]:
 		'The number for your GA4 property, from Google Analytics. Leave off the word properties/.',
 	[keys.providerFieldClientEmailHelp]:
-		'The service account address from the file Google gave you. Add it as a Viewer in the GA4 property’s access settings, or reads are refused.',
+		"The service account address from the file Google gave you. Add it as a Viewer in the GA4 property's access settings, or reads are refused.",
 	[keys.providerFieldPrivateKeyHelp]:
 		'The private key from that same Google file, copied exactly. It is stored securely.',
 	[keys.providerFieldProjectIdHelp]: 'Optional. The project_id from the service account file.',
 	[keys.providerFieldPosthogProjectIdHelp]:
-		'The number shown as Project ID in your PostHog project’s settings.',
+		"The number shown as Project ID in your PostHog project's settings.",
 	[keys.providerFieldRegionHelp]:
 		'The cloud your PostHog address names: US for us.posthog.com, EU for eu.posthog.com. Ignored when Host is a self-hosted instance. Required when Host is blank.',
 	[keys.providerFieldRevenueCurrencyHelp]:

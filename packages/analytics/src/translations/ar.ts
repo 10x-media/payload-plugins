@@ -170,7 +170,7 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 	[keys.providerConnectionRefusedHelp]: 'تحقق من المفتاح والمعرّفات والمضيف.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'تحقق من المفتاح والمعرّفات والمنطقة والمضيف.',
 	[keys.providerConnectionRefusedHelpGa4]:
-		'تحقق من معرّف الموقع والمفتاح، ومن أن بريد العميل مُضاف كمُشاهد للموقع.',
+		'تحقق من معرّف الخاصية والمفتاح، ومن أن البريد الإلكتروني للعميل مُضاف كمُشاهد للخاصية.',
 	[keys.providerConnectionIncompleteHelp]:
 		'مفتاح أو معرّف يحتاجه هذا الفحص فارغ. أدخله واحفظ ثم اختبر مرة أخرى.',
 	[keys.providerConnectionUnknownSiteHelp]:
@@ -398,7 +398,7 @@ export const ar: LocaleBundle<'zero' | 'one' | 'two' | 'few' | 'many' | 'other'>
 		'لـ Umami المستضاف ذاتيًا: مفتاح API من إعداداته أو رمز تسجيل الدخول. في Umami Cloud استخدم مفتاح API. يُحفظ بأمان.',
 	[keys.providerFieldPropertyIdHelp]: 'رقم خاصية GA4 من Google Analytics. من دون كلمة properties/.',
 	[keys.providerFieldClientEmailHelp]:
-		'عنوان حساب الخدمة من الملف الذي قدّمه Google. أضِفه كمُشاهد في إدارة الوصول لموقع GA4، وإلا فستُرفض القراءات.',
+		'عنوان حساب الخدمة من الملف الذي قدّمه Google. أضِفه كمُشاهد في إدارة الوصول لخاصية GA4، وإلا فستُرفض القراءات.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'المفتاح الخاص من ملف Google نفسه، منسوخًا كما هو تمامًا. يُحفظ بأمان.',
 	[keys.providerFieldProjectIdHelp]: 'اختياري. قيمة project_id من ملف حساب الخدمة.',

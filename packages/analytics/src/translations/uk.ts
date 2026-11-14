@@ -174,7 +174,7 @@ export const uk: LocaleBundle<'one' | 'few' | 'many' | 'other'> = {
 	[keys.providerConnectionRefusedHelp]: 'Перевірте ключ, ID і хост.',
 	[keys.providerConnectionRefusedHelpPosthog]: 'Перевірте ключ, ID, регіон і хост.',
 	[keys.providerConnectionRefusedHelpGa4]:
-		'Перевірте Property ID і ключ, а також що client email доданий читачем ресурсу.',
+		'Перевірте ID ресурсу і ключ, а також що Email клієнта доданий читачем ресурсу.',
 	[keys.providerConnectionIncompleteHelp]:
 		'Не заповнено ключ або ID, потрібний для перевірки. Заповніть, збережіть і перевірте знову.',
 	[keys.providerConnectionUnknownSiteHelp]:
