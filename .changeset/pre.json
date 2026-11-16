@@ -172,6 +172,7 @@
 		"content-lock-kv-failure-recovery",
 		"content-lock-startup-heal",
 		"content-lock-without-content-lock",
+		"conversations-deep-links",
 		"conversations-initial-beta",
 		"conversations-locales",
 		"conversations-server-function",
