@@ -177,6 +177,8 @@ test('a new provider document checks its saved connection beside Save, and keeps
 	await expect(status).toHaveText('Status:\u00a0Not connected')
 	await page.locator('#field-name').fill('Umami check, edited')
 	await expect(button).toBeDisabled()
+	// The pointer still rests where the click left it, so it moves away first: the tooltip shows on entering.
+	await page.mouse.move(0, 0)
 	await button.hover()
 	await expect(
 		page.locator('.tooltip--show', { hasText: 'Save your changes to test them.' })
