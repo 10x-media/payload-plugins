@@ -1,5 +1,51 @@
 # @10x-media/analytics
 
+## 1.0.0-beta.17
+
+### Minor Changes
+
+- **Additive: a Test connection button on provider documents.** The sidebar of a vendor document shows what its connection last came to (Connected, Not connected, No answer, Not checked), when it last worked and failed, the vendor's own words and until when reads rest. A **Test connection** button beside **Save** checks the saved settings with the vendor's cheapest read. Ordinary reads keep the result current. A save that changes how the document connects (a key sent again, another host, ID, provider or scope) clears the result; any other save keeps it. Where the vendor did not word a failure itself (a refused host, a network error), the panel shows translated advice alone, which names what to check for each vendor: the Region for PostHog, the Property ID and the property access for GA4. A reader who may not edit the document sees the button disabled, with the reason in its tooltip, as do a new document and unsaved changes. The analytics view shows the vendor's words under a source's setup error, and when the source last worked, to a reader who may read its document. The result is kept in `payload.kv` under `analytics:provider-status:<document ID>`, so no table and no migration are added, and answered by `GET` and `POST /api/_x/provider-status?id=`, which take the caller's own read and update access to the document. When the plugin knows why a check failed, `errorReason` says so and the panel says it in the admin's language: a key or an ID the check needs is empty (`incomplete`), or the vendor does not know the site (`unknownSite`, self-hosted Umami). Adapters may implement `checkConnection(ctx)` (`ConnectionCheckContext`); every built-in vendor adapter does. Upgrade: run `pnpm payload generate:importmap`, so the provider form renders the Connection panel and its button.
+
+- **Behavioral: under a `fallback` policy, a tenant whose own sources all fail reads the shared source.** A provider document that was configured but failing used to switch its tenant off the shared platform source, so one bad key cost the tenant every number. A document now counts as failing while its last result is a refusal, or a vendor that did not answer while its reads rest. While every one of a tenant's documents is failing, the shared source is listed beside them, opens as the default in place of a failing one, and the view and the providers list say why (`notice: 'ownSourceFailing'` on `GET /api/_x/sources`). A document failing for more than 10 minutes is checked again in the background when its tenant's listing is read, at most once every 10 minutes, so it takes its tenant back once it works.
+
+- **Behavioral (GA4): Property ID takes the number alone.** `properties/<id>` saved, and every read answered "3 INVALID_ARGUMENT: ... A numeric Property ID is required." The field now refuses it. A stored document with such a value saves again once it is corrected.
+
+- **Behavioral: a provider document's Host outside `providers.hosts.allow` is refused on save.** The form saved an address the plugin then refused to call. The **Host** field now says the site does not allow the address. A document saved before keeps reading as refused, and its next save is refused until the Host is changed or allowed. Upgrade: check the Host of every provider document against `providers.hosts.allow`.
+
+- **Behavioral (Plausible): Site ID and Website address take the site as Plausible stores it.** An address with `https://`, `www.`, a trailing slash or capital letters saved, and every read answered "Invalid API key or site ID". Both fields now refuse it with a field error; a site in a subfolder (`example.com/blog`) is accepted, and Website address takes several sites separated by commas, each counting the pageview on its own dashboard. A stored document with such a value saves again once it is corrected.
+
+- **Additive: a policy function can ask which own sources fail.** Each of `ownSources` carries `failing()`, which resolves to true while the source counts as failing for `'fallback'`. The statuses are read on its first call, so a function that never asks costs no read.
+
+- **Behavioral (PostHog): a provider document with a blank Host needs a Region.** The Region then decides where reads and capture go, and leaving it unset used to read from US Cloud without anyone picking it. A stored document without one saves again once a Region is picked. Picking US keeps its personal API key, because reads stay on US Cloud. Picking EU moves the reads, so the key has to be entered again. Upgrade: pick a **Region** on every PostHog provider document whose **Host** is blank ([From 1.0.0-beta.16](https://docs.10xmedia.de/analytics/upgrading/beta-17#posthogs-region)).
+
+- **Behavioral: a vendor's error names its own message.** A refused read carries the vendor's JSON `detail`, `message` or `error` rather than the first 200 characters of the body.
+
+### Patch Changes
+
+- **Fixed: credential fields are labelled in the reader's language.** The **API key**, **API token** and **Private key** fields kept their English label in every admin language. They now carry a label per locale, as their help already did.
+
+- **Fixed: a refused save names the field by its label.** A second **Default for this site** in one site, and a goal slug already taken, toasted "The following field is invalid: isDefault" or "slug". The toast now reads the field's label, in the admin's language.
+
+- **Fixed (GA4): a Measurement ID pasted with spaces around it saves.** The field refused it.
+
+- **Fixed (GA4): a private key that cannot be parsed reads as a setup error.** A service account key pasted incompletely read as an outage ("The analytics tool is busy right now.") and was retried. It now reads as not set up correctly, as a wrong key does.
+
+- **Fixed: a Host that only gains or loses a trailing slash keeps the stored key.** The save counted it as a move to another address and cleared the document's key.
+
+- **Fixed (Umami, PostHog): an ID with `/`, `?` or `#` no longer breaks the request path.** Umami's website ID and PostHog's project ID are sent URL-encoded.
+
+- **Fixed: provider fields say what to paste and where to find it.** PostHog's **Project ID**, **API key** (a personal `phx_...` key with the Query Read scope) and **Region**, Plausible's **API key** (a Stats API key), GA4's **Project ID**, **Client email** (added as a Viewer on the property) and **Measurement ID** have help text, and every **Host** says it is only for a self-hosted instance. **Region** says it is required when **Host** is blank, and the form's description says that changing the Host, an ID or the Region of a saved entry clears its keys. All 11 locales.
+
+- **Fixed: the providers list's notice lines up with the list.** It rendered outside the page's gutter, edge to edge. It now sits inside it.
+
+- **Fixed: read failures name their scope.** The engine's `analytics: read failed for adapter "<id>"` warning and the query endpoint's warning now say the scope they read for, or `install-wide`.
+
+- **Fixed: an ID or a key pasted with spaces around it reads.** A Plausible Site ID or an Umami Website ID saved with a space before or after it failed every read, and Plausible's answer pointed at the key. Provider documents now read and capture with their IDs, keys and tokens trimmed, stored documents included.
+
+- **Fixed (Umami): the key fields say which key goes where.** **API token** said "Umami Cloud token" though it is the self-hosted key, sent as `Bearer`. It now names self-hosted Umami, and **API key** on an Umami document names Umami Cloud, in all 11 locales.
+
+- **Fixed (Umami): a Website ID Umami does not know fails the read.** Self-hosted Umami answers the stats of an unknown website with zeros, so the source read as working and showed no visits. The adapter now asks for the website before it reads, until Umami has answered once, and refuses an unknown one. An adapter that `providers.resolve` builds for each read asks on each read.
+
 ## 1.0.0-beta.16
 
 ### Minor Changes
