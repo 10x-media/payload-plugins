@@ -1089,10 +1089,17 @@
 	 * The provider form's Connection panel, in the sidebar: laid out like Payload's auth-field
 	 * controls, its status and dates styled like the document controls' "Status: <value>".
 	 */
+	/* Payload styles only a `label.field-label`; this one is a span, since it labels no input. */
+	.analytics-provider-connection > .field-label {
+		display: flex;
+		padding-bottom: calc(var(--base) * 0.25);
+		color: var(--theme-elevation-800);
+	}
+
 	.analytics-provider-connection__body {
 		display: flex;
 		flex-direction: column;
-		gap: var(--base);
+		gap: calc(var(--base) * 0.75);
 	}
 
 	/* Its margin would stack on the column's gap. */
@@ -1114,7 +1121,7 @@
 	.analytics-provider-connection__facts {
 		display: flex;
 		flex-direction: column;
-		gap: calc(var(--base) * 0.2);
+		gap: calc(var(--base) * 0.25);
 		margin: 0;
 		padding: 0;
 		list-style: none;

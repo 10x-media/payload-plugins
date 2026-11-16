@@ -4,6 +4,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { keys } from '../translations/keys'
 import type { ProviderStatusResponse } from './connectionState'
 import { ProviderConnection } from './ProviderConnection'
+import { ProviderConnectionTest } from './ProviderConnectionTest'
 
 const doc = vi.hoisted(() => ({
 	id: '6650f1c2a9e4b3d2c1a09f87' as string | undefined,
@@ -22,18 +23,32 @@ vi.mock('@payloadcms/ui', () => ({
 		children,
 		disabled,
 		onClick,
+		tooltip,
 	}: {
 		children?: ReactNode
 		disabled?: boolean
 		onClick?: () => void
+		tooltip?: string
 	}) => (
-		<button disabled={disabled} onClick={onClick} type="button">
+		<button data-tooltip={tooltip} disabled={disabled} onClick={onClick} type="button">
 			{children}
 		</button>
 	),
-	FieldDescription: ({ description }: { description?: string }) => <p>{description}</p>,
 	FieldLabel: ({ label }: { label?: string }) => <span>{label}</span>,
 	fieldBaseClass: 'field-type',
+	Pill: ({
+		children,
+		className,
+		pillStyle,
+	}: {
+		children?: ReactNode
+		className?: string
+		pillStyle?: string
+	}) => (
+		<span className={className} data-pill={pillStyle}>
+			{children}
+		</span>
+	),
 	ShimmerEffect: () => <span data-testid="shimmer" />,
 	toast: toasts,
 	useConfig: () => ({
@@ -66,21 +81,30 @@ const answers = (...bodies: ProviderStatusResponse[]): void => {
 	}
 }
 
-const renderPanel = async () => {
-	const result = render(
+/** The button beside Save and the sidebar panel, as the edit view renders them. */
+const Both = () => (
+	<>
+		<ProviderConnectionTest />
 		<ProviderConnection field={{ name: 'connection', type: 'ui' } as never} path="connection" />
-	)
+	</>
+)
+
+const renderPanel = async () => {
+	const result = render(<Both />)
 	await act(async () => {})
 	return result
 }
 
-/** The value after the panel's "Status:" label. */
-const statusOf = () =>
-	document.querySelector(
-		'.analytics-provider-connection__facts li .analytics-provider-connection__fact-value'
-	)?.textContent
+/** The panel's status pill. */
+const statusOf = () => document.querySelector('.analytics-provider-connection__status')?.textContent
 
 const testButton = () => screen.getByRole('button', { name: keys.providerConnectionTest })
+
+/** Whether the button is disabled, and the tooltip that says why. */
+const blockedBy = () => {
+	const button = testButton() as HTMLButtonElement
+	return { disabled: button.disabled, tooltip: button.getAttribute('data-tooltip') }
+}
 
 beforeEach(() => {
 	doc.id = '6650f1c2a9e4b3d2c1a09f87'
@@ -108,7 +132,14 @@ describe('ProviderConnection', () => {
 			'/api/_x/provider-status?id=6650f1c2a9e4b3d2c1a09f87'
 		)
 		expect(statusOf()).toBe(keys.providerConnectionUnchecked)
-		expect((testButton() as HTMLButtonElement).disabled).toBe(false)
+		expect(blockedBy()).toEqual({ disabled: false, tooltip: null })
+	})
+
+	it('shows no button on a native document, which has no connection to test', async () => {
+		doc.provider = 'native'
+		answers({ status: {} })
+		await renderPanel()
+		expect(screen.queryByRole('button', { name: keys.providerConnectionTest })).toBeNull()
 	})
 
 	it('checks on a click and shows what the vendor said', async () => {
@@ -263,24 +294,22 @@ describe('ProviderConnection', () => {
 		doc.id = undefined
 		await renderPanel()
 		expect(fetchMock).not.toHaveBeenCalled()
-		expect((testButton() as HTMLButtonElement).disabled).toBe(true)
-		expect(screen.getByText(keys.providerConnectionSaveFirst)).toBeDefined()
+		expect(statusOf()).toBe(keys.providerConnectionUnchecked)
+		expect(blockedBy()).toEqual({ disabled: true, tooltip: keys.providerConnectionSaveFirst })
 	})
 
 	it('asks for a save first while the form has unsaved changes', async () => {
 		doc.modified = true
 		answers({ status: {} })
 		await renderPanel()
-		expect((testButton() as HTMLButtonElement).disabled).toBe(true)
-		expect(screen.getByText(keys.providerConnectionUnsaved)).toBeDefined()
+		expect(blockedBy()).toEqual({ disabled: true, tooltip: keys.providerConnectionUnsaved })
 	})
 
 	it('says why a reader who may not edit the document cannot test it', async () => {
 		doc.hasSavePermission = false
 		answers({ status: {} })
 		await renderPanel()
-		expect((testButton() as HTMLButtonElement).disabled).toBe(true)
-		expect(screen.getByText(keys.providerConnectionNoPermission)).toBeDefined()
+		expect(blockedBy()).toEqual({ disabled: true, tooltip: keys.providerConnectionNoPermission })
 	})
 
 	it('reads the status again after a save, which may have reset it', async () => {
@@ -291,9 +320,7 @@ describe('ProviderConnection', () => {
 		const panel = await renderPanel()
 		expect(statusOf()).toBe(keys.providerConnectionNotConnected)
 		doc.lastUpdateTime = 2
-		panel.rerender(
-			<ProviderConnection field={{ name: 'connection', type: 'ui' } as never} path="connection" />
-		)
+		panel.rerender(<Both />)
 		await act(async () => {})
 		expect(fetchMock).toHaveBeenCalledTimes(2)
 		expect(statusOf()).toBe(keys.providerConnectionUnchecked)
