@@ -518,7 +518,10 @@ export type MetricValue = number | null;
 export type MetricValues = Partial<Record<MetricKey, MetricValue>>;
 
 // @beta
-export function ProviderConnection(input: UIFieldClientProps): JSX.Element;
+export function ProviderConnection(_props: UIFieldClientProps): JSX.Element;
+
+// @beta
+export function ProviderConnectionTest(): JSX.Element | null;
 
 // @beta
 export function ProvidersListNotice(): JSX.Element | null;

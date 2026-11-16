@@ -70,6 +70,7 @@ export {
 	routePaths,
 } from '../plugin/routes'
 export { ProviderConnection } from '../providers/ProviderConnection'
+export { ProviderConnectionTest } from '../providers/ProviderConnectionTest'
 export { ProvidersListNotice } from '../providers/ProvidersListNotice'
 export {
 	buildQueryUrl,

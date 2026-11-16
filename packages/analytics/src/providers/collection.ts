@@ -45,6 +45,7 @@ export const PROVIDERS_SLUG = 'analytics-providers'
 /** The list's note to a tenant reading the platform's source in `fallback`. */
 export const PROVIDERS_LIST_NOTICE_COMPONENT = '@10x-media/analytics/client#ProvidersListNotice'
 const PROVIDER_CONNECTION_COMPONENT = '@10x-media/analytics/client#ProviderConnection'
+const PROVIDER_CONNECTION_TEST_COMPONENT = '@10x-media/analytics/client#ProviderConnectionTest'
 
 /** Builds the sealed variant of a secret source field; injected so the fields peer stays lazy. */
 export type BuildSecretField = (source: TextField | TextareaField) => Field[]
@@ -669,7 +670,7 @@ const providerFields = (
 	]
 }
 
-/** The sidebar's Connection panel of a vendor document, its Test connection button inside. */
+/** The sidebar's Connection panel of a vendor document; its Test connection button sits beside Save. */
 const connectionField: Field = {
 	name: 'connection',
 	type: 'ui',
@@ -700,7 +701,10 @@ export const buildProvidersCollection = (args: BuildProvidersCollectionArgs): Co
 			defaultColumns: ['name', 'provider', 'enabled'],
 			group: staticLabel(keys.adminGroup),
 			description: staticLabel(keys.providersCollectionDescription),
-			...(args.listNotice ? { components: { beforeList: [PROVIDERS_LIST_NOTICE_COMPONENT] } } : {}),
+			components: {
+				...(args.listNotice ? { beforeList: [PROVIDERS_LIST_NOTICE_COMPONENT] } : {}),
+				edit: { beforeDocumentControls: [PROVIDER_CONNECTION_TEST_COMPONENT] },
+			},
 		},
 		access: {
 			read: providerRowAccess(args),
