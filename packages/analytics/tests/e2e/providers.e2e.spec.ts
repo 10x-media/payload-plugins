@@ -162,7 +162,7 @@ test('a new provider document checks its saved connection from the sidebar, and 
 	await button.click()
 	await expect(page.locator('[data-sonner-toast]', { hasText: 'Connection failed' })).toBeVisible()
 	await expect(status).toHaveText('Status:\u00a0Not connected')
-	await expect(panel).toContainText('Check the key, the IDs and the host.')
+	await expect(panel).toContainText('A key or an ID this check needs is empty.')
 
 	const stored = await page.request.get(`/api/_x/provider-status?id=${encodeURIComponent(id)}`)
 	expect(stored.ok()).toBeTruthy()
