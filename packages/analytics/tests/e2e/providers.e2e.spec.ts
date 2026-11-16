@@ -46,7 +46,7 @@ test('@narrowed-providers the create and edit views open on a narrowed select an
 	expect(await offeredNames(page)).toEqual(OFFERED)
 	await page.locator('#field-name').fill(name)
 	await pickRegion(page, 'EU')
-	await page.getByRole('button', { name: 'Save' }).click()
+	await page.getByRole('button', { name: 'Save', exact: true }).click()
 	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
 
 	await page.goto(`${COLLECTION}/${await providerId(page.request, name)}`)
@@ -65,7 +65,7 @@ test('@narrowed-providers a stored type no longer served opens, shows its type a
 	await expect(providerSelect(page)).toContainText('Payload')
 
 	await page.locator('#field-name').fill(`${RETIRED} edited`)
-	await page.getByRole('button', { name: 'Save' }).click()
+	await page.getByRole('button', { name: 'Save', exact: true }).click()
 	await expect(page.locator('body')).toContainText('The following field is invalid: Provider')
 	const stored = await page.request.get(`/api/analytics-providers/${id}?depth=0`)
 	expect(await stored.json()).toMatchObject({ name: RETIRED, provider: 'native' })
@@ -90,7 +90,7 @@ const posthogDraft = async (
 
 /** A save the form refused, the toast naming the field it refused on. */
 const refused = async (page: Page, field: string): Promise<void> => {
-	await page.getByRole('button', { name: 'Save' }).click()
+	await page.getByRole('button', { name: 'Save', exact: true }).click()
 	await expect(page.locator('[data-sonner-toast]', { hasText: `PostHog → ${field}` })).toBeVisible()
 	await expect(page).toHaveURL(/\/create$/)
 }
@@ -105,7 +105,7 @@ test('a PostHog Host on the other cloud region than its Region is refused, space
 	await refused(page, 'Host')
 
 	await page.locator('#field-posthog__host').fill('  https://eu.posthog.com  ')
-	await page.getByRole('button', { name: 'Save' }).click()
+	await page.getByRole('button', { name: 'Save', exact: true }).click()
 	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
 })
 
@@ -118,7 +118,7 @@ test('a PostHog document with a blank Host, spaces and all, is refused until it 
 	await refused(page, 'Region')
 
 	await pickRegion(page, 'EU')
-	await page.getByRole('button', { name: 'Save' }).click()
+	await page.getByRole('button', { name: 'Save', exact: true }).click()
 	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
 })
 
@@ -156,7 +156,7 @@ test('a new provider document checks its saved connection beside Save, and keeps
 		page.locator('.tooltip--show', { hasText: 'Save the document to test it.' })
 	).toBeVisible()
 
-	await page.getByRole('button', { name: 'Save' }).click()
+	await page.getByRole('button', { name: 'Save', exact: true }).click()
 	await expect(page).toHaveURL(new RegExp(`${COLLECTION}/(?!create$)[^/]+$`))
 	const id = page.url().split('/').pop() ?? ''
 	await expect(status).toHaveText('Status:\u00a0Not checked')
