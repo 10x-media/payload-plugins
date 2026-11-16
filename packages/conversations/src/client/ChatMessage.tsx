@@ -28,6 +28,8 @@ export type ChatMessageProps = {
 	footer?: ReactNode
 	/** Slot: replaces the name and time line. */
 	header?: ReactNode
+	/** The message a link opened the feed at: drawn marked for a moment. */
+	highlighted?: boolean
 	instance: string
 	message: WindowMessage
 	/** Opens the message's thread; absent inside a thread. */
@@ -52,6 +54,7 @@ const DefaultMessage = ({
 	compact = false,
 	footer,
 	header,
+	highlighted = false,
 	instance,
 	message,
 	onOpenThread,
@@ -93,6 +96,7 @@ const DefaultMessage = ({
 	const classes = [
 		'conversations-message',
 		compact && 'conversations-message--compact',
+		highlighted && 'conversations-message--highlighted',
 		bare && 'conversations-message--bare',
 		deleted && 'conversations-message--deleted',
 		message.sendStatus && `conversations-message--${message.sendStatus}`,

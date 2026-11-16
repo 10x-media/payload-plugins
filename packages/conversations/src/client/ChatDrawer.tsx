@@ -1,10 +1,10 @@
 'use client'
 
 import { Drawer, useModal, XIcon } from '@payloadcms/ui'
-import type { ReactNode } from 'react'
+import { type ReactNode, useEffect, useRef } from 'react'
 
 import { resolveLabel } from '../react/hooks'
-import { type UseChatPanelResult, useChatPanel } from '../react/useChatPanel'
+import { type FeedFocus, type UseChatPanelResult, useChatPanel } from '../react/useChatPanel'
 import type { WindowMessage } from '../react/window'
 import { keys } from '../translations/keys'
 import { useTranslation } from '../translations/useTranslation'
@@ -19,7 +19,29 @@ import {
 	replaceable,
 } from './components'
 
-export type ChatDrawerProps = {
+/** Why a panel shows something other than what it was asked to open. */
+export type ChatUnavailableReason = 'channel' | 'message'
+
+/** What `ChatPanel` and `ChatDrawer` take to open on a channel or at a message. */
+export type ChatOpenAtProps = {
+	/**
+	 * The channel to open on instead of the first. When the viewer cannot read
+	 * it, the first readable one opens under a notice.
+	 */
+	channel?: null | string
+	/**
+	 * A message id to open at: its channel, the feed around it with the
+	 * message marked, and for a reply its thread. Wins over `channel`.
+	 */
+	message?: null | string
+	/**
+	 * Instead of the built-in notice when the channel or message asked for
+	 * cannot be read; return null to show none.
+	 */
+	renderUnavailable?: (reason: ChatUnavailableReason) => ReactNode
+}
+
+export type ChatDrawerProps = ChatOpenAtProps & {
 	conversationKey: string
 	/** The Payload modal slug this drawer opens under. */
 	drawerSlug: string
@@ -67,7 +89,7 @@ const DrawerHeader = ({
 	)
 }
 
-export type ChatPanelProps = {
+export type ChatPanelProps = ChatOpenAtProps & {
 	conversationKey: string
 	/** Drawn first, with the panel's state (e.g. the drawer header with its channel slot). */
 	renderHeader?: (panel: UseChatPanelResult) => ReactNode
@@ -81,16 +103,33 @@ export type ChatPanelProps = {
 }
 
 const PanelBody = ({
+	channel,
 	conversationKey,
 	instance,
+	message,
 	renderHeader,
 	renderType,
+	renderUnavailable,
 	threadSlug,
 }: Omit<ChatPanelProps, 'components'>) => {
 	const { i18n, t } = useTranslation()
 	const { closeModal, openModal } = useModal()
-	const panel = useChatPanel({ conversationKey })
-	const { channels, conversation, current, other, reads, thread, viewer } = panel
+	const panel = useChatPanel({ conversationKey, initialChannel: channel, message })
+	const { channels, conversation, current, other, reads, thread, threadFocus, viewer } = panel
+
+	// A link to a reply opens its thread once; closing it is then like any other thread.
+	const openedFor = useRef<FeedFocus | null>(null)
+	useEffect(() => {
+		if (!threadFocus || openedFor.current === threadFocus) return
+		openedFor.current = threadFocus
+		openModal(threadSlug)
+	}, [openModal, threadFocus, threadSlug])
+
+	const unavailable: ChatUnavailableReason | null = panel.requestedMessageUnavailable
+		? 'message'
+		: panel.requestedChannelUnavailable
+			? 'channel'
+			: null
 
 	// Opened from the click, not from an effect on `thread`: Escape and a click
 	// outside close the modal without clearing `thread`, and reopening the same
@@ -111,13 +150,23 @@ const PanelBody = ({
 				onChange={panel.setChannel}
 				reads={reads}
 			/>
+			{unavailable ? (
+				renderUnavailable ? (
+					renderUnavailable(unavailable)
+				) : (
+					<div className="conversations-panel__notice" role="status">
+						{t(unavailable === 'message' ? keys.messageUnavailable : keys.channelUnavailable)}
+					</div>
+				)
+			) : null}
 			{current ? (
 				<>
 					<ChatFeed
 						conversation={conversation}
 						empty={t(keys.emptyChannel, { channel: label })}
+						focus={panel.focus?.id ?? null}
 						instance={instance}
-						key={`feed:${current.slug}`}
+						key={`feed:${current.slug}:${panel.focus?.id ?? ''}`}
 						onOpenThread={openThread}
 						readOnly={!current.canCreate}
 						renderType={renderType}
@@ -156,7 +205,9 @@ const PanelBody = ({
 						<ChatThread
 							authors={conversation.authors}
 							channel={current}
+							focus={threadFocus}
 							instance={instance}
+							key={String(thread.id)}
 							renderType={renderType}
 							root={thread}
 							viewer={viewer}
@@ -169,11 +220,14 @@ const PanelBody = ({
 }
 
 const DrawerBody = ({
+	channel,
 	conversationKey,
 	drawerSlug,
 	header,
 	instance,
+	message,
 	renderType,
+	renderUnavailable,
 	subtitle,
 	title,
 }: Omit<ChatDrawerProps, 'components'>) => {
@@ -182,8 +236,10 @@ const DrawerBody = ({
 	return (
 		<div className="conversations-drawer">
 			<ChatPanel
+				channel={channel}
 				conversationKey={conversationKey}
 				instance={instance}
+				message={message}
 				renderHeader={({ current }) => (
 					<DrawerHeader
 						onClose={() => closeModal(drawerSlug)}
@@ -200,6 +256,7 @@ const DrawerBody = ({
 					</DrawerHeader>
 				)}
 				renderType={renderType}
+				renderUnavailable={renderUnavailable}
 				threadSlug={`${drawerSlug}-thread`}
 			/>
 		</div>

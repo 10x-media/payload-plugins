@@ -19,6 +19,7 @@ import { PlaygroundNavLink as PlaygroundNavLink_5b5fa18eb8ab6632dd6288f6e303f5b3
 import { TenantSelector as TenantSelector_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { TenantSelectionProvider as TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62 } from '@payloadcms/plugin-multi-tenant/rsc'
 import { ChatAdminProviderServer as ChatAdminProviderServer_7345af0c80d81d7368c532bb4469972c } from '@10x-media/conversations/rsc'
+import { LinkedConversation as LinkedConversation_fef1be63fd8a0f31132b1cd33ea146dc } from '../../../components/LinkedConversation'
 import { ChatView as ChatView_9ff71714c0033d16c2f4e44b53d7abe9 } from '../../../chat/ChatView'
 import { PlaygroundView as PlaygroundView_794a6abe41de858e73edd23cfa8a8229 } from '../../../playground/PlaygroundView'
 import { ConversationsSlotDispatcher as ConversationsSlotDispatcher_7345af0c80d81d7368c532bb4469972c } from '@10x-media/conversations/rsc'
@@ -62,6 +63,7 @@ export const importMap = {
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelector": TenantSelector_d6d5f193a167989e2ee7d14202901e62,
   "@payloadcms/plugin-multi-tenant/rsc#TenantSelectionProvider": TenantSelectionProvider_d6d5f193a167989e2ee7d14202901e62,
   "@10x-media/conversations/rsc#ChatAdminProviderServer": ChatAdminProviderServer_7345af0c80d81d7368c532bb4469972c,
+  "/components/LinkedConversation#LinkedConversation": LinkedConversation_fef1be63fd8a0f31132b1cd33ea146dc,
   "/chat/ChatView#ChatView": ChatView_9ff71714c0033d16c2f4e44b53d7abe9,
   "/playground/PlaygroundView#PlaygroundView": PlaygroundView_794a6abe41de858e73edd23cfa8a8229,
   "@10x-media/conversations/rsc#ConversationsSlotDispatcher": ConversationsSlotDispatcher_7345af0c80d81d7368c532bb4469972c,

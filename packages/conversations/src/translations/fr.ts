@@ -15,6 +15,7 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.bold]: 'Gras',
 	[keys.bulletList]: 'Liste à puces',
 	[keys.cancel]: 'Annuler',
+	[keys.channelUnavailable]: 'Vous n’avez plus accès au canal visé par ce lien.',
 	[keys.close]: 'Fermer',
 	[keys.comment]: 'Commentaire',
 	[keys.comments]: 'Commentaires',
@@ -44,6 +45,8 @@ export const fr: Record<TranslationKey, string> = {
 	[keys.mention]: 'Mentionner quelqu’un',
 	[keys.mentionNoResults]: 'Personne trouvé',
 	[keys.messageDeleted]: 'Message supprimé',
+	[keys.messageUnavailable]:
+		'Le message visé par ce lien n’existe plus, ou vous n’y avez plus accès.',
 	[keys.messageMenu]: 'Actions du message',
 	[keys.modEnterToSend]: 'Ctrl+Entrée pour envoyer',
 	[keys.more]: 'Plus de mise en forme',

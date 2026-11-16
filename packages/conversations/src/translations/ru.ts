@@ -15,6 +15,7 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.bold]: 'Жирный',
 	[keys.bulletList]: 'Маркированный список',
 	[keys.cancel]: 'Отмена',
+	[keys.channelUnavailable]: 'У вас больше нет доступа к каналу, на который ведёт эта ссылка.',
 	[keys.close]: 'Закрыть',
 	[keys.comment]: 'Комментарий',
 	[keys.comments]: 'Комментарии',
@@ -44,6 +45,8 @@ export const ru: Record<TranslationKey, string> = {
 	[keys.mention]: 'Упомянуть кого-то',
 	[keys.mentionNoResults]: 'Никого не найдено',
 	[keys.messageDeleted]: 'Сообщение удалено',
+	[keys.messageUnavailable]:
+		'Сообщение, на которое ведёт эта ссылка, удалено, или у вас больше нет к нему доступа.',
 	[keys.messageMenu]: 'Действия с сообщением',
 	[keys.modEnterToSend]: 'Ctrl+Enter, чтобы отправить',
 	[keys.more]: 'Другое форматирование',

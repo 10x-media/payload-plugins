@@ -8,8 +8,10 @@ export { ChatComposer, type ChatComposerProps } from '../client/ChatComposer'
 export {
 	ChatDrawer,
 	type ChatDrawerProps,
+	type ChatOpenAtProps,
 	ChatPanel,
 	type ChatPanelProps,
+	type ChatUnavailableReason,
 } from '../client/ChatDrawer'
 export { ChatFeed, type ChatFeedProps, type FeedItem } from '../client/ChatFeed'
 export { ChatMessage, type ChatMessageProps } from '../client/ChatMessage'

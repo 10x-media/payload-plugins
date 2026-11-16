@@ -64,10 +64,20 @@ export {
 	type WatchEntry,
 } from '../react/transport'
 export { type ClientTransportFactory, transportFromSpec } from '../react/transportFromSpec'
-export { type UseChatPanelResult, useChatPanel } from '../react/useChatPanel'
+export {
+	type FeedFocus,
+	type UseChatPanelArgs,
+	type UseChatPanelResult,
+	useChatPanel,
+} from '../react/useChatPanel'
 export { type UseComposerResult, useComposer } from '../react/useComposer'
 export { useDelayedFlag } from '../react/useDelayedFlag'
-export { FEED_DIVIDER_ATTRIBUTE, type UseFeedResult, useFeed } from '../react/useFeed'
+export {
+	FEED_DIVIDER_ATTRIBUTE,
+	FEED_MESSAGE_ATTRIBUTE,
+	type UseFeedResult,
+	useFeed,
+} from '../react/useFeed'
 export { type UseMessageResult, useMessage } from '../react/useMessage'
 export { useThread } from '../react/useThread'
 export { dividerBefore, type WindowMessage, type WindowState } from '../react/window'

@@ -106,6 +106,9 @@ export const createApi = ({
 					? { method: init.method ?? 'GET' }
 					: json(init.method ?? 'POST', init.body)
 			),
+		/** One message by id, with its thread's root for a reply; a 404 when it cannot be read. */
+		get: (id: number | string) =>
+			request<MessageResponse>(`/messages/${encodeURIComponent(String(id))}`),
 		edit: (id: number | string, body: { body?: unknown; text?: string }) =>
 			request<MessageResponse>(`/messages/${encodeURIComponent(String(id))}`, json('PATCH', body)),
 		list: (query: ListQuery) => {
