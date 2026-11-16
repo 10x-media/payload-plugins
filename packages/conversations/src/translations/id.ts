@@ -15,6 +15,7 @@ export const id: Record<TranslationKey, string> = {
 	[keys.bold]: 'Tebal',
 	[keys.bulletList]: 'Daftar berpoin',
 	[keys.cancel]: 'Batal',
+	[keys.channelUnavailable]: 'Anda tidak lagi memiliki akses ke saluran yang dituju tautan ini.',
 	[keys.close]: 'Tutup',
 	[keys.comment]: 'Komentar',
 	[keys.comments]: 'Komentar',
@@ -44,6 +45,8 @@ export const id: Record<TranslationKey, string> = {
 	[keys.mention]: 'Sebut seseorang',
 	[keys.mentionNoResults]: 'Tidak ada yang ditemukan',
 	[keys.messageDeleted]: 'Pesan dihapus',
+	[keys.messageUnavailable]:
+		'Pesan yang dituju tautan ini sudah tidak ada, atau Anda tidak lagi memiliki akses ke sana.',
 	[keys.messageMenu]: 'Tindakan pesan',
 	[keys.modEnterToSend]: 'Ctrl+Enter untuk mengirim',
 	[keys.more]: 'Format lainnya',

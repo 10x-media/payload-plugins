@@ -214,7 +214,7 @@ hooks: {
 ```
 
 - `afterMessage` runs after every create, edit and delete (a soft delete reports `delete`).
-- `afterMention` runs with the users newly mentioned in a message, as `{ collection, id }` refs, never again for the same user on an edit. Each passed the mention rules, so each can read the message.
+- `afterMention` runs with the users newly mentioned in a message, as `{ collection, id }` refs, never again for the same user on an edit. Each passed the mention rules, so each can read the message. `key`, `channel`, `message.id` and, for a reply, `message.parent` (its root, threads being one level deep) are all a link to the message needs; see [Links into a conversation](/conversations/admin-ui/custom-views#links-into-a-conversation).
 - Both run inside the request, after the row is written: an email sent here delays the response, and a throw fails the request although the message is saved. Queue a job instead of doing slow work inline.
 
 For anything else, `overrides.messages.hooks` adds ordinary Payload collection hooks, which run after the plugin's own.
@@ -228,6 +228,7 @@ Every endpoint lives under `/api/conversations/<slug>` and requires a signed-in 
 | `POST /subscribe` | `{ keys, count? }`; `count`: `true` (default) or the keys to count | Per allowed key: readable channels with `canCreate`, unread per channel, visible root count, token. Plus channel labels and cues for the viewer, extension data, `viewer`, `reads`, `deleted`, server `now` |
 | `GET /messages` | `key`, `channel` (repeat or comma-separate for several), `parent?`, `limit` (default 30, max 100), one of `before` / `after` (cursor `createdAt,id`), `around` (a time), `updatedSince`, `latest=1` | `messages`, `authors`, `hasOlder`, `hasNewer`, `cursor` (the viewer's cursor before this load), `threadReads` |
 | `POST /messages` | `{ key, channel, parent?, body? \| text?, type?, data?, clientId? }` | 201 `{ message, authors, root? }` |
+| `GET /messages/:id` | | `{ message, authors, root? }`, `root` for a reply. A 404 when the viewer cannot read the message's channel or the feed no longer shows it |
 | `PATCH /messages/:id` | `{ body? \| text? }` | `{ message, authors }` |
 | `DELETE /messages/:id` | | `{ message, root? }` |
 | `POST /read` | `{ key, channels, at? }` or `{ key, thread, at? }` | `{ ok: true }`. Raises the cursor to `at` (default now, never in the future) |

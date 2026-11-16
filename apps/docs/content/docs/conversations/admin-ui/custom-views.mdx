@@ -237,6 +237,81 @@ export const DiscussButton = ({ conversationKey }: { conversationKey: string }) 
 
 Modal slugs are global in the admin. Derive them from the instance and key (as above) so two buttons for one conversation share a drawer and two conversations never do. A thread opens under `` `${slug}-thread` ``.
 
+## Links into a conversation
+
+A notification or an email should land on the message it is about. `ChatDrawer`, `ChatPanel` and `ChatTrigger` take `channel` and `message`:
+
+- `message` opens that message's channel, loads the feed around it (however far back), scrolls it into view and marks it. A reply opens its root's thread at the reply.
+- `channel` opens that channel instead of the first.
+- When the user cannot read what the link names, the first readable channel opens under a notice instead of silently showing something else. `renderUnavailable` replaces the notice.
+
+`afterMention` has what a link needs, with no further query: `key`, `channel`, `message.id`, and for a reply `message.parent`, its root's id (threads are one level deep).
+
+One drawer for every link on any admin page is an admin provider that reads the URL:
+
+```tsx
+'use client'
+import { ChatDrawer } from '@10x-media/conversations/client'
+import { ChatScope } from '@10x-media/conversations/react'
+import { useModal } from '@payloadcms/ui'
+import { useSearchParams } from 'next/navigation'
+import { type ReactNode, useEffect } from 'react'
+
+const SLUG = 'linked-conversation'
+
+export const LinkedConversation = ({ children }: { children?: ReactNode }) => {
+  const params = useSearchParams()
+  const conversationKey = params.get('conversation')
+  const channel = params.get('channel')
+  const message = params.get('message')
+  const { openModal } = useModal()
+
+  useEffect(() => {
+    if (conversationKey) openModal(SLUG)
+  }, [channel, conversationKey, message, openModal])
+
+  return (
+    <>
+      {children}
+      {conversationKey ? (
+        <ChatScope instance="comments">
+          <ChatDrawer
+            channel={channel}
+            conversationKey={conversationKey}
+            drawerSlug={SLUG}
+            instance="comments"
+            message={message}
+          />
+        </ChatScope>
+      ) : null}
+    </>
+  )
+}
+```
+
+Admin providers nest in the order of `admin.components.providers`, and the plugin appends its own when it runs. A provider listed in your base config therefore sits outside the chat store, and its `ChatScope` renders nothing. Add it after the plugin, from a plugin listed after `conversations()`:
+
+```ts
+plugins: [
+  conversations({ /* ... */ }),
+  (config) => ({
+    ...config,
+    admin: {
+      ...config.admin,
+      components: {
+        ...config.admin?.components,
+        providers: [
+          ...(config.admin?.components?.providers ?? []),
+          '/components/LinkedConversation#LinkedConversation',
+        ],
+      },
+    },
+  }),
+]
+```
+
+The dev app's `dev/components/LinkedConversation.tsx` is this provider: `/admin?conversation=<key>&message=<id>` opens on any page.
+
 ## Several instances on one screen
 
 Each instance has its own provider in the admin; nested providers do not interfere. Wrap each subtree in its own `ChatScope`, and a subtree only ever talks to its instance:

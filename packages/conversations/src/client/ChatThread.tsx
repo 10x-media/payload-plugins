@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react'
 
 import type { ChannelView } from '../react/hooks'
+import type { FeedFocus } from '../react/useChatPanel'
 import { useThread } from '../react/useThread'
 import type { WindowMessage } from '../react/window'
 import { keys } from '../translations/keys'
@@ -16,6 +17,8 @@ import { replaceable } from './components'
 export type ChatThreadProps = {
 	authors: AuthorsMap
 	channel: ChannelView
+	/** A reply to open the thread at and mark, e.g. a linked one. */
+	focus?: FeedFocus | null
 	instance: string
 	renderType?: (message: WindowMessage) => ReactNode
 	root: WindowMessage
@@ -26,13 +29,14 @@ export type ChatThreadProps = {
 const DefaultThread = ({
 	authors,
 	channel,
+	focus = null,
 	instance,
 	renderType,
 	root,
 	viewer,
 }: ChatThreadProps) => {
 	const { t } = useTranslation()
-	const conversation = useThread({ authors, root })
+	const conversation = useThread({ anchor: focus?.at ?? null, authors, root })
 	return (
 		<div className="conversations-thread">
 			<div className="conversations-thread__root">
@@ -47,6 +51,7 @@ const DefaultThread = ({
 			</div>
 			<ChatFeed
 				conversation={conversation}
+				focus={focus?.id ?? null}
 				instance={instance}
 				readOnly={!channel.canCreate}
 				renderType={renderType}

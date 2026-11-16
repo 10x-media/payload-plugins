@@ -1,6 +1,7 @@
 'use client'
 
 import { Button, useDocumentInfo, useModal } from '@payloadcms/ui'
+import type { ReactNode } from 'react'
 
 import { useChannels } from '../react/hooks'
 import { ChatScope } from '../react/provider'
@@ -12,9 +13,22 @@ import { replaceable } from './components'
 import './conversations.css'
 
 export type ChatTriggerProps = {
+	/** The channel the drawer opens on; see `ChatDrawer`'s `channel`. */
+	channel?: null | string
 	/** Overrides the key taken from the document being edited. */
 	conversationKey?: string
+	/**
+	 * Shown instead of the button once it is known the viewer can read no
+	 * channel of the conversation. Default: nothing.
+	 */
+	fallback?: ReactNode
 	instance: string
+	/** A message id the drawer opens at; see `ChatDrawer`'s `message`. */
+	message?: null | string
+	/** The drawer's line under the title. Default: the edited document's title. */
+	subtitle?: ReactNode
+	/** The drawer's title. Default: "Comments". */
+	title?: ReactNode
 }
 
 const CommentIcon = () => (
@@ -28,12 +42,20 @@ const CommentIcon = () => (
 	</svg>
 )
 
-const TriggerButton = ({ conversationKey, instance }: Required<ChatTriggerProps>) => {
+const TriggerButton = ({
+	channel,
+	conversationKey,
+	fallback,
+	instance,
+	message,
+	subtitle,
+	title,
+}: ChatTriggerProps & { conversationKey: string }) => {
 	const { t } = useTranslation()
 	const { openModal } = useModal()
-	const { title } = useDocumentInfo()
-	const { channels, count, reads, unread } = useChannels(conversationKey)
-	if (channels.length === 0) return null
+	const { title: documentTitle } = useDocumentInfo()
+	const { channels, count, reads, status, unread } = useChannels(conversationKey)
+	if (channels.length === 0) return status === 'loading' ? null : (fallback ?? null)
 	const drawerSlug = `conversations-${instance}-${conversationKey.replace(/[^a-zA-Z0-9-]/g, '-')}`
 	return (
 		<>
@@ -53,10 +75,13 @@ const TriggerButton = ({ conversationKey, instance }: Required<ChatTriggerProps>
 				) : null}
 			</Button>
 			<ChatDrawer
+				channel={channel}
 				conversationKey={conversationKey}
 				drawerSlug={drawerSlug}
 				instance={instance}
-				subtitle={title}
+				message={message}
+				subtitle={subtitle === undefined ? documentTitle : subtitle}
+				title={title}
 			/>
 		</>
 	)
@@ -64,10 +89,10 @@ const TriggerButton = ({ conversationKey, instance }: Required<ChatTriggerProps>
 
 /**
  * The document-controls button: count, unread dot, and the drawer it opens.
- * Renders nothing on a create view (no id yet) or when the user can read no
- * channel of this document.
+ * Renders nothing on a create view (no id yet), and `fallback` when the user
+ * can read no channel of this document.
  */
-const DefaultTrigger = ({ conversationKey, instance }: ChatTriggerProps) => {
+const DefaultTrigger = ({ conversationKey, ...props }: ChatTriggerProps) => {
 	const { collectionSlug, globalSlug, id } = useDocumentInfo()
 	const key =
 		conversationKey ??
@@ -78,8 +103,8 @@ const DefaultTrigger = ({ conversationKey, instance }: ChatTriggerProps) => {
 				: null)
 	if (!key) return null
 	return (
-		<ChatScope instance={instance}>
-			<TriggerButton conversationKey={key} instance={instance} />
+		<ChatScope instance={props.instance}>
+			<TriggerButton {...props} conversationKey={key} />
 		</ChatScope>
 	)
 }
