@@ -1092,7 +1092,7 @@
 	/* Payload styles only a `label.field-label`; this one is a span, since it labels no input. */
 	.analytics-provider-connection > .field-label {
 		display: flex;
-		padding-bottom: calc(var(--base) * 0.25);
+		padding-block-end: calc(var(--base) * 0.25);
 		color: var(--theme-elevation-800);
 	}
 
