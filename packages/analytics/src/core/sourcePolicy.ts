@@ -18,6 +18,12 @@ export interface OwnSource {
 	id: string
 	label: string
 	docId: string
+	/**
+	 * Whether the document's connection is failing, as the `fallback` policy reads it: refused, or a
+	 * vendor that did not answer while its reads rest. The statuses are read on the first call, once
+	 * per request, so a policy that never asks costs no read.
+	 */
+	failing(): Promise<boolean>
 }
 
 /**
@@ -34,7 +40,8 @@ export type SourcePolicyFunction = (args: {
 
 /**
  * Who besides `access.crossScope.unscopedSource` reads a tenant through a shared adapter: `staff`
- * nobody else, `tenant` the scope's members, `fallback` its members until they have a source of their own.
+ * nobody else, `tenant` the scope's members, `fallback` its members while they have no source of their own
+ * that works.
  */
 export type SourcePolicy = 'staff' | 'tenant' | 'fallback' | SourcePolicyFunction
 

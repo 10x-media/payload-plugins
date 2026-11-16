@@ -686,7 +686,82 @@ describe('posthog adapter', () => {
 			q({ metrics: ['pageviews'], granularity: 'hour', timezone: 'Europe/Berlin' }),
 			{}
 		)
-		expect(seriesSql).toContain("toStartOfHour(timestamp, 'Europe/Berlin')")
+		expect(seriesSql).toContain("toStartOfHour(toTimeZone(timestamp, 'Europe/Berlin')) AS hour")
+	})
+
+	it('buckets the hour series explicitly in UTC by default (HogQL toStartOfHour takes one argument)', async () => {
+		let seriesSql = ''
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY hour')) {
+					seriesSql = sql
+					return HttpResponse.json({ columns: ['hour', 'm0'], types: [], results: [] })
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'hour' }),
+			{}
+		)
+		expect(seriesSql).toContain("toStartOfHour(toTimeZone(timestamp, 'UTC')) AS hour")
+	})
+
+	it('reads an hour label as the Query API serves it, offset and all, at its wall-clock hour', async () => {
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', async ({ request }) => {
+				const sql = ((await request.json()) as { query?: { query?: string } }).query?.query ?? ''
+				if (sql.includes('GROUP BY hour')) {
+					return HttpResponse.json({
+						columns: ['hour', 'm0'],
+						types: [],
+						results: [['2026-01-01T05:00:00+01:00', 4]],
+					})
+				}
+				return HttpResponse.json({ columns: ['m0'], types: [], results: [[4]] })
+			})
+		)
+		const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+			q({ metrics: ['pageviews'], granularity: 'hour', timezone: 'Europe/Berlin' }),
+			{}
+		)
+		expect(result.rows).toEqual([
+			{ timestamp: '2026-01-01T05:00:00.000Z', metrics: { pageviews: 4 } },
+		])
+	})
+
+	describe('read host', () => {
+		const answer = () => HttpResponse.json({ columns: ['m0'], types: [], results: [[1]] })
+
+		it("reads from the region's cloud when no host is set", async () => {
+			server.use(http.post('https://eu.posthog.com/api/projects/123/query/', answer))
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k', region: 'eu' }).query(
+				q({ metrics: ['pageviews'] }),
+				{}
+			)
+			expect(result.totals).toEqual({ pageviews: 1 })
+		})
+
+		it('reads from US Cloud with neither a host nor a region', async () => {
+			server.use(http.post('https://us.posthog.com/api/projects/123/query/', answer))
+			const result = await posthog({ projectId: '123', apiKey: 'phx_k' }).query(
+				q({ metrics: ['pageviews'] }),
+				{}
+			)
+			expect(result.totals).toEqual({ pageviews: 1 })
+		})
+
+		it('reads from a self-hosted host whatever the region says', async () => {
+			server.use(http.post('https://ph.example.com/api/projects/123/query/', answer))
+			const result = await posthog({
+				projectId: '123',
+				apiKey: 'phx_k',
+				host: 'https://ph.example.com',
+				region: 'eu',
+			}).query(q({ metrics: ['pageviews'] }), {})
+			expect(result.totals).toEqual({ pageviews: 1 })
+		})
 	})
 
 	it('targets the configured host (EU / self-host)', async () => {
@@ -1047,5 +1122,52 @@ describe('posthog capture', () => {
 		const roundTripped = JSON.parse(JSON.stringify(capture?.client))
 		expect(roundTripped).toEqual({ kind: 'posthog', token: 'phc_public' })
 		expect(JSON.stringify(capture?.client)).not.toContain('phx_super_secret')
+	})
+})
+
+describe('posthog checkConnection', () => {
+	const ctx = () => ({ signal: AbortSignal.timeout(5_000), timeoutMs: 5_000 })
+
+	it("sends the smallest query to the region's Query API with the personal key", async () => {
+		let sent: { auth: string | null; body: unknown } | undefined
+		server.use(
+			http.post('https://eu.posthog.com/api/projects/123/query/', async ({ request }) => {
+				sent = { auth: request.headers.get('authorization'), body: await request.json() }
+				return HttpResponse.json({ columns: ['1'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k', region: 'eu' }).checkConnection?.(ctx())
+		expect(sent).toEqual({
+			auth: 'Bearer phx_k',
+			body: { query: { kind: 'HogQLQuery', query: 'SELECT 1' } },
+		})
+	})
+
+	it('throws what PostHog refused with, status and all', async () => {
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', () =>
+				HttpResponse.json(
+					{ detail: 'Personal API key found in request Authorization header is invalid.' },
+					{ status: 403 }
+				)
+			)
+		)
+		await expect(
+			posthog({ projectId: '123', apiKey: 'phx_eu' }).checkConnection?.(ctx())
+		).rejects.toMatchObject({ name: 'ProviderHttpError', status: 403 })
+	})
+})
+
+describe('posthog ids in addresses', () => {
+	it('reads with the project id as one path segment', async () => {
+		let path: string | null = null
+		server.use(
+			http.post('https://us.posthog.com/api/projects/:id/query/', ({ request }) => {
+				path = new URL(request.url).pathname
+				return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: 'a/b', apiKey: 'phx_k' }).query(q(), {})
+		expect(path).toBe('/api/projects/a%2Fb/query/')
 	})
 })

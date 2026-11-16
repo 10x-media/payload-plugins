@@ -1178,9 +1178,73 @@
 		color: var(--analytics-text-muted);
 	}
 
+	/* What the vendor said, inside the view's error banner: often one long JSON word. */
+	.analytics-view__source-note {
+		display: block;
+		margin-block-start: var(--spacer-1);
+		overflow-wrap: anywhere;
+	}
+
 	/* The view spaces its children by its gap, which Payload's banner margin would double. */
 	.analytics-view > .analytics-sources-notice {
 		margin-block-end: 0;
+	}
+
+	/*
+	 * The provider form's Connection panel, in the sidebar: laid out like Payload's auth-field
+	 * controls, its status and dates styled like the document controls' "Status: <value>".
+	 */
+	/* Payload styles only a `label.field-label`; this one is a span, since it labels no input. */
+	.analytics-provider-connection > .field-label {
+		display: flex;
+		color: var(--field-color-label);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		letter-spacing: var(--field-label-letter-spacing);
+	}
+
+	.analytics-provider-connection__body {
+		display: flex;
+		flex-direction: column;
+		gap: var(--spacer-3);
+	}
+
+	/* Its margin would stack on the column's gap. */
+	.analytics-provider-connection .banner {
+		margin-block-end: 0;
+	}
+
+	.analytics-provider-connection__help {
+		display: block;
+		font-weight: var(--text-body-medium-bold-font-weight);
+	}
+
+	/* A vendor's answer is often one long JSON word. */
+	.analytics-provider-connection__words {
+		display: block;
+		overflow-wrap: anywhere;
+	}
+
+	.analytics-provider-connection__facts {
+		display: flex;
+		flex-direction: column;
+		gap: var(--spacer-1);
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+
+	.analytics-provider-connection__facts li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+	}
+
+	.analytics-provider-connection__fact-label {
+		color: var(--analytics-text-muted);
+	}
+
+	.analytics-provider-connection__fact-value {
+		font-weight: var(--text-body-medium-bold-font-weight);
 	}
 
 	/* The breakdown's tabs, with the filter a row click set beside them. */

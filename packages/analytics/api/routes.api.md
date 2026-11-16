@@ -74,6 +74,7 @@ export interface AnalyticsAdapter {
     // (undocumented)
     readonly capabilities: AnalyticsCapabilities;
     readonly capture?: CaptureSupport;
+    checkConnection?(ctx: ConnectionCheckContext): Promise<void>;
     close?(payload: Payload): void | Promise<void>;
     // (undocumented)
     readonly id: string;
@@ -266,6 +267,13 @@ export interface CaptureSupport {
     // (undocumented)
     snippet(args: SnippetArgs): CaptureSnippet;
     withoutConsent?: HeldSlotMode;
+}
+
+// @public
+export interface ConnectionCheckContext {
+    payload?: Payload;
+    signal: AbortSignal;
+    timeoutMs: number;
 }
 
 // @public
@@ -539,6 +547,7 @@ export interface RoutePaths {
     goals: string;
     ingest: string;
     live: string;
+    providerStatus: string;
     proxy: string;
     proxyPattern: string;
     query: string;

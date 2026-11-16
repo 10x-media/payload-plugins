@@ -12,7 +12,7 @@ import { keys } from '../translations/keys'
 import { createStaticLabels } from '../translations/staticLabel'
 import type { BuildProvidersCollectionArgs, BuildSecretField } from './collection'
 import { analyticsProviderFields, buildProvidersCollection } from './collection'
-import { PROVIDER_IDS } from './factory'
+import { PROVIDER_IDS } from './ids'
 import { CONNECTION_PATHS, SECRET_PATHS } from './secrets'
 
 const named = (fields: Field[] | undefined, name: string): Field | undefined =>
@@ -159,8 +159,9 @@ describe('buildProvidersCollection', () => {
 			...unscopedArgs,
 			isSealed: (value) => value === sealed,
 		})
-		const [stamp, retarget] = withSeal.hooks?.beforeChange ?? []
-		expect(withSeal.hooks?.beforeChange).toHaveLength(2)
+		// The scope stamp, the note of a connection change, then the retarget.
+		const [stamp, , retarget] = withSeal.hooks?.beforeChange ?? []
+		expect(withSeal.hooks?.beforeChange).toHaveLength(3)
 		const data = {
 			provider: 'plausible',
 			plausible: { host: 'https://b.example.com', siteId: 's', apiKey: sealed },
@@ -262,9 +263,9 @@ describe('buildProvidersCollection', () => {
 		})
 	})
 
-	// Payload drops a function description from the client field, and the write-only editor reads
-	// the client field's own: a credential's help has to reach the browser as strings.
-	it("keeps each credential's help on the client field, in every language, install strings first", () => {
+	// Payload drops a function label and description from the client field, and the write-only editor
+	// reads the client field's own: a credential's label and help have to reach the browser as strings.
+	it("keeps each credential's label and help on the client field, in every language, install strings first", () => {
 		const relabeled = buildProvidersCollection({
 			slug: 'analytics-providers',
 			onChange: () => {},
@@ -308,6 +309,8 @@ describe('buildProvidersCollection', () => {
 			})
 			const description = (client as { admin?: { description?: unknown } }).admin?.description
 			expect(description, path).toMatchObject({ en: expect.any(String), zh: expect.any(String) })
+			const label = (client as { label?: unknown }).label
+			expect(label, path).toMatchObject({ en: expect.any(String), de: expect.any(String) })
 			expect((description as Record<string, string>).nl, path).toBe(
 				(description as Record<string, string>).en
 			)
@@ -500,8 +503,11 @@ describe('analyticsProviderFields', () => {
 			onChange: () => {},
 			...unscopedArgs,
 		})
+		// The Connection panel reads the collection's own status rows, which a host store has none of.
 		expect(fields.map((f) => ('name' in f ? f.name : f.type))).toEqual(
-			collection.fields.map((f) => ('name' in f ? f.name : f.type))
+			collection.fields
+				.map((f) => ('name' in f ? f.name : f.type))
+				.filter((name) => name !== 'connection')
 		)
 	})
 
@@ -670,7 +676,7 @@ describe('the default-for-this-site flag', () => {
 
 	const reqWith = (docs: unknown[]) => {
 		const find = vi.fn(async (_args: { where: unknown; pagination?: boolean }) => ({ docs }))
-		return { find, req: { t: (key: string) => key, payload: { find } } }
+		return { find, req: { t: (key: string) => key, i18n: { language: 'en' }, payload: { find } } }
 	}
 
 	it('is a sidebar checkbox after enabled, off by default, on a scoped install only', () => {
@@ -704,6 +710,8 @@ describe('the default-for-this-site flag', () => {
 		await expect(
 			hookOf(scoped())({ data: { isDefault: true }, operation: 'create', req })
 		).rejects.toMatchObject({
+			// The toast names the field by its label, not its path.
+			message: expect.stringContaining(keys.providerFieldIsDefault),
 			data: { errors: [{ path: 'isDefault', message: keys.providerErrorDefaultTaken }] },
 		})
 		const call = find.mock.calls[0]?.[0]

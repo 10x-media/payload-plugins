@@ -207,7 +207,7 @@ export const renderEntryPoints = (
 		'',
 		'## The adapter contract types',
 		'',
-		`The adapter entries, \`/next\` and \`/testing\` each also export the types an adapter is written against, the constants among them as types only, all of them stable and all also exported from \`@10x-media/analytics/types\`, which exports the constants as values: ${code(contract)}.`,
+		`The adapter entries, \`/routes\` and \`/testing\` each also export the types an adapter is written against, the constants among them as types only, all of them stable and all also exported from \`@10x-media/analytics/types\`, which exports the constants as values: ${code(contract)}.`,
 		''
 	)
 	for (const entry of page.entries) {

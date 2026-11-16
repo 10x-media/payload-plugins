@@ -118,8 +118,8 @@ export type {
 	ProviderCollectionFieldOverrides,
 	ProviderFieldOverride,
 } from '../providers/collection'
-export type { ProviderId } from '../providers/factory'
 export type { HostPattern, ProviderHostPolicy } from '../providers/hosts'
+export type { ProviderId } from '../providers/ids'
 export type { QueryError, QueryErrorCode } from '../query/errors'
 export type {
 	FetchQueryInit,

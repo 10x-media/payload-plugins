@@ -11,15 +11,7 @@ import { withFixedLabel } from '../core/sourceLabel'
 import { isOneOf, isRecord } from '../core/values'
 import type { WithoutConsentLevel } from '../tracker/config'
 import { checkDocumentHost, type DocumentHost, type ProviderHostPolicy } from './hosts'
-
-export type ProviderId = 'native' | 'plausible' | 'umami' | 'ga4' | 'posthog'
-export const PROVIDER_IDS = [
-	'native',
-	'plausible',
-	'umami',
-	'ga4',
-	'posthog',
-] as const satisfies readonly ProviderId[]
+import { documentAdapterId } from './ids'
 
 /** The provider-settings document shape the adapter factory reads (depth 0, secrets revealed). */
 export type ProviderDoc = {
@@ -62,8 +54,12 @@ export type ProviderDoc = {
 	} | null
 }
 
+/** A stored text value without the spaces a paste can leave around it. */
+const trimmed = (value: string | null | undefined): string => value?.trim() ?? ''
+
 /** A stored blank reads as unset. */
-const orUndefined = (value: string | null | undefined): string | undefined => value || undefined
+const orUndefined = (value: string | null | undefined): string | undefined =>
+	trimmed(value) || undefined
 
 /** An unset or unrecognized stored level follows `capture.withoutConsent`. */
 const documentWithoutConsent = (
@@ -81,10 +77,6 @@ const posthogRegion = (value: string | null | undefined): 'us' | 'eu' | undefine
 export const normalizePrivateKey = (key: string): string => key.replace(/\\n/g, '\n')
 
 const shortId = (id: number | string): string => String(id).slice(-6)
-
-/** The registry id of a provider document's adapter, which grants and stand-ins must match. */
-export const documentAdapterId = (provider: unknown, id: unknown): string =>
-	`${String(provider)}:${String(id)}`
 
 /** A lent `native` adapter under the document's name, so a source reads as its tenant named it. */
 const withDocumentLabel = (adapter: AnalyticsAdapter, doc: ProviderDoc): AnalyticsAdapter =>
@@ -119,6 +111,10 @@ export const failingAdapter = (
 		capabilities: shape.capabilities,
 		isConfigured: shape.isConfigured ?? (() => true),
 		query: fail,
+		// So Test connection says why, as a read would, rather than that there is nothing to check.
+		checkConnection: async () => {
+			throw error()
+		},
 		...(shape.realtime ? { realtime: fail } : {}),
 	}
 }
@@ -157,10 +153,12 @@ const buildBaseAdapter = (
 			const cfg = doc.plausible ?? {}
 			return onDocumentHost(checkDocumentHost('plausible', cfg.host, ctx.hosts), (host) =>
 				plausible({
-					siteId: cfg.siteId ?? '',
-					apiKey: cfg.apiKey ?? '',
+					siteId: trimmed(cfg.siteId),
+					apiKey: trimmed(cfg.apiKey),
 					host,
-					domain: orUndefined(cfg.domain),
+					domain: orUndefined(
+						cfg.domain && [...new Set(cfg.domain.split(',').map((site) => site.trim()))].join(',')
+					),
 					scriptId: orUndefined(cfg.scriptId),
 					revenueCurrency: orUndefined(cfg.revenueCurrency),
 					fetch: ctx.fetch,
@@ -172,7 +170,7 @@ const buildBaseAdapter = (
 			const cfg = doc.umami ?? {}
 			return onDocumentHost(checkDocumentHost('umami', cfg.host, ctx.hosts), (host) =>
 				umami({
-					websiteId: cfg.websiteId ?? '',
+					websiteId: trimmed(cfg.websiteId),
 					apiKey: orUndefined(cfg.apiKey),
 					token: orUndefined(cfg.token),
 					host,
@@ -184,9 +182,9 @@ const buildBaseAdapter = (
 		case 'ga4': {
 			const cfg = doc.ga4 ?? {}
 			return ga4({
-				propertyId: cfg.propertyId ?? '',
+				propertyId: trimmed(cfg.propertyId),
 				credentials: {
-					client_email: cfg.clientEmail ?? '',
+					client_email: trimmed(cfg.clientEmail),
 					private_key: normalizePrivateKey(cfg.privateKey ?? ''),
 				},
 				projectId: orUndefined(cfg.projectId),
@@ -200,12 +198,12 @@ const buildBaseAdapter = (
 			const cfg = doc.posthog ?? {}
 			return onDocumentHost(checkDocumentHost('posthog', cfg.host, ctx.hosts), (host) =>
 				posthog({
-					projectId: cfg.projectId ?? '',
-					apiKey: cfg.apiKey ?? '',
+					projectId: trimmed(cfg.projectId),
+					apiKey: trimmed(cfg.apiKey),
 					host,
 					projectToken: orUndefined(cfg.projectToken),
 					region: posthogRegion(cfg.region),
-					scopeProperty: orUndefined(cfg.scopeProperty?.trim()),
+					scopeProperty: orUndefined(cfg.scopeProperty),
 					fetch: ctx.fetch,
 					...consent,
 				})

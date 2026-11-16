@@ -7,6 +7,7 @@ import { ProvidersListNotice } from './ProvidersListNotice'
 
 vi.mock('@payloadcms/ui', () => ({
 	Banner: ({ children }: { children?: ReactNode }) => <div role="status">{children}</div>,
+	Gutter: ({ children }: { children?: ReactNode }) => <div className="gutter">{children}</div>,
 	useAuth: () => ({ user: { id: 'user-1' } }),
 	useConfig: () => ({
 		config: { routes: { admin: '/admin', api: '/api' }, serverURL: 'https://cms.test' },
@@ -44,6 +45,12 @@ describe('ProvidersListNotice', () => {
 		await renderNotice()
 		expect(screen.getByText(keys.sourcesPlatformFallback)).toBeDefined()
 		expect(String(fetchMock.mock.calls[0]?.[0])).toContain('/sources')
+	})
+
+	it("tells a tenant whose own source is failing that the platform's numbers stand in", async () => {
+		answer({ ...listing, notice: 'ownSourceFailing' })
+		await renderNotice()
+		expect(screen.getByText(keys.sourcesOwnSourceFailing)).toBeDefined()
 	})
 
 	it('renders nothing for a listing without a notice', async () => {

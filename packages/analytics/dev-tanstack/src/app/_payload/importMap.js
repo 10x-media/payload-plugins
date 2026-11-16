@@ -7,6 +7,8 @@ import { TenantField as TenantField_1d0591e3cf4f332c83a86da13a0de59a } from '@pa
 import { AssignTenantFieldTrigger as AssignTenantFieldTrigger_1d0591e3cf4f332c83a86da13a0de59a } from '@payloadcms/plugin-multi-tenant/client'
 import { ProtectedCell as ProtectedCell_cf1583332d9c5fb967cd4249af29ce12 } from '@10x-media/fields/rsc'
 import { ProtectedField as ProtectedField_02043ee4f38853ef8c4ef9fd50352514 } from '@10x-media/fields/client'
+import { ProviderConnection as ProviderConnection_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
+import { ProviderConnectionTest as ProviderConnectionTest_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { GoalAmountField as GoalAmountField_cf3604008f3ebbc369f9463262b1f9eb } from '@10x-media/analytics/client'
 import { LLMInstructionsDescription as LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de } from '@payloadcms/ui'
 import { LLMInstructionsCell as LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a } from '@payloadcms/ui/rsc'
@@ -48,6 +50,8 @@ export const importMap = {
   "@payloadcms/plugin-multi-tenant/client#AssignTenantFieldTrigger": AssignTenantFieldTrigger_1d0591e3cf4f332c83a86da13a0de59a,
   "@10x-media/fields/rsc#ProtectedCell": ProtectedCell_cf1583332d9c5fb967cd4249af29ce12,
   "@10x-media/fields/client#ProtectedField": ProtectedField_02043ee4f38853ef8c4ef9fd50352514,
+  "@10x-media/analytics/client#ProviderConnection": ProviderConnection_cf3604008f3ebbc369f9463262b1f9eb,
+  "@10x-media/analytics/client#ProviderConnectionTest": ProviderConnectionTest_cf3604008f3ebbc369f9463262b1f9eb,
   "@10x-media/analytics/client#GoalAmountField": GoalAmountField_cf3604008f3ebbc369f9463262b1f9eb,
   "@payloadcms/ui#LLMInstructionsDescription": LLMInstructionsDescription_3817bf644402e67bfe6577f60ef982de,
   "@payloadcms/ui/rsc#LLMInstructionsCell": LLMInstructionsCell_ab83ff7e88da8d3530831f296ec4756a,

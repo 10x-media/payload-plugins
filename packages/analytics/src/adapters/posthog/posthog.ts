@@ -13,6 +13,7 @@ import {
 	type AnalyticsQuery,
 	type AnalyticsResult,
 	type AnalyticsRow,
+	type ConnectionCheckContext,
 	DIMENSION_KEYS,
 	type DimensionKey,
 	type FilterOperator,
@@ -26,6 +27,7 @@ import { DEFAULT_TIMEZONE } from '../../timeframe/tz'
 import type { WithoutConsentLevel } from '../../tracker/config'
 import { emptyGoalBreakdown, goalHint, hintFailed, hintSlugs } from '../goalRead'
 import { hostnameOf, withoutTrailingSlash } from '../http/baseUrl'
+import { fetchJson } from '../http/fetchJson'
 import {
 	declaredFilters,
 	everyOperatorOn,
@@ -36,6 +38,7 @@ import {
 import { readTime } from '../readTime'
 import { dayIso, hourIso } from '../series'
 import { upstreamJson } from '../upstream'
+import { cloudAppHost, cloudRegionOf, type PosthogRegion } from './cloud'
 import { createProjectCheck } from './projectCheck'
 
 export interface PosthogConfig {
@@ -49,7 +52,7 @@ export interface PosthogConfig {
 	/** Personal API key with the "Query Read" scope (phx_...). Never exposed to the browser. */
 	apiKey: string
 	/**
-	 * API address. Defaults to US Cloud; EU is https://eu.posthog.com, self-host is your instance's
+	 * API address. Unset, the `region`'s cloud, US Cloud without one; self-host is your instance's
 	 * address, with the base path when a reverse proxy serves it under one.
 	 */
 	host?: string
@@ -61,8 +64,8 @@ export interface PosthogConfig {
 	 */
 	scopeProperty?: string
 	/**
-	 * PostHog Cloud region for the proxied capture routes. Derived from `host` when omitted. A
-	 * self-hosted `host` takes capture itself and ignores this.
+	 * PostHog Cloud region: where capture goes and, with no `host`, where reads go. Derived from `host`
+	 * when omitted. A self-hosted `host` takes both and ignores this.
 	 */
 	region?: 'us' | 'eu'
 	/**
@@ -85,13 +88,11 @@ export interface PosthogConfig {
 	withoutConsent?: WithoutConsentLevel
 }
 
-const US_CLOUD = 'https://us.posthog.com'
-
-const resolveRegion = (config: PosthogConfig): 'us' | 'eu' => {
+const resolveRegion = (config: PosthogConfig): PosthogRegion => {
 	if (config.region) {
 		return config.region
 	}
-	return config.host?.includes('eu.posthog.com') ? 'eu' : 'us'
+	return (config.host && cloudRegionOf(config.host)) || 'us'
 }
 
 /**
@@ -132,7 +133,7 @@ const captureHosts = (config: PosthogConfig): CaptureHosts => {
 		assets: `https://${region}-assets.i.posthog.com`,
 		ingest: `https://${region}.i.posthog.com`,
 		cloud: true,
-		ui: ui ?? `https://${region}.posthog.com`,
+		ui: ui ?? cloudAppHost(region),
 	}
 }
 
@@ -317,15 +318,16 @@ const FILTER_SQL: Record<FilterOperator, (expr: string, value: string) => string
 }
 
 interface SeriesBucket {
-	/** The HogQL function that buckets a timestamp. */
-	fn: string
+	/** HogQL that buckets `timestamp` in the reporting zone, given as a quoted literal. */
+	expr: (zone: string) => string
 	/** A bucket label read back as an ISO instant. */
 	isoOf: (label: string) => string | null
 }
 
 const SERIES_BUCKETS: Record<'day' | 'hour', SeriesBucket> = {
-	day: { fn: 'toStartOfDay', isoOf: dayIso },
-	hour: { fn: 'toStartOfHour', isoOf: hourIso },
+	day: { expr: (zone) => `toStartOfDay(timestamp, ${zone})`, isoOf: dayIso },
+	// HogQL's toStartOfHour takes one argument, unlike toStartOfDay, so the zone goes through toTimeZone.
+	hour: { expr: (zone) => `toStartOfHour(toTimeZone(timestamp, ${zone}))`, isoOf: hourIso },
 }
 
 /**
@@ -342,7 +344,7 @@ interface PosthogQueryResponse {
 }
 
 export function posthog(config: PosthogConfig): AnalyticsAdapter {
-	const host = withoutTrailingSlash(config.host ?? US_CLOUD)
+	const host = withoutTrailingSlash(config.host ?? cloudAppHost(resolveRegion(config)))
 	const maxLookbackDays = config.maxLookbackDays !== undefined ? config.maxLookbackDays : 730
 	const withoutConsent = adapterWithoutConsent(
 		config.withoutConsent,
@@ -391,6 +393,20 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 				}
 			: {}),
 		isConfigured: () => Boolean(config.projectId && config.apiKey),
+		// The Query API reads go through, rather than the project settings, which need project:read.
+		async checkConnection(ctx: ConnectionCheckContext): Promise<void> {
+			await fetchJson<unknown>(
+				`${host}/api/projects/${encodeURIComponent(config.projectId)}/query/`,
+				{
+					method: 'POST',
+					headers: { authorization: `Bearer ${config.apiKey}` },
+					body: { query: { kind: 'HogQLQuery', query: 'SELECT 1' } },
+					provider: 'posthog',
+					signal: ctx.signal,
+					...(config.fetch ? { fetch: config.fetch } : {}),
+				}
+			)
+		},
 		register(_config, context) {
 			fillsCountingSlot = context?.adapterCountsWithoutConsent !== false
 		},
@@ -492,13 +508,17 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 			}
 
 			const runSql = (sql: string): Promise<PosthogQueryResponse> =>
-				upstreamJson<PosthogQueryResponse>(ctx, `${host}/api/projects/${config.projectId}/query/`, {
-					method: 'POST',
-					headers: { authorization: `Bearer ${config.apiKey}` },
-					body: { query: { kind: 'HogQLQuery', query: sql } },
-					provider: 'posthog',
-					fetch: config.fetch,
-				})
+				upstreamJson<PosthogQueryResponse>(
+					ctx,
+					`${host}/api/projects/${encodeURIComponent(config.projectId)}/query/`,
+					{
+						method: 'POST',
+						headers: { authorization: `Bearer ${config.apiKey}` },
+						body: { query: { kind: 'HogQLQuery', query: sql } },
+						provider: 'posthog',
+						fetch: config.fetch,
+					}
+				)
 
 			/** A result row's metrics, its metric columns starting at `offset`. */
 			const readRow = (row: unknown[], offset: number): MetricValues => {
@@ -527,10 +547,10 @@ export function posthog(config: PosthogConfig): AnalyticsAdapter {
 					? q.granularity
 					: undefined
 			if (unit) {
-				const { fn, isoOf } = SERIES_BUCKETS[unit]
+				const { expr, isoOf } = SERIES_BUCKETS[unit]
 				// Without a timezone argument HogQL buckets in the project's zone, so the reporting zone
 				// (UTC included) is always passed; the window literals stay UTC instants, already aligned.
-				const bucket = `${fn}(timestamp, ${sqlString(q.timezone ?? DEFAULT_TIMEZONE)})`
+				const bucket = expr(sqlString(q.timezone ?? DEFAULT_TIMEZONE))
 				const [series, totals] = await Promise.all([
 					runSql(
 						`SELECT ${bucket} AS ${unit}, ${columns} ${from} GROUP BY ${unit} ORDER BY ${unit}`

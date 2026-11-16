@@ -25,6 +25,7 @@ export const plugin = analytics({
 | `GET` | `/api/_x/query` | [readers](#who-may-read) | always: the [query endpoint](#query-endpoint) |
 | `GET` | `/api/_x/sources` | readers | always: the [sources endpoint](#sources-endpoint) |
 | `POST` | `/api/_x/refresh` | readers | always: the [refresh endpoint](#refresh-endpoint) |
+| `GET`, `POST` | `/api/_x/provider-status` | users who may read the provider document, `POST` those who may update it | `providers.collection` is on: the [provider status endpoint](#provider-status-endpoint) |
 | `GET` | `/api/_x/goals` | readers | always: the [goals endpoint](#goals-endpoint) |
 | `GET` | `/api/_x/document` | readers | `collections` binds at least one collection: the [document endpoint](#document-endpoint) |
 | `GET` | `/api/_x/live` | readers | a config adapter reads realtime, or the install runs provider documents: the [live endpoint](#live-endpoint) |
@@ -77,7 +78,7 @@ Every answer of a read endpoint, success or failure, carries `Cache-Control: pri
 
 `label` is the adapter's label for this reader (the native engine's is **Payload** unless its [`label` option](/analytics/providers#a-sources-name) says otherwise), or a provider document's name; a `native` provider document keeps the id `native` and lends it the document's name. `defaultId` is the [default source](/analytics/concepts#sources-and-adapters): in a tenant scope the document flagged **Default for this site**, then the `defaultSource` rule ([A tenant's default source](/analytics/multi-tenancy#a-tenants-default-source)); otherwise, and when neither picks one this reader may read, `defaultAdapter`, else the first config adapter, and the first source left when the scope's listing drops that one.
 
-`notice` is present only to say something about the listing. `'platformFallback'` means the listing holds a shared adapter a [`fallback` policy](/analytics/multi-tenancy#letting-tenants-read-a-shared-source) admitted because the reader has no source of their own: the numbers are the platform's until they add one.
+`notice` is present only to say something about the listing. `'platformFallback'` means the listing holds a shared adapter a [`fallback` policy](/analytics/multi-tenancy#letting-tenants-read-a-shared-source) admitted because the reader has no source of their own: the numbers are the platform's until they add one. `'ownSourceFailing'` means it admitted one because every source of the reader's own is failing; `defaultId` is then that shared adapter when the default would have been a failing source.
 
 It takes **no scope parameter**, deliberately, so a tenant can never enumerate another tenant's sources. `collection` and `id` together list the sources of that document's own scope instead, for the document panel's source switcher: a document that is not bound, missing or not the caller's to read answers `404 not_found`, a failed document read `500 internal`, and a document in a scope the caller may not read `400 untrusted_scope`.
 
@@ -367,6 +368,35 @@ Unlike `fetchQuery` it is not deduped: a reader pressing Refresh twice means it 
 
 A refresh invalidates; it does not re-read. Nothing is fetched from the source until a surface asks, so the next read of that scope pays the cold round trip.
 
+## Provider status endpoint
+
+```http
+GET /api/_x/provider-status?id=<provider document id>
+POST /api/_x/provider-status?id=<provider document id>
+```
+
+`GET` answers the last connection result of one provider document. `POST` first checks the connection with the cheapest read the vendor has, then answers the same, with what the check found in `checked`. The **Test connection** button in the document's form calls it ([Checking a connection](/analytics/providers#checking-a-connection)).
+
+```jsonc
+{
+  "status": {
+    "lastSuccessAt": "2026-11-09T10:00:00.000Z",
+    "lastErrorAt": "2026-11-09T09:58:12.000Z",
+    "errorKind": "source_misconfigured", // or "unavailable"
+    "errorReason": "incomplete", // or "unknownSite", when the plugin knows why
+    "errorDetail": "posthog: HTTP 403 Invalid personal API key.",
+    "pausedUntil": "2026-11-09T09:58:42.000Z" // while the source rests
+  },
+  "checked": { "ok": false, "kind": "source_misconfigured", "detail": "posthog: HTTP 403 Invalid personal API key." } // POST only
+}
+```
+
+Every field of `status` is absent until it was written, so a document nothing has read yet answers `{ "status": {} }`, and so does one whose last result is about its settings before a save that changed how it connects. Ordinary reads write it as well: a failure at once, a success at most every 15 minutes per instance and at once after a failure. On several instances a success can therefore show up to 15 minutes late; **Test connection** writes at once. `errorDetail` is the vendor's answer cut to 300 characters; a refused host keeps none.
+
+Access is Payload's own for the provider document, asked with the caller's user: `GET` needs read access to it and `POST` update access. A document the caller may not read, another tenant's included, answers `404` exactly like a missing one, and nothing is sent to its vendor.
+
+A check waits 10 seconds for the vendor. A document without its key or ids is refused without asking the vendor. A second `POST` for the same document within 5 seconds on one instance, with no save in between, answers the stored result without `checked` and asks nothing.
+
 ## Goals endpoint
 
 `GET /api/_x/goals` lists the goals the request's scope can see, which is what the [goal picker](/analytics/goals#2-pick-a-goal-in-a-block) offers: the config goals merged with the [goals collection](/analytics/goals#5-let-editors-manage-goals)'s for the request's own scope, the collection's read through its own read access with the reader's user.
@@ -538,6 +568,12 @@ The union is exported as `AnalyticsErrorCode` (with `QueryErrorCode` as an alias
 | `/_x/refresh` | `413` | `payload_too_large` | | the body is over 4 KiB |
 | `/_x/refresh` | `500` | `internal` | | the `access.read` check threw; logged |
 | `/_x/refresh` | `503` | `unavailable` | | this Payload instance runs without the plugin, or the token could not be written; logged |
+| `/_x/provider-status` | `400` | `invalid_param` | `id` | `id` is missing or blank, or a `POST` names a document whose provider has no connection to check (`native`) |
+| `/_x/provider-status` | `401` | `unauthorized` | | no signed-in user |
+| `/_x/provider-status` | `403` | `forbidden` | | a `POST` from a caller who may read the document but not update it |
+| `/_x/provider-status` | `404` | `not_found` | `id` | the document does not exist or the caller may not read it; the two are one answer |
+| `/_x/provider-status` | `500` | `internal` | | the document or its stored status could not be read; logged with the document id |
+| `/_x/provider-status` | `503` | `unavailable` | | this Payload instance runs without the plugin |
 | `/_x/goals` | `400` | `untrusted_scope` | | the request's own tenant is one `scope.member` says the user does not belong to |
 | `/_x/goals` | `401` | `unauthorized` | | no signed-in user |
 | `/_x/goals` | `403` | `forbidden` | | `access.read` denied the request |

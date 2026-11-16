@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PROVIDER_IDS } from './factory'
+import { PROVIDER_IDS } from './ids'
 import { CONNECTION_PATHS, SECRET_PATHS } from './secrets'
 
 describe('SECRET_PATHS', () => {

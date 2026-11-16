@@ -7,6 +7,8 @@ import {
 	parseHostAddress,
 	parseHostPattern,
 	resolveHostPolicy,
+	validatePosthogHost,
+	validatePosthogRegion,
 	validateProviderHost,
 } from './hosts'
 
@@ -192,5 +194,139 @@ describe('checkDocumentHost', () => {
 			host: 'umami:3000?x',
 			reason: 'it is not an address this install accepts',
 		})
+	})
+})
+
+describe("validateProviderHost against the install's allow list", () => {
+	const listed = (provider: HostedProvider) =>
+		validateProviderHost(false, {
+			provider,
+			allow: [parseHostPattern('https://*.example.com', false)],
+		})
+
+	it.each([
+		['blank', { provider: 'umami', value: '' }, true],
+		[
+			'an address the allow list names',
+			{ provider: 'umami', value: 'https://umami.example.com' },
+			true,
+		],
+		["the vendor's own cloud", { provider: 'plausible', value: 'https://plausible.io' }, true],
+		['PostHog EU Cloud', { provider: 'posthog', value: 'https://eu.posthog.com' }, true],
+		[
+			'an address outside the allow list',
+			{ provider: 'umami', value: 'https://umami.other.org' },
+			'analytics:providerErrorHostNotAllowed',
+		],
+		[
+			"another vendor's cloud",
+			{ provider: 'umami', value: 'https://plausible.io' },
+			'analytics:providerErrorHostNotAllowed',
+		],
+	] as const)('%s', async (_name, { provider, value }, expected) => {
+		expect(await listed(provider)(value, t)).toBe(expected)
+	})
+
+	it('still answers a malformed address as malformed', async () => {
+		expect(await listed('umami')('https://umami.other.org/?a=1', t)).toBe(
+			'analytics:providerErrorHostFormat'
+		)
+	})
+})
+
+describe('validatePosthogHost', () => {
+	const validate = validatePosthogHost(false)
+
+	it.each([
+		['blank Host with Region EU', { host: '', region: 'eu' }, true],
+		['a Host of only spaces with Region EU', { host: '   ', region: 'eu' }, true],
+		['EU Cloud with Region EU', { host: 'https://eu.posthog.com', region: 'eu' }, true],
+		[
+			'EU Cloud inside spaces with Region EU',
+			{ host: '  https://eu.posthog.com  ', region: 'eu' },
+			true,
+		],
+		[
+			'the older US address with Region US',
+			{ host: 'https://app.posthog.com', region: 'us' },
+			true,
+		],
+		[
+			'EU Cloud with no Region, which the host decides',
+			{ host: 'https://eu.posthog.com', region: undefined },
+			true,
+		],
+		[
+			'a self-hosted instance with Region EU',
+			{ host: 'https://ph.example.com', region: 'eu' },
+			true,
+		],
+		[
+			'US Cloud with Region EU',
+			{ host: 'https://us.posthog.com', region: 'eu' },
+			'analytics:providerErrorPosthogHostRegion',
+		],
+		[
+			'the older US address with Region EU',
+			{ host: 'https://app.posthog.com', region: 'eu' },
+			'analytics:providerErrorPosthogHostRegion',
+		],
+		[
+			'EU Cloud with Region US',
+			{ host: 'https://eu.posthog.com', region: 'us' },
+			'analytics:providerErrorPosthogHostRegion',
+		],
+		[
+			'plain http, refused as any host is',
+			{ host: 'http://eu.posthog.com', region: 'eu' },
+			'analytics:providerErrorHostInsecure',
+		],
+		[
+			'a space inside the address',
+			{ host: 'https://eu.posthog .com', region: 'eu' },
+			'analytics:providerErrorHostFormat',
+		],
+	] as const)('%s', (_name, { host, region }, expected) => {
+		const args = { req: { t: (key: string) => key }, siblingData: { region } } as never
+		expect(validate(host, args)).toBe(expected)
+	})
+})
+
+describe('validatePosthogRegion', () => {
+	const options = [
+		{ label: 'US', value: 'us' },
+		{ label: 'EU', value: 'eu' },
+	]
+
+	it.each([
+		[
+			'no Region with a blank Host',
+			{ region: undefined, host: '' },
+			'analytics:providerErrorPosthogRegionRequired',
+		],
+		[
+			'no Region with a Host of only spaces',
+			{ region: null, host: '   ' },
+			'analytics:providerErrorPosthogRegionRequired',
+		],
+		[
+			'no Region and no Host at all',
+			{ region: '', host: undefined },
+			'analytics:providerErrorPosthogRegionRequired',
+		],
+		['Region EU with a blank Host', { region: 'eu', host: '' }, true],
+		[
+			'no Region with a cloud Host, which decides it',
+			{ region: undefined, host: 'https://eu.posthog.com' },
+			true,
+		],
+		[
+			'no Region with a self-hosted Host',
+			{ region: undefined, host: 'https://ph.example.com' },
+			true,
+		],
+	] as const)('%s', async (_name, { region, host }, expected) => {
+		const args = { req: { t: (key: string) => key }, siblingData: { host }, options } as never
+		expect(await validatePosthogRegion(region, args)).toBe(expected)
 	})
 })
