@@ -20,7 +20,19 @@ type ErrorBody = { error: { code: string; param?: string } }
 /** Which tenant each test user belongs to; `alpha-viewer` reads alpha's documents but edits none. */
 const TENANT: Record<string, string> = { alpha: 'alpha', 'alpha-viewer': 'alpha', beta: 'beta' }
 
-const userOf = (id: string): User => ({ id, collection: 'users' }) as unknown as User
+/**
+ * The seeded user's id for each name in {@link TENANT}, and back: Payload 4 stamps a document's
+ * `createdBy` with its creator, which on Mongo must be a real user's ObjectId.
+ */
+const idOf: Record<string, string | number> = {}
+const nameOf = new Map<string, string>()
+
+const userOf = (name: string): User =>
+	({ id: idOf[name] ?? name, collection: 'users' }) as unknown as User
+
+/** The {@link TENANT} name of whoever the request authenticated as. */
+const tenantOf = (user: { id: unknown } | null | undefined): string | undefined =>
+	TENANT[nameOf.get(String(user?.id)) ?? '']
 
 /**
  * Plausible's query API on loopback: a `denied` site is refused the way a wrong key is, a `down` one
@@ -89,17 +101,19 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 				adapters: [memoryAdapter()],
 				capture: { gate: 'off' },
 				scope: {
-					resolve: ({ req }) => TENANT[String(req.user?.id)] ?? null,
-					member: ({ req, scope }) => TENANT[String(req.user?.id)] === scope,
+					resolve: ({ req }) => tenantOf(req.user) ?? null,
+					member: ({ req, scope }) => tenantOf(req.user) === scope,
 				},
 				access: { crossScope: () => false },
 				providers: {
 					collection: {
 						access: {
-							update: ({ req }) =>
-								req.user?.id === 'alpha' || req.user?.id === 'beta'
-									? { scope: { equals: TENANT[String(req.user.id)] } }
-									: false,
+							update: ({ req }) => {
+								const name = nameOf.get(String(req.user?.id))
+								return name === 'alpha' || name === 'beta'
+									? { scope: { equals: TENANT[name] } }
+									: false
+							},
 						},
 					},
 					hosts: { allow: [vendor.origin, closed], allowPrivateNetwork: true },
@@ -107,6 +121,15 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 				widgets: { comparison: false },
 			}),
 		})
+		for (const name of Object.keys(TENANT)) {
+			const user = await booted.payload.create({
+				collection: 'users',
+				data: { email: `${name}@example.com`, password: 'provider-status' },
+				overrideAccess: true,
+			})
+			idOf[name] = user.id
+			nameOf.set(String(user.id), name)
+		}
 	}, 240_000)
 
 	afterAll(async () => {
