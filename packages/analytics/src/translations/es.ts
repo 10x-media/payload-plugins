@@ -122,7 +122,8 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldSiteId]: 'ID del sitio',
 	[keys.providerFieldApiKey]: 'Clave de API',
 	[keys.providerFieldHost]: 'Host',
-	[keys.providerFieldHostHelp]: 'Déjalo vacío para usar la dirección predeterminada.',
+	[keys.providerFieldHostHelp]:
+		'Solo para una instancia propia: su dirección. Déjalo vacío para usar la nube del proveedor.',
 	[keys.providerFieldWebsiteId]: 'ID del sitio web',
 	[keys.providerFieldToken]: 'Token de API',
 	[keys.providerFieldPropertyId]: 'ID de propiedad',
@@ -137,8 +138,10 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldMeasurementId]: 'ID de medición',
 	[keys.providerFieldCaptureHelp]:
 		'Esto activa el seguimiento en tu sitio. Déjalo vacío para desactivarlo.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'El ID de medición (G-...) de tu flujo de datos web, del administrador de GA4. Activa el seguimiento de tu sitio; déjalo vacío para desactivarlo.',
 	[keys.providerFieldDomainHelp]:
-		'El dominio con el que el script de seguimiento registra las visitas, normalmente el mismo que el ID del sitio. Activa el seguimiento con el script estándar de Plausible y tiene prioridad sobre el ID del script si rellenas ambos. Déjalo vacío, junto con el ID del script, para desactivar el seguimiento.',
+		'El dominio con el que el script de seguimiento registra las visitas, normalmente el mismo que el ID del sitio. Activa el seguimiento con el script estándar de Plausible y tiene prioridad sobre el ID del script si rellenas ambos. Déjalo vacío, junto con el ID del script, para desactivar el seguimiento. Para contar las visitas en varios sitios, sepáralos con comas.',
 	[keys.providerFieldScriptIdHelp]:
 		'Para un sitio que usa el script más reciente de Plausible, propio de cada sitio: el ID de su dirección, la parte después de pa- en pa-XXXX.js. Activa el seguimiento con ese script. Déjalo vacío, junto con la dirección web, para desactivar el seguimiento.',
 	[keys.providerErrorMeasurementId]: 'Usa solo letras, dígitos y guiones, por ejemplo G-AB12CD34.',
@@ -147,9 +150,43 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Escribe solo la dirección, por ejemplo https://analytics.example.com o https://example.com/analytics, sin ninguna parte que empiece por ? o # y sin usuario ni contraseña.',
 	[keys.providerErrorHostInsecure]: 'La dirección debe empezar por https://.',
+	[keys.providerErrorHostNotAllowed]:
+		'Este sitio no permite esta dirección. Pide a su desarrollador que la añada.',
+	[keys.providerErrorSiteDomain]:
+		'Escribe el sitio tal como aparece en Plausible, como example.com o example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Escribe solo el número, como 123456789.',
+	[keys.providerErrorPosthogRegionRequired]: 'Elige la región de tu proyecto.',
 	[keys.providerErrorPosthogHostRegion]: 'Dirección de la otra región de PostHog.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Token de proyecto (phc_), no clave API.',
 	[keys.providerErrorPosthogKeyAsToken]: 'Clave privada. Usa el token phc_.',
+	[keys.providerConnectionLabel]: 'Conexión',
+	[keys.providerConnectionStatus]: 'Estado',
+	[keys.providerConnectionTest]: 'Probar conexión',
+	[keys.providerConnectionConnected]: 'Conectado',
+	[keys.providerConnectionNotConnected]: 'Sin conexión',
+	[keys.providerConnectionNoAnswer]: 'Sin respuesta',
+	[keys.providerConnectionUnchecked]: 'Sin comprobar',
+	[keys.providerConnectionLastSuccess]: 'Último éxito',
+	[keys.providerConnectionLastError]: 'Último fallo',
+	[keys.providerConnectionPaused]: 'Lecturas en pausa hasta {{date}}',
+	[keys.providerConnectionResumes]: 'Se reanuda',
+	[keys.providerConnectionSaveFirst]: 'Guarda el documento para probarlo.',
+	[keys.providerConnectionUnsaved]: 'Guarda los cambios para probarlos.',
+	[keys.providerConnectionNoPermission]:
+		'Solo quien puede editar este documento puede probar su conexión.',
+	[keys.providerConnectionRefusedHelp]: 'Revisa la clave, los ID y el host.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'Revisa la clave, los ID, la región y el host.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Revisa el ID de propiedad y la clave, y que el correo del cliente sea Lector de la propiedad.',
+	[keys.providerConnectionIncompleteHelp]:
+		'Falta una clave o un ID que esta comprobación necesita. Introdúcelo, guarda y vuelve a probar.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'El servicio no conoce este sitio. Copia su ID desde la configuración del propio servicio.',
+	[keys.providerConnectionUnreachableHelp]: 'El servicio no respondió. Inténtalo más tarde.',
+	[keys.providerConnectionChecked]: 'La conexión funciona',
+	[keys.providerConnectionFailed]: 'La conexión falló',
+	[keys.providerConnectionCheckRunning]:
+		'Ya hay una comprobación de estos ajustes en curso. Vuelve a probar en unos segundos.',
 	[keys.providerFieldIsDefault]: 'Predeterminado para este sitio',
 	[keys.providerFieldIsDefaultHelp]:
 		'Las estadísticas se abren con esta herramienta salvo que el lector elija otra. Solo una herramienta por sitio puede ser la predeterminada.',
@@ -355,7 +392,7 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.filterHintGoal]: 'Código corto del objetivo, por ejemplo newsletter-signup',
 	[keys.filterHintCurrency]: 'Código de moneda de tres letras, por ejemplo EUR',
 	[keys.providersCollectionDescription]:
-		'Añade una entrada por cada herramienta de analítica que conectes. Tus claves se guardan de forma segura y no vuelven a mostrarse; solo quedan visibles los últimos cuatro caracteres para que sepas cuál está guardada.',
+		'Añade una entrada por cada herramienta de analítica que conectes. Tus claves se guardan de forma segura y no vuelven a mostrarse; solo quedan visibles los últimos cuatro caracteres para que sepas cuál está guardada. Cambiar adónde se conecta una entrada guardada (el Host, la región, un ID con el que lee, el Email del cliente o la Etiqueta del sitio) borra sus claves: vuelve a introducirlas al guardar.',
 	[keys.providerFieldNameHelp]: 'Se muestra allí donde eliges una fuente de datos.',
 	[keys.providerFieldProviderHelp]:
 		'Para qué herramienta de analítica es. Los campos de abajo cambian según tu elección.',
@@ -364,20 +401,27 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'El sitio web que mide Plausible, normalmente escrito como yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'La clave de solo lectura con la que se consultan tus informes. Se guarda de forma segura y no vuelve a mostrarse.',
+		'Una clave de Stats API de la configuración de tu cuenta de Plausible, en API Keys. Se guarda de forma segura y no se vuelve a mostrar.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'Una clave de API personal (phx_...) con el permiso Query Read, de la configuración de tu cuenta de PostHog. Se guarda de forma segura y no se vuelve a mostrar.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'Para Umami Cloud. En Umami autoalojado, pon la clave en Token de API. Se guarda de forma segura y no vuelve a mostrarse.',
 	[keys.providerFieldWebsiteIdHelp]:
 		'El ID de tu sitio web, que aparece en la barra de direcciones de tu panel de Umami.',
 	[keys.providerFieldTokenHelp]:
-		'Tu token de Umami Cloud, que se usa en lugar de usuario y contraseña. Se guarda de forma segura.',
+		'Para Umami autoalojado: una clave de API de su configuración o un token de inicio de sesión. En Umami Cloud, usa Clave de API. Se guarda de forma segura.',
 	[keys.providerFieldPropertyIdHelp]:
 		'El número de tu propiedad GA4, en Google Analytics. Sin la palabra properties/.',
 	[keys.providerFieldClientEmailHelp]:
-		'La dirección de la cuenta de servicio que aparece en el archivo que te dio Google.',
+		'La dirección de la cuenta de servicio del archivo que te dio Google. Añádela como Lector en la gestión de acceso de la propiedad de GA4, o las lecturas se rechazarán.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'La clave privada de ese mismo archivo de Google, copiada tal cual. Se guarda de forma segura.',
-	[keys.providerFieldProjectIdHelp]: 'El proyecto con el que se conecta.',
+	[keys.providerFieldProjectIdHelp]:
+		'Opcional. El project_id del archivo de la cuenta de servicio.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'El número que aparece como Project ID en la configuración de tu proyecto de PostHog.',
 	[keys.providerFieldRegionHelp]:
-		'Solo para PostHog Cloud. Se ignora cuando Host es una instancia autoalojada.',
+		'La nube de tu dirección de PostHog: US para us.posthog.com, EU para eu.posthog.com. Se ignora si Host es una instancia propia. Obligatorio si Host está vacío.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'El código de moneda de 3 letras de tus objetivos de venta, por ejemplo USD. Los ingresos no se muestran hasta que lo indiques.',
 	[keys.providerFieldGa4CurrencyHelp]:
@@ -420,6 +464,8 @@ export const es: LocaleBundle<'one' | 'many' | 'other'> = {
 	[keys.panelNoViews]: 'No hay vistas en este rango de fechas.',
 	[keys.sourcesPlatformFallback]:
 		'Estas cifras vienen de la herramienta de analítica de la plataforma hasta que este sitio añada la suya. Al añadirla, se cambia a ella.',
+	[keys.sourcesOwnSourceFailing]:
+		'La herramienta de analítica propia de este sitio no funciona, así que estas cifras vienen de la de la plataforma. Se vuelve a ella en cuanto su conexión funcione de nuevo.',
 	[keys.stateSourceSubstituted]:
 		'La fuente de datos guardada ya no está disponible, así que se muestra la predeterminada.',
 	[keys.statePosthogCookielessDropped]:

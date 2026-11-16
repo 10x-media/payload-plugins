@@ -17,6 +17,7 @@ import {
 	ReadFailedError,
 	readFailureOf,
 	ScopeBusyError,
+	vendorAnswerOf,
 } from './classifyError'
 
 /** A google-gax style error: GA4's client rejects with the gRPC status as a numeric `code`. */
@@ -249,5 +250,34 @@ describe('readFailureOf', () => {
 		).toEqual({ status: 'busy', retryAfterMs: 7000 })
 		expect(readFailureOf(new ScopeBusyError(2000))).toEqual({ status: 'busy', retryAfterMs: 2000 })
 		expect(readFailureOf(new Error(PROVIDER_READ_TIMEOUT_MESSAGE))).toEqual({ status: 'busy' })
+	})
+})
+
+describe('vendorAnswerOf', () => {
+	const grpc = (code: number, message: string) => Object.assign(new Error(message), { code })
+
+	it('keeps what the vendor answered, by an HTTP status or a gRPC code, anywhere in the chain', () => {
+		const answered = new ProviderHttpError(
+			403,
+			'posthog',
+			'posthog: HTTP 403 Invalid personal API key.'
+		)
+		expect(vendorAnswerOf(new Error('read failed', { cause: answered }))).toBe(answered.message)
+		expect(
+			vendorAnswerOf(grpc(7, '7 PERMISSION_DENIED: User does not have sufficient permissions'))
+		).toBe('7 PERMISSION_DENIED: User does not have sufficient permissions')
+	})
+
+	// The gRPC client sets these itself, in words that can name the address it tried.
+	it('keeps nothing the gRPC client or the runtime said on its own', () => {
+		for (const code of [1, 4, 14]) {
+			expect(
+				vendorAnswerOf(grpc(code, `${code} UNAVAILABLE: connect to 10.0.0.5:443 failed`))
+			).toBeUndefined()
+		}
+		expect(vendorAnswerOf(new TypeError('fetch failed'))).toBeUndefined()
+		expect(
+			vendorAnswerOf(new DOMException('The operation was aborted.', 'AbortError'))
+		).toBeUndefined()
 	})
 })

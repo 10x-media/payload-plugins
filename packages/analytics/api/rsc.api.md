@@ -537,7 +537,7 @@ export interface SeriesPoint {
 export function SourceSelectFieldServer(props: SelectFieldServerProps): JSX.Element;
 
 // @public
-export type SourcesNotice = 'platformFallback';
+export type SourcesNotice = 'platformFallback' | 'ownSourceFailing';
 
 // @public (undocumented)
 export interface SourcesResponse {
@@ -578,6 +578,7 @@ export type TimeframePreset = (typeof TIMEFRAME_PRESETS)[number];
 export interface ViewEndpoints {
     // (undocumented)
     live: string;
+    providerStatus?: string;
     // (undocumented)
     query: string;
     // (undocumented)

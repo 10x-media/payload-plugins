@@ -37,7 +37,9 @@ const isWireSource = (value: unknown): value is WireSource =>
 const isSourcesResponse = (value: unknown): value is SourcesResponse =>
 	isRecord(value) &&
 	(value.defaultId === null || typeof value.defaultId === 'string') &&
-	(value.notice === undefined || value.notice === 'platformFallback') &&
+	(value.notice === undefined ||
+		value.notice === 'platformFallback' ||
+		value.notice === 'ownSourceFailing') &&
 	Array.isArray(value.sources) &&
 	value.sources.every(isWireSource)
 

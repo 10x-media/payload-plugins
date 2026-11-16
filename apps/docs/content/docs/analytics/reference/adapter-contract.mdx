@@ -18,6 +18,7 @@ Everything in the plugin reads through one interface, `AnalyticsAdapter` from `@
 | `isConfigured()` | False when its credentials are missing. An unconfigured source answers every read with empty rows and makes no network call. |
 | `query(query, ctx)` | Answers a read: rows, totals and `meta`. |
 | `realtime(query, ctx)` | Optional. Answers the live reads the realtime widget, the view's realtime strip and the document panel's counter poll. |
+| `checkConnection(ctx)` | Optional. One cheap read that proves the source's settings work, behind a provider document's **Test connection**. It resolves when the vendor accepts them and throws what a read would when it does not. It does not go through the source's [lane](/analytics/cache#reaching-the-sources), so a rested source is tried anyway. `ctx` holds `signal` and `timeoutMs` for the check's deadline, and `payload` for an adapter that keeps a client per instance. The built-in vendor adapters run their own read path's smallest request: PostHog a `SELECT 1` through the Query API, Plausible one day's `visitors`, Umami the website itself, GA4 a one-row report. |
 | `register(config, context)` | Optional. Runs once while the plugin builds the Payload config: [lifecycle](#lifecycle). |
 | `registerSchema(config, context)` | Optional. Runs in place of `register` while the plugin is [switched off](/analytics/reference/options#switching-it-off). |
 | `attach(payload)` | Optional. Binds the adapter to each Payload instance a runtime is built for. |
@@ -253,7 +254,7 @@ A deterministic in-memory adapter for tests and local development. It serves `pa
 
 ### Waiting for background work
 
-The plugin does some of its work after a call has answered: it stores cached reads, runs the native engine's upkeep, and buffers hits when [write batching](/analytics/native#write-batching-opt-in) is on. A test that reads back what it just tracked, or destroys Payload, waits for that first with `settleAnalytics`, which flushes the write buffer too:
+The plugin does some of its work after a call has answered: it stores cached reads, runs the native engine's upkeep, buffers hits when [write batching](/analytics/native#write-batching-opt-in) is on, and writes or clears provider connection statuses. A test that reads back what it just tracked, or destroys Payload, waits for that first with `settleAnalytics`, which flushes the write buffer too:
 
 ```ts
 import { trackServerEvent } from '@10x-media/analytics'

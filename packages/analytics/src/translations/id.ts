@@ -121,7 +121,8 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerFieldSiteId]: 'ID situs',
 	[keys.providerFieldApiKey]: 'Kunci API',
 	[keys.providerFieldHost]: 'Host',
-	[keys.providerFieldHostHelp]: 'Kosongkan untuk memakai alamat bawaan.',
+	[keys.providerFieldHostHelp]:
+		'Hanya untuk instans yang di-host sendiri: alamatnya. Biarkan kosong untuk memakai cloud penyedia.',
 	[keys.providerFieldWebsiteId]: 'ID situs web',
 	[keys.providerFieldToken]: 'Token API',
 	[keys.providerFieldPropertyId]: 'ID properti',
@@ -136,8 +137,10 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerFieldMeasurementId]: 'ID pengukuran',
 	[keys.providerFieldCaptureHelp]:
 		'Ini menyalakan pelacakan di situs Anda. Kosongkan untuk mematikannya.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'ID pengukuran (G-...) aliran data web Anda, dari admin GA4. Ini menyalakan pelacakan situs Anda; biarkan kosong untuk mematikannya.',
 	[keys.providerFieldDomainHelp]:
-		'Domain yang dipakai skrip pelacakan untuk mencatat kunjungan, biasanya sama dengan ID situs. Ini menyalakan pelacakan dengan skrip standar Plausible dan didahulukan daripada ID skrip jika keduanya diisi. Kosongkan ini dan ID skrip untuk mematikan pelacakan.',
+		'Domain yang dipakai skrip pelacakan untuk mencatat kunjungan, biasanya sama dengan ID situs. Ini menyalakan pelacakan dengan skrip standar Plausible dan didahulukan daripada ID skrip jika keduanya diisi. Kosongkan ini dan ID skrip untuk mematikan pelacakan. Untuk menghitung kunjungan di beberapa situs, pisahkan dengan koma.',
 	[keys.providerFieldScriptIdHelp]:
 		'Untuk situs yang memakai skrip Plausible versi baru per situs: ID dalam alamatnya, bagian setelah pa- di pa-XXXX.js. Ini menyalakan pelacakan dengan skrip tersebut. Kosongkan ini dan alamat situs untuk mematikan pelacakan.',
 	[keys.providerErrorMeasurementId]:
@@ -147,9 +150,43 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Masukkan alamatnya saja, misalnya https://analytics.example.com atau https://example.com/analytics, tanpa bagian yang diawali ? atau # dan tanpa nama pengguna atau kata sandi.',
 	[keys.providerErrorHostInsecure]: 'Alamat harus diawali dengan https://.',
+	[keys.providerErrorHostNotAllowed]:
+		'Situs ini tidak mengizinkan alamat ini. Minta pengembangnya untuk menambahkannya.',
+	[keys.providerErrorSiteDomain]:
+		'Masukkan situs seperti yang tercantum di Plausible, seperti example.com atau example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Masukkan angkanya saja, seperti 123456789.',
+	[keys.providerErrorPosthogRegionRequired]: 'Pilih wilayah proyek PostHog Anda.',
 	[keys.providerErrorPosthogHostRegion]: 'Alamat ini dari wilayah PostHog lain.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'Token proyek (phc_), bukan kunci API.',
 	[keys.providerErrorPosthogKeyAsToken]: 'Ini kunci pribadi. Gunakan token phc_.',
+	[keys.providerConnectionLabel]: 'Koneksi',
+	[keys.providerConnectionStatus]: 'Status',
+	[keys.providerConnectionTest]: 'Uji koneksi',
+	[keys.providerConnectionConnected]: 'Terhubung',
+	[keys.providerConnectionNotConnected]: 'Tidak terhubung',
+	[keys.providerConnectionNoAnswer]: 'Tidak ada jawaban',
+	[keys.providerConnectionUnchecked]: 'Belum diperiksa',
+	[keys.providerConnectionLastSuccess]: 'Terakhir berhasil',
+	[keys.providerConnectionLastError]: 'Terakhir gagal',
+	[keys.providerConnectionPaused]: 'Pembacaan dijeda hingga {{date}}',
+	[keys.providerConnectionResumes]: 'Pembacaan berlanjut',
+	[keys.providerConnectionSaveFirst]: 'Simpan dokumen untuk mengujinya.',
+	[keys.providerConnectionUnsaved]: 'Simpan perubahan untuk mengujinya.',
+	[keys.providerConnectionNoPermission]:
+		'Hanya yang boleh mengubah dokumen ini yang dapat menguji koneksinya.',
+	[keys.providerConnectionRefusedHelp]: 'Periksa kunci, ID, dan host.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'Periksa kunci, ID, wilayah, dan host.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Periksa ID properti dan kunci, serta pastikan email klien adalah Viewer properti.',
+	[keys.providerConnectionIncompleteHelp]:
+		'Kunci atau ID yang diperlukan pemeriksaan ini masih kosong. Isi, simpan, lalu uji lagi.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		'Layanan tidak mengenal situs ini. Salin ID-nya dari pengaturan layanan tersebut.',
+	[keys.providerConnectionUnreachableHelp]: 'Layanan tidak menjawab. Coba lagi nanti.',
+	[keys.providerConnectionChecked]: 'Koneksi berfungsi',
+	[keys.providerConnectionFailed]: 'Koneksi gagal',
+	[keys.providerConnectionCheckRunning]:
+		'Pemeriksaan pengaturan ini sedang berjalan. Uji lagi dalam beberapa detik.',
 	[keys.providerFieldIsDefault]: 'Bawaan untuk situs ini',
 	[keys.providerFieldIsDefaultHelp]:
 		'Analitik dibuka dengan alat ini kecuali pembaca memilih yang lain. Hanya satu alat per situs yang bisa menjadi bawaan.',
@@ -354,7 +391,7 @@ export const id: LocaleBundle<'other'> = {
 	[keys.filterHintGoal]: 'Kode singkat sasaran, misalnya newsletter-signup',
 	[keys.filterHintCurrency]: 'Kode mata uang tiga huruf, misalnya EUR',
 	[keys.providersCollectionDescription]:
-		'Tambahkan satu entri untuk setiap alat analitik yang Anda hubungkan. Kunci Anda disimpan dengan aman dan tidak ditampilkan lagi; hanya empat karakter terakhir yang tetap terlihat agar Anda tahu kunci mana yang tersimpan.',
+		'Tambahkan satu entri untuk setiap alat analitik yang Anda hubungkan. Kunci Anda disimpan dengan aman dan tidak ditampilkan lagi; hanya empat karakter terakhir yang tetap terlihat agar Anda tahu kunci mana yang tersimpan. Mengubah tujuan koneksi entri yang tersimpan (Host, Wilayah, ID yang dipakai untuk membaca, Email klien, atau Label situs) akan menghapus kuncinya: masukkan lagi dalam penyimpanan yang sama.',
 	[keys.providerFieldNameHelp]: 'Tampil di mana pun Anda memilih sumber data.',
 	[keys.providerFieldProviderHelp]:
 		'Untuk alat analitik yang mana. Kolom di bawah berubah sesuai pilihan Anda.',
@@ -363,18 +400,25 @@ export const id: LocaleBundle<'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'Situs yang diukur Plausible, biasanya ditulis seperti yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'Kunci baca-saja untuk mengambil laporan Anda. Disimpan dengan aman dan tidak ditampilkan lagi.',
+		'Kunci Stats API dari pengaturan akun Plausible Anda, di bagian API Keys. Disimpan dengan aman dan tidak ditampilkan lagi.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'Kunci API pribadi (phx_...) dengan cakupan Query Read dari pengaturan akun PostHog Anda. Disimpan dengan aman dan tidak ditampilkan lagi.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'Untuk Umami Cloud. Pada Umami yang di-host sendiri, isi kuncinya di Token API. Disimpan dengan aman dan tidak ditampilkan lagi.',
 	[keys.providerFieldWebsiteIdHelp]: 'ID situs Anda, terlihat di bilah alamat dasbor Umami.',
 	[keys.providerFieldTokenHelp]:
-		'Token Umami Cloud Anda, dipakai sebagai pengganti nama pengguna dan kata sandi. Disimpan dengan aman.',
+		'Untuk Umami yang di-host sendiri: kunci API dari pengaturannya atau token login. Untuk Umami Cloud, gunakan Kunci API. Disimpan dengan aman.',
 	[keys.providerFieldPropertyIdHelp]:
 		'Nomor properti GA4 Anda dari Google Analytics. Tanpa kata properties/.',
-	[keys.providerFieldClientEmailHelp]: 'Alamat akun layanan dari berkas yang diberikan Google.',
+	[keys.providerFieldClientEmailHelp]:
+		'Alamat akun layanan dari file yang diberikan Google. Tambahkan sebagai Viewer di pengelolaan akses properti GA4, atau pembacaan akan ditolak.',
 	[keys.providerFieldPrivateKeyHelp]:
 		'Kunci privat dari berkas Google yang sama, disalin persis. Disimpan dengan aman.',
-	[keys.providerFieldProjectIdHelp]: 'Proyek yang dihubungkan.',
+	[keys.providerFieldProjectIdHelp]: 'Opsional. project_id dari file akun layanan.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		'Angka yang tertera sebagai Project ID di pengaturan proyek PostHog Anda.',
 	[keys.providerFieldRegionHelp]:
-		'Hanya untuk PostHog Cloud. Diabaikan jika Host adalah instans yang dihosting sendiri.',
+		'Cloud pada alamat PostHog Anda: US untuk us.posthog.com, EU untuk eu.posthog.com. Diabaikan jika Host adalah instans yang di-host sendiri. Wajib jika Host kosong.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'Kode mata uang 3 huruf untuk sasaran penjualan Anda, misalnya USD. Pendapatan tidak akan tampil sebelum ini diisi.',
 	[keys.providerFieldGa4CurrencyHelp]:
@@ -417,6 +461,8 @@ export const id: LocaleBundle<'other'> = {
 	[keys.panelNoViews]: 'Tidak ada tayangan dalam rentang tanggal ini.',
 	[keys.sourcesPlatformFallback]:
 		'Angka ini berasal dari alat analitik platform sampai situs ini menambahkan alatnya sendiri. Setelah ditambahkan, angkanya beralih ke alat itu.',
+	[keys.sourcesOwnSourceFailing]:
+		'Alat analitik milik situs ini tidak berfungsi, jadi angka ini berasal dari alat analitik platform. Tampilan beralih kembali setelah koneksinya berfungsi lagi.',
 	[keys.stateSourceSubstituted]:
 		'Sumber data yang tersimpan tidak tersedia lagi, jadi sumber default yang ditampilkan.',
 	[keys.statePosthogCookielessDropped]:

@@ -1124,3 +1124,50 @@ describe('posthog capture', () => {
 		expect(JSON.stringify(capture?.client)).not.toContain('phx_super_secret')
 	})
 })
+
+describe('posthog checkConnection', () => {
+	const ctx = () => ({ signal: AbortSignal.timeout(5_000), timeoutMs: 5_000 })
+
+	it("sends the smallest query to the region's Query API with the personal key", async () => {
+		let sent: { auth: string | null; body: unknown } | undefined
+		server.use(
+			http.post('https://eu.posthog.com/api/projects/123/query/', async ({ request }) => {
+				sent = { auth: request.headers.get('authorization'), body: await request.json() }
+				return HttpResponse.json({ columns: ['1'], types: [], results: [[1]] })
+			})
+		)
+		await posthog({ projectId: '123', apiKey: 'phx_k', region: 'eu' }).checkConnection?.(ctx())
+		expect(sent).toEqual({
+			auth: 'Bearer phx_k',
+			body: { query: { kind: 'HogQLQuery', query: 'SELECT 1' } },
+		})
+	})
+
+	it('throws what PostHog refused with, status and all', async () => {
+		server.use(
+			http.post('https://us.posthog.com/api/projects/123/query/', () =>
+				HttpResponse.json(
+					{ detail: 'Personal API key found in request Authorization header is invalid.' },
+					{ status: 403 }
+				)
+			)
+		)
+		await expect(
+			posthog({ projectId: '123', apiKey: 'phx_eu' }).checkConnection?.(ctx())
+		).rejects.toMatchObject({ name: 'ProviderHttpError', status: 403 })
+	})
+})
+
+describe('posthog ids in addresses', () => {
+	it('reads with the project id as one path segment', async () => {
+		let path: string | null = null
+		server.use(
+			http.post('https://us.posthog.com/api/projects/:id/query/', ({ request }) => {
+				path = new URL(request.url).pathname
+				return HttpResponse.json({ columns: ['m0'], types: ['UInt64'], results: [[0]] })
+			})
+		)
+		await posthog({ projectId: 'a/b', apiKey: 'phx_k' }).query(q(), {})
+		expect(path).toBe('/api/projects/a%2Fb/query/')
+	})
+})

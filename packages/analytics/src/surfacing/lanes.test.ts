@@ -59,6 +59,42 @@ describe('createLanes', () => {
 		vi.useRealTimers()
 	})
 
+	it('tells each counted outcome once, with the health after it, and nothing for a refused run', async () => {
+		const onOutcome = vi.fn()
+		const lanes = createLanes({ onOutcome })
+		const adapter = source('posthog:5')
+		const lane = lanes.for(adapter, 't1')
+		await lane.run(async () => 'answered', options())
+		expect(onOutcome).toHaveBeenLastCalledWith(adapter, { ok: true }, { open: false })
+
+		const refusal = new ProviderHttpError(403, 'posthog', 'posthog: HTTP 403 bad key')
+		await expect(
+			lane.run(async () => {
+				throw refusal
+			}, options())
+		).rejects.toBe(refusal)
+		expect(onOutcome).toHaveBeenLastCalledWith(
+			adapter,
+			{ ok: false, failure: { kind: 'source_misconfigured' }, error: refusal },
+			expect.objectContaining({ open: true, lastFailure: 'source_misconfigured' })
+		)
+		expect(onOutcome.mock.lastCall?.[2].retryAfterMs).toBeGreaterThan(0)
+
+		await expect(lane.run(async () => 'never', options())).rejects.toSatisfy(isLaneRefused)
+		expect(onOutcome).toHaveBeenCalledTimes(2)
+	})
+
+	it('tells a Retry-After pause with the outcome it came with', async () => {
+		const onOutcome = vi.fn()
+		const lane = createLanes({ onOutcome }).for(source('vendor'))
+		await expect(
+			lane.run(async () => {
+				throw new ProviderHttpError(429, 'vendor', { message: 'slow down', retryAfterMs: 5000 })
+			}, options())
+		).rejects.toMatchObject({ status: 429 })
+		expect(onOutcome.mock.lastCall?.[2]).toMatchObject({ open: false, retryAfterMs: 5000 })
+	})
+
 	it('keeps one lane per adapter instance, never one per id', () => {
 		const lanes = createLanes()
 		const a = source('plausible')

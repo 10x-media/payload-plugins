@@ -22,8 +22,8 @@ import type {
 	ConnectionFieldAccess,
 	ProviderCollectionFieldOverrides,
 } from '../providers/collection'
-import type { ProviderId } from '../providers/factory'
 import type { ProviderHostPolicy } from '../providers/hosts'
+import type { ProviderId } from '../providers/ids'
 import type { AfterReadHook } from '../surfacing/afterRead'
 import type { CacheStore } from '../surfacing/cacheStore'
 import type { TimeframePreset } from '../timeframe/presets'

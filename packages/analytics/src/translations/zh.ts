@@ -116,7 +116,7 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerFieldSiteId]: '站点 ID',
 	[keys.providerFieldApiKey]: 'API 密钥',
 	[keys.providerFieldHost]: '主机',
-	[keys.providerFieldHostHelp]: '留空即使用默认地址。',
+	[keys.providerFieldHostHelp]: '仅用于自托管实例：填写其地址。留空则使用服务商的云。',
 	[keys.providerFieldWebsiteId]: '网站 ID',
 	[keys.providerFieldToken]: 'API 令牌',
 	[keys.providerFieldPropertyId]: '媒体资源 ID',
@@ -130,8 +130,10 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerFieldRevenueCurrency]: '收入货币',
 	[keys.providerFieldMeasurementId]: '衡量 ID',
 	[keys.providerFieldCaptureHelp]: '这会开启网站的访问统计。留空即关闭统计。',
+	[keys.providerFieldMeasurementIdHelp]:
+		'GA4 管理中网站数据流的衡量 ID（G-...）。它会开启网站跟踪；留空则关闭跟踪。',
 	[keys.providerFieldDomainHelp]:
-		'跟踪脚本记录访问时使用的域名，通常与站点 ID 相同。填写后会用 Plausible 的标准脚本开启访问统计；若同时填写了脚本 ID，以此项为准。将此项和脚本 ID 都留空即可关闭统计。',
+		'跟踪脚本记录访问时使用的域名，通常与站点 ID 相同。填写后会用 Plausible 的标准脚本开启访问统计；若同时填写了脚本 ID，以此项为准。将此项和脚本 ID 都留空即可关闭统计。如需在多个站点统计访问，请用逗号分隔。',
 	[keys.providerFieldScriptIdHelp]:
 		'适用于使用 Plausible 新版按站点脚本的网站：脚本地址中的 ID，即 pa-XXXX.js 中 pa- 之后的部分。填写后会用该脚本开启访问统计。将此项和网站地址都留空即可关闭统计。',
 	[keys.providerErrorMeasurementId]: '只能使用字母、数字和连字符，例如 G-AB12CD34。',
@@ -139,9 +141,39 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.providerErrorHostFormat]:
 		'只需输入地址，例如 https://analytics.example.com 或 https://example.com/analytics，不要包含以 ? 或 # 开头的部分，也不要包含用户名或密码。',
 	[keys.providerErrorHostInsecure]: '地址必须以 https:// 开头。',
+	[keys.providerErrorHostNotAllowed]: '此网站不允许使用此地址。请让其开发者添加。',
+	[keys.providerErrorSiteDomain]:
+		'按 Plausible 中列出的方式填写站点，例如 example.com 或 example.com/blog。',
+	[keys.providerErrorPropertyId]: '只填写数字，例如 123456789。',
+	[keys.providerErrorPosthogRegionRequired]: '请选择 PostHog 项目的区域。',
 	[keys.providerErrorPosthogHostRegion]: '此地址属于另一个 PostHog 区域。',
 	[keys.providerErrorPosthogTokenAsApiKey]: '这是项目令牌（phc_），不是 API 密钥。',
 	[keys.providerErrorPosthogKeyAsToken]: '这是私钥。请使用 phc_ 令牌。',
+	[keys.providerConnectionLabel]: '连接',
+	[keys.providerConnectionStatus]: '状态',
+	[keys.providerConnectionTest]: '测试连接',
+	[keys.providerConnectionConnected]: '已连接',
+	[keys.providerConnectionNotConnected]: '未连接',
+	[keys.providerConnectionNoAnswer]: '无响应',
+	[keys.providerConnectionUnchecked]: '未检查',
+	[keys.providerConnectionLastSuccess]: '上次成功',
+	[keys.providerConnectionLastError]: '上次失败',
+	[keys.providerConnectionPaused]: '读取暂停至 {{date}}',
+	[keys.providerConnectionResumes]: '恢复读取',
+	[keys.providerConnectionSaveFirst]: '请先保存文档再测试。',
+	[keys.providerConnectionUnsaved]: '请先保存更改再测试。',
+	[keys.providerConnectionNoPermission]: '只有可以编辑此文档的人才能测试它的连接。',
+	[keys.providerConnectionRefusedHelp]: '请检查密钥、ID 和主机。',
+	[keys.providerConnectionRefusedHelpPosthog]: '请检查密钥、ID、区域和主机。',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'请检查媒体资源 ID 和密钥，并确认客户端邮箱是该媒体资源的查看者。',
+	[keys.providerConnectionIncompleteHelp]:
+		'此检查所需的密钥或 ID 为空。请填写并保存，然后重新测试。',
+	[keys.providerConnectionUnknownSiteHelp]: '该服务不认识此站点。请从该服务自己的设置中复制其 ID。',
+	[keys.providerConnectionUnreachableHelp]: '服务没有响应。请稍后再试。',
+	[keys.providerConnectionChecked]: '连接正常',
+	[keys.providerConnectionFailed]: '连接失败',
+	[keys.providerConnectionCheckRunning]: '已在检查这些设置。请几秒钟后再测试。',
 	[keys.providerFieldIsDefault]: '设为本站默认',
 	[keys.providerFieldIsDefaultHelp]:
 		'除非读者另选，分析数据默认在此工具中打开。每个站点只能有一个默认工具。',
@@ -337,20 +369,29 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.filterHintGoal]: '目标的简短代号，例如 newsletter-signup',
 	[keys.filterHintCurrency]: '三位货币代码，例如 EUR',
 	[keys.providersCollectionDescription]:
-		'每连接一个分析工具就添加一条记录。您的密钥会被安全保存且不再显示；只保留最后四位可见，方便分辨保存的是哪一个。',
+		'每连接一个分析工具就添加一条记录。您的密钥会被安全保存且不再显示；只保留最后四位可见，方便分辨保存的是哪一个。更改已保存记录的连接目标（主机、区域、读取所用的 ID、客户端邮箱或站点标识）会清除其密钥：请在同一次保存中重新输入。',
 	[keys.providerFieldNameHelp]: '在任何选择数据源的地方显示。',
 	[keys.providerFieldProviderHelp]: '这是为哪个分析工具设置的。下方的字段会随您的选择而变化。',
 	[keys.providerFieldEnabledHelp]: '关闭后会保留已保存的信息，但网站上任何位置都不再使用这个工具。',
 	[keys.providerFieldSiteIdHelp]: 'Plausible 统计的网站，通常写成 yourdomain.com。',
-	[keys.providerFieldApiKeyHelp]: '用于读取报告的只读密钥。会被安全保存且不再显示。',
+	[keys.providerFieldApiKeyHelp]:
+		'Plausible 账户设置中 API Keys 下的 Stats API 密钥。它会被安全保存，且不再显示。',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'来自 PostHog 账户设置、具有 Query Read 权限的个人 API 密钥（phx_...）。它会被安全保存，且不再显示。',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'用于 Umami Cloud。自托管的 Umami 请把密钥填在 API 令牌中。会被安全保存且不再显示。',
 	[keys.providerFieldWebsiteIdHelp]: '您的网站 ID，可在 Umami 面板的地址栏中找到。',
-	[keys.providerFieldTokenHelp]: '您的 Umami Cloud 令牌，用来代替用户名和密码。会被安全保存。',
+	[keys.providerFieldTokenHelp]:
+		'用于自托管的 Umami：其设置中的 API 密钥或登录令牌。Umami Cloud 请使用 API 密钥。会被安全保存。',
 	[keys.providerFieldPropertyIdHelp]:
 		'Google Analytics 中 GA4 媒体资源的编号。不要带 properties/ 这个词。',
-	[keys.providerFieldClientEmailHelp]: 'Google 提供的文件中的服务账号地址。',
+	[keys.providerFieldClientEmailHelp]:
+		'Google 提供的文件中的服务账号地址。请在 GA4 媒体资源的访问权限管理中将其添加为查看者，否则读取会被拒绝。',
 	[keys.providerFieldPrivateKeyHelp]: '同一个 Google 文件中的私钥，原样复制。会被安全保存。',
-	[keys.providerFieldProjectIdHelp]: '要连接的项目。',
-	[keys.providerFieldRegionHelp]: '仅适用于 PostHog Cloud。主机为自托管实例时将忽略此项。',
+	[keys.providerFieldProjectIdHelp]: '可选。服务账号文件中的 project_id。',
+	[keys.providerFieldPosthogProjectIdHelp]: 'PostHog 项目设置中显示为 Project ID 的数字。',
+	[keys.providerFieldRegionHelp]:
+		'您的 PostHog 地址所在的云：us.posthog.com 选 US，eu.posthog.com 选 EU。主机为自托管实例时忽略。主机为空时必填。',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'销售目标使用的 3 位货币代码，例如 USD。未设置前不会显示收入。',
 	[keys.providerFieldGa4CurrencyHelp]:
@@ -392,6 +433,8 @@ export const zh: LocaleBundle<'other'> = {
 	[keys.panelNoViews]: '此日期范围内没有展示。',
 	[keys.sourcesPlatformFallback]:
 		'在此站点添加自己的分析工具之前，这些数据来自平台的分析工具。添加后将切换为使用它。',
+	[keys.sourcesOwnSourceFailing]:
+		'此站点自己的分析工具无法使用，因此这些数据来自平台的分析工具。它的连接恢复正常后将切换回来。',
 	[keys.stateSourceSubstituted]: '已保存的数据源不再可用，因此显示默认数据源。',
 	[keys.statePosthogCookielessDropped]:
 		'PostHog 正在丢弃未经同意统计的访问：请在项目的 Web analytics 设置中启用 “Cookieless tracking”。',

@@ -118,7 +118,8 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldSiteId]: 'Site ID',
 	[keys.providerFieldApiKey]: 'API key',
 	[keys.providerFieldHost]: 'Host',
-	[keys.providerFieldHostHelp]: 'Leave this blank to use the default address.',
+	[keys.providerFieldHostHelp]:
+		"Only for a self-hosted instance: its address. Leave it blank to use the vendor's cloud.",
 	[keys.providerFieldWebsiteId]: 'Website ID',
 	[keys.providerFieldToken]: 'API token',
 	[keys.providerFieldPropertyId]: 'Property ID',
@@ -133,8 +134,10 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldMeasurementId]: 'Measurement ID',
 	[keys.providerFieldCaptureHelp]:
 		'This turns on tracking for your site. Leave it blank to turn tracking off.',
+	[keys.providerFieldMeasurementIdHelp]:
+		'The measurement ID (G-...) of your web data stream, from the GA4 admin. It turns on tracking for your site; leave it blank to turn tracking off.',
 	[keys.providerFieldDomainHelp]:
-		"The domain the tracking script reports visits under, usually the same as the site ID. It turns on tracking with Plausible's standard script, and wins over the script ID when both are filled in. Leave it and the script ID blank to turn tracking off.",
+		"The domain the tracking script reports visits under, usually the same as the site ID. It turns on tracking with Plausible's standard script, and wins over the script ID when both are filled in. Leave it and the script ID blank to turn tracking off. To count visits on several sites, separate them with commas.",
 	[keys.providerFieldScriptIdHelp]:
 		"For a site using Plausible's newer per-site script: the ID in its address, the part after pa- in pa-XXXX.js. It turns on tracking with that script. Leave it and the website address blank to turn tracking off.",
 	[keys.providerErrorMeasurementId]:
@@ -144,9 +147,43 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerErrorHostFormat]:
 		'Enter only the address, for example https://analytics.example.com or https://example.com/analytics, with no part starting with ? or # and no user name or password.',
 	[keys.providerErrorHostInsecure]: 'The address must start with https://.',
+	[keys.providerErrorHostNotAllowed]:
+		'This site does not allow this address. Ask its developer to add it.',
+	[keys.providerErrorSiteDomain]:
+		'Enter the site as Plausible lists it, such as example.com or example.com/blog.',
+	[keys.providerErrorPropertyId]: 'Enter the number alone, as in 123456789.',
+	[keys.providerErrorPosthogRegionRequired]: "Pick your PostHog project's region.",
 	[keys.providerErrorPosthogHostRegion]: 'This address is in the other PostHog region.',
 	[keys.providerErrorPosthogTokenAsApiKey]: 'A project token (phc_), not an API key.',
 	[keys.providerErrorPosthogKeyAsToken]: 'A private key: use the phc_ token.',
+	[keys.providerConnectionLabel]: 'Connection',
+	[keys.providerConnectionStatus]: 'Status',
+	[keys.providerConnectionTest]: 'Test connection',
+	[keys.providerConnectionConnected]: 'Connected',
+	[keys.providerConnectionNotConnected]: 'Not connected',
+	[keys.providerConnectionNoAnswer]: 'No answer',
+	[keys.providerConnectionUnchecked]: 'Not checked',
+	[keys.providerConnectionLastSuccess]: 'Last worked',
+	[keys.providerConnectionLastError]: 'Last failed',
+	[keys.providerConnectionPaused]: 'Reads paused until {{date}}',
+	[keys.providerConnectionResumes]: 'Reads resume',
+	[keys.providerConnectionSaveFirst]: 'Save the document to test it.',
+	[keys.providerConnectionUnsaved]: 'Save your changes to test them.',
+	[keys.providerConnectionNoPermission]:
+		'Only someone who may edit this document can test its connection.',
+	[keys.providerConnectionRefusedHelp]: 'Check the key, the IDs and the host.',
+	[keys.providerConnectionRefusedHelpPosthog]: 'Check the key, the IDs, the Region and the host.',
+	[keys.providerConnectionRefusedHelpGa4]:
+		'Check the Property ID and the key, and that the client email is a Viewer of the property.',
+	[keys.providerConnectionIncompleteHelp]:
+		'A key or an ID this check needs is empty. Enter it and save, then test again.',
+	[keys.providerConnectionUnknownSiteHelp]:
+		"The service does not know this site. Copy its ID from the service's own settings.",
+	[keys.providerConnectionUnreachableHelp]: 'The service did not answer. Try again later.',
+	[keys.providerConnectionChecked]: 'Connection works',
+	[keys.providerConnectionFailed]: 'Connection failed',
+	[keys.providerConnectionCheckRunning]:
+		'A check of these settings is already running. Test again in a few seconds.',
 	[keys.providerFieldIsDefault]: 'Default for this site',
 	[keys.providerFieldIsDefaultHelp]:
 		'Analytics opens on this tool unless the reader picks another. Only one tool per site can be the default.',
@@ -350,7 +387,7 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.filterHintGoal]: 'Goal short code, for example newsletter-signup',
 	[keys.filterHintCurrency]: 'Three-letter currency code, for example EUR',
 	[keys.providersCollectionDescription]:
-		'Add one entry for each analytics tool you connect. Your keys are stored securely and never shown again; only the last four characters stay visible so you can tell which one is saved.',
+		'Add one entry for each analytics tool you connect. Your keys are stored securely and never shown again; only the last four characters stay visible so you can tell which one is saved. Changing where a saved entry connects (its Host, its Region, an ID it reads with, the Client email or the Site label) clears its keys: enter them again in the same save.',
 	[keys.providerFieldNameHelp]: 'Shown wherever you choose a data source.',
 	[keys.providerFieldProviderHelp]:
 		'Which analytics tool this is for. The fields below change with your choice.',
@@ -359,19 +396,26 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.providerFieldSiteIdHelp]:
 		'The website Plausible tracks, usually written as yourdomain.com.',
 	[keys.providerFieldApiKeyHelp]:
-		'The read-only key for reading your reports. It is stored securely and never shown again.',
+		'A Stats API key from your Plausible account settings, under API keys. It is stored securely and never shown again.',
+	[keys.providerFieldPosthogApiKeyHelp]:
+		'A personal API key (phx_...) with the Query Read scope, from your PostHog account settings. It is stored securely and never shown again.',
+	[keys.providerFieldUmamiApiKeyHelp]:
+		'For Umami Cloud. On self-hosted Umami, put the key in API token instead. It is stored securely and never shown again.',
 	[keys.providerFieldWebsiteIdHelp]:
 		'The ID for your website, found in the address bar of your Umami dashboard.',
 	[keys.providerFieldTokenHelp]:
-		'Your Umami Cloud token, used instead of a username and password. It is stored securely.',
+		'For self-hosted Umami: an API key from its settings, or a login token. On Umami Cloud, use API key instead. It is stored securely.',
 	[keys.providerFieldPropertyIdHelp]:
 		'The number for your GA4 property, from Google Analytics. Leave off the word properties/.',
-	[keys.providerFieldClientEmailHelp]: 'The service account address from the file Google gave you.',
+	[keys.providerFieldClientEmailHelp]:
+		"The service account address from the file Google gave you. Add it as a Viewer in the GA4 property's access settings, or reads are refused.",
 	[keys.providerFieldPrivateKeyHelp]:
 		'The private key from that same Google file, copied exactly. It is stored securely.',
-	[keys.providerFieldProjectIdHelp]: 'The project this connects to.',
+	[keys.providerFieldProjectIdHelp]: 'Optional. The project_id from the service account file.',
+	[keys.providerFieldPosthogProjectIdHelp]:
+		"The number shown as Project ID in your PostHog project's settings.",
 	[keys.providerFieldRegionHelp]:
-		'PostHog Cloud only. Ignored when Host is a self-hosted instance.',
+		'The cloud your PostHog address names: US for us.posthog.com, EU for eu.posthog.com. Ignored when Host is a self-hosted instance. Required when Host is blank.',
 	[keys.providerFieldRevenueCurrencyHelp]:
 		'The 3-letter currency code for your sales goals, for example USD. Revenue will not show until this is set.',
 	[keys.providerFieldGa4CurrencyHelp]:
@@ -414,6 +458,8 @@ export const en: LocaleBundle<'one' | 'other'> = {
 	[keys.panelNoViews]: 'No views in this date range.',
 	[keys.sourcesPlatformFallback]:
 		"These numbers come from the platform's analytics tool until this site adds its own. Adding one switches to it.",
+	[keys.sourcesOwnSourceFailing]:
+		"This site's own analytics tool is not working, so these numbers come from the platform's. The view switches back once its connection works again.",
 	[keys.stateSourceSubstituted]:
 		'The saved data source is no longer available, so the default one is shown.',
 	[keys.statePosthogCookielessDropped]:

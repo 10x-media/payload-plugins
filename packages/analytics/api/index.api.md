@@ -134,6 +134,7 @@ export interface AnalyticsAdapter {
     // (undocumented)
     readonly capabilities: AnalyticsCapabilities;
     readonly capture?: CaptureSupport;
+    checkConnection?(ctx: ConnectionCheckContext): Promise<void>;
     close?(payload: Payload): void | Promise<void>;
     // (undocumented)
     readonly id: string;
@@ -795,6 +796,13 @@ export const CONNECTION_PATHS: ReadonlyArray<{
 export type ConnectionAccess = FieldAccess | ConnectionFieldAccess;
 
 // @public
+export interface ConnectionCheckContext {
+    payload?: Payload;
+    signal: AbortSignal;
+    timeoutMs: number;
+}
+
+// @public
 export interface ConnectionFieldAccess {
     // (undocumented)
     create?: FieldAccess;
@@ -1364,15 +1372,43 @@ export const keys: {
     readonly providerFieldRevenueCurrency: "analytics:providerFieldRevenueCurrency";
     readonly providerFieldMeasurementId: "analytics:providerFieldMeasurementId";
     readonly providerFieldCaptureHelp: "analytics:providerFieldCaptureHelp";
+    readonly providerFieldMeasurementIdHelp: "analytics:providerFieldMeasurementIdHelp";
     readonly providerFieldDomainHelp: "analytics:providerFieldDomainHelp";
     readonly providerFieldScriptIdHelp: "analytics:providerFieldScriptIdHelp";
     readonly providerErrorMeasurementId: "analytics:providerErrorMeasurementId";
     readonly providerErrorScriptId: "analytics:providerErrorScriptId";
     readonly providerErrorHostFormat: "analytics:providerErrorHostFormat";
     readonly providerErrorHostInsecure: "analytics:providerErrorHostInsecure";
+    readonly providerErrorHostNotAllowed: "analytics:providerErrorHostNotAllowed";
+    readonly providerErrorSiteDomain: "analytics:providerErrorSiteDomain";
+    readonly providerErrorPropertyId: "analytics:providerErrorPropertyId";
+    readonly providerErrorPosthogRegionRequired: "analytics:providerErrorPosthogRegionRequired";
     readonly providerErrorPosthogHostRegion: "analytics:providerErrorPosthogHostRegion";
     readonly providerErrorPosthogTokenAsApiKey: "analytics:providerErrorPosthogTokenAsApiKey";
     readonly providerErrorPosthogKeyAsToken: "analytics:providerErrorPosthogKeyAsToken";
+    readonly providerConnectionLabel: "analytics:providerConnectionLabel";
+    readonly providerConnectionStatus: "analytics:providerConnectionStatus";
+    readonly providerConnectionTest: "analytics:providerConnectionTest";
+    readonly providerConnectionConnected: "analytics:providerConnectionConnected";
+    readonly providerConnectionNotConnected: "analytics:providerConnectionNotConnected";
+    readonly providerConnectionNoAnswer: "analytics:providerConnectionNoAnswer";
+    readonly providerConnectionUnchecked: "analytics:providerConnectionUnchecked";
+    readonly providerConnectionLastSuccess: "analytics:providerConnectionLastSuccess";
+    readonly providerConnectionLastError: "analytics:providerConnectionLastError";
+    readonly providerConnectionPaused: "analytics:providerConnectionPaused";
+    readonly providerConnectionResumes: "analytics:providerConnectionResumes";
+    readonly providerConnectionSaveFirst: "analytics:providerConnectionSaveFirst";
+    readonly providerConnectionUnsaved: "analytics:providerConnectionUnsaved";
+    readonly providerConnectionNoPermission: "analytics:providerConnectionNoPermission";
+    readonly providerConnectionRefusedHelp: "analytics:providerConnectionRefusedHelp";
+    readonly providerConnectionRefusedHelpPosthog: "analytics:providerConnectionRefusedHelpPosthog";
+    readonly providerConnectionRefusedHelpGa4: "analytics:providerConnectionRefusedHelpGa4";
+    readonly providerConnectionIncompleteHelp: "analytics:providerConnectionIncompleteHelp";
+    readonly providerConnectionUnknownSiteHelp: "analytics:providerConnectionUnknownSiteHelp";
+    readonly providerConnectionUnreachableHelp: "analytics:providerConnectionUnreachableHelp";
+    readonly providerConnectionChecked: "analytics:providerConnectionChecked";
+    readonly providerConnectionFailed: "analytics:providerConnectionFailed";
+    readonly providerConnectionCheckRunning: "analytics:providerConnectionCheckRunning";
     readonly providerFieldIsDefault: "analytics:providerFieldIsDefault";
     readonly providerFieldIsDefaultHelp: "analytics:providerFieldIsDefaultHelp";
     readonly providerErrorDefaultTaken: "analytics:providerErrorDefaultTaken";
@@ -1561,12 +1597,15 @@ export const keys: {
     readonly providerFieldEnabledHelp: "analytics:providerFieldEnabledHelp";
     readonly providerFieldSiteIdHelp: "analytics:providerFieldSiteIdHelp";
     readonly providerFieldApiKeyHelp: "analytics:providerFieldApiKeyHelp";
+    readonly providerFieldPosthogApiKeyHelp: "analytics:providerFieldPosthogApiKeyHelp";
+    readonly providerFieldUmamiApiKeyHelp: "analytics:providerFieldUmamiApiKeyHelp";
     readonly providerFieldWebsiteIdHelp: "analytics:providerFieldWebsiteIdHelp";
     readonly providerFieldTokenHelp: "analytics:providerFieldTokenHelp";
     readonly providerFieldPropertyIdHelp: "analytics:providerFieldPropertyIdHelp";
     readonly providerFieldClientEmailHelp: "analytics:providerFieldClientEmailHelp";
     readonly providerFieldPrivateKeyHelp: "analytics:providerFieldPrivateKeyHelp";
     readonly providerFieldProjectIdHelp: "analytics:providerFieldProjectIdHelp";
+    readonly providerFieldPosthogProjectIdHelp: "analytics:providerFieldPosthogProjectIdHelp";
     readonly providerFieldRegionHelp: "analytics:providerFieldRegionHelp";
     readonly providerFieldRevenueCurrencyHelp: "analytics:providerFieldRevenueCurrencyHelp";
     readonly providerFieldGa4CurrencyHelp: "analytics:providerFieldGa4CurrencyHelp";
@@ -1604,6 +1643,7 @@ export const keys: {
     readonly panelNoVisits: "analytics:panelNoVisits";
     readonly panelNoViews: "analytics:panelNoViews";
     readonly sourcesPlatformFallback: "analytics:sourcesPlatformFallback";
+    readonly sourcesOwnSourceFailing: "analytics:sourcesOwnSourceFailing";
     readonly stateSourceSubstituted: "analytics:stateSourceSubstituted";
     readonly statePosthogCookielessDropped: "analytics:statePosthogCookielessDropped";
     readonly viewWithoutConsentShare: "analytics:viewWithoutConsentShare";
@@ -1653,6 +1693,7 @@ export type OrderSignatureMode = 'required' | 'optional';
 export interface OwnSource {
     // (undocumented)
     docId: string;
+    failing(): Promise<boolean>;
     // (undocumented)
     id: string;
     // (undocumented)
@@ -2192,6 +2233,7 @@ export interface RoutePaths {
     goals: string;
     ingest: string;
     live: string;
+    providerStatus: string;
     proxy: string;
     proxyPattern: string;
     query: string;

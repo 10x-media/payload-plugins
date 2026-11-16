@@ -1,12 +1,17 @@
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
 import type { CollectionConfig, Payload, PayloadRequest } from 'payload'
-import { afterAll, beforeAll, expect, it } from 'vitest'
+import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import type { AnalyticsAdapter } from '../../src/core/contract'
 import type { SourcePolicy } from '../../src/core/sourcePolicy'
 import { analytics } from '../../src/index'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
+import { getRuntime } from '../../src/plugin/runtime'
 import { PROVIDERS_SLUG } from '../../src/providers/collection'
+import { providerStatusKey } from '../../src/providers/status'
 import { memoryAdapter } from '../../src/testing/memoryAdapter'
+import { settleAnalytics } from '../../src/testing/settle'
 import { callEndpoint } from './endpointHelpers'
 
 const routes = routePaths(DEFAULT_ROUTE_BASE)
@@ -50,6 +55,33 @@ const sharedAdapter = (asked: Array<string | undefined>): AnalyticsAdapter => {
 	}
 }
 
+/** Plausible's query API on loopback, answering every site; it records which sites it was asked about. */
+const startPlausible = async () => {
+	const asked: string[] = []
+	const server = createServer((req, res) => {
+		let body = ''
+		req.on('data', (chunk: Buffer) => {
+			body += chunk.toString()
+		})
+		req.on('end', () => {
+			asked.push(String((JSON.parse(body) as { site_id?: unknown }).site_id))
+			res.writeHead(200, { 'content-type': 'application/json' })
+			res.end(JSON.stringify({ results: [{ metrics: [3], dimensions: [] }] }))
+		})
+	})
+	await new Promise<void>((resolve) => server.listen(0, '127.0.0.1', resolve))
+	const { port } = server.address() as AddressInfo
+	return {
+		origin: `http://127.0.0.1:${port}`,
+		asked,
+		stop: () =>
+			new Promise<void>((resolve) => {
+				server.close(() => resolve())
+				server.closeAllConnections()
+			}),
+	}
+}
+
 const login = async (payload: Payload, email: string, data: Record<string, unknown>) => {
 	await payload.create({ collection: 'users', data: { email, password: PASSWORD, ...data } })
 	return (await payload.login({ collection: 'users', data: { email, password: PASSWORD } })).user
@@ -67,9 +99,11 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 		let booted: BootedPayload
 		let alpha: unknown
 		let betaPage: string
+		let vendor: Awaited<ReturnType<typeof startPlausible>>
 		const asked: Array<string | undefined> = []
 
 		beforeAll(async () => {
+			vendor = await startPlausible()
 			booted = await bootPayload({
 				db,
 				collections: [users, pages],
@@ -84,7 +118,10 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 					},
 					access: { crossScope: ({ req }) => readerOf(req)?.platform === true },
 					sources: { shared: { tenants: policy } },
-					providers: { collection: true },
+					providers: {
+						collection: true,
+						hosts: { allow: [vendor.origin], allowPrivateNetwork: true },
+					},
 					collections: { pages: { pathField: 'slug' } },
 				}),
 			})
@@ -98,6 +135,7 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 
 		afterAll(async () => {
 			await booted?.stop()
+			await vendor?.stop()
 		})
 
 		const get = (path: string, query: string) =>
@@ -189,6 +227,414 @@ for (const policy of ['tenant', 'fallback'] as const satisfies readonly SourcePo
 					})
 				}
 			})
+
+			const createOwn = async (siteId: string): Promise<string> => {
+				const doc = (await booted.payload.create({
+					collection: PROVIDERS_SLUG as never,
+					data: {
+						name: 'Alpha Plausible',
+						provider: 'plausible',
+						enabled: true,
+						plausible: { siteId, apiKey: 'alpha-plausible-key-1234', host: vendor.origin },
+					} as never,
+					user: alpha as never,
+					overrideAccess: false,
+				})) as unknown as { id: string | number }
+				return String(doc.id)
+			}
+			const removeOwn = (id: string) =>
+				booted.payload.delete({ collection: PROVIDERS_SLUG as never, id, overrideAccess: true })
+			const statusStore = () => {
+				const store = getRuntime(booted.payload)?.providerStatus
+				if (!store) throw new Error('no provider status store')
+				return store
+			}
+
+			it(`lists the shared adapter beside the tenant's own source while that source is refused, and opens on it, on ${db}`, async () => {
+				const id = await createOwn('alpha-refused.test')
+				try {
+					await statusStore().record(id, {
+						ok: false,
+						kind: 'source_misconfigured',
+						detail: 'plausible: HTTP 401 Invalid API key or site ID',
+					})
+					const failing = await listing()
+					expect(failing.sources.map((source) => source.id).sort()).toEqual(
+						[`plausible:${id}`, 'shared'].sort()
+					)
+					expect(failing.defaultId).toBe('shared')
+					expect(failing.notice).toBe('ownSourceFailing')
+					const shared = await get(routes.query, `metrics=pageviews&${RANGE}&source=shared`)
+					expect(shared.status).toBe(200)
+					// Refused just now: nothing asks the vendor again yet.
+					expect(vendor.asked).not.toContain('alpha-refused.test')
+
+					await statusStore().record(id, { ok: true })
+					const working = await listing()
+					expect(working.sources.map((source) => source.id)).toEqual([`plausible:${id}`])
+					expect(working.defaultId).toBe(`plausible:${id}`)
+					expect(working.notice).toBeUndefined()
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`checks a refused source again once it has rested, and lists it alone when it answers, on ${db}`, async () => {
+				const id = await createOwn('alpha-back.test')
+				try {
+					await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					const key = providerStatusKey(id)
+					await booted.payload.kv.set(key, {
+						...(await booted.payload.kv.get<Record<string, unknown>>(key)),
+						lastErrorAt: new Date(Date.now() - 11 * 60_000).toISOString(),
+					})
+					expect((await listing()).notice).toBe('ownSourceFailing')
+					await vi.waitFor(() => expect(vendor.asked).toContain('alpha-back.test'), {
+						timeout: 10_000,
+					})
+					await vi.waitFor(async () => expect((await listing()).notice).toBeUndefined(), {
+						timeout: 10_000,
+					})
+					expect((await listing()).defaultId).toBe(`plausible:${id}`)
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`counts a vendor that did not answer as failing only while its reads rest, on ${db}`, async () => {
+				const id = await createOwn('alpha-slow.test')
+				try {
+					await statusStore().record(id, { ok: false, kind: 'unavailable' })
+					const once = await listing()
+					expect(once.sources.map((source) => source.id)).toEqual([`plausible:${id}`])
+					expect(once.notice).toBeUndefined()
+
+					await statusStore().record(id, { ok: false, kind: 'unavailable', pausedForMs: 60_000 })
+					const resting = await listing()
+					expect(resting.defaultId).toBe('shared')
+					expect(resting.notice).toBe('ownSourceFailing')
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`counts no refusal written about the document before its last save as failing, on ${db}`, async () => {
+				const id = await createOwn('alpha-stale.test')
+				try {
+					await statusStore().record(
+						id,
+						{ ok: false, kind: 'source_misconfigured' },
+						{
+							version: '2000-01-01T00:00:00.000Z',
+						}
+					)
+					const listed = await listing()
+					expect(listed.sources.map((source) => source.id)).toEqual([`plausible:${id}`])
+					expect(listed.notice).toBeUndefined()
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`stands in for no one while one of the tenant's own sources still works, on ${db}`, async () => {
+				const broken = await createOwn('alpha-broken.test')
+				const working = await createOwn('alpha-working.test')
+				try {
+					await statusStore().record(broken, { ok: false, kind: 'source_misconfigured' })
+					const mixed = await listing()
+					expect(mixed.sources.map((source) => source.id).sort()).toEqual(
+						[`plausible:${broken}`, `plausible:${working}`].sort()
+					)
+					expect(mixed.notice).toBeUndefined()
+				} finally {
+					await removeOwn(broken)
+					await removeOwn(working)
+				}
+			})
+
+			it(`opens on the shared source in place of a failing document marked the default, on ${db}`, async () => {
+				const id = await createOwn('alpha-default.test')
+				try {
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						id,
+						data: { isDefault: true } as never,
+						user: alpha as never,
+						overrideAccess: false,
+					})
+					expect((await listing()).defaultId).toBe(`plausible:${id}`)
+					await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					expect((await listing()).defaultId).toBe('shared')
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`reads on when the status rows cannot be read, counting no source as failing, on ${db}`, async () => {
+				const id = await createOwn('alpha-unread.test')
+				const store = statusStore()
+				const unread = vi.spyOn(store, 'readMany').mockRejectedValue(new Error('no such table'))
+				try {
+					await store.record(id, { ok: false, kind: 'source_misconfigured' })
+					const body = await listing()
+					expect(body.sources.map((source) => source.id)).toEqual([`plausible:${id}`])
+					expect(body.notice).toBeUndefined()
+				} finally {
+					unread.mockRestore()
+					await removeOwn(id)
+				}
+			})
+
+			it(`keeps a document's last result through a save its fields refuse, on ${db}`, async () => {
+				const id = await createOwn('alpha-refused-save.test')
+				try {
+					await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					await expect(
+						booted.payload.update({
+							collection: PROVIDERS_SLUG as never,
+							id,
+							// Past access: the Host is a connection field a tenant member may not write.
+							data: {
+								plausible: {
+									apiKey: 'alpha-plausible-key-9999',
+									host: 'ftp://alpha.example.com/?x=1',
+								},
+							} as never,
+							overrideAccess: true,
+						})
+					).rejects.toThrow()
+					expect((await statusStore().read(id))?.errorKind).toBe('source_misconfigured')
+				} finally {
+					await removeOwn(id)
+				}
+			})
+
+			it(`saves a document whose status cannot be cleared, on ${db}`, async () => {
+				const id = await createOwn('alpha-uncleared.test')
+				const store = statusStore()
+				const uncleared = vi.spyOn(store, 'forget').mockRejectedValue(new Error('no such table'))
+				try {
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						id,
+						data: { plausible: { apiKey: 'alpha-plausible-key-4321' } } as never,
+						user: alpha as never,
+						overrideAccess: false,
+					})
+					await settleAnalytics(booted.payload)
+					expect(uncleared).toHaveBeenCalledWith(id)
+				} finally {
+					uncleared.mockRestore()
+					await removeOwn(id)
+				}
+			})
+
+			it(`forgets, in a bulk save, only the result of a document whose connection moved, on ${db}`, async () => {
+				const moved = await createOwn('alpha-bulk-moved.test')
+				const kept = await createOwn('alpha-bulk-kept.test')
+				const host = `${vendor.origin}/kept`
+				try {
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						id: kept,
+						data: { plausible: { host } } as never,
+						overrideAccess: true,
+					})
+					await settleAnalytics(booted.payload)
+					for (const id of [moved, kept]) {
+						await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					}
+					// One request for both, the way a bulk edit in the list saves them.
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						where: { id: { in: [moved, kept] } },
+						data: { plausible: { host } } as never,
+						overrideAccess: true,
+					})
+					await settleAnalytics(booted.payload)
+					expect(await statusStore().read(moved)).toBeUndefined()
+					expect((await statusStore().read(kept))?.errorKind).toBe('source_misconfigured')
+				} finally {
+					await removeOwn(moved)
+					await removeOwn(kept)
+				}
+			})
+
+			it(`forgets a document's last result once its key is sent again, on ${db}`, async () => {
+				const id = await createOwn('alpha-rekeyed.test')
+				try {
+					await statusStore().record(id, { ok: false, kind: 'source_misconfigured' })
+					expect((await listing()).notice).toBe('ownSourceFailing')
+					await booted.payload.update({
+						collection: PROVIDERS_SLUG as never,
+						id,
+						data: { plausible: { apiKey: 'alpha-plausible-key-5678' } } as never,
+						user: alpha as never,
+						overrideAccess: false,
+					})
+					await settleAnalytics(booted.payload)
+					expect(await statusStore().read(id)).toBeUndefined()
+					expect((await listing()).notice).toBeUndefined()
+				} finally {
+					await removeOwn(id)
+				}
+			})
 		}
 	})
 }
+
+describeForDb('analytics source policy: a function sees which own sources fail', {}, (db) => {
+	let booted: BootedPayload
+	let alpha: unknown
+	let vendor: Awaited<ReturnType<typeof startPlausible>>
+	const seen: Array<Array<{ docId: string; failing: boolean }>> = []
+
+	beforeAll(async () => {
+		vendor = await startPlausible()
+		booted = await bootPayload({
+			db,
+			collections: [users, pages],
+			plugin: analytics({
+				adapters: [sharedAdapter([])],
+				platformAdapter: 'shared',
+				capture: { gate: 'off' },
+				scope: {
+					resolve: ({ req }) => readerOf(req)?.tenant ?? null,
+					member: ({ req, scope }) =>
+						readerOf(req)?.platform === true || readerOf(req)?.tenant === scope,
+				},
+				access: { crossScope: ({ req }) => readerOf(req)?.platform === true },
+				sources: {
+					shared: {
+						tenants: async ({ ownSources }) => {
+							const read = await Promise.all(
+								ownSources.map(async (source) => ({
+									docId: source.docId,
+									failing: await source.failing(),
+								}))
+							)
+							seen.push(read)
+							return read.every((source) => source.failing)
+						},
+					},
+				},
+				providers: {
+					collection: true,
+					hosts: { allow: [vendor.origin], allowPrivateNetwork: true },
+				},
+			}),
+		})
+		alpha = await login(booted.payload, 'alpha@t.dev', { tenant: 'alpha' })
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted?.stop()
+		await vendor?.stop()
+	})
+
+	it(`passes each own source with whether it is failing, on ${db}`, async () => {
+		const doc = (await booted.payload.create({
+			collection: PROVIDERS_SLUG as never,
+			data: {
+				name: 'Alpha Plausible',
+				provider: 'plausible',
+				enabled: true,
+				plausible: {
+					siteId: 'alpha-fn.test',
+					apiKey: 'alpha-plausible-key-1234',
+					host: vendor.origin,
+				},
+			} as never,
+			user: alpha as never,
+			overrideAccess: false,
+		})) as unknown as { id: string | number }
+		const id = String(doc.id)
+		const listed = async (): Promise<string[]> => {
+			const res = await callEndpoint(booted.payload, {
+				path: routes.sources,
+				query: '',
+				user: alpha,
+			})
+			expect(res.status).toBe(200)
+			return ((await res.json()) as SourcesBody).sources.map((source) => source.id).sort()
+		}
+		const store = getRuntime(booted.payload)?.providerStatus
+		if (!store) throw new Error('no provider status store')
+
+		expect(await listed()).toEqual([`plausible:${id}`])
+		expect(seen.at(-1)).toEqual([expect.objectContaining({ docId: id, failing: false })])
+
+		await store.record(id, { ok: false, kind: 'source_misconfigured' })
+		expect(await listed()).toEqual([`plausible:${id}`, 'shared'].sort())
+		expect(seen.at(-1)).toEqual([expect.objectContaining({ docId: id, failing: true })])
+	})
+})
+
+describeForDb('analytics source policy: a working default the host picked stays', {}, (db) => {
+	let booted: BootedPayload
+	let alpha: unknown
+	let vendor: Awaited<ReturnType<typeof startPlausible>>
+
+	beforeAll(async () => {
+		vendor = await startPlausible()
+		booted = await bootPayload({
+			db,
+			collections: [users, pages],
+			plugin: analytics({
+				// The platform's PostHog stands in under `fallback`; a partner's shared source is read by
+				// every member, and the host's rule opens tenants on it.
+				adapters: [sharedAdapter([]), { ...sharedAdapter([]), id: 'partner', label: 'Partner' }],
+				platformAdapter: 'shared',
+				capture: { gate: 'off' },
+				scope: {
+					resolve: ({ req }) => readerOf(req)?.tenant ?? null,
+					member: ({ req, scope }) =>
+						readerOf(req)?.platform === true || readerOf(req)?.tenant === scope,
+				},
+				access: { crossScope: ({ req }) => readerOf(req)?.platform === true },
+				sources: { shared: { tenants: 'fallback' }, partner: { tenants: 'tenant' } },
+				defaultSource: ({ sources }) => sources.find((source) => source.id === 'partner')?.id,
+				providers: {
+					collection: true,
+					hosts: { allow: [vendor.origin], allowPrivateNetwork: true },
+				},
+			}),
+		})
+		alpha = await login(booted.payload, 'alpha@t.dev', { tenant: 'alpha' })
+	}, 240_000)
+
+	afterAll(async () => {
+		await booted?.stop()
+		await vendor?.stop()
+	})
+
+	it(`keeps the host's working default while the tenant's own source fails, on ${db}`, async () => {
+		const doc = (await booted.payload.create({
+			collection: PROVIDERS_SLUG as never,
+			data: {
+				name: 'Alpha Plausible',
+				provider: 'plausible',
+				enabled: true,
+				plausible: {
+					siteId: 'alpha-kept.test',
+					apiKey: 'alpha-plausible-key-1234',
+					host: vendor.origin,
+				},
+			} as never,
+			user: alpha as never,
+			overrideAccess: false,
+		})) as unknown as { id: string | number }
+		const store = getRuntime(booted.payload)?.providerStatus
+		if (!store) throw new Error('no provider status store')
+		await store.record(String(doc.id), { ok: false, kind: 'source_misconfigured' })
+
+		const res = await callEndpoint(booted.payload, { path: routes.sources, query: '', user: alpha })
+		expect(res.status).toBe(200)
+		const body = (await res.json()) as SourcesBody
+		expect(body.sources.map((source) => source.id).sort()).toEqual(
+			[`plausible:${doc.id}`, 'partner', 'shared'].sort()
+		)
+		expect(body.notice).toBe('ownSourceFailing')
+		expect(body.defaultId).toBe('partner')
+	})
+})

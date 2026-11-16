@@ -415,7 +415,7 @@ export const plugin = analytics({
 |---|---|
 | `'staff'` | Readers `access.crossScope.unscopedSource` admits, and nobody else. The default, and what 1.0.0-beta.12 did. |
 | `'tenant'` | Also the tenant's own members, always. |
-| `'fallback'` | Also the tenant's own members, until they read a source of their own. |
+| `'fallback'` | Also the tenant's own members, until they read a source of their own, and again while every one of those is failing. |
 | a function | Also the tenant's own members, while it answers `true`. |
 
 Staff are whoever `unscopedSource` admits, and no policy changes what they read. A member is a user `scope.member` says belongs to the tenant the request resolved, and a member reads the shared adapter narrowed to that tenant. A policy adds members for their own tenant and never widens which scope anyone reads: under every policy a tenant user asking for `scope=*` or another tenant's id gets `400 untrusted_scope`, since the `aggregate` and `named` gates decide those and a policy does not touch them.
@@ -438,9 +438,13 @@ Alpha's editors read Alpha's slice of the platform PostHog, and the view and the
 
 A source of one's own is an [available](/analytics/providers#when-a-document-is-a-source) provider document of the tenant that grants a source this reader may read under `providers.collection.sourceAccess`. When Alpha's admin saves a Plausible document with its credentials, the next request lists Plausible alone and opens on it, with no cache in between. Where the app runs more than one instance, the others follow within ten seconds, as they do for any provider save ([How a document becomes an adapter](/analytics/providers#how-a-document-becomes-an-adapter)). Switching the document off brings the platform PostHog back the same way.
 
+A source of one's own that is failing does not count. A document is failing while its last result is a refusal (the vendor refused the key, the site or the host), or a vendor that did not answer while its reads rest. When every one of the tenant's documents is failing, the listing shows the platform PostHog beside them, and the view and the providers list say that the tenant's own tool is not working, so these are the platform's numbers. `GET /api/_x/sources` answers with `notice: 'ownSourceFailing'` then. The failing sources stay listed.
+
+The last result is the one the document's [Connection panel](/analytics/providers#checking-a-connection) shows. A document failing for more than 10 minutes is checked again in the background, at most once every 10 minutes.
+
 #### A function
 
-`({ req, scope, adapterId, ownSources }) => boolean`, which may return a promise. `ownSources` lists the reader's own sources as `{ id, label, docId }`. Members read the adapter when it answers `true`; any other answer, or a throw, denies, and a throw is logged. It is asked at most once per request, scope and adapter.
+`({ req, scope, adapterId, ownSources }) => boolean`, which may return a promise. `ownSources` lists the reader's own sources as `{ id, label, docId, failing }`. `failing()` resolves to true while the source counts as failing for the [`fallback` policy](#fallback); the statuses are read on its first call, so a function that never calls it costs no read. Unlike `'fallback'`, a function only decides whether members read the adapter: the default source stays the one [A tenant's default source](#a-tenants-default-source) picks, and the listing carries no notice. Members read the adapter when it answers `true`; any other answer, or a throw, denies, and a throw is logged. It is asked at most once per request, scope and adapter.
 
 ```ts
 import type { SourcePolicyFunction } from '@10x-media/analytics'
@@ -451,6 +455,12 @@ export const untilOwnVendor: SourcePolicyFunction = ({ ownSources }) =>
 ```
 
 With `sources: { posthog: { tenants: untilOwnVendor } }`, Alpha's and Gamma's editors read the platform PostHog, Gamma's beside native, and Beta's do not.
+
+```ts
+// The platform's numbers while the tenant has no source of its own that works.
+export const untilOneWorks: SourcePolicyFunction = async ({ ownSources }) =>
+  (await Promise.all(ownSources.map((source) => source.failing()))).every(Boolean)
+```
 
 #### What a policy leaves alone
 
@@ -466,6 +476,8 @@ A reader who names no source reads the default: the view opens on it, a widget w
 1. The tenant's provider document flagged **Default for this site**, when it is a source and the reader may read it.
 2. The `defaultSource` rule.
 3. What 1.0.0-beta.12 picked: `defaultAdapter`, else the first config adapter, else the first source the reader may read.
+
+Under a [`fallback` policy](#fallback), when the default these steps pick is one of the tenant's own failing documents, the shared source standing in for them is the default instead.
 
 `defaultSource` takes one of three forms, and fails the boot without `scope.resolve`:
 

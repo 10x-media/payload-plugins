@@ -1,12 +1,20 @@
 import type { PayloadRequest } from 'payload'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { type GatedScope, SYSTEM } from '../access/principal'
 import type { AnalyticsRuntime } from '../plugin/runtime'
 import { memoryAdapter } from '../testing/memoryAdapter'
 import { PLATFORM_SCOPE } from './contract'
 import { allCrossScope } from './options'
 import { createRegistry } from './registry'
-import { resolveQueryScope, resolveReadContext, resolveRequestedScope } from './scopedRead'
+import {
+	resolveQueryScope,
+	resolveReadContext,
+	resolveRequestedScope,
+	visibleSourcesFor,
+} from './scopedRead'
+
+// Every provider document the reader's request sees is readable here.
+vi.mock('../plugin/readableProviders', () => ({ readableProviderDocIds: () => null }))
 
 const runtimeWith = (overrides: Partial<AnalyticsRuntime> = {}): AnalyticsRuntime => ({
 	registry: createRegistry([memoryAdapter()]),
@@ -626,5 +634,47 @@ describe('resolveQueryScope', () => {
 			adapter,
 		})
 		expect(runtimeOwned).toEqual({ ok: true, queryScope: 'tenant-a' })
+	})
+})
+
+describe('visibleSourcesFor under a fallback policy', () => {
+	it('counts no status row of a native document as failing', async () => {
+		const native = { ...memoryAdapter(), id: 'native' }
+		const shared = { ...scopedAdapter(), id: 'shared' }
+		const refused = {
+			lastErrorAt: '2026-01-01T00:00:00.000Z',
+			errorKind: 'source_misconfigured' as const,
+		}
+		const readMany = vi.fn(
+			async (ids: readonly string[]) => new Map(ids.map((id) => [id, refused]))
+		)
+		const runtime = runtimeWith({
+			scoped: true,
+			member: () => true,
+			providersCollection: { slug: 'analytics-providers', scopeField: 'scope' },
+			configAdapterIds: new Set(['native', 'shared']),
+			sourcePolicies: new Map([['shared', 'fallback']]),
+			providerStatus: {
+				record: async () => {},
+				read: async () => undefined,
+				readMany,
+				forget: async () => {},
+				carry: async () => {},
+				idle: async () => {},
+			},
+		})
+		const result = await visibleSourcesFor({
+			runtime,
+			req: userReq(),
+			resolved: {
+				registry: createRegistry([native, shared]),
+				grants: new Map([['native', 'doc-1']]),
+			},
+			scope: 'tenant-a',
+			gates: { unscopedSource: async () => false } as never,
+		})
+		expect(readMany.mock.calls.flatMap(([ids]) => ids)).not.toContain('doc-1')
+		expect(result.ownFailing).toBe(false)
+		expect(result.fallbackAdmitted.has('shared')).toBe(false)
 	})
 })

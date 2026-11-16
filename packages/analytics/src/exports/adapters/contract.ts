@@ -22,6 +22,7 @@ export type {
 	AnalyticsQuery,
 	AnalyticsResult,
 	AnalyticsRow,
+	ConnectionCheckContext,
 	DateRange,
 	DIMENSION_KEYS,
 	DimensionKey,
