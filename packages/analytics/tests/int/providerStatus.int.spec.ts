@@ -1,7 +1,7 @@
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { type BootedPayload, bootPayload, describeForDb } from '@10x-media/payload-test-harness'
-import { createLocalReq, type TypedUser } from 'payload'
+import { createPayloadRequest, type User } from 'payload'
 import { afterAll, beforeAll, expect, it, vi } from 'vitest'
 import { analytics } from '../../src/index'
 import { DEFAULT_ROUTE_BASE, routePaths } from '../../src/plugin/routes'
@@ -20,7 +20,7 @@ type ErrorBody = { error: { code: string; param?: string } }
 /** Which tenant each test user belongs to; `alpha-viewer` reads alpha's documents but edits none. */
 const TENANT: Record<string, string> = { alpha: 'alpha', 'alpha-viewer': 'alpha', beta: 'beta' }
 
-const userOf = (id: string): TypedUser => ({ id, collection: 'users' }) as unknown as TypedUser
+const userOf = (id: string): User => ({ id, collection: 'users' }) as unknown as User
 
 /**
  * Plausible's query API on loopback: a `denied` site is refused the way a wrong key is, a `down` one
@@ -132,13 +132,11 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 	/** The status endpoint, called by `who` the way Payload's router hands the request over. */
 	const status = async (method: 'GET' | 'POST', who: string | null, id: unknown) => {
 		const query = id === undefined ? '' : `?id=${encodeURIComponent(String(id))}`
-		const req = await createLocalReq(
-			{
-				req: { url: `http://localhost/api${routes.providerStatus}${query}`, method },
-				...(who ? { user: userOf(who) } : {}),
-			},
-			booted.payload
-		)
+		const req = await createPayloadRequest({
+			payload: booted.payload,
+			req: { url: `http://localhost/api${routes.providerStatus}${query}`, method },
+			...(who ? { user: userOf(who) } : {}),
+		})
 		return handlerAt(booted.payload, routes.providerStatus)(req)
 	}
 
@@ -199,7 +197,7 @@ describeForDb('analytics provider status: reads, the Test connection button, ten
 	it(`answers a key that no longer decrypts as a setup to fix, not a server error, on ${db}`, async () => {
 		const doc = await createProvider('alpha', 'undecryptable.example')
 		const { withRawEncrypted } = await import('@10x-media/fields/encrypted')
-		const req = await createLocalReq({}, booted.payload)
+		const req = await createPayloadRequest({ payload: booted.payload })
 		const raw = (await withRawEncrypted(req, () =>
 			booted.payload.findByID({ collection: PROVIDERS_SLUG, id: doc.id, req, overrideAccess: true })
 		)) as { plausible?: { apiKey?: string } }

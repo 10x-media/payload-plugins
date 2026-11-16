@@ -501,7 +501,7 @@ const collectionRegistry = (
 			}
 			const { decryptFieldValue, withRawEncrypted } = await loadEncrypted()
 			// Never the caller's, as in buildDocuments.
-			const req = await createLocalReq({}, payload)
+			const req = await createPayloadRequest({ payload })
 			const raw: unknown = await withRawEncrypted(req, () =>
 				payload.findByID({
 					collection: slug,

@@ -62,7 +62,7 @@ export function ProviderConnectionTest() {
 
 	return (
 		<Button
-			buttonStyle="subtle"
+			buttonStyle="secondary"
 			disabled={blocked !== undefined || checking}
 			margin={false}
 			onClick={check}

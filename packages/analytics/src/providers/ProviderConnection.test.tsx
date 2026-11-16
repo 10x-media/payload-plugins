@@ -162,7 +162,7 @@ describe('ProviderConnection', () => {
 		expect(fetchMock.mock.calls[1]?.[1]?.method).toBe('POST')
 		expect(statusOf()).toBe(keys.providerConnectionNotConnected)
 		const banner = screen.getByText(keys.providerConnectionRefusedHelp).closest('[data-banner]')
-		expect(banner?.getAttribute('data-banner')).toBe('error')
+		expect(banner?.getAttribute('data-banner')).toBe('danger')
 		// The vendor's words as a reader reads them: its name, the message, then the status.
 		expect(banner?.textContent).toContain(`${keys.providerNamePosthog}: Invalid personal API key.`)
 		const facts = [...document.querySelectorAll('.analytics-provider-connection__facts li')].map(

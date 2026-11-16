@@ -111,7 +111,7 @@ export function ProviderConnection(_props: UIFieldClientProps) {
 								{t(STATE_LABEL[state])}
 							</Pill>
 						) : (
-							<ShimmerEffect height="calc(var(--base) * 0.8)" width="calc(var(--base) * 5)" />
+							<ShimmerEffect height="var(--spacer-3)" width="6rem" />
 						)}
 					</li>
 					{shown.map(([label, value]) => (
@@ -122,7 +122,7 @@ export function ProviderConnection(_props: UIFieldClientProps) {
 					))}
 				</ul>
 				{failed && help ? (
-					<Banner type={state === 'refused' ? 'error' : 'default'}>
+					<Banner type={state === 'refused' ? 'danger' : 'default'}>
 						<strong className="analytics-provider-connection__help">{t(help)}</strong>
 						{words ? (
 							<span className="analytics-provider-connection__words">

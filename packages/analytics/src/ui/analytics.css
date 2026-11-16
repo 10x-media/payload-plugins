@@ -1181,7 +1181,7 @@
 	/* What the vendor said, inside the view's error banner: often one long JSON word. */
 	.analytics-view__source-note {
 		display: block;
-		margin-block-start: calc(var(--base) * 0.25);
+		margin-block-start: var(--spacer-1);
 		overflow-wrap: anywhere;
 	}
 
@@ -1197,14 +1197,15 @@
 	/* Payload styles only a `label.field-label`; this one is a span, since it labels no input. */
 	.analytics-provider-connection > .field-label {
 		display: flex;
-		padding-block-end: calc(var(--base) * 0.25);
-		color: var(--theme-elevation-800);
+		color: var(--field-color-label);
+		font-weight: var(--text-body-medium-bold-font-weight);
+		letter-spacing: var(--field-label-letter-spacing);
 	}
 
 	.analytics-provider-connection__body {
 		display: flex;
 		flex-direction: column;
-		gap: calc(var(--base) * 0.75);
+		gap: var(--spacer-3);
 	}
 
 	/* Its margin would stack on the column's gap. */
@@ -1214,7 +1215,7 @@
 
 	.analytics-provider-connection__help {
 		display: block;
-		font-weight: 600;
+		font-weight: var(--text-body-medium-bold-font-weight);
 	}
 
 	/* A vendor's answer is often one long JSON word. */
@@ -1226,7 +1227,7 @@
 	.analytics-provider-connection__facts {
 		display: flex;
 		flex-direction: column;
-		gap: calc(var(--base) * 0.25);
+		gap: var(--spacer-1);
 		margin: 0;
 		padding: 0;
 		list-style: none;
@@ -1243,7 +1244,7 @@
 	}
 
 	.analytics-provider-connection__fact-value {
-		font-weight: 600;
+		font-weight: var(--text-body-medium-bold-font-weight);
 	}
 
 	/* The breakdown's tabs, with the filter a row click set beside them. */
