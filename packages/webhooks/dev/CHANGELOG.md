@@ -1,5 +1,12 @@
 # @10x-media/webhooks-dev
 
+## 0.0.1-alpha.9
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/webhooks@4.0.0-alpha.2
+
 ## 0.0.1-alpha.8
 
 ### Patch Changes
