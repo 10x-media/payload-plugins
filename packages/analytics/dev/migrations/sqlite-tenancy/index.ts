@@ -2,6 +2,7 @@ import * as migration_20261009_100121_baseline from './20261009_100121_baseline'
 import * as migration_20261015_083156_provider_default from './20261015_083156_provider_default'
 import * as migration_20261016_100022_consent_modes from './20261016_100022_consent_modes'
 import * as migration_20261110_132113_payload_4 from './20261110_132113_payload_4'
+import * as migration_20261118_205755_payload_4_beta_10 from './20261118_205755_payload_4_beta_10'
 
 export const migrations = [
 	{
@@ -23,5 +24,10 @@ export const migrations = [
 		up: migration_20261110_132113_payload_4.up,
 		down: migration_20261110_132113_payload_4.down,
 		name: '20261110_132113_payload_4',
+	},
+	{
+		up: migration_20261118_205755_payload_4_beta_10.up,
+		down: migration_20261118_205755_payload_4_beta_10.down,
+		name: '20261118_205755_payload_4_beta_10',
 	},
 ]

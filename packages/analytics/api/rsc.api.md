@@ -9,7 +9,7 @@ import { CollectionSlug } from 'payload';
 import { ComponentType } from 'react';
 import { DataFromCollectionSlug } from 'payload';
 import { GeneratedTypes } from 'payload';
-import { JSX } from 'react/jsx-runtime';
+import { JSX } from 'react';
 import { LabelFunction } from 'payload';
 import { PayloadRequest } from 'payload';
 import { RawPayloadComponent } from 'payload';
