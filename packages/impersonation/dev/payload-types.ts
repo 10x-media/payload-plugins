@@ -556,6 +556,7 @@ export interface ImpersonationSession {
   ip?: string | null;
   userAgent?: string | null;
   impersonatorLocale?: string | null;
+  impersonatorStrategy?: string | null;
   absoluteExpiresAt?: string | null;
   targetLocked?: boolean | null;
   createdBy?:
@@ -922,6 +923,7 @@ export interface ImpersonationSessionsSelect<T extends boolean = true> {
   ip?: T;
   userAgent?: T;
   impersonatorLocale?: T;
+  impersonatorStrategy?: T;
   absoluteExpiresAt?: T;
   targetLocked?: T;
   createdBy?: T;

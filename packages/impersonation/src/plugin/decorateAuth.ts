@@ -67,9 +67,17 @@ const wrapStrategy = ({
 			})
 		}
 
+		if (sid !== row.targetSid) {
+			return result
+		}
+
+		if (row.impersonatorStrategy && options.inheritStrategies.includes(row.impersonatorStrategy)) {
+			user._strategy = row.impersonatorStrategy
+		}
+
 		const impersonator = relationOf(row.impersonator)
 		const target = relationOf(row.target)
-		if (options.decorateRequests && impersonator && target && sid === row.targetSid) {
+		if (options.decorateRequests && impersonator && target) {
 			const actor: ImpersonationActor = {
 				absoluteExpiresAt: row.absoluteExpiresAt ?? null,
 				id: row.id,
