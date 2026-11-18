@@ -1,5 +1,17 @@
 # @10x-media/impersonation
 
+## 0.1.0-beta.4
+
+### Minor Changes
+
+- Add `inheritStrategies`. The target session takes over the impersonator's `req.user._strategy` when it is in the list, so a second-factor plugin such as `payload-totp` no longer denies every collection while impersonating. Start stores the strategy on the row as `impersonatorStrategy`. On Postgres, create a migration for the new column.
+
+### Patch Changes
+
+- The impersonation bar follows the admin language. It used to keep the language the session was started in.
+
+  Closes #312
+
 ## 0.1.0-beta.3
 
 ### Patch Changes

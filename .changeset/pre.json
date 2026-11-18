@@ -264,6 +264,8 @@
 		"icon-manifest-label-annotation",
 		"impersonation-bar-chip",
 		"impersonation-bar-hydration-translations",
+		"impersonation-bar-locale",
+		"impersonation-inherit-strategies",
 		"impersonation-native-admin-ui",
 		"impersonation-picker-search-reset",
 		"impersonation-review-fixes",
