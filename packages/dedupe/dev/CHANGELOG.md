@@ -1,5 +1,14 @@
 # @10x-media/dedupe-dev
 
+## 0.0.1-alpha.8
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-variants@4.0.0-alpha.3
+  - @10x-media/audit-logs@4.0.0-alpha.3
+  - @10x-media/dedupe@4.0.0-alpha.2
+
 ## 0.0.1-alpha.7
 
 ### Patch Changes

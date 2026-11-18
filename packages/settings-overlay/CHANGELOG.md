@@ -1,5 +1,11 @@
 # @10x-media/settings-overlay
 
+## 4.0.0-alpha.3
+
+### Patch Changes
+
+- Requires Payload `4.0.0-beta.10`: the `payload` and `@payloadcms/*` peers are `^4.0.0-beta.10`, and the plugins are built and tested against it.
+
 ## 4.0.0-alpha.2
 
 ### Minor Changes

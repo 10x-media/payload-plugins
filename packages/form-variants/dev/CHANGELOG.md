@@ -1,5 +1,12 @@
 # @10x-media/form-variants-dev
 
+## 0.0.1-alpha.3
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-variants@4.0.0-alpha.3
+
 ## 0.0.1-alpha.2
 
 ### Patch Changes

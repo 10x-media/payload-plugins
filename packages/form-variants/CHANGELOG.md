@@ -1,5 +1,13 @@
 # @10x-media/form-variants
 
+## 4.0.0-alpha.3
+
+### Patch Changes
+
+- The variant form saves the way Payload `4.0.0-beta.10`'s edit view does: the form refreshes its own state after a save and on each change, and locks and stale data come from the document info. A save whose form was reset or left before it returned no longer redirects, switches variant or runs `afterSave`.
+
+- Requires Payload `4.0.0-beta.10`: the `payload` and `@payloadcms/*` peers are `^4.0.0-beta.10`, and the plugins are built and tested against it.
+
 ## 4.0.0-alpha.2
 
 ### Minor Changes

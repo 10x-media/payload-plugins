@@ -1,5 +1,13 @@
 # @10x-media/form-builder
 
+## 4.0.0-alpha.3
+
+### Patch Changes
+
+- The admin builds on Payload `4.0.0-beta.10`: the condition, calculation, flow, field name and recipient pickers read the form through `getDataFromFormState`, which replaced `reduceFieldsToValues` in `payload/shared`.
+
+- Requires Payload `4.0.0-beta.10`: the `payload` and `@payloadcms/*` peers are `^4.0.0-beta.10`, and the plugins are built and tested against it.
+
 ## 4.0.0-alpha.2
 
 ### Minor Changes

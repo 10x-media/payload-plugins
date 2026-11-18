@@ -1,5 +1,12 @@
 # @10x-media/settings-overlay-dev
 
+## 0.0.1-alpha.6
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/settings-overlay@4.0.0-alpha.3
+
 ## 0.0.1-alpha.5
 
 ### Patch Changes
