@@ -1,5 +1,12 @@
 # @10x-media/analytics-dev-tanstack
 
+## 0.0.1-alpha.2
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/analytics@4.0.0-alpha.2
+
 ## 0.0.1-alpha.1
 
 ### Patch Changes
