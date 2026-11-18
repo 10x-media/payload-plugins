@@ -1,5 +1,11 @@
 # @10x-media/analytics
 
+## 4.0.0-alpha.3
+
+### Minor Changes
+
+- A new `./shared` entry exports the helpers with no server and no React dependency (key formats and parsers, constants, error names and guards, formatters), for a host module that both server code and client components import. On Payload 4 the browser build of `payload` is `payload/shared`, so a client bundle that reaches the root fails on `definePlugin` and the Local API, and a server caller of a `'use client'` entry gets a client reference instead of the function. The root and the client entries keep exporting the same helpers.
+
 ## 4.0.0-alpha.2
 
 ### Minor Changes

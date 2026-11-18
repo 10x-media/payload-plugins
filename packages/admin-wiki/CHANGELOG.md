@@ -1,5 +1,13 @@
 # @10x-media/admin-wiki
 
+## 4.0.0-alpha.2
+
+### Minor Changes
+
+- The plugin takes an `order` option, so a host can move it when another plugin has to run on the other side of it, as content-lock already allowed. admin-wiki keeps `order: 1000` by default; lowering it lets a plugin on the default order see `wiki-pages` and `wiki-media` (a storage adapter, document-preview), at the cost of the config walk no longer seeing that plugin's collections and fields. form-builder keeps `50` and webhooks `10`.
+
+- A new `./shared` entry exports the helpers with no server and no React dependency (key formats and parsers, constants, error names and guards, formatters), for a host module that both server code and client components import. On Payload 4 the browser build of `payload` is `payload/shared`, so a client bundle that reaches the root fails on `definePlugin` and the Local API, and a server caller of a `'use client'` entry gets a client reference instead of the function. The root and the client entries keep exporting the same helpers.
+
 ## 4.0.0-alpha.1
 
 ### Major Changes
