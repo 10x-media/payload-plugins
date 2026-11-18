@@ -31,7 +31,7 @@ vi.mock('@payloadcms/ui', () => ({
 	},
 }))
 vi.mock('payload/shared', () => ({
-	reduceFieldsToValues: () => ({ fields: [] }),
+	getDataFromFormState: () => ({ fields: [] }),
 	formatAdminURL: ({ apiRoute, path }: { apiRoute: string; path: string }) => `${apiRoute}${path}`,
 }))
 vi.mock('../translations/useTranslation', () => ({

@@ -2,7 +2,7 @@
 
 import { Button, CirclePlusIcon, useFormFields } from '@payloadcms/ui'
 import type { Operator, Where } from 'payload'
-import { reduceFieldsToValues, transformWhereQuery } from 'payload/shared'
+import { getDataFromFormState, transformWhereQuery } from 'payload/shared'
 import { useMemo } from 'react'
 import { type ConditionFieldType, firstOperatorFor } from '../conditions/fieldTypes'
 import { keys } from '../translations/keys'
@@ -73,7 +73,7 @@ export const ConditionBuilder = ({
 	// Serialize the operand list so the builder re-renders only when operands actually change (a field
 	// added, renamed, retyped, or its options edited), not on every unrelated form-state update.
 	const operandsJson = useFormFields(([fields]) =>
-		JSON.stringify(operandsFromData(reduceFieldsToValues(fields, true), conditionTypes, selfName))
+		JSON.stringify(operandsFromData(getDataFromFormState(fields, true), conditionTypes, selfName))
 	)
 	const operands = useMemo(() => JSON.parse(operandsJson) as ConditionOperand[], [operandsJson])
 

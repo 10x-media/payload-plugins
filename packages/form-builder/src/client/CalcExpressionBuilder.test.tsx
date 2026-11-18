@@ -102,7 +102,7 @@ vi.mock('@payloadcms/ui', () => ({
 		</select>
 	),
 }))
-vi.mock('payload/shared', () => ({ reduceFieldsToValues: () => formData.current }))
+vi.mock('payload/shared', () => ({ getDataFromFormState: () => formData.current }))
 vi.mock('../translations/useTranslation', () => ({
 	useTranslation: () => ({ t: (k: string) => k, i18n: { language: 'en' } }),
 }))

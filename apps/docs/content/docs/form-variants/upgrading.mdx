@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x.
 
 ## Checklist
 
-1. Upgrade `@10x-media/form-variants` with Payload: its peers are `payload`, `@payloadcms/ui` and `@payloadcms/translations` at `^4.0.0-beta.7`. `next` is no longer a peer.
+1. Upgrade `@10x-media/form-variants` with Payload: its peers are `payload`, `@payloadcms/ui` and `@payloadcms/translations` at `^4.0.0-beta.10`. `next` is no longer a peer.
 2. Pass `overrideAccess: true` where a `gate`, `afterSave` or other code of yours reads or writes documents through the Local API without a user (see [Local API access](#local-api-access)).
 3. Restyle any CSS of your own that targets the progress rail or the switcher trigger (see [Look](#look)).
 4. Regenerate the import map (`pnpm payload generate:importmap`). The plugin adds no database fields, so there is nothing to migrate.

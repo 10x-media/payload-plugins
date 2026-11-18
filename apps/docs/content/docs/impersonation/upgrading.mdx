@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x beta) to 4.x, on Next.
 
 ## Checklist
 
-1. Upgrade `@10x-media/impersonation` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.7`. `next` is no longer a peer. In parallel mode, upgrade `@10x-media/dual-session` to 4.x as well, and follow [its upgrading page](/dual-session/upgrading): its Next.js proxy moved to `@10x-media/dual-session/next`, and TanStack Start needs its middleware.
+1. Upgrade `@10x-media/impersonation` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.10`. `next` is no longer a peer. In parallel mode, upgrade `@10x-media/dual-session` to 4.x as well, and follow [its upgrading page](/dual-session/upgrading): its Next.js proxy moved to `@10x-media/dual-session/next`, and TanStack Start needs its middleware.
 2. End open impersonation sessions before the deploy (see [Sessions](#sessions)).
 3. On TanStack Start, render the website banner from a server function (see [Frontend banner](#frontend-banner)).
 4. In your own code, rename `TypedUser` to `User` and pass `overrideAccess: true` where it looks users up without one (see [Your own code](#your-own-code)).

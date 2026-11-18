@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x.
 
 ## Checklist
 
-1. Upgrade `@10x-media/dedupe` with Payload: its peers are `payload`, `@payloadcms/ui`, `@payloadcms/translations` and the optional `@payloadcms/richtext-lexical` at `^4.0.0-beta.7`. `next` and `@payloadcms/next` are no longer peers.
+1. Upgrade `@10x-media/dedupe` with Payload: its peers are `payload`, `@payloadcms/ui`, `@payloadcms/translations` and the optional `@payloadcms/richtext-lexical` at `^4.0.0-beta.10`. `next` and `@payloadcms/next` are no longer peers.
 2. With `localization` in your config and a merged collection that has drafts and localized fields, run Payload's `localize-status` migration (see [Localized drafts](#localized-drafts)).
 3. Pass `overrideAccess: true` where your own code reads or writes documents without a user, and build requests with `createPayloadRequest` (see [Local API access](#local-api-access)).
 4. Drop `jobs.enableConcurrencyControl` from your config if you set it for the plugin (see [Jobs](#jobs)).

@@ -60,7 +60,7 @@ Staff keep the shared cookie, byte for byte as core writes it; everyone else mov
 
 ## Requirements
 
-Payload `^4.0.0-beta.7`, on Next.js or TanStack Start. `next` is only needed for the proxy (`/next`), `@tanstack/react-start` only for the middleware (`/tanstack-start`); the plugin itself is framework-agnostic. Coming from the Payload 3 line: [Upgrading to Payload 4](/dual-session/upgrading).
+Payload `^4.0.0-beta.10`, on Next.js or TanStack Start. `next` is only needed for the proxy (`/next`), `@tanstack/react-start` only for the middleware (`/tanstack-start`); the plugin itself is framework-agnostic. Coming from the Payload 3 line: [Upgrading to Payload 4](/dual-session/upgrading).
 
 The collection backing the admin panel (`admin.user`) may only be listed together with an `isolate` predicate. It owns the shared cookie, and moving it wholesale would take the admin panel down. The plugin refuses to build a config that does.
 

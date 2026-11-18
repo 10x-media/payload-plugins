@@ -97,10 +97,10 @@
 		"clean": "rm -rf dist *.tsbuildinfo dev/.next"
 	},
 	"peerDependencies": {
-		"@payloadcms/plugin-multi-tenant": "^4.0.0-beta.6",
-		"@payloadcms/translations": "^4.0.0-beta.6",
-		"@payloadcms/ui": "^4.0.0-beta.6",
-		"payload": "^4.0.0-beta.6",
+		"@payloadcms/plugin-multi-tenant": "^4.0.0-beta.10",
+		"@payloadcms/translations": "^4.0.0-beta.10",
+		"@payloadcms/ui": "^4.0.0-beta.10",
+		"payload": "^4.0.0-beta.10",
 		"react": "^19.0.0",
 		"react-dom": "^19.0.0"
 	},

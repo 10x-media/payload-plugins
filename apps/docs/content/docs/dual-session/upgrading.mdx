@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x, on Next.js or
 
 ## Checklist
 
-1. Upgrade `@10x-media/dual-session` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.7`. `next` and `@tanstack/react-start` are optional peers, one per framework.
+1. Upgrade `@10x-media/dual-session` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.10`. `next` and `@tanstack/react-start` are optional peers, one per framework.
 2. On Next.js, import the proxy from `@10x-media/dual-session/next` (see [The proxy moved](#the-proxy-moved)).
 3. On TanStack Start, register the middleware (see [TanStack Start](#tanstack-start)).
 4. Give every isolated auth collection a `read` access its own users pass (see [Frontend users must be able to read themselves](#frontend-users-must-be-able-to-read-themselves)).

@@ -23,15 +23,13 @@ import {
 	useRouter,
 	useRouteTransition,
 	useSearchParams,
-	useServerFunctions,
 	useUploadEdits,
 } from '@payloadcms/ui'
-import { abortAndIgnore, handleAbortRef } from '@payloadcms/ui/utilities/abortAndIgnore'
 import { handleBackToDashboard } from '@payloadcms/ui/utilities/handleBackToDashboard'
 import { handleGoBack } from '@payloadcms/ui/utilities/handleGoBack'
 import { handleTakeOver } from '@payloadcms/ui/utilities/handleTakeOver'
-import type { ClientCollectionConfig, FormState, JsonObject, User } from 'payload'
-import { formatAdminURL, hasAutosaveEnabled } from 'payload/shared'
+import type { ClientCollectionConfig, JsonObject, User } from 'payload'
+import { formatAdminURL } from 'payload/shared'
 import type React from 'react'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
@@ -61,7 +59,8 @@ type Props = VariantProviderProps & { variant: ClientVariant }
  * Owning the form is what makes the save guard, `afterSave` and value-preserving switching
  * between step variants possible. The save flow (the create redirect, drawer callbacks,
  * locking, stale-data detection, upload edits) follows `DefaultEditView` so a document saves
- * the same way on either surface.
+ * the same way on either surface. As there, `Form` refreshes its own state after a save and on
+ * every change, and reports locks and stale data through `useDocumentInfo`.
  */
 export const VariantForm: React.FC<Props> = (props) => {
 	const { documentSlots, variant } = props
@@ -70,25 +69,23 @@ export const VariantForm: React.FC<Props> = (props) => {
 		action,
 		collectionSlug,
 		currentEditor,
-		data,
 		disableLeaveWithoutSaving,
-		docPermissions,
 		documentIsLocked,
 		documentLockState,
-		getDocPermissions,
-		getDocPreferences,
 		hasSavePermission,
 		incrementVersionCount,
 		initialState,
 		isEditing,
 		isInitializing,
 		isLocked,
+		isStale,
 		isTrashed,
 		lastUpdateTime,
 		redirectAfterCreate,
 		setCurrentEditor,
 		setData,
 		setDocumentIsLocked,
+		setIsStale,
 		setLastUpdateTime,
 		unlockDocument,
 		updateDocumentEditor,
@@ -112,7 +109,6 @@ export const VariantForm: React.FC<Props> = (props) => {
 	const localeCode = useLocale()?.code
 	const { reportUpdate } = useDocumentEvents()
 	const { resetUploadEdits } = useUploadEdits()
-	const { getFormState } = useServerFunctions()
 	const { startRouteTransition } = useRouteTransition()
 	const { clearRouteCache } = useRouteCache()
 	const { available, inDrawer, setOutcome, state: wizardState, switchTo } = useFormVariants()
@@ -126,8 +122,6 @@ export const VariantForm: React.FC<Props> = (props) => {
 				]) ?? <VariantSwitcher />)
 			: null
 
-	const abortOnChangeRef = useRef<AbortController | null>(null)
-	const abortOnSaveRef = useRef<AbortController | null>(null)
 	const locale = params.get('locale')
 	const operation = collectionSlug && !id ? 'create' : 'update'
 	const auth = collectionConfig?.auth
@@ -136,15 +130,8 @@ export const VariantForm: React.FC<Props> = (props) => {
 	const isLockingEnabled = lockDocumentsProp !== false
 	const lockDuration = typeof lockDocumentsProp === 'object' ? lockDocumentsProp.duration : 300
 	const lockDurationInMilliseconds = lockDuration * 1000
-	const autosaveEnabled = collectionConfig ? hasAutosaveEnabled(collectionConfig) : false
 	const [isReadOnlyForIncomingUser, setIsReadOnlyForIncomingUser] = useState(false)
 	const [showTakeOverModal, setShowTakeOverModal] = useState(false)
-	const [showStaleDataModal, setShowStaleDataModal] = useState(false)
-	const [editSessionStartTime, setEditSessionStartTime] = useState(Date.now())
-	const hasCheckedForStaleDataRef = useRef(false)
-	const originalUpdatedAtRef = useRef<string | undefined>(data?.updatedAt as string | undefined)
-	const saveCounterRef = useRef(0)
-	const isSavingRef = useRef(false)
 	const lockExpiryTime = lastUpdateTime + lockDurationInMilliseconds
 	// Render cannot read the clock, so the lock's expiry is state, flipped by a timer the moment
 	// it passes, which is what hides the locked-document modal. As on the native form.
@@ -169,44 +156,29 @@ export const VariantForm: React.FC<Props> = (props) => {
 	const wizardStateRef = useRef(wizardState)
 	wizardStateRef.current = wizardState
 
-	const handleDocumentLocking = useCallback(
-		(lockedState: { lastEditedAt?: string; user?: User | number | string } | undefined) => {
-			setDocumentIsLocked?.(true)
-			const previousOwnerID =
-				typeof documentLockState.current?.user === 'object'
-					? documentLockState.current?.user?.id
-					: documentLockState.current?.user
-			if (lockedState?.user) {
-				const lockedUserID =
-					typeof lockedState.user === 'string' || typeof lockedState.user === 'number'
-						? lockedState.user
-						: lockedState.user.id
-				if (!documentLockState.current || lockedUserID !== previousOwnerID) {
-					if (previousOwnerID === user?.id && lockedUserID !== user?.id) {
-						setShowTakeOverModal(true)
-						if (documentLockState.current) {
-							documentLockState.current.hasShownLockedModal = true
-						}
-					}
-					documentLockState.current = {
-						hasShownLockedModal: documentLockState.current?.hasShownLockedModal || false,
-						isLocked: true,
-						user: lockedState.user,
-					}
-					setCurrentEditor?.(lockedState.user as User)
-				}
-				if (lockedState.lastEditedAt) {
-					setLastUpdateTime(new Date(lockedState.lastEditedAt).getTime())
-				}
-			}
-		},
-		[documentLockState, setCurrentEditor, setDocumentIsLocked, setLastUpdateTime, user?.id]
-	)
+	const currentEditorID = typeof currentEditor === 'object' ? currentEditor?.id : currentEditor
+	const previousEditorIDRef = useRef(currentEditorID)
+
+	// Another user took the lock over from the current one.
+	useEffect(() => {
+		const previousEditorID = previousEditorIDRef.current
+		previousEditorIDRef.current = currentEditorID
+		if (
+			isLockingEnabled &&
+			previousEditorID === user?.id &&
+			currentEditorID &&
+			currentEditorID !== user?.id &&
+			documentLockState.current
+		) {
+			setShowTakeOverModal(true)
+			documentLockState.current.hasShownLockedModal = true
+		}
+	}, [currentEditorID, documentLockState, isLockingEnabled, user?.id])
 
 	const handleStaleDataReload = useCallback(() => {
-		setShowStaleDataModal(false)
+		setIsStale(false)
 		router.refresh()
-	}, [router])
+	}, [router, setIsStale])
 
 	const handlePrevent = useCallback((nextHref: null | string) => {
 		nextHrefRef.current = nextHref
@@ -291,8 +263,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 
 	const onSave = useCallback<NonNullable<FormProps['onSuccess']>>(
 		async (json, ctx) => {
-			const { context, formState } = ctx || {}
-			const controller = handleAbortRef(abortOnSaveRef as React.RefObject<AbortController>)
+			const { context, isCurrent = () => true } = ctx || {}
 			const response = json as { doc?: JsonObject; message?: string; result?: JsonObject }
 			const document = response?.doc || response?.result
 			const updatedAt = (document?.updatedAt as string | undefined) || new Date().toISOString()
@@ -300,16 +271,14 @@ export const VariantForm: React.FC<Props> = (props) => {
 			if (user && collectionSlug === userSlug && id === user.id) {
 				void refreshCookieAsync()
 			}
-			setLastUpdateTime(new Date(updatedAt).getTime())
-			originalUpdatedAtRef.current = updatedAt
-			hasCheckedForStaleDataRef.current = false
-			isSavingRef.current = false
-
-			if (context?.incrementVersionCount !== false) {
-				incrementVersionCount()
-			}
-			if (typeof setData === 'function') {
-				void setData(document || {})
+			if (isCurrent()) {
+				setLastUpdateTime(new Date(updatedAt).getTime())
+				if (context?.incrementVersionCount !== false) {
+					incrementVersionCount()
+				}
+				if (typeof setData === 'function') {
+					void setData(document || {})
+				}
 			}
 			const saveOperation = id ? 'update' : 'create'
 			if (typeof onSaveFromContext === 'function') {
@@ -324,10 +293,30 @@ export const VariantForm: React.FC<Props> = (props) => {
 				} as unknown as Parameters<typeof onSaveFromContext>[0])
 			}
 
+			reportUpdate({
+				id,
+				doc: document,
+				drawerSlug,
+				entitySlug: collectionSlug,
+				operation: saveOperation,
+				updatedAt,
+			} as Parameters<typeof reportUpdate>[0])
+
+			// The form was reset or unmounted while the save was in flight: nothing below is its own.
+			if (!isCurrent()) {
+				return
+			}
+			if (id && isLockingEnabled) {
+				setDocumentIsLocked?.(false)
+			}
+
 			const isPageCreate = !isEditing && depth < 2 && redirectAfterCreate !== false
 			// Every save here is a deliberate one: the variant form renders no `Autosave`, so
 			// `afterSave` needs no exception for the writes autosave would otherwise make.
 			const action = await runAfterSave(document, saveOperation)
+			if (!isCurrent()) {
+				return
+			}
 
 			if (action && 'redirect' in action) {
 				startRouteTransition(() => router.push(action.redirect))
@@ -362,185 +351,43 @@ export const VariantForm: React.FC<Props> = (props) => {
 			} else {
 				resetUploadEdits()
 			}
-
-			if (context?.getDocPermissions !== false) {
-				await getDocPermissions(json as JsonObject)
-			}
-
-			if (id) {
-				const docPreferences = await getDocPreferences()
-				const { state } = await getFormState({
-					id,
-					collectionSlug,
-					data: document,
-					docPermissions,
-					docPreferences,
-					formState,
-					operation,
-					renderAllFields: false,
-					returnLockStatus: false,
-					schemaPath: schemaPathSegments.join('.'),
-					signal: controller.signal,
-					skipValidation: true,
-				})
-				if (upload && state) {
-					delete state.file
-				}
-				if (isLockingEnabled) {
-					setDocumentIsLocked?.(false)
-				}
-				reportUpdate({
-					id,
-					doc: document,
-					drawerSlug,
-					entitySlug: collectionSlug,
-					operation: 'update',
-					updatedAt,
-				} as Parameters<typeof reportUpdate>[0])
-				abortOnSaveRef.current = null
-				return state
-			}
-			reportUpdate({
-				id,
-				doc: document,
-				drawerSlug,
-				entitySlug: collectionSlug,
-				operation: 'create',
-				updatedAt,
-			} as Parameters<typeof reportUpdate>[0])
 		},
 		[
 			adminRoute,
 			collectionSlug,
 			depth,
-			docPermissions,
 			drawerSlug,
-			getDocPermissions,
-			getDocPreferences,
-			getFormState,
 			id,
 			incrementVersionCount,
 			isEditing,
 			isLockingEnabled,
 			locale,
 			onSaveFromContext,
-			operation,
 			redirectAfterCreate,
 			refreshCookieAsync,
 			reportUpdate,
 			resetUploadEdits,
 			router,
 			runAfterSave,
-			schemaPathSegments,
 			setData,
 			setDocumentIsLocked,
 			setLastUpdateTime,
 			setOutcome,
 			startRouteTransition,
 			switchTo,
-			upload,
 			user,
 			userSlug,
 		]
 	)
 
-	const onChange = useCallback<NonNullable<FormProps['onChange']>[number]>(
-		async ({ formState: prevFormState, submitted }) => {
-			onFormChangeRef.current?.()
-			const controller = handleAbortRef(abortOnChangeRef as React.RefObject<AbortController>)
-			const saveCounterAtStart = saveCounterRef.current
-			const isSavingAtStart = isSavingRef.current
-			const dataUpdatedAt = data?.updatedAt as string | undefined
-			if (
-				dataUpdatedAt &&
-				(!originalUpdatedAtRef.current || dataUpdatedAt > originalUpdatedAtRef.current)
-			) {
-				originalUpdatedAtRef.current = dataUpdatedAt
-				hasCheckedForStaleDataRef.current = false
-			}
-			const currentTime = Date.now()
-			const updateLastEdited = isLockingEnabled && currentTime - editSessionStartTime >= 10000
-			if (updateLastEdited) {
-				setEditSessionStartTime(currentTime)
-			}
-			const checkForStaleData =
-				!hasCheckedForStaleDataRef.current &&
-				Boolean(originalUpdatedAtRef.current) &&
-				operation === 'update' &&
-				!isTrashed &&
-				!autosaveEnabled
-			if (checkForStaleData) {
-				hasCheckedForStaleDataRef.current = true
-			}
-			const docPreferences = await getDocPreferences()
-			const result = await getFormState({
-				id,
-				checkForStaleData,
-				collectionSlug,
-				docPermissions,
-				docPreferences,
-				formState: prevFormState,
-				operation,
-				originalUpdatedAt: checkForStaleData ? originalUpdatedAtRef.current : undefined,
-				readOnly: isTrashed || isReadOnlyForIncomingUser,
-				renderAllFields: false,
-				returnLockStatus: isLockingEnabled,
-				schemaPath: schemaPathSegments.join('.'),
-				signal: controller.signal,
-				skipValidation: !submitted,
-				updateLastEdited,
-			})
-			if (!result) {
-				return prevFormState
-			}
-			const { lockedState, staleDataState, state } = result
-			if (isLockingEnabled) {
-				handleDocumentLocking(lockedState)
-			}
-			if (
-				staleDataState?.isStale &&
-				!isSavingAtStart &&
-				saveCounterRef.current === saveCounterAtStart
-			) {
-				setShowStaleDataModal(true)
-			}
-			abortOnChangeRef.current = null
-			return state as FormState
-		},
-		[
-			autosaveEnabled,
-			collectionSlug,
-			data?.updatedAt,
-			docPermissions,
-			editSessionStartTime,
-			getDocPreferences,
-			getFormState,
-			handleDocumentLocking,
-			id,
-			isLockingEnabled,
-			isReadOnlyForIncomingUser,
-			isTrashed,
-			operation,
-			schemaPathSegments,
-		]
-	)
+	// Payload ignores what `onChange` returns: the form refreshes its own state.
+	const onChange = useCallback<NonNullable<FormProps['onChange']>[number]>(() => {
+		onFormChangeRef.current?.()
+	}, [])
 
 	useEffect(() => {
 		return () => {
 			setShowTakeOverModal(false)
-		}
-	}, [])
-
-	useEffect(() => {
-		const abortOnChange = abortOnChangeRef.current
-		const abortOnSave = abortOnSaveRef.current
-		return () => {
-			if (abortOnChange) {
-				abortAndIgnore(abortOnChange)
-			}
-			if (abortOnSave) {
-				abortAndIgnore(abortOnSave)
-			}
 		}
 	}, [])
 
@@ -682,10 +529,6 @@ export const VariantForm: React.FC<Props> = (props) => {
 					key={`${isLocked}`}
 					method={id ? 'PATCH' : 'POST'}
 					onChange={[onChange]}
-					onSubmit={() => {
-						saveCounterRef.current += 1
-						isSavingRef.current = true
-					}}
 					onSuccess={onSave}
 				>
 					<FormStateBridge />
@@ -719,9 +562,7 @@ export const VariantForm: React.FC<Props> = (props) => {
 							}}
 						/>
 					)}
-					{showStaleDataModal && (
-						<DocumentStaleData isActive={showStaleDataModal} onReload={handleStaleDataReload} />
-					)}
+					{isStale && <DocumentStaleData isActive={isStale} onReload={handleStaleDataReload} />}
 					{preventLeaveWithoutSaving && (
 						<LeaveWithoutSaving
 							modalSlug={drawerSlug ? `leave-without-saving-${drawerSlug}` : undefined}

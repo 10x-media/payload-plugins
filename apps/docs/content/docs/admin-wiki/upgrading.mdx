@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x, including the
 
 ## Checklist
 
-1. Upgrade `@10x-media/admin-wiki` with Payload: its peers are `payload`, `@payloadcms/ui`, and `@payloadcms/richtext-lexical` at `^4.0.0-beta.6`. `next` and `@payloadcms/next` are no longer peers, so the wiki runs on TanStack Start too.
+1. Upgrade `@10x-media/admin-wiki` with Payload: its peers are `payload`, `@payloadcms/ui`, and `@payloadcms/richtext-lexical` at `^4.0.0-beta.10`. `next` and `@payloadcms/next` are no longer peers, so the wiki runs on TanStack Start too.
 2. Check the [config changes](#config-changes) against your config and custom CSS.
 3. With `localization` in your config, migrate the guides' publication status before the first boot on the old data: [MongoDB](#mongodb), [Postgres](#postgres), [SQLite](#sqlite). Without `localization` there is no wiki data to migrate.
 4. Regenerate the import map (`pnpm payload generate:importmap`).

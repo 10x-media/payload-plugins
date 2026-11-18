@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x, where reliabi
 
 ## Checklist
 
-1. Upgrade `@10x-media/jobs` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.6`.
+1. Upgrade `@10x-media/jobs` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.10`.
 2. Remove the [options that are gone](#removed-options) from your plugin config, worker, and `vercel.json`.
 3. Tune the lease on `jobs.processingLease` in the Payload config instead (see [The processing lease](/jobs/reliability#the-processing-lease)).
 4. On Postgres or SQLite, create and run a migration: `pnpm payload migrate:create` then `pnpm payload migrate`. It picks up Payload's own jobs changes and the reliability columns the plugin no longer adds.

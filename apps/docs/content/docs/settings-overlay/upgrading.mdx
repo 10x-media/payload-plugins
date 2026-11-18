@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x.
 
 ## Checklist
 
-1. Upgrade `@10x-media/settings-overlay` with Payload: its peers are `payload`, `@payloadcms/ui` and `@payloadcms/translations` at `^4.0.0-beta.6`. `next` and `@payloadcms/next` are no longer peers.
+1. Upgrade `@10x-media/settings-overlay` with Payload: its peers are `payload`, `@payloadcms/ui` and `@payloadcms/translations` at `^4.0.0-beta.10`. `next` and `@payloadcms/next` are no longer peers.
 2. Remove the `@10x-media/settings-overlay/embed` alias from `next.config` and any import of it (see [The embed shim is gone](#the-embed-shim-is-gone)).
 3. Remove `history` from every overlay and from `defaults` (see [The panel no longer writes the URL](#the-panel-no-longer-writes-the-url)).
 4. Drop the `replace` option from `setTarget` calls, and any use of `QUERY_PARAM` or `settingsQuery`.

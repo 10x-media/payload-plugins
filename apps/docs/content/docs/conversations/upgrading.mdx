@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x.
 
 ## Checklist
 
-1. Upgrade `@10x-media/conversations` with Payload: its peers are `payload`, `@payloadcms/ui` and `@payloadcms/richtext-lexical` at `^4.0.0-beta.7`.
+1. Upgrade `@10x-media/conversations` with Payload: its peers are `payload`, `@payloadcms/ui` and `@payloadcms/richtext-lexical` at `^4.0.0-beta.10`.
 2. Pass `overrideAccess: true` (or `req`) where code of yours reads or writes through the Local API without a user, including the plugin's own collections (see [Local API access](#local-api-access)).
 3. If website accounts upload into an attachments collection of your own, or read their own account, give those collections access that admits them (see [Website accounts](#website-accounts)).
 4. With `serverComponents: 'server-function'` on TanStack Start, register the plugin's server functions there too (see [Slots](/conversations/admin-ui/slots#how-server-components-reach-the-admin)).

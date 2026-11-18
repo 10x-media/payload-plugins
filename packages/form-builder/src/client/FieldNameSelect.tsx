@@ -8,7 +8,7 @@ import {
 	useField,
 	useFormFields,
 } from '@payloadcms/ui'
-import { reduceFieldsToValues } from 'payload/shared'
+import { getDataFromFormState } from 'payload/shared'
 import { type CSSProperties, useMemo } from 'react'
 import { fieldNames, fieldNamesOfType } from '../fields/fieldNamesOfType'
 import type { TranslationKey } from '../translations/keys'
@@ -73,7 +73,7 @@ export const FieldNameSelect = (props: FieldNameSelectProps) => {
 		: toStaticLabel(props.field?.admin?.description)
 
 	const optionsJson = useFormFields(([fields]) =>
-		JSON.stringify(optionsFromData(reduceFieldsToValues(fields, true), props.types))
+		JSON.stringify(optionsFromData(getDataFromFormState(fields, true), props.types))
 	)
 	const options = useMemo(() => JSON.parse(optionsJson) as ReactSelectOption[], [optionsJson])
 
