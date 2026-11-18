@@ -28,6 +28,12 @@ import type { ValidationRulesConfig } from './validation/registry'
 export type FormBuilderPluginOptions = {
 	disabled?: boolean
 	/**
+	 * Plugin order. Payload runs plugins sorted by it, ascending, default `0`.
+	 * A plugin that has to see the form collections runs above it.
+	 * @default 50
+	 */
+	order?: number
+	/**
 	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
 	 * translation keys exported from `@10x-media/form-builder/i18n`. Values win
 	 * over the built-in locales key-by-key; locales the plugin does not ship are

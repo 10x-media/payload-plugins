@@ -113,7 +113,7 @@ Entries arrive sorted featured-first, then by title.
 
 ## Building your own surface
 
-Every surface listens on a [target key](/admin-wiki/targets#target-keys), and the key builders are exported alongside the components, so a key is never spelled by hand:
+Every surface listens on a [target key](/admin-wiki/targets#target-keys), and the key builders are exported alongside the components (and from `@10x-media/admin-wiki/shared`, for a module both server code and client components import), so a key is never spelled by hand:
 
 ```ts
 collectionTargetKey('posts')                  // collection:posts

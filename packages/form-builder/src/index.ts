@@ -1,4 +1,4 @@
-import { type Config, definePlugin } from 'payload'
+import { type Config, definePlugin, type Plugin } from 'payload'
 import { assertNoActionBlockCollision } from './actions/assertNoBlockCollision'
 import { buildDefaultActionDefinitions } from './actions/builtin'
 import { resolveActions } from './actions/registry'
@@ -23,7 +23,7 @@ import { resolveSpamConfig } from './spam/resolveSpam'
 import { defaultValidationRules } from './validation/builtin'
 import { resolveValidationRules } from './validation/registry'
 
-export const formBuilder = definePlugin<FormBuilderPluginOptions>({
+const definition = definePlugin<FormBuilderPluginOptions>({
 	slug: '@10x-media/form-builder',
 	order: 50,
 	plugin: ({ config, options = {}, plugins }): Config => {
@@ -159,6 +159,19 @@ export const formBuilder = definePlugin<FormBuilderPluginOptions>({
 		return config
 	},
 })
+
+/**
+ * Form builder plugin for Payload: forms, submissions and their actions.
+ * Runs at `options.order` (default `50`), so a plugin that wraps every
+ * collection already in the config sets a higher order of its own.
+ */
+export const formBuilder = (options: FormBuilderPluginOptions = {}): Plugin => {
+	const plugin = definition(options)
+	if (options.order !== undefined) {
+		plugin.order = options.order
+	}
+	return plugin
+}
 
 export type {
 	BodyConverter,

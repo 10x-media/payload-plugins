@@ -18,6 +18,13 @@
  *    breaks the consumer's bundle. A package whose dist imports stylesheets while
  *    `sideEffects` is `false` gets a warning, since a production bundler may drop them.
  *
+ * 7. Browser-safe graphs: nothing reachable from a 'use client' module or from a `./shared`
+ *    entry imports a `node:*` builtin or a value from `payload` that `payload/shared` lacks.
+ *    Payload 4 maps the `browser` condition to `payload/shared`, so a client bundle that reaches
+ *    `definePlugin` or `createPayloadRequest` fails to build. A `./shared` entry must also stay
+ *    clear of 'use client' modules, since a server caller would get a client reference instead
+ *    of the function.
+ *
  * Run standalone via `pnpm check:dist` (after a build) or in CI. Pass `--only-built` to
  * skip packages that have no `dist/` at all, which is what an affected-scoped CI build
  * leaves behind: the packages outside the run's scope were never built, and reporting
@@ -25,6 +32,7 @@
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { createRequire } from 'node:module'
 import { dirname, join, relative } from 'node:path'
 import { publint } from 'publint'
 import { formatMessage } from 'publint/utils'
@@ -55,6 +63,125 @@ const exportTargets = (exports: unknown): string[] => {
 	if (typeof exports === 'string') return [exports]
 	if (exports && typeof exports === 'object') return Object.values(exports).flatMap(exportTargets)
 	return []
+}
+
+const IMPORT_RE =
+	/(?:^|\n)\s*(?:import|export)\s+([^'";]*?)\s*from\s*['"]([^'"]+)['"]|(?:^|\n)\s*import\s*['"]([^'"]+)['"]/g
+const EXPORT_NAMES_RE = /export\s*\{([^}]*)\}/g
+const EXPORT_STAR_RE = /export\s*\*\s*from\s*['"]([^'"]+)['"]/g
+const EXPORT_DECL_RE = /export\s+(?:async\s+)?(?:const|function|class|let)\s+(\w+)/g
+
+/** Value names `payload/shared` exports, read from the build the package resolves. */
+const payloadSharedNames = (pkgDir: string): Set<string> | null => {
+	let entry: string
+	try {
+		entry = createRequire(join(pkgDir, 'package.json')).resolve('payload/shared')
+	} catch {
+		return null
+	}
+	const names = new Set<string>()
+	const text = readFileSync(entry, 'utf8')
+	for (const [, list = ''] of text.matchAll(EXPORT_NAMES_RE)) {
+		for (const part of list.split(',')) {
+			const name = part
+				.trim()
+				.split(/\s+as\s+/)
+				.pop()
+			if (name) names.add(name)
+		}
+	}
+	for (const [, specifier = ''] of text.matchAll(EXPORT_STAR_RE)) {
+		const target = join(dirname(entry), specifier)
+		if (!existsSync(target)) continue
+		for (const [, name = ''] of readFileSync(target, 'utf8').matchAll(EXPORT_DECL_RE)) {
+			names.add(name)
+		}
+	}
+	return names
+}
+
+type ModuleFacts = { bad: string[]; client: boolean; deps: string[] }
+
+/**
+ * Follows the relative imports of every 'use client' module and every `./shared` entry in a
+ * package's dist, and reports what a browser build cannot load.
+ */
+const verifyBrowserGraphs = (
+	pkgDir: string,
+	distDir: string,
+	sharedEntries: string[]
+): string[] => {
+	const shared = payloadSharedNames(pkgDir)
+	if (!shared) return []
+	const facts = new Map<string, ModuleFacts>()
+	const factsOf = (file: string): ModuleFacts => {
+		const known = facts.get(file)
+		if (known) return known
+		const text = readFileSync(file, 'utf8')
+		const bad: string[] = []
+		const deps: string[] = []
+		for (const [, clause = '', from, bare] of text.matchAll(IMPORT_RE)) {
+			const specifier = from ?? bare ?? ''
+			if (specifier === 'payload') {
+				if (/^type\s/.test(clause)) continue
+				if (/\*\s+as\s/.test(clause)) bad.push('payload (namespace import)')
+				const named = /\{([^}]*)\}/.exec(clause)?.[1] ?? ''
+				for (const part of named.split(',')) {
+					const name = part.trim().split(/\s+as\s+/)[0]
+					if (name && !name.startsWith('type ') && !shared.has(name)) bad.push(`payload#${name}`)
+				}
+			} else if (specifier.startsWith('node:')) {
+				bad.push(specifier)
+			} else if (specifier.startsWith('.')) {
+				const target = join(dirname(file), specifier)
+				if (existsSync(target)) deps.push(target)
+			}
+		}
+		const result = { bad, client: DIRECTIVE_RE.test(text.trimStart()), deps }
+		facts.set(file, result)
+		return result
+	}
+	const errors: string[] = []
+	const reported = new Set<string>()
+	const walkFrom = (start: string, label: string, refuseClient: boolean): void => {
+		const parent = new Map<string, string | null>([[start, null]])
+		const queue = [start]
+		while (queue.length > 0) {
+			const current = queue.shift() as string
+			const { bad, client, deps } = factsOf(current)
+			const problems = refuseClient && client && current !== start ? ["a 'use client' module"] : bad
+			if (problems.length > 0) {
+				if (reported.has(current)) continue
+				reported.add(current)
+				const chain: string[] = []
+				for (let at: string | null | undefined = current; at; at = parent.get(at)) {
+					chain.unshift(relative(distDir, at).replaceAll('\\', '/'))
+				}
+				errors.push(`${label} reaches ${problems.join(', ')}: ${chain.join(' -> ')}`)
+				continue
+			}
+			for (const dep of deps) {
+				if (parent.has(dep)) continue
+				parent.set(dep, current)
+				queue.push(dep)
+			}
+		}
+	}
+	for (const file of walk(distDir, (p) => p.endsWith('.js'))) {
+		if (factsOf(file).client) walkFrom(file, `'use client' ${relative(pkgDir, file)}`, false)
+	}
+	for (const entry of sharedEntries) walkFrom(join(pkgDir, entry), `shared entry ${entry}`, true)
+	return errors
+}
+
+/** dist targets of the `./shared` export and any `./<name>/shared` beside it. */
+const sharedEntryTargets = (exports: unknown): string[] => {
+	if (!exports || typeof exports !== 'object') return []
+	return Object.entries(exports as Record<string, unknown>)
+		.filter(([key]) => key === './shared' || key.endsWith('/shared'))
+		.flatMap(([, value]) => exportTargets(value))
+		.filter((target) => target.startsWith('./dist/') && target.endsWith('.js'))
+		.filter((target, index, all) => all.indexOf(target) === index)
 }
 
 const verifyPackage = async (pkgDir: string): Promise<string[]> => {
@@ -119,6 +246,8 @@ const verifyPackage = async (pkgDir: string): Promise<string[]> => {
 			`  warn ${pkg.name}: dist imports stylesheets but package.json sets "sideEffects": false, so a production bundler may drop them`
 		)
 	}
+
+	errors.push(...verifyBrowserGraphs(pkgDir, distDir, sharedEntryTargets(pkg.exports)))
 
 	for (const target of exportTargets(pkg.exports ?? {})) {
 		if (!existsSync(join(pkgDir, target))) {

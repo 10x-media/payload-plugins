@@ -229,6 +229,13 @@ export type SecretRotationOptions = {
 export type WebhooksPluginOptions = {
 	disabled?: boolean
 	/**
+	 * Plugin order. Payload runs plugins sorted by it, ascending, default `0`.
+	 * Keep it below automations' (`100`) so the `webhook` trigger reaches its
+	 * catalog, and below any plugin that has to see the webhook collections.
+	 * @default 10
+	 */
+	order?: number
+	/**
 	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
 	 * translation keys exported from `@10x-media/webhooks/i18n`. Values win over
 	 * the built-in locales key-by-key; locales the plugin does not ship are added

@@ -77,7 +77,7 @@ Per type:
 
 | Parameter | Holds |
 |---|---|
-| `settings` | `<overlay>/<item>[/<id>]`, read only. `SEARCH_PARAM` from `@10x-media/settings-overlay` names it. |
+| `settings` | `<overlay>/<item>[/<id>]`, read only. `SEARCH_PARAM` from `@10x-media/settings-overlay` (or `/shared`, for client code) names it. |
 
 A list's filters, search, sort and paging live in the panel's memory and never reach the URL, so a list view on the page underneath keeps its own `where[...]` parameters untouched.
 

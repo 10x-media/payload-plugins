@@ -30,4 +30,31 @@ describe('adminWiki plugin order', () => {
 			expect.arrayContaining(['collection:late', 'field:collection:late.headline'])
 		)
 	})
+
+	it('runs at the order the host passes, so a later plugin sees the wiki collections', async () => {
+		let seen: string[] = []
+		const needsWikiMedia = Object.assign(
+			(config: Config): Config => {
+				seen = (config.collections ?? []).map((collection) => collection.slug)
+				return config
+			},
+			{ order: 10 }
+		)
+		const plugin = adminWiki({ order: 0 })
+		await buildConfig({
+			collections: [{ slug: 'users', auth: true, fields: [] }],
+			db: mongooseAdapter({ url: 'mongodb://127.0.0.1:1/never-connected' }),
+			plugins: [needsWikiMedia, plugin],
+			secret: 'test-secret',
+			telemetry: false,
+		})
+
+		expect(plugin.order).toBe(0)
+		expect(seen).toEqual(expect.arrayContaining(['wiki-pages', 'wiki-media']))
+	})
+
+	it('keeps the default order when none is passed', () => {
+		expect(adminWiki({}).order).toBe(ADMIN_WIKI_PLUGIN_ORDER)
+		expect(adminWiki().order).toBe(ADMIN_WIKI_PLUGIN_ORDER)
+	})
 })

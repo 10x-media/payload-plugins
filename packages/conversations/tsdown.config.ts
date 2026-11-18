@@ -4,6 +4,7 @@ export default definePluginBuild({
 	entry: {
 		index: 'src/index.ts',
 		'exports/types': 'src/exports/types.ts',
+		'exports/shared': 'src/exports/shared.ts',
 		'exports/client': 'src/exports/client.ts',
 		'exports/react': 'src/exports/react.ts',
 		'exports/composer': 'src/exports/composer.ts',

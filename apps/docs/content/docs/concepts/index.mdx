@@ -18,7 +18,7 @@ export default buildConfig({
 })
 ```
 
-`definePlugin` attaches two pieces of metadata to the returned plugin. The `slug` is the package name (`@10x-media/jobs`); Payload builds a slug-keyed map of registered plugins from it, which is how the plugins detect each other. Webhooks, for example, switches its delivery mode when it finds Jobs in that map. `order` controls when a plugin runs relative to its siblings: contributors run early (webhooks at `order: 10`), consumers late (automations at `order: 100`), so contributions are already in place when the consumer reads them. Both mechanisms are shown in action in [Jobs family interop](/concepts/jobs-family).
+`definePlugin` attaches two pieces of metadata to the returned plugin. The `slug` is the package name (`@10x-media/jobs`); Payload builds a slug-keyed map of registered plugins from it, which is how the plugins detect each other. Webhooks, for example, switches its delivery mode when it finds Jobs in that map. `order` controls when a plugin runs relative to its siblings: contributors run early (webhooks at `order: 10`), consumers late (automations at `order: 100`), so contributions are already in place when the consumer reads them. A plugin that sets an `order` of its own (admin-wiki, content-lock, form-builder, webhooks) takes an `order` option too, so you can move it when another plugin has to run on the other side of it; each plugin's docs say what it gives up when moved. Both mechanisms are shown in action in [Jobs family interop](/concepts/jobs-family).
 
 Every factory accepts `disabled: true`, which returns the incoming config untouched. Use it to switch a plugin off per environment without removing the call.
 
@@ -45,8 +45,11 @@ Each package splits its surface into subpath exports so server code, client comp
 | `.` | The plugin factory, options types, and server-side helpers. |
 | `./types` | Types only. Import from here in code that must not pull in runtime. |
 | `./client` | Client components (`'use client'`). Referenced by the admin import map. |
+| `./shared` | Helpers with no server and no React dependency (key formats, parsers, constants, formatters), where the plugin has them. Import from here in a module that both server code and client components import. |
 | `./rsc` | Server components for the admin, where the plugin has them. |
 | `./i18n` | Translation `keys`, the built-in `translations`, and the `TranslationsOption` type. See [Translations](/concepts/translations). |
+
+On Payload 4 the root entry is server-only. Payload maps the `browser` condition to `payload/shared`, so a client bundle that reaches the plugin factory (and with it `definePlugin` and the Local API) fails to build, and a server caller of a `'use client'` entry gets a client reference instead of the function. A helper both sides need lives in `./shared`; the root and the client entries keep re-exporting it.
 
 Some plugins add more: analytics ships `./adapters/*`, `./geo`, and `./testing`; form-builder ships `./react` (the frontend renderer) and `./styles.css`.
 

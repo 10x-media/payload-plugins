@@ -1,5 +1,47 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, expectTypeOf, it } from 'vitest'
 import { toFormDocument } from './toFormDocument'
+
+/**
+ * The shape `payload generate:types` writes for a forms collection whose blocks set an
+ * `interfaceName`: each block is an interface, which has no implicit index signature.
+ */
+interface GeneratedTextBlock {
+	name: string
+	label?: string | null
+	required?: boolean | null
+	id?: string | null
+	blockName?: string | null
+	blockType: 'text'
+}
+
+interface GeneratedMessageBlock {
+	message?: { root: { type: string; [k: string]: unknown } } | null
+	id?: string | null
+	blockName?: string | null
+	blockType: 'message'
+}
+
+interface GeneratedForm {
+	id: string
+	title?: string | null
+	multistep?: boolean | null
+	pollEnabled?: boolean | null
+	fields?: (GeneratedTextBlock | GeneratedMessageBlock)[] | null
+	submitLabel?: string | null
+	poll?: {
+		resultsField?: string | null
+		resultsVisibility?: ('afterVote' | 'afterClose') | null
+		closesAt?: string | null
+		outcome?: { winningValues?: string[] | null; resolvedAt?: string | null }
+	}
+	response?: {
+		type?: ('message' | 'redirect') | null
+		message?: { root: { type: string; [k: string]: unknown } } | null
+		redirect?: { url?: string | null }
+	}
+	updatedAt: string
+	createdAt: string
+}
 
 describe('toFormDocument', () => {
 	it('coerces a null response to undefined', () => {
@@ -248,5 +290,16 @@ describe('toFormDocument', () => {
 		]
 		const doc = toFormDocument({ id: 1, fields, poll: { resultsField: 'winner' } })
 		expect(doc.fields[0]?.options).toEqual([{ label: 'Old', value: 'old' }])
+	})
+
+	it('accepts a generated form type whose blocks are interfaces, with no cast', () => {
+		const form: GeneratedForm = {
+			id: 'f1',
+			fields: [{ blockType: 'text', name: 'email' }, { blockType: 'message' }],
+			createdAt: '',
+			updatedAt: '',
+		}
+		expectTypeOf(toFormDocument).toBeCallableWith(form)
+		expect(toFormDocument(form).fields).toHaveLength(2)
 	})
 })

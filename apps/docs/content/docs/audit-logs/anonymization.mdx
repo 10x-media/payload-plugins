@@ -47,7 +47,7 @@ type AnonymizeFunction = (args: {
 
 Return `redacted` to drop the value, or return anything else to store that instead. Returning `value` keeps it as is.
 
-`REDACTED` is the string `'__REDACTED__'`, exported from the package for when you read logs back:
+`REDACTED` is the string `'__REDACTED__'`, exported from the package (and from `@10x-media/audit-logs/shared`, for client code) for when you read logs back:
 
 ```ts
 import { REDACTED } from '@10x-media/audit-logs'

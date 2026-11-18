@@ -35,6 +35,11 @@
 			"types": "./src/exports/types.ts",
 			"default": "./dist/exports/types.js"
 		},
+		"./shared": {
+			"development": "./src/exports/shared.ts",
+			"types": "./src/exports/shared.ts",
+			"default": "./dist/exports/shared.js"
+		},
 		"./client": {
 			"development": "./src/exports/client.ts",
 			"types": "./src/exports/client.ts",
@@ -140,6 +145,11 @@
 				"types": "./dist/exports/types.d.ts",
 				"import": "./dist/exports/types.js",
 				"default": "./dist/exports/types.js"
+			},
+			"./shared": {
+				"types": "./dist/exports/shared.d.ts",
+				"import": "./dist/exports/shared.js",
+				"default": "./dist/exports/shared.js"
 			},
 			"./client": {
 				"types": "./dist/exports/client.d.ts",

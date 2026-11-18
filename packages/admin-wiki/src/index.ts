@@ -1,4 +1,4 @@
-import { type Config, definePlugin, type PayloadComponent } from 'payload'
+import { type Config, definePlugin, type PayloadComponent, type Plugin } from 'payload'
 
 import { buildWikiMediaCollection } from './collections/wikiMedia'
 import { buildWikiPagesCollection } from './collections/wikiPages'
@@ -65,14 +65,7 @@ const componentImportPath = (component: PayloadComponent): string | undefined =>
  */
 export const ADMIN_WIKI_PLUGIN_ORDER = 1000
 
-/**
- * Admin Wiki plugin for Payload: a living wiki inside the admin panel.
- * Registers the wiki collections (guide pages + media), the plugin registry,
- * and translations. Runs after the plugins that add collections or fields
- * (see `ADMIN_WIKI_PLUGIN_ORDER`), so guides can target them. Authored with
- * `definePlugin` so sibling plugins can detect it by slug.
- */
-export const adminWiki = definePlugin<AdminWikiPluginOptions>({
+const definition = definePlugin<AdminWikiPluginOptions>({
 	slug: '@10x-media/admin-wiki',
 	order: ADMIN_WIKI_PLUGIN_ORDER,
 	// Payload passes `options` as undefined when the plugin is registered without any.
@@ -98,7 +91,7 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		if (walk.injectedFieldCount === 0) {
 			warnings.push(
 				'@10x-media/admin-wiki: the config walker found no fields to attach help to. ' +
-					'A plugin that adds collections or fields needs an order below ADMIN_WIKI_PLUGIN_ORDER.'
+					`A plugin that adds collections or fields needs an order below the wiki's (${options.order ?? ADMIN_WIKI_PLUGIN_ORDER}).`
 			)
 		}
 		if (warnings.length > 0) {
@@ -188,6 +181,21 @@ export const adminWiki = definePlugin<AdminWikiPluginOptions>({
 		return config
 	},
 })
+
+/**
+ * Admin Wiki plugin for Payload: a living wiki inside the admin panel.
+ * Registers the wiki collections (guide pages + media), the plugin registry,
+ * and translations. Runs after the plugins that add collections or fields
+ * (`options.order`, default `ADMIN_WIKI_PLUGIN_ORDER`), so guides can target
+ * them. Authored with `definePlugin` so sibling plugins can detect it by slug.
+ */
+export const adminWiki = (options: AdminWikiPluginOptions = {}): Plugin => {
+	const plugin = definition(options)
+	if (options.order !== undefined) {
+		plugin.order = options.order
+	}
+	return plugin
+}
 
 export { SUMMARY_MAX_LENGTH } from './collections/wikiPages'
 export { type WikiFeaturesArgs, wikiFeatures } from './editor/wikiEditor'

@@ -29,7 +29,7 @@ This registers two collections under a **Forms** admin group: `forms` (the docum
 
 The in-admin condition and flow builders ship their own styles; no admin setup is needed.
 
-`formBuilder` registers with `order: 50`. Plugins execute in ascending `order` (lower first), so any plugin that needs to run *after* it, for example `@payloadcms/plugin-multi-tenant`, which wraps every collection already present in the config including the three above, needs an explicit `order` higher than `50`.
+`formBuilder` registers with `order: 50`. Plugins execute in ascending `order` (lower first), so any plugin that needs to run *after* it, for example `@payloadcms/plugin-multi-tenant`, which wraps every collection already present in the config including the three above, needs an explicit `order` higher than `50`. To move the form builder instead, pass `formBuilder({ order })`: below a plugin that has to see the form collections, above one whose collections or fields the form builder reads.
 
 ## Author a form
 
