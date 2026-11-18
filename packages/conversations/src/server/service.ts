@@ -13,6 +13,7 @@ import type {
 	ChannelAccess,
 	ListResponse,
 	MentionCandidate,
+	MessageResponse,
 	SubscribeResponse,
 	WireMessage,
 } from '../shared/wire'
@@ -275,6 +276,42 @@ export const listMessages = async (
 		hasOlder: feed.hasOlder,
 		messages: await decorateMessages(req, instance, { messages: feed.messages, viewer }),
 		threadReads,
+	}
+}
+
+/**
+ * One message by id, for a link straight to it: the message, and for a reply
+ * its thread's root, after conversation and channel access. A message the
+ * viewer cannot read, or one its feed no longer shows, is a 404 like a
+ * missing one, so a link reveals nothing about what it pointed at.
+ */
+export const getMessage = async (
+	req: PayloadRequest,
+	instance: ConversationsInstance,
+	id: string
+): Promise<MessageResponse> => {
+	const viewer = viewerKey(req)
+	const message = await findRoot(req, instance, id)
+	if (!message || isRemoved(instance, message)) {
+		return fail('Not found', 404)
+	}
+	const access = (await resolveAccess(req, instance, [message.key])).get(message.key)
+	if (!access?.channels.some((channel) => channel.slug === message.channel)) {
+		return fail('Not found', 404)
+	}
+	const root = message.parent ? await findRoot(req, instance, message.parent) : null
+	const shown = root ? [message, root] : [message]
+	const [authors, decorated] = await Promise.all([
+		projectAuthors(req, instance, shown),
+		decorateMessages(req, instance, { messages: shown, viewer }),
+	])
+	const [own, parent] = decorated as [ConversationMessage, ConversationMessage | undefined]
+	return {
+		authors,
+		message: own,
+		...(root && parent
+			? { root: isRemoved(instance, root) ? { ...parent, removed: true } : parent }
+			: {}),
 	}
 }
 

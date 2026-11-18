@@ -19,6 +19,8 @@ export type ChatFeedProps = {
 	conversation: UseConversationResult
 	/** Shown when the channel has no messages. */
 	empty?: ReactNode
+	/** A message id to open at and mark, e.g. a linked one; `conversation` should be anchored at it. */
+	focus?: null | string
 	instance: string
 	/** Rows from elsewhere, interleaved by timestamp. */
 	items?: FeedItem[]
@@ -37,6 +39,7 @@ export type ChatFeedProps = {
 const DefaultFeed = ({
 	conversation,
 	empty,
+	focus,
 	instance,
 	items,
 	onOpenThread,
@@ -44,7 +47,7 @@ const DefaultFeed = ({
 	renderType,
 }: ChatFeedProps) => {
 	const { i18n, t } = useTranslation()
-	const feed = useFeed({ conversation, items })
+	const feed = useFeed({ conversation, focus, items })
 
 	const dayLabel = (day: FeedDay) => {
 		if (day.relative === 'today') return t(keys.today)
@@ -90,6 +93,7 @@ const DefaultFeed = ({
 								<ChatMessage
 									authors={conversation.authors}
 									compact={row.compact}
+									highlighted={feed.highlighted === String(row.message.id)}
 									instance={instance}
 									message={row.message}
 									onOpenThread={onOpenThread}

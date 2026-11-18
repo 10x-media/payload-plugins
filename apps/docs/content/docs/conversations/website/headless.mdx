@@ -39,10 +39,10 @@ Unread counts for many keys at once, for a room list or an inbox. Retains every 
 ### useConversation
 
 ```ts
-const conversation = useConversation({ key, channel, parent, limit })
+const conversation = useConversation({ key, channel, parent, limit, anchor })
 ```
 
-One feed or thread as a window. Pass `channel`, or `channels` for several in one feed; `parent` (a root id) gives that root's thread. `limit` is the page size, 30 by default.
+One feed or thread as a window. Pass `channel`, or `channels` for several in one feed; `parent` (a root id) gives that root's thread. `limit` is the page size, 30 by default. `anchor`, a time, opens the window around it instead, for a linked message's `createdAt`; changing it reopens the window.
 
 | Field | |
 |---|---|
@@ -111,10 +111,10 @@ These carry the behaviour of the admin's and the registry's components. Use them
 ### useFeed
 
 ```ts
-const feed = useFeed({ conversation, items })
+const feed = useFeed({ conversation, items, focus })
 ```
 
-A scrolling feed around a `useConversation` result. Put `scrollerRef` and `onScroll` on the scrolling element, an empty `topRef` element first inside it and an empty `bottomRef` element last, and give your "New messages" divider the attribute `data-feed-divider` (`FEED_DIVIDER_ATTRIBUTE`).
+A scrolling feed around a `useConversation` result. Put `scrollerRef` and `onScroll` on the scrolling element, an empty `topRef` element first inside it and an empty `bottomRef` element last, give your "New messages" divider the attribute `data-feed-divider` (`FEED_DIVIDER_ATTRIBUTE`), and each message's element `data-message-id` (`FEED_MESSAGE_ATTRIBUTE`) with its id.
 
 | Field | |
 |---|---|
@@ -123,8 +123,9 @@ A scrolling feed around a `useConversation` result. Put `scrollerRef` and `onScr
 | `showJump`, `unseen`, `toBottom()` | "N new" or "Jump to latest", and the action |
 | `skeleton` | A slow first load: show a placeholder. Never true for a quick one |
 | `status` | From the conversation |
+| `highlighted` | The `focus` message, once the feed opened at it: mark it |
 
-It opens at the divider or the bottom, follows the bottom while the reader is there, counts what arrives below otherwise, loads pages as the top or bottom comes into view, and calls `markSeen` at the end.
+`focus`, a message id, opens the feed at that message when it is in the window (anchor the conversation at its `createdAt`). Otherwise it opens at the divider or the bottom, follows the bottom while the reader is there, counts what arrives below otherwise, loads pages as the top or bottom comes into view, and calls `markSeen` at the end.
 
 `items` interleaves rows from elsewhere by time: `{ id, at, node }`, for example audit entries in a ticket's history. `buildFeedRows({ messages, dividerBefore, items, isBare })` is the pure function underneath, for a list that does not scroll; `useFeed` passes `isBare` from the instance's type layouts, so bare rows are never grouped.
 
@@ -149,10 +150,12 @@ The behaviour around the `Composer` editor: `editorRef`, `onChange` (keeps a dra
 ### useChatPanel
 
 ```ts
-const panel = useChatPanel({ conversationKey })
+const panel = useChatPanel({ conversationKey, initialChannel, message })
 ```
 
 A whole conversation's state: `channels`, the `current` one and `setChannel`, its `conversation`, `other` (with exactly two channels, the other one, for a "Switch to" link instead of tabs), `thread` with `openThread` and `closeThread`, `loading`, `reads`, `viewer`.
+
+`initialChannel` opens on that channel; `message` (an id) opens at that message, as `ChatPanel` does: its channel, `focus` (`{ id, at }`) for `useFeed` and the conversation's anchor, and for a reply the root's `thread` with `threadFocus` for the thread's feed. `requestedChannelUnavailable` and `requestedMessageUnavailable` say the user cannot read what was asked for and the first readable channel shows instead; both clear once the user picks a channel. Changing any of the three arguments starts over.
 
 ### useThread
 

@@ -104,6 +104,11 @@ export const useUnread = (keys: string[]): Record<string, Record<string, number>
 }
 
 export type UseConversationArgs = {
+	/**
+	 * A moment (ISO) to open around instead of the latest page or the first
+	 * unread, e.g. a linked message's `createdAt`. A change reopens the window.
+	 */
+	anchor?: null | string
 	channel?: string
 	/** Several channels in one feed, e.g. an "all" view. */
 	channels?: string[]
@@ -142,11 +147,13 @@ export type UseConversationResult = {
 const SYNC_OVERLAP_MS = 10_000
 
 /**
- * One feed or thread as a bidirectional window: opens at the latest page, or
- * around the first unread message when there are more than a page; loads
+ * One feed or thread as a bidirectional window: opens around `anchor` when
+ * given, else at the latest page, or around the first unread message when
+ * there are more than a page; loads
  * older and newer pages; merges change sync and this tab's own sends by id.
  */
 export const useConversation = ({
+	anchor = null,
 	channel,
 	channels: channelList,
 	key,
@@ -169,6 +176,8 @@ export const useConversation = ({
 	threadReadsRef.current = threadReads
 	/** Which window this is, for the provider's reopen cache. */
 	const cacheId = `${key}|${channelsKey}|${parent ?? ''}|${limit}`
+	/** This window opened at its anchor: a new anchor is a switch, like another channel. */
+	const windowId = `${cacheId}|${anchor ?? ''}`
 	/** The window the reducer state belongs to; it lags a render behind a switch. */
 	const owner = useRef<null | string>(null)
 	const generation = useRef(0)
@@ -183,15 +192,16 @@ export const useConversation = ({
 	}, [])
 
 	const load = useCallback(
-		async (latest: boolean) => {
+		async (open: { around?: string; latest?: boolean }) => {
 			if (!channelsKey) return
 			const run = ++generation.current
 			dispatch({ type: 'loading' })
 			try {
 				const page = await store.api.list({
+					around: open.around,
 					channels: channelsKey.split(','),
 					key,
-					latest,
+					latest: open.latest,
 					limit,
 					parent,
 				})
@@ -246,7 +256,7 @@ export const useConversation = ({
 	useEffect(
 		() => () => {
 			const current = stateRef.current
-			if (owner.current !== cacheId || current.status !== 'ready') return
+			if (owner.current !== windowId || current.status !== 'ready') return
 			store.cacheWindow(cacheId, {
 				authors: authorsRef.current,
 				// Unconfirmed sends are not kept: change sync brings the confirmed ones.
@@ -254,13 +264,13 @@ export const useConversation = ({
 				threadReads: threadReadsRef.current,
 			})
 		},
-		[cacheId, store]
+		[cacheId, store, windowId]
 	)
 
-	// Open from the cache when this window was shown before, then catch up; else load.
+	// Around the anchor; else from the cache when shown before, then catch up; else load.
 	useEffect(() => {
-		owner.current = cacheId
-		const cached = store.cachedWindow(cacheId)
+		owner.current = windowId
+		const cached = anchor ? undefined : store.cachedWindow(cacheId)
 		if (cached) {
 			generation.current++
 			setAuthors(cached.authors)
@@ -273,8 +283,8 @@ export const useConversation = ({
 		setAuthors({})
 		setThreadReads({})
 		dispatch({ type: 'reset' })
-		void load(false)
-	}, [cacheId, load, store, sync])
+		void load(anchor ? { around: anchor } : {})
+	}, [anchor, cacheId, load, store, sync, windowId])
 
 	useEffect(() => {
 		const release = store.retain(key)
@@ -363,8 +373,8 @@ export const useConversation = ({
 
 	// Right after a switch (another channel, another thread) the state is still
 	// the previous feed's: show the new one's cached window, or a loading one.
-	const own = owner.current === cacheId
-	const cachedView = own ? undefined : store.cachedWindow(cacheId)
+	const own = owner.current === windowId
+	const cachedView = own || anchor ? undefined : store.cachedWindow(cacheId)
 	const view = own
 		? state
 		: cachedView
@@ -377,7 +387,7 @@ export const useConversation = ({
 		error: own ? error : null,
 		hasNewer: view.hasNewer,
 		hasOlder: view.hasOlder,
-		jumpToLatest: () => load(true),
+		jumpToLatest: () => load({ latest: true }),
 		loadNewer,
 		loadOlder,
 		markSeen,

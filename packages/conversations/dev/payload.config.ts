@@ -406,6 +406,21 @@ export default buildConfig({
 			},
 			extensions: [comments({ collections: { projects: true } }), reactions()],
 		}),
+		// After the instances: an admin provider sits inside the ones listed before it, so the
+		// chat store the plugins add is above this one.
+		(config) => ({
+			...config,
+			admin: {
+				...config.admin,
+				components: {
+					...config.admin?.components,
+					providers: [
+						...(config.admin?.components?.providers ?? []),
+						'/components/LinkedConversation#LinkedConversation',
+					],
+				},
+			},
+		}),
 	],
 	telemetry: false,
 	onInit: async (payload) => {

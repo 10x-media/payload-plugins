@@ -15,6 +15,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.bold]: 'Fett',
 	[keys.bulletList]: 'Aufzählung',
 	[keys.cancel]: 'Abbrechen',
+	[keys.channelUnavailable]:
+		'Du hast keinen Zugriff mehr auf den Kanal, auf den dieser Link verweist.',
 	[keys.close]: 'Schließen',
 	[keys.comment]: 'Kommentar',
 	[keys.comments]: 'Kommentare',
@@ -44,6 +46,8 @@ export const de: Record<TranslationKey, string> = {
 	[keys.mention]: 'Jemanden erwähnen',
 	[keys.mentionNoResults]: 'Niemand gefunden',
 	[keys.messageDeleted]: 'Nachricht gelöscht',
+	[keys.messageUnavailable]:
+		'Die Nachricht, auf die dieser Link verweist, ist nicht mehr da, oder du hast keinen Zugriff mehr darauf.',
 	[keys.messageMenu]: 'Nachrichtenaktionen',
 	[keys.modEnterToSend]: 'Strg+Enter zum Senden',
 	[keys.more]: 'Weitere Formatierung',

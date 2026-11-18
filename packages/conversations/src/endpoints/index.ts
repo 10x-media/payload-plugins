@@ -5,6 +5,7 @@ import {
 	deleteMessage,
 	editMessage,
 	extensionContext,
+	getMessage,
 	listMessages,
 	markRead,
 	poll,
@@ -117,6 +118,11 @@ export const buildEndpoints = (instance: ConversationsInstance): Endpoint[] => {
 			},
 			method: 'post',
 			path: `${base}/messages`,
+		},
+		{
+			handler: async (req) => Response.json(await getMessage(req, instance, routeId(req))),
+			method: 'get',
+			path: `${base}/messages/:id`,
 		},
 		{
 			handler: async (req) => {
