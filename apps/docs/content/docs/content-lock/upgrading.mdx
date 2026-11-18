@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x, including the
 
 ## Checklist
 
-1. Upgrade `@10x-media/content-lock` with Payload: its peers are `payload`, `@payloadcms/ui`, `@payloadcms/richtext-lexical` and `@payloadcms/translations` at `^4.0.0-beta.6`. `next` is no longer a peer.
+1. Upgrade `@10x-media/content-lock` with Payload: its peers are `payload`, `@payloadcms/ui`, `@payloadcms/richtext-lexical` and `@payloadcms/translations` at `^4.0.0-beta.10`. `next` is no longer a peer.
 2. With `localization` in your config, migrate the windows' publication status **before** you rely on a lock (see [Localized projects](#localized-projects)).
 3. If a group or `exempt` names `payload-folders`, name your folder collection instead (see [Folders](#folders)).
 4. Pass `overrideAccess: true` where your own code writes windows without a user (see [Local API access](#local-api-access)).

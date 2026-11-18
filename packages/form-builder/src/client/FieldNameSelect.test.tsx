@@ -9,7 +9,7 @@ vi.mock('@payloadcms/ui', () => ({
 	FieldDescription: () => null,
 	ReactSelect: () => null,
 }))
-vi.mock('payload/shared', () => ({ reduceFieldsToValues: () => ({ fields: [] }) }))
+vi.mock('payload/shared', () => ({ getDataFromFormState: () => ({ fields: [] }) }))
 vi.mock('../translations/useTranslation', () => ({
 	useTranslation: () => ({ t: (k: string) => k }),
 }))

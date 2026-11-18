@@ -11,7 +11,7 @@ Upgrade Payload itself by [Payload's migration guide](https://payloadcms.com/doc
 
 ### Checklist
 
-1. Upgrade `@10x-media/audit-logs` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.7`. `next` is no longer a peer.
+1. Upgrade `@10x-media/audit-logs` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.10`. `next` is no longer a peer.
 2. Remove `auditFields` from every collection and global, and `defaults` from the plugin options. Replace `createdByField` and `lastModifiedByField` with Payload's `createCreatedByField` and `createUpdatedByField` where you placed them by hand (see [The field component](/audit-logs/audit-fields#the-field-component)).
 3. To keep the fields visible in the admin, set `authorshipFields`: `true`, or the collections and globals that had `auditFields`.
 4. Move the stored values across, on [MongoDB](#mongodb) or [Postgres](#postgres).

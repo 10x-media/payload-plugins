@@ -233,7 +233,7 @@ type Theme = 'light' | 'dark' | 'light, enhanced contrast' | 'dark, enhanced con
  * theme tokens built on it, then the contrast mode's overrides.
  */
 const payloadPalette = (): Record<Theme, Map<string, string>> => {
-	const ramp = declarationsIn(readFileSync(join(payloadCssDir(), 'design-tokens.css'), 'utf8'))
+	const ramp = declarationsIn(readFileSync(join(payloadCssDir(), 'color-ramps.css'), 'utf8'))
 	const colors = readFileSync(join(payloadCssDir(), 'colors.css'), 'utf8')
 	const darkAt = colors.indexOf("[data-theme='dark'] {")
 	const enhancedAt = colors.indexOf('html[data-enhanced-contrast]')

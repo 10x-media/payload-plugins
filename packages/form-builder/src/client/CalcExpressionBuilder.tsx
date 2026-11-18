@@ -12,7 +12,7 @@ import {
 	useField,
 	useFormFields,
 } from '@payloadcms/ui'
-import { reduceFieldsToValues } from 'payload/shared'
+import { getDataFromFormState } from 'payload/shared'
 import { useMemo, useState } from 'react'
 import { formatCalc } from '../calc/formatCalc'
 import { normalizeCalc } from '../calc/normalizeCalc'
@@ -847,7 +847,7 @@ export const CalcExpressionBuilder = (props: CalcExpressionBuilderProps) => {
 	}, [path])
 
 	const siblingsJson = useFormFields(([fields]) =>
-		JSON.stringify(siblingsFromData(reduceFieldsToValues(fields, true), selfIndex))
+		JSON.stringify(siblingsFromData(getDataFromFormState(fields, true), selfIndex))
 	)
 	const siblings = useMemo(() => JSON.parse(siblingsJson) as Siblings, [siblingsJson])
 

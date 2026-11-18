@@ -7,8 +7,7 @@
 import { ComponentType } from 'react';
 import { FC } from 'react';
 import { GroupFieldClientProps } from 'payload';
-import { JSX } from 'react/jsx-runtime';
-import { JSX as JSX_2 } from 'react';
+import { JSX } from 'react';
 import { NumberFieldClientProps } from 'payload';
 import { ReactNode } from 'react';
 import { SelectFieldClientProps } from 'payload';
@@ -503,7 +502,7 @@ export type MetricFormat = string | {
 export type MetricKey = 'pageviews' | 'visitors' | 'visits' | 'sessions' | 'bounceRate' /** Time on page: engaged time per pageview, an average in milliseconds over the pageviews it is read for. */ | 'avgDuration' /** Time per visit: engaged time per visit, an average in milliseconds over the visits it is read for. */ | 'visitDuration' | 'scrollDepth' | 'events' | 'conversions' | 'revenue' /** Times a content item was seen on screen. Counted per item only, never per page or site. */ | 'impressions' /** Clicks on a content item, the first per item and pageview. */ | 'interactions';
 
 // @beta @deprecated
-export const MetricSelectField: (props: MetricSelectFieldProps) => JSX_2.Element;
+export const MetricSelectField: (props: MetricSelectFieldProps) => JSX.Element;
 
 // @beta (undocumented)
 export type MetricSelectFieldProps = SelectFieldClientProps & {
@@ -808,7 +807,7 @@ export type SortDirection = 'ascending' | 'descending';
 export type SourceErrorKind = 'misconfigured' | 'host-refused';
 
 // @beta @deprecated
-export const SourceSelectField: (props: SelectFieldClientProps) => JSX_2.Element;
+export const SourceSelectField: (props: SelectFieldClientProps) => JSX.Element;
 
 // @public
 export type SourcesNotice = 'platformFallback' | 'ownSourceFailing';

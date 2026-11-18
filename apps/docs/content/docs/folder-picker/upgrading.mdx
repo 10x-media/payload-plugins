@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x.
 
 ## Checklist
 
-1. Upgrade `@10x-media/folder-picker` with Payload: the peers are `payload`, `@payloadcms/ui` and `@payloadcms/translations` at `^4.0.0-beta.6`. `@dnd-kit/core` is no longer a peer, and the admin runs on Next.js and on TanStack Start alike.
+1. Upgrade `@10x-media/folder-picker` with Payload: the peers are `payload`, `@payloadcms/ui` and `@payloadcms/translations` at `^4.0.0-beta.10`. `@dnd-kit/core` is no longer a peer, and the admin runs on Next.js and on TanStack Start alike.
 2. Replace the folder config (see [Folders in Payload 4](#folders-in-payload-4)), and move your folders and each document's folder by Payload's migration guide.
 3. Regenerate the import map (`pnpm payload generate:importmap`; on TanStack Start, its own as well) and your types (`pnpm payload generate:types`).
 

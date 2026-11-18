@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x.
 
 ## Checklist
 
-1. Upgrade `@10x-media/webhooks` and `@10x-media/fields` with Payload: the peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.6`. `next` is no longer a peer, and the admin runs on Next.js and on TanStack Start alike.
+1. Upgrade `@10x-media/webhooks` and `@10x-media/fields` with Payload: the peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.10`. `next` is no longer a peer, and the admin runs on Next.js and on TanStack Start alike.
 2. On Postgres or SQLite, create and run a migration: `pnpm payload migrate:create` then `pnpm payload migrate`. Payload 4 adds `createdBy` and `updatedBy` to every collection, the subscriptions included (see [Authorship](#authorship)).
 3. Regenerate the import map (`pnpm payload generate:importmap`) and your types (`pnpm payload generate:types`).
 4. Pass `overrideAccess: true` to your own Local API calls on the plugin's collections and to `payload.jobs.run()` where they run without a user (see [Local API access](#local-api-access)).

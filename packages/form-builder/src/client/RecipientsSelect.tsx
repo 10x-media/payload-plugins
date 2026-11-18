@@ -12,7 +12,7 @@ import {
 	useField,
 	useFormFields,
 } from '@payloadcms/ui'
-import { reduceFieldsToValues } from 'payload/shared'
+import { getDataFromFormState } from 'payload/shared'
 import { type CSSProperties, useEffect, useMemo, useState } from 'react'
 import { isPlausibleEmail } from '../actions/emailRecipients'
 import { fieldNames, fieldNamesOfType } from '../fields/fieldNamesOfType'
@@ -158,7 +158,7 @@ export const RecipientsSelect = (props: RecipientsSelectProps) => {
 	const tokenJson = useFormFields(([fields]) =>
 		fieldTokens
 			? JSON.stringify(
-					tokenOptionsFromData(reduceFieldsToValues(fields, true), props.tokenFieldTypes)
+					tokenOptionsFromData(getDataFromFormState(fields, true), props.tokenFieldTypes)
 				)
 			: '[]'
 	)

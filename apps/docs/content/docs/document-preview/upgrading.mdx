@@ -7,7 +7,7 @@ description: Move an install from the Payload 3 line (0.x) to 4.x.
 
 ## Checklist
 
-1. Upgrade `@10x-media/document-preview` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.7`.
+1. Upgrade `@10x-media/document-preview` with Payload: its peers are `payload` and `@payloadcms/ui` at `^4.0.0-beta.10`.
 2. Remove `display` from every collection's options (see [The preview moved into the file panel](#the-preview-moved-into-the-file-panel)).
 3. Regenerate the import map (`pnpm payload generate:importmap`). The plugin adds no database fields, so there is nothing to migrate.
 

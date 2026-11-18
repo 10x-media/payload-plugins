@@ -17,7 +17,7 @@ import {
 	useField,
 	useFormFields,
 } from '@payloadcms/ui'
-import { reduceFieldsToValues } from 'payload/shared'
+import { getDataFromFormState } from 'payload/shared'
 import type { ChangeEvent } from 'react'
 import { useMemo, useRef, useState } from 'react'
 import type { ConditionFieldType } from '../conditions/fieldTypes'
@@ -383,7 +383,7 @@ export const FlowBuilder = (props: FlowBuilderProps) => {
 	const [expandedKeys, setExpandedKeys] = useState<Set<string>>(new Set())
 
 	const fieldRowsJson = useFormFields(([fields]) =>
-		JSON.stringify(extractFieldRows(reduceFieldsToValues(fields, true) as Record<string, unknown>))
+		JSON.stringify(extractFieldRows(getDataFromFormState(fields, true) as Record<string, unknown>))
 	)
 	// Registry labels may be host-registered keys or literals; Payload's `t` returns unknown keys unchanged.
 	const translatedBareLabels = useMemo(
