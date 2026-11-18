@@ -14,7 +14,7 @@ import {
 	sameUser,
 } from '../session/resolve'
 import type { ImpersonationRecord, ResolvedOptions } from '../types'
-import { boundSid } from '../types'
+import { asAuthUser, boundSid } from '../types'
 import {
 	callerSid,
 	defaultRedirect,
@@ -204,6 +204,7 @@ export const startHandler = async (req: PayloadRequest): Promise<Response> => {
 				impersonatorEmail: typeof user.email === 'string' ? user.email : undefined,
 				impersonatorLocale: locale,
 				impersonatorSid: sid,
+				impersonatorStrategy: asAuthUser(user)._strategy,
 				impersonatorTitle: userTitle(
 					req.payload,
 					user.collection,
