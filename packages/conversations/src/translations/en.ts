@@ -20,6 +20,7 @@ export const en: Record<TranslationKey, string> = {
 	[keys.bold]: 'Bold',
 	[keys.bulletList]: 'Bulleted list',
 	[keys.cancel]: 'Cancel',
+	[keys.channelUnavailable]: 'You no longer have access to the channel this link points to.',
 	[keys.close]: 'Close',
 	[keys.comment]: 'Comment',
 	[keys.comments]: 'Comments',
@@ -49,6 +50,8 @@ export const en: Record<TranslationKey, string> = {
 	[keys.mention]: 'Mention someone',
 	[keys.mentionNoResults]: 'Nobody found',
 	[keys.messageDeleted]: 'Message deleted',
+	[keys.messageUnavailable]:
+		'The message this link points to is gone, or you no longer have access to it.',
 	[keys.messageMenu]: 'Message actions',
 	[keys.modEnterToSend]: 'Ctrl+Enter to send',
 	[keys.more]: 'More formatting',

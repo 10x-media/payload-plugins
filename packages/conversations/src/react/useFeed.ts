@@ -21,11 +21,16 @@ const END_SLACK_PX = 48
 /** The attribute a renderer puts on its "New messages" divider, so the feed can open at it. */
 export const FEED_DIVIDER_ATTRIBUTE = 'data-feed-divider'
 
+/** The attribute a renderer puts on each message's element, so the feed can open at one. */
+export const FEED_MESSAGE_ATTRIBUTE = 'data-message-id'
+
 export type UseFeedResult = {
 	/** Put on an empty element at the very bottom of the scroller: reaching it loads newer pages. */
 	bottomRef: RefObject<HTMLDivElement | null>
 	hasNewer: boolean
 	hasOlder: boolean
+	/** The message the feed opened at (`focus`), once it is on screen: mark it. */
+	highlighted: null | string
 	/** Load the page before the first row, keeping the reader's place. */
 	loadOlder: () => Promise<void>
 	/** Put on the scroller. */
@@ -48,7 +53,8 @@ export type UseFeedResult = {
 
 /**
  * The behaviour of a scrolling feed or thread, for any markup: opens at the
- * "New messages" divider (an element with `data-feed-divider`) or the bottom,
+ * `focus` message (an element with `data-message-id`), else at the "New
+ * messages" divider (an element with `data-feed-divider`), else the bottom,
  * keeps the reader's place while older pages load in above, follows the
  * bottom while the reader is there, counts what arrives below otherwise, and
  * loads pages as the top or bottom comes into view. Reaching the end marks
@@ -56,9 +62,12 @@ export type UseFeedResult = {
  */
 export const useFeed = ({
 	conversation,
+	focus = null,
 	items,
 }: {
 	conversation: UseConversationResult
+	/** A message id to open at instead of the divider or the bottom, when it is in the window. */
+	focus?: null | string
 	/** Rows from elsewhere, interleaved by time. */
 	items?: FeedItem[]
 }): UseFeedResult => {
@@ -69,6 +78,7 @@ export const useFeed = ({
 	const opened = useRef(false)
 	const anchor = useRef<null | { height: number; top: number }>(null)
 	const [unseen, setUnseen] = useState(0)
+	const [highlighted, setHighlighted] = useState<null | string>(null)
 	/** The newest row the reader has had on screen; only rows after it count as new. */
 	const lastId = useRef<null | string>(null)
 	const { dividerBefore, hasNewer, hasOlder, loadNewer, loadOlder, markSeen, messages, status } =
@@ -100,11 +110,21 @@ export const useFeed = ({
 	// A quick load shows nothing in between; a slow one a skeleton that does not blink.
 	const skeleton = useDelayedFlag(status === 'loading' && shownIds.length === 0)
 
-	// First paint of a loaded window: the divider if there is one, else the bottom.
+	// First paint of a loaded window: the focus message, else the divider if there is one, else the bottom.
 	useLayoutEffect(() => {
 		const element = scrollerRef.current
 		if (!element || status !== 'ready' || skeleton || opened.current) return
 		opened.current = true
+		const focused = focus
+			? element.querySelector<HTMLElement>(`[${FEED_MESSAGE_ATTRIBUTE}="${CSS.escape(focus)}"]`)
+			: null
+		if (focused) {
+			// A third from the top: what came before is in view, and room for what follows.
+			element.scrollTop = focused.offsetTop - element.clientHeight / 3
+			setHighlighted(focus)
+			checkEnd()
+			return
+		}
 		const divider = dividerBefore
 			? element.querySelector<HTMLElement>(`[${FEED_DIVIDER_ATTRIBUTE}]`)
 			: null
@@ -114,7 +134,7 @@ export const useFeed = ({
 			element.scrollTop = element.scrollHeight
 		}
 		checkEnd()
-	}, [checkEnd, dividerBefore, skeleton, status])
+	}, [checkEnd, dividerBefore, focus, skeleton, status])
 
 	// Keep the reader's place when rows are added above; follow the bottom when there.
 	useLayoutEffect(() => {
@@ -188,6 +208,7 @@ export const useFeed = ({
 		bottomRef,
 		hasNewer,
 		hasOlder,
+		highlighted,
 		loadOlder: older,
 		onScroll: checkEnd,
 		rows: skeleton ? [] : rows,

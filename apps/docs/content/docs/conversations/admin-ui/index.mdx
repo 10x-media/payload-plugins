@@ -66,8 +66,13 @@ The button `comments()` puts into the document controls. It takes the key from t
 |---|---|---|
 | `instance` | `string` | Required |
 | `conversationKey` | `string` | Overrides the key taken from the document |
+| `channel` | `string` | The channel the drawer opens on. See `ChatPanel` |
+| `message` | `string` | A message id the drawer opens at. See `ChatPanel` |
+| `title` | `ReactNode` | The drawer's title. Default: "Comments" |
+| `subtitle` | `ReactNode` | The drawer's line under the title. Default: the edited document's title; pass it outside an edit view, where there is none |
+| `fallback` | `ReactNode` | Shown instead of the button once it is known the user can read no channel of the target |
 
-It renders nothing on a create view (no id yet) and nothing when the user can read no channel of the target. The label reads "Comment" at zero and "Comments" with a count otherwise. The unread dot shows only with `reads` on. The drawer's modal slug is derived from the instance and key, so two triggers for one conversation open the same drawer.
+It renders nothing on a create view (no id yet), and `fallback` (default: nothing) when the user can read no channel of the target. Nothing shows while that is still loading. The label reads "Comment" at zero and "Comments" with a count otherwise. The unread dot shows only with `reads` on. The drawer's modal slug is derived from the instance and key, so two triggers for one conversation open the same drawer.
 
 ### ChatDrawer
 
@@ -81,6 +86,11 @@ It renders nothing on a create view (no id yet) and nothing when the user can re
 | `header` | `ReactNode` | Extra content after the title, before the `drawerHeader` slot |
 | `components` | `Partial<ReplaceableComponents>` | Replacements for everything the drawer draws. See [Replacing components](/conversations/admin-ui/replacing-components) |
 | `renderType` | `(message) => ReactNode` | Draws messages whose `type` is not `text` |
+| `channel` | `string` | The channel to open on instead of the first |
+| `message` | `string` | A message id to open at; wins over `channel` |
+| `renderUnavailable` | `(reason: 'channel' \| 'message') => ReactNode` | Instead of the built-in notice when the channel or message asked for cannot be read; return `null` for none |
+
+`channel`, `message` and `renderUnavailable` pass through to `ChatPanel`, which describes what they do. Changing `conversationKey`, `channel` or `message` while the drawer is mounted starts over, as if it had just opened: one drawer can show whichever conversation a link names.
 
 Open it with Payload's `useModal().openModal(drawerSlug)`. A thread opens under `` `${drawerSlug}-thread` ``, stacked on top.
 
@@ -96,6 +106,11 @@ The drawer's body without the drawer: channel tabs, the current channel's feed, 
 | `renderHeader` | `(panel: UseChatPanelResult) => ReactNode` | Drawn first, with the panel's state |
 | `components` | `Partial<ReplaceableComponents>` | Replacements for everything the panel draws |
 | `renderType` | `(message) => ReactNode` | |
+| `channel` | `string` | The channel to open on instead of the first |
+| `message` | `string` | A message id to open at; wins over `channel` |
+| `renderUnavailable` | `(reason: 'channel' \| 'message') => ReactNode` | Instead of the built-in notice; return `null` for none |
+
+With `message`, the panel opens on that message's channel with the feed loaded around it, however old, scrolls it into view and marks it for a moment. For a reply it opens the root's thread, at the reply. With `channel`, it opens on that channel. When the user cannot read what was asked for (access lost, deleted, another conversation, no such channel) it opens on the first readable channel under a notice saying so, until the user picks a channel. See [Links into a conversation](/conversations/admin-ui/custom-views#links-into-a-conversation).
 
 With exactly two channels, the composer's cue line carries a "Switch to &lt;other&gt;" link. A read-only channel shows the reason in place of the editor.
 

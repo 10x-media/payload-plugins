@@ -140,6 +140,68 @@ test.describe('comments drawer', () => {
 	})
 })
 
+test.describe('links into a conversation', () => {
+	type Sent = { message: { id: string } }
+
+	/** Sends through the API, as a notification's source would have. */
+	const post = async (page: Page, body: Record<string, unknown>): Promise<string> => {
+		const res = await page.request.post('/api/conversations/comments/messages', { data: body })
+		expect(res.ok()).toBeTruthy()
+		return ((await res.json()) as Sent).message.id
+	}
+
+	/** `dev/components/LinkedConversation.tsx` opens `?conversation=` on any admin page. */
+	const openLink = (page: Page, params: Record<string, string>) =>
+		page.goto(`/admin?${new URLSearchParams(params).toString()}`)
+
+	test('a message link opens its channel around it, marked, past the first page', async ({
+		page,
+	}) => {
+		await login(page, ME)
+		const key = `collection:persons:${await personId(page, 'Jana Nováková')}`
+		const text = `linked ${Date.now()}`
+		const id = await post(page, { channel: 'shared', key, text })
+		for (let index = 0; index < 35; index++) {
+			await post(page, { channel: 'shared', key, text: `after ${index}` })
+		}
+		await openLink(page, { conversation: key, message: id })
+		await expect(page.locator('.conversations-tabs__tab--active')).toContainText('Shared')
+		const linked = page.locator('.conversations-message--highlighted')
+		await expect(linked).toContainText(text)
+		await expect(linked).toBeInViewport()
+		await expect(page.getByRole('button', { name: 'Jump to latest' })).toBeVisible()
+	})
+
+	test('a reply link opens its thread at the reply', async ({ page }) => {
+		await login(page, ME)
+		const key = `collection:persons:${await personId(page, 'Jana Nováková')}`
+		const root = await post(page, { channel: 'internal', key, text: `root ${Date.now()}` })
+		const text = `linked reply ${Date.now()}`
+		const reply = await post(page, { key, parent: root, text })
+		await openLink(page, { conversation: key, message: reply })
+		await expect(page.locator('.conversations-drawer__title', { hasText: 'Thread' })).toBeVisible()
+		await expect(
+			page.locator('.conversations-thread .conversations-message--highlighted')
+		).toContainText(text)
+	})
+
+	test('a channel link opens that channel, and an unreadable one says so', async ({ page }) => {
+		await login(page, ME)
+		const key = `collection:persons:${await personId(page, 'Jana Nováková')}`
+		await openLink(page, { channel: 'shared', conversation: key })
+		await expect(page.locator('.conversations-tabs__tab--active')).toContainText('Shared')
+		await expect(page.locator('.conversations-panel__notice')).toHaveCount(0)
+
+		await openLink(page, { channel: 'gone', conversation: key })
+		await expect(page.locator('.conversations-panel__notice')).toHaveText(
+			'You no longer have access to the channel this link points to.'
+		)
+		await expect(page.locator('.conversations-tabs__tab--active')).toContainText('Internal')
+		await page.locator('.conversations-tabs__tab', { hasText: 'Shared' }).click()
+		await expect(page.locator('.conversations-panel__notice')).toHaveCount(0)
+	})
+})
+
 test.describe('two users', () => {
 	test('a message from one user reaches the other through polling', async ({ browser }) => {
 		const me = await asUser(browser, ME)

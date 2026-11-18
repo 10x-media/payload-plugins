@@ -15,6 +15,7 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.bold]: 'غامق',
 	[keys.bulletList]: 'قائمة نقطية',
 	[keys.cancel]: 'إلغاء',
+	[keys.channelUnavailable]: 'لم يعد لديك وصول إلى القناة التي يشير إليها هذا الرابط.',
 	[keys.close]: 'إغلاق',
 	[keys.comment]: 'تعليق',
 	[keys.comments]: 'التعليقات',
@@ -44,6 +45,8 @@ export const ar: Record<TranslationKey, string> = {
 	[keys.mention]: 'الإشارة إلى شخص',
 	[keys.mentionNoResults]: 'لم يُعثر على أحد',
 	[keys.messageDeleted]: 'حُذفت الرسالة',
+	[keys.messageUnavailable]:
+		'الرسالة التي يشير إليها هذا الرابط لم تعد موجودة، أو لم يعد لديك وصول إليها.',
 	[keys.messageMenu]: 'إجراءات الرسالة',
 	[keys.modEnterToSend]: 'Ctrl+Enter للإرسال',
 	[keys.more]: 'مزيد من التنسيق',

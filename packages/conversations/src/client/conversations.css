@@ -280,6 +280,40 @@
 	background: var(--color-bg-hover);
 }
 
+/* The message a link opened the feed at: marked, then fading back to the feed. */
+.conversations-message--highlighted {
+	animation: conversations-highlight 3s ease-out forwards;
+}
+
+@keyframes conversations-highlight {
+	0%,
+	40% {
+		background: var(--color-bg-warning-tertiary);
+	}
+	100% {
+		background: transparent;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.conversations-message--highlighted {
+		animation: none;
+		background: var(--color-bg-warning-tertiary);
+	}
+}
+
+/* Why the panel shows something other than what a link asked for. */
+.conversations-panel__notice {
+	margin: var(--spacer-2) var(--spacer-3);
+	padding: var(--spacer-2) var(--spacer-2-5);
+	border: 1px solid var(--color-border-warning);
+	border-radius: var(--radius-medium);
+	background: var(--color-bg-warning-tertiary);
+	color: var(--color-text);
+	font-size: var(--text-body-medium-font-size);
+	line-height: var(--text-body-medium-line-height);
+}
+
 .conversations-message__gutter {
 	flex: none;
 	width: 28px;

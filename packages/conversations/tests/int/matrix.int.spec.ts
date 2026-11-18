@@ -26,6 +26,8 @@ type Page = {
 }
 
 const mentions: Array<{ key: string; users: string[] }> = []
+/** What a mention notification links with, per mention. */
+const mentionLinks: Array<{ channel: string; id: string; key: string; parent: null | string }> = []
 const written: Array<{ id: string; operation: string }> = []
 
 describeForDb('conversations core', {}, (db) => {
@@ -50,8 +52,14 @@ describeForDb('conversations core', {}, (db) => {
 				instanceOptions({
 					extensions: [comments({ globals: { settings: ['internal'] } })],
 					hooks: {
-						afterMention: ({ key, users }) => {
+						afterMention: ({ channel, key, message, users }) => {
 							mentions.push({ key, users: users.map((u) => `${u.collection}:${u.id}`) })
+							mentionLinks.push({
+								channel,
+								id: String(message.id),
+								key,
+								parent: message.parent ?? null,
+							})
 						},
 						afterMessage: ({ message, operation }) => {
 							written.push({ id: String(message.id), operation })
@@ -311,6 +319,72 @@ describeForDb('conversations core', {}, (db) => {
 				text: 'nested',
 			})
 			expect(nested.status).toBe(400)
+		})
+	})
+
+	describe('linking to a message', () => {
+		const get = (session: Session, id: number | string) =>
+			call<Sent>(booted, `GET /conversations/comments/messages/${String(id)}`, { session })
+
+		it('answers a root message without a root', async () => {
+			const root = await send(staff, { channel: 'shared', key: personKey, text: 'linked root' })
+			const found = await get(customer, root.json.message.id)
+			expect(found.status).toBe(200)
+			expect(found.json.message.id).toBe(root.json.message.id)
+			expect(found.json.message.channel).toBe('shared')
+			expect(found.json.message.key).toBe(personKey)
+			expect(found.json.root).toBeUndefined()
+			expect(Object.keys(found.json.authors)).toContain(staff.userKey)
+		})
+
+		it('answers a reply with its root, and mentions in it carry the root', async () => {
+			const root = await send(staff, { channel: 'internal', key: personKey, text: 'thread' })
+			const reply = await send(staff, {
+				body: bodyOf(textNode('see '), mentionNode(staff2.userKey, 'Staff Two')),
+				key: personKey,
+				parent: String(root.json.message.id),
+			})
+			const found = await get(staff2, reply.json.message.id)
+			expect(found.status).toBe(200)
+			expect(found.json.message.parent).toBe(String(root.json.message.id))
+			expect(found.json.root?.id).toBe(root.json.message.id)
+			expect(found.json.root?.replyCount).toBe(1)
+			expect(mentionLinks.at(-1)).toEqual({
+				channel: 'internal',
+				id: String(reply.json.message.id),
+				key: personKey,
+				parent: String(root.json.message.id),
+			})
+		})
+
+		it('is a 404 for an unreadable channel, a viewer without access, a bad id or a deleted message', async () => {
+			const internal = await send(staff, { channel: 'internal', key: personKey, text: 'staff' })
+			expect((await get(customer, internal.json.message.id)).status).toBe(404)
+			const shared = await send(staff, { channel: 'shared', key: personKey, text: 'shared' })
+			expect((await get(stranger, shared.json.message.id)).status).toBe(404)
+			expect((await get(customer, 'not-an-id')).status).toBe(404)
+			const deleted = await send(staff, { channel: 'shared', key: personKey, text: 'gone' })
+			await call(booted, `DELETE /conversations/comments/messages/${deleted.json.message.id}`, {
+				session: staff,
+			})
+			expect((await get(customer, deleted.json.message.id)).status).toBe(404)
+		})
+
+		it('opens a feed around a moment, with the message inside the window', async () => {
+			const sent: Array<Awaited<ReturnType<typeof send>>> = []
+			for (let index = 0; index < 12; index++) {
+				sent.push(await send(staff, { channel: 'shared', key: otherKey, text: `line ${index}` }))
+			}
+			const target = sent[2]?.json.message
+			const page = await list(staff, {
+				around: String(target?.createdAt),
+				channel: 'shared',
+				key: otherKey,
+				limit: '6',
+			})
+			const ids = page.json.messages.map((message) => message.id)
+			expect(ids).toContain(target?.id)
+			expect(page.json.hasNewer).toBe(true)
 		})
 	})
 

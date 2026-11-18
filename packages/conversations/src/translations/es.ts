@@ -15,6 +15,7 @@ export const es: Record<TranslationKey, string> = {
 	[keys.bold]: 'Negrita',
 	[keys.bulletList]: 'Lista con viñetas',
 	[keys.cancel]: 'Cancelar',
+	[keys.channelUnavailable]: 'Ya no tienes acceso al canal al que apunta este enlace.',
 	[keys.close]: 'Cerrar',
 	[keys.comment]: 'Comentario',
 	[keys.comments]: 'Comentarios',
@@ -44,6 +45,8 @@ export const es: Record<TranslationKey, string> = {
 	[keys.mention]: 'Mencionar a alguien',
 	[keys.mentionNoResults]: 'No se encontró a nadie',
 	[keys.messageDeleted]: 'Mensaje eliminado',
+	[keys.messageUnavailable]:
+		'El mensaje al que apunta este enlace ya no existe o ya no tienes acceso a él.',
 	[keys.messageMenu]: 'Acciones del mensaje',
 	[keys.modEnterToSend]: 'Ctrl+Enter para enviar',
 	[keys.more]: 'Más formato',

@@ -15,6 +15,7 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.bold]: 'Жирний',
 	[keys.bulletList]: 'Маркований список',
 	[keys.cancel]: 'Скасувати',
+	[keys.channelUnavailable]: 'У вас більше немає доступу до каналу, на який веде це посилання.',
 	[keys.close]: 'Закрити',
 	[keys.comment]: 'Коментар',
 	[keys.comments]: 'Коментарі',
@@ -44,6 +45,8 @@ export const uk: Record<TranslationKey, string> = {
 	[keys.mention]: 'Згадати когось',
 	[keys.mentionNoResults]: 'Нікого не знайдено',
 	[keys.messageDeleted]: 'Повідомлення видалено',
+	[keys.messageUnavailable]:
+		'Повідомлення, на яке веде це посилання, видалено, або у вас більше немає доступу до нього.',
 	[keys.messageMenu]: 'Дії з повідомленням',
 	[keys.modEnterToSend]: 'Ctrl+Enter, щоб надіслати',
 	[keys.more]: 'Інше форматування',
