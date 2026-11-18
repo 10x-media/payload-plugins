@@ -1,4 +1,4 @@
-import { type Config, definePlugin } from 'payload'
+import { type Config, definePlugin, type Plugin } from 'payload'
 
 import type { WebhooksPluginOptions } from './options'
 import { registerTranslations } from './plugin/registerTranslations'
@@ -37,13 +37,7 @@ declare module 'payload' {
 /** The trigger slug webhooks contributes to the automations catalog. */
 export const WEBHOOK_TRIGGER_SLUG = 'webhook' as const
 
-/**
- * Webhooks plugin for Payload. Runs before automations (`order: 10`) so it can
- * push its `webhook` trigger into automations when present, and builds outbound
- * delivery: opt-in collections emit signed HTTP POSTs to subscribed endpoints,
- * delivered via native Payload jobs or bounded-await inline.
- */
-export const webhooks = definePlugin<WebhooksPluginOptions>({
+const definition = definePlugin<WebhooksPluginOptions>({
 	slug: '@10x-media/webhooks',
 	order: 10,
 	plugin: ({ config, options = {}, plugins }): Config => {
@@ -63,5 +57,20 @@ export const webhooks = definePlugin<WebhooksPluginOptions>({
 		return config
 	},
 })
+
+/**
+ * Webhooks plugin for Payload. Runs before automations (`options.order`,
+ * default `10`) so it can push its `webhook` trigger into automations when
+ * present, and builds outbound delivery: opt-in collections emit signed HTTP
+ * POSTs to subscribed endpoints, delivered via native Payload jobs or
+ * bounded-await inline.
+ */
+export const webhooks = (options: WebhooksPluginOptions = {}): Plugin => {
+	const plugin = definition(options)
+	if (options.order !== undefined) {
+		plugin.order = options.order
+	}
+	return plugin
+}
 
 export type { WebhooksPluginOptions as PluginOptions } from './options'

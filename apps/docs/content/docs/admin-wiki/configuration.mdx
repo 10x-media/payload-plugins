@@ -42,6 +42,7 @@ adminWiki({
 | `featured` | `boolean` | `true` | Lead the list band with the collection's featured guides as cards |
 | `hidden` | `{ media, pages }` | visible | Payload's `admin.hidden` passthrough, per wiki collection |
 | `localeMap` | `Record<string, string>` | `{}` | Map admin UI languages to content locales. See [Targeting](/admin-wiki/targets#localization) |
+| `order` | `number` | `1000` | Payload plugin order. See [Plugin order](#plugin-order) |
 | `overrides` | `{ media, pages }` | `{}` | Reshape the collections the plugin registers. See [Collection overrides](#collection-overrides) |
 | `slugs` | `{ media, pages }` | `wiki-media`, `wiki-pages` | Collection slug overrides |
 | `translations` | `TranslationsOption` | built-ins | Per-locale string overrides. See [i18n](/admin-wiki/i18n) |
@@ -179,6 +180,17 @@ plugins: [
 ```
 
 A plugin that sets an `order` of its own above `1000` runs after the wiki, and its collections and fields are not documented. A plugin that has to see the wiki's own collections (to extend them, say) sets a higher order on purpose.
+
+When the plugins that need the wiki's collections keep the default order (a storage adapter configuring `wiki-media`, a translation or preview plugin listing it, a bulk-operation guard), pass `order` instead, so the wiki runs before them:
+
+```ts
+plugins: [
+  adminWiki({ order: -10 }),
+  documentPreview({ collections: { 'wiki-media': {} } }), // order 0, sees wiki-media
+]
+```
+
+The cost is the walk: it now sees only what the plugins below `-10` and your own config added, so fields that plugins running after the wiki add get no help and cannot be targeted, and the plugin logs a warning on boot if the walk finds nothing. Pick the order from your own list: the right number depends on which plugins have to see the wiki and which the wiki has to see.
 
 If the walk finds no fields at all, the plugin logs a warning on boot rather than failing. In practice that means the plugin ran before the config had any fields to document.
 

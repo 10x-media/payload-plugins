@@ -19,7 +19,9 @@ describe('formBuilder factory', () => {
 		expect(i18n.en?.formBuilder?.fieldTitle).toBe('Title')
 	})
 
-	const richTextFieldsOf = async (richText: Parameters<typeof formBuilder>[0]['richText']) => {
+	const richTextFieldsOf = async (
+		richText: NonNullable<Parameters<typeof formBuilder>[0]>['richText']
+	) => {
 		const plugin = formBuilder({ richText })
 		const config = { collections: [] } as unknown as Config
 		const out = await Promise.resolve(plugin(config))
@@ -127,7 +129,7 @@ describe('formBuilder factory', () => {
 		expect(doc).toEqual({ id: 1, fields: [], multistep: false, pollEnabled: false })
 	})
 
-	const buildWithEmail = async (email: Parameters<typeof formBuilder>[0]['email']) => {
+	const buildWithEmail = async (email: NonNullable<Parameters<typeof formBuilder>[0]>['email']) => {
 		const plugin = formBuilder({ email })
 		const config = { collections: [] } as unknown as Config
 		const out = await Promise.resolve(plugin(config))

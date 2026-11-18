@@ -30,7 +30,7 @@ Detection uses Payload's `definePlugin` slug registry: each plugin registers und
 
 ## Contributions run before consumers
 
-Plugin `order` makes cross-plugin contributions deterministic. Webhooks runs early (`order: 10`) and, when Automations is registered, pushes its `webhook` trigger slug into the Automations options. Automations runs last (`order: 100`) and resolves its trigger catalog after every contributor has run.
+Plugin `order` makes cross-plugin contributions deterministic. Webhooks runs early (`order: 10`, overridable with its `order` option) and, when Automations is registered, pushes its `webhook` trigger slug into the Automations options. Automations runs last (`order: 100`) and resolves its trigger catalog after every contributor has run.
 
 ```ts title="payload.config.ts"
 import { buildConfig } from 'payload'

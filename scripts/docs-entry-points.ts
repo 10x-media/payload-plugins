@@ -271,6 +271,13 @@ const ANALYTICS: EntryPointsPage = {
 			what: "The types of every public shape: the adapter contract, the options, the endpoints' requests and answers, the read results, plus the key lists the pickers are built from.",
 		},
 		{
+			report: 'shared',
+			specifier: '@10x-media/analytics/shared',
+			where:
+				'Anywhere, including a module that both server code and client components import. It loads no package and no stylesheet.',
+			what: "The query contract's dimension and operator lists, the route paths, the error codes and their readers, the timeframe presets and `formatMetricValue`: what [`/client`](#10x-mediaanalyticsclient) exports with no React, and the root with no Payload.",
+		},
+		{
 			report: 'attributes',
 			specifier: '@10x-media/analytics/attributes',
 			where:

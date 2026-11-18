@@ -84,10 +84,15 @@ const buttonSettingsOf = (form: {
  * Pure and framework-agnostic (no 'use client'): safe to call from a Server Component or any
  * other server-side code before handing the result to the client `<Form>`.
  */
-export function toFormDocument(
+export function toFormDocument<TField extends { blockType: string; name?: string | null }>(
 	form: {
 		id: number | string
-		fields?: { blockType: string; name?: string; [key: string]: unknown }[] | null
+		/**
+		 * Generic over the row and with no index signature: a block generated with an
+		 * `interfaceName` is an interface, which TypeScript never treats as indexable, so an index
+		 * signature would reject every host's generated form type.
+		 */
+		fields?: readonly TField[] | null
 		flow?: unknown
 		response?: {
 			type?: string | null
@@ -142,7 +147,7 @@ export function toFormDocument(
 				...(winningValues.length > 0 ? { outcome: { winningValues } } : {}),
 			}
 		: undefined
-	let fields = (form.fields ?? []) as FormFieldInstance[]
+	let fields = (form.fields ?? []) as unknown as FormFieldInstance[]
 	if (options?.pollOptions) {
 		fields = applyPollOptions(fields, form.poll?.resultsField, options.pollOptions)
 	}

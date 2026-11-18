@@ -310,6 +310,15 @@ export type AdminWikiPluginOptions = {
 	 */
 	disabled?: boolean
 	/**
+	 * Plugin order. Payload runs plugins sorted by it, ascending, default `0`.
+	 * High by default so the config walk sees every plugin on the default
+	 * order. Lower it when another plugin has to run after the wiki to see
+	 * its collections: that plugin's own collections and fields then go
+	 * undocumented.
+	 * @default 1000
+	 */
+	order?: number
+	/**
 	 * Per-locale overrides for this plugin's UI strings, keyed by the typed
 	 * translation keys exported from `@10x-media/admin-wiki/i18n`. Values win
 	 * over the built-in locales key-by-key; locales the plugin does not ship are
