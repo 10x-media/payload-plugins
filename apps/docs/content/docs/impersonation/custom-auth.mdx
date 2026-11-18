@@ -22,3 +22,30 @@ impersonation({
 `binding` defaults to `user._sid`. API-key callers have no sid and are refused.
 
 On dual-session isolated targets, start writes `generateIsolatedAuthCookie` instead of the shared cookie (parallel mode). A role-split collection that returns the shared name for that user falls back to swap. Pass the loaded target as `user` into `resolveIsolatedCookieName`.
+
+## Second factor
+
+A second-factor plugin such as `payload-totp` labels a verified request with its own strategy name (`req.user._strategy === 'totp'`) and denies access without it. The target session has no second factor of its own, so it authenticates through its own strategy and every collection is denied.
+
+`inheritStrategies` copies the impersonator's strategy to the target session:
+
+```ts
+impersonation({
+  access: {
+    impersonate: ({ req }) => req.user?._strategy === 'totp',
+  },
+  inheritStrategies: ['totp'],
+})
+```
+
+1. Start stores `req.user._strategy` on the row as `impersonatorStrategy`.
+2. Each request on the target sid gets that value as `req.user._strategy`, if it is in `inheritStrategies`.
+3. The impersonator's own requests keep their strategy. In parallel mode only the target side inherits; admin requests stay on the impersonator's own strategy.
+
+Only a strategy the impersonator really had is copied. An impersonator who signed in without the second factor passes on `local-jwt`, so the target session stays denied. Gate `access.impersonate` on the strategy to refuse such a start up front.
+
+The inherited strategy lasts as long as the row is open, even after the impersonator's own second factor expires. Set `maxDuration` with `inheritStrategies`.
+
+Block the second-factor plugin's setup and verify endpoints while `req.user._impersonation` is set. payload-totp stores `req.user._strategy` as the strategy to re-run, so setting up 2FA in an inherited session makes its strategy call itself.
+
+On Postgres, `impersonatorStrategy` is a new column on the sessions table. Create a migration after upgrading.

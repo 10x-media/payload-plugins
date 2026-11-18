@@ -187,7 +187,7 @@ export type EnabledOptions = {
 	 * Last pass over the built `impersonation-sessions` collection. Whatever
 	 * this returns is registered as-is, including access. Do not rename fields
 	 * the plugin reads (`impersonator`, `target`, `targetSid`, `impersonatorSid`,
-	 * `startedAt`, `endedAt`, `endedBy`, `mode`, `absoluteExpiresAt`) and do not
+	 * `startedAt`, `endedAt`, `endedBy`, `mode`, `absoluteExpiresAt`, `impersonatorStrategy`) and do not
 	 * change the slug here. Use `collectionSlug` for that.
 	 */
 	collection?: {
@@ -196,6 +196,13 @@ export type EnabledOptions = {
 	cookies?: { clearOnSwitch?: string[] }
 	decorateRequests?: boolean
 	hintCookieName?: string
+	/**
+	 * Values of `user._strategy` the target session takes over from the
+	 * impersonator, for example `['totp']` with payload-totp. The impersonator's
+	 * strategy is read on start and stored on the row. A strategy outside this
+	 * list is not copied, so the target session keeps its own.
+	 */
+	inheritStrategies?: string[]
 	maxDuration?: number
 	/**
 	 * Opt-in cleanup of closed rows, plus `closeStaleImpersonations` on the same
@@ -252,6 +259,7 @@ export type ResolvedOptions = {
 	cookies: { clearOnSwitch: string[] }
 	decorateRequests: boolean
 	hintCookieName: string
+	inheritStrategies: string[]
 	maxDuration: number | undefined
 	onEnd?: EnabledOptions['onEnd']
 	onStart?: EnabledOptions['onStart']
@@ -292,6 +300,7 @@ export type ImpersonationRecord = {
 	impersonatorEmail?: null | string
 	impersonatorLocale?: null | string
 	impersonatorSid: string
+	impersonatorStrategy?: null | string
 	impersonatorTitle?: null | string
 	ip?: null | string
 	mode: ImpersonationMode

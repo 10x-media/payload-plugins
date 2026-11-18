@@ -15,6 +15,7 @@ const options = {
 	cookies: { clearOnSwitch: [] },
 	decorateRequests: true,
 	hintCookieName: 'impersonation-hint',
+	inheritStrategies: [],
 	maxDuration: undefined,
 	reason: 'off',
 	retention: undefined,

@@ -1,5 +1,6 @@
 import * as migration_20260917_112029_init from './20260917_112029_init'
 import * as migration_20260921_140000_posts from './20260921_140000_posts'
+import * as migration_20261118_180000_impersonator_strategy from './20261118_180000_impersonator_strategy'
 
 export const migrations = [
 	{
@@ -11,5 +12,10 @@ export const migrations = [
 		up: migration_20260921_140000_posts.up,
 		down: migration_20260921_140000_posts.down,
 		name: '20260921_140000_posts',
+	},
+	{
+		up: migration_20261118_180000_impersonator_strategy.up,
+		down: migration_20261118_180000_impersonator_strategy.down,
+		name: '20261118_180000_impersonator_strategy',
 	},
 ]

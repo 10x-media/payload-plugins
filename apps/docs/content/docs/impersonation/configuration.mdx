@@ -15,6 +15,7 @@ description: Options for access, cookies, duration, UI, and session seams.
 | `apiPath` | `string` | `/impersonation` | Root endpoint prefix. Must not collide with a collection slug. |
 | `hintCookieName` | `string` | `impersonation-hint` | Row id hint. Must not start with `cookiePrefix`. |
 | `decorateRequests` | `boolean` | `true` | Paint `req.user._impersonation` on the **target** session, including both emails. `false` skips that field only. `maxDuration` still closes the session on the next authenticated request. |
+| `inheritStrategies` | `string[]` | `[]` | Values of `req.user._strategy` the **target** session takes over from the impersonator. Start stores the impersonator's strategy on the row. A strategy outside the list is not copied. See [Second factor](/impersonation/custom-auth#second-factor). |
 | `reason` | `'off' \| 'optional' \| 'required'` | `'off'` | Note stored on the row. |
 | `maxDuration` | `number` (seconds) | unset | Absolute cap from `startedAt`. Unset means refresh can keep the session alive. |
 | `retention` | `{ deleteAfterDays, cron?, queue? }` | off | Opt-in job: close stale open rows, then delete **closed** rows older than N days. Host must run the queue (`jobs.autoRun`). Open rows are never deleted. |
