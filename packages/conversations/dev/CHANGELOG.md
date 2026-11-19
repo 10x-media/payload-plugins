@@ -1,5 +1,12 @@
 # @10x-media/conversations-dev
 
+## 0.0.1-alpha.5
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/conversations@4.0.0-alpha.4
+
 ## 0.0.1-alpha.4
 
 ### Patch Changes

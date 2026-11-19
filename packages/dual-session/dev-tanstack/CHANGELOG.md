@@ -1,5 +1,12 @@
 # @10x-media/dual-session-dev-tanstack
 
+## 0.0.1-alpha.3
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/dual-session@4.0.0-alpha.4
+
 ## 0.0.1-alpha.2
 
 ### Patch Changes

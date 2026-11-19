@@ -1,5 +1,13 @@
 # @10x-media/content-lock-dev
 
+## 0.0.1-alpha.5
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/content-lock@4.0.0-alpha.3
+  - @10x-media/jobs@4.0.0-alpha.3
+
 ## 0.0.1-alpha.4
 
 ### Patch Changes

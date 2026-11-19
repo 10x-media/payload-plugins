@@ -1,5 +1,12 @@
 # @10x-media/folder-picker-dev
 
+## 0.0.1-alpha.3
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/folder-picker@4.0.0-alpha.2
+
 ## 0.0.1-alpha.2
 
 ### Patch Changes

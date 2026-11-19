@@ -1,5 +1,12 @@
 # @10x-media/form-builder-dev-tanstack
 
+## 0.0.1-alpha.2
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/form-builder@4.0.0-alpha.3
+
 ## 0.0.1-alpha.1
 
 ### Patch Changes
