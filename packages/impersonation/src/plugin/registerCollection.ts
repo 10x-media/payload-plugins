@@ -100,6 +100,7 @@ export const buildRecordsCollection = ({
 			{ name: 'ip', type: 'text' },
 			{ name: 'userAgent', type: 'text' },
 			{ name: 'impersonatorLocale', type: 'text' },
+			{ name: 'impersonatorStrategy', type: 'text' },
 			{ name: 'absoluteExpiresAt', type: 'date' },
 			{ name: 'targetLocked', type: 'checkbox' },
 		],

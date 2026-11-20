@@ -123,6 +123,7 @@ export const normalizeOptions = (options: EnabledOptions, config: Config): Resol
 		},
 		decorateRequests: options.decorateRequests !== false,
 		hintCookieName,
+		inheritStrategies: options.inheritStrategies ?? [],
 		maxDuration: options.maxDuration,
 		onEnd: options.onEnd,
 		onStart: options.onStart,

@@ -29,6 +29,7 @@ describe('normalizeOptions', () => {
 		expect(resolved.apiPath).toBe('/impersonation')
 		expect(resolved.hintCookieName).toBe('impersonation-hint')
 		expect(resolved.decorateRequests).toBe(true)
+		expect(resolved.inheritStrategies).toEqual([])
 		expect(resolved.reason).toBe('off')
 		expect(resolved.cookies.clearOnSwitch).toEqual(['payload-tenant'])
 		expect(resolved.maxDuration).toBeUndefined()

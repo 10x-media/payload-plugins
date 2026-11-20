@@ -124,7 +124,7 @@ export const ImpersonationProvider = async ({
 		return <ImpersonationClientConfig value={clientValue}>{children}</ImpersonationClientConfig>
 	}
 
-	const locale = barSource.impersonatorLocale
+	const locale = i18n?.language ?? barSource.impersonatorLocale
 	const message = (key: TranslationKey) => messageFor(locale, key, payload.config.i18n.translations)
 	const targetName =
 		labelUser(options.ui.userLabel, {
