@@ -1,5 +1,12 @@
 # @10x-media/impersonation-dev
 
+## 0.0.1-alpha.7
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/impersonation@4.0.0-alpha.4
+
 ## 0.0.1-alpha.6
 
 ### Patch Changes
