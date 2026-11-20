@@ -39,6 +39,7 @@ export default buildConfig({
 		dualSession({ collections: ['partners'] }),
 		impersonation({
 			access: {
+				filterTargets: ({ req }) => canImpersonate(req.user),
 				impersonate: ({ req }) => canImpersonate(req.user),
 				readRecords: ({ req }) => canImpersonate(req.user),
 				terminate: ({ req }) => canImpersonate(req.user),
