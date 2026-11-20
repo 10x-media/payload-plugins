@@ -40,7 +40,7 @@ Each flag is independent. `ui: false` turns all of them off. The provider still 
 | `ui.cardEmail` | `true` | Show email under `useAsTitle` on default switcher cards. |
 | `ui.userLabel` | `'title'` | How the bar and frontend banner name users. `'title'` is the collection's `useAsTitle`, `'email'` is the email. Each falls back to the other. |
 
-Build your own control with `useImpersonation` from `@10x-media/impersonation/client`. It returns `{ status, setStatus, start, exit, end, reasonMode, targetFilters, apiPath, cardEmail, sessionCollection }`. `targetFilters` is the `access.filterTargets` result (`true` or a `Where` per collection). `status` starts from the server render and updates after the bar checks the live session. `StartConfirmModal` is exported too.
+Build your own control with `useImpersonation` from `@10x-media/impersonation/client`. It returns `{ status, setStatus, start, exit, end, reasonMode, targetFilters, apiPath, cardEmail, sessionCollection }`. `targetFilters` is the `access.filterTargets` result for the signed-in viewer (`true` or a `Where` per collection), refreshed on every admin page. `status` starts from the server render and updates after the bar checks the live session. `StartConfirmModal` is exported too.
 
 `collection.overrides` receives the built sessions collection and whatever it returns is registered, including access. Do not rename fields the plugin reads, and do not change the slug here. Use `collectionSlug` for that.
 
