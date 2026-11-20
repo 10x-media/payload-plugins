@@ -1,16 +1,13 @@
-import { headers as nextHeaders } from 'next/headers'
 import type { ServerProps } from 'payload'
-import { createLocalReq } from 'payload'
 import type { ReactNode } from 'react'
 
-import { resolveTargetFilters } from '../access/filterTargets'
+import { viewerTargetFilters } from '../access/viewerTargetFilters'
 import { FAILURE_CODES } from '../endpoints/codes'
 import { statusFromRow } from '../getImpersonation'
-import { labelUser } from '../ids'
+import { labelUser, viewerKey } from '../ids'
 import { IMPERSONATION_SID_PREFIX } from '../plugin/constants'
 import { readHintCookie } from '../plugin/lookup'
 import { getRegistry } from '../plugin/registry'
-import { startableCollectionSlugs } from '../plugin/startable'
 import {
 	cachedFindOpenBySid,
 	impersonationSide,
@@ -37,15 +34,7 @@ export const ImpersonationProvider = async ({
 		return children
 	}
 
-	const startable = startableCollectionSlugs(payload.config.collections, options)
-	let targets: Awaited<ReturnType<typeof resolveTargetFilters>> = Object.fromEntries(
-		startable.map((slug) => [slug, true as const])
-	)
-	if (user && options.access.filterTargets) {
-		const headerList = await nextHeaders()
-		const req = await createLocalReq({ req: { headers: headerList, i18n } as never, user }, payload)
-		targets = await resolveTargetFilters({ collections: startable, options, req })
-	}
+	const targets = await viewerTargetFilters(user, i18n, payload)
 
 	const apiPath = `${payload.config.routes.api}${options.apiPath}`
 	const sid = boundSid(user, options.session.binding)
@@ -118,6 +107,7 @@ export const ImpersonationProvider = async ({
 		sessionCollection: options.collectionSlug,
 		status,
 		targetFilters: targets,
+		viewer: viewerKey(user),
 	}
 
 	if (!options.ui.bar || !barSource) {
