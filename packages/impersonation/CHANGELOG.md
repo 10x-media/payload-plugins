@@ -1,5 +1,19 @@
 # @10x-media/impersonation
 
+## 4.0.0-alpha.4
+
+### Minor Changes
+
+- Add `inheritStrategies`. The target session takes over the impersonator's `req.user._strategy` when it is in the list, so a second-factor plugin such as `payload-totp` no longer denies every collection while impersonating. Start stores the strategy on the row as `impersonatorStrategy`. On Postgres, create a migration for the new column.
+
+### Patch Changes
+
+- The impersonation bar follows the admin language. It used to keep the language the session was started in.
+
+  Closes #312
+
+- The switcher, the document button and `useImpersonation().targetFilters` follow `access.filterTargets` right after login and after switching accounts in the same tab. Before, they kept the filters resolved on the signed-out login page until the next full reload, so a user the filter excludes still saw the switcher. The plugin now also registers a header component, `ImpersonationTargetsHeader`, that renders nothing visible. Upgrade: run `pnpm payload generate:importmap`, so the admin renders the header component.
+
 ## 4.0.0-alpha.3
 
 ### Patch Changes
