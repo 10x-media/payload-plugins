@@ -2,6 +2,15 @@ import type { CollectionSlug, Payload } from 'payload'
 
 import type { UserLabel } from './types'
 
+/**
+ * Identifies the signed-in viewer across the server and client halves of the provider, so the
+ * client can tell when the target filters it holds were resolved for somebody else. `null` when
+ * nobody is signed in.
+ */
+export const viewerKey = (
+	user: { collection?: string; id: number | string } | null | undefined
+): null | string => (user ? `${user.collection ?? ''}:${user.id}` : null)
+
 /** Payload ids are strings on Mongo and numbers on Postgres; compare as text. */
 export const idsEqual = (a: unknown, b: unknown): boolean =>
 	a != null && b != null && String(a) === String(b)

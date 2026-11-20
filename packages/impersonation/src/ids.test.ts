@@ -1,7 +1,7 @@
 import type { Payload } from 'payload'
 import { describe, expect, it } from 'vitest'
 
-import { labelUser, userTitle } from './ids'
+import { labelUser, userTitle, viewerKey } from './ids'
 
 const payload = (useAsTitle?: string) =>
 	({ collections: { users: { config: { admin: { useAsTitle } } } } }) as unknown as Payload
@@ -33,5 +33,19 @@ describe('labelUser', () => {
 		expect(labelUser('email', { title: 'Dev Editor' })).toBe('Dev Editor')
 		expect(labelUser('title', { email: 'a@b.c', title: null })).toBe('a@b.c')
 		expect(labelUser('title', {})).toBeUndefined()
+	})
+})
+
+describe('viewerKey', () => {
+	it('keys a user by collection and id, so users of two collections never match', () => {
+		expect(viewerKey({ collection: 'users', id: 7 })).toBe('users:7')
+		expect(viewerKey({ collection: 'customers', id: 7 })).not.toBe(
+			viewerKey({ collection: 'users', id: 7 })
+		)
+	})
+
+	it('is null when nobody is signed in', () => {
+		expect(viewerKey(null)).toBeNull()
+		expect(viewerKey(undefined)).toBeNull()
 	})
 })

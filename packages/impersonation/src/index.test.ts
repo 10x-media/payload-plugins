@@ -47,6 +47,13 @@ describe('impersonation factory', () => {
 		expect(out.admin?.components?.actions ?? []).toEqual([])
 	})
 
+	it('registers the target filter sync in the header even when ui is false', () => {
+		const out = impersonation({ ...allowAll, ui: false })(fakeConfig()) as Config
+		expect(out.admin?.components?.header).toEqual([
+			'@10x-media/impersonation/rsc#ImpersonationTargetsHeader',
+		])
+	})
+
 	it('registers the records collection and root endpoints', () => {
 		const out = impersonation(allowAll)(fakeConfig()) as Config
 		expect(
