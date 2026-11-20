@@ -15,12 +15,14 @@ export const pathOf = (component: PayloadComponent): string | undefined => {
 
 const ACTION = '@10x-media/impersonation/rsc#ImpersonationAction'
 const PROVIDER = '@10x-media/impersonation/rsc#ImpersonationProvider'
+const TARGETS_HEADER = '@10x-media/impersonation/rsc#ImpersonationTargetsHeader'
 const DOCUMENT_ACTION = '@10x-media/impersonation/client#ImpersonationDocumentButton'
 
 export const registerAdmin = (config: Config, options: ResolvedOptions): void => {
 	config.admin ??= {}
 	config.admin.components ??= {}
 	config.admin.components.providers = [...(config.admin.components.providers ?? []), PROVIDER]
+	config.admin.components.header = [...(config.admin.components.header ?? []), TARGETS_HEADER]
 
 	const cardPath = options.ui.card ? pathOf(options.ui.card) : undefined
 	if (cardPath) {
