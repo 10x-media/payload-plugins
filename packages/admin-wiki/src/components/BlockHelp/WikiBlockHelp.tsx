@@ -3,6 +3,7 @@
 import { blockTargetKey } from '../../shared/targetKeys'
 import { WikiTargetHelp } from '../FieldHelp/WikiFieldHelp'
 import { useWikiFieldPicker } from '../FieldPicker/WikiPickerContext'
+import { useWikiTargets } from '../WikiProvider/WikiProvider'
 import './block-help.css'
 
 export type WikiBlockHelpProps = {
@@ -14,8 +15,9 @@ export type WikiBlockHelpProps = {
  * A block's guides, rendered as a UI field after the block's own fields.
  *
  * No write affordance: it would repeat on every row of the block type, and the
- * block's fields each carry their own. Renders nothing when no guide targets the
- * block, so an unguided block costs a row of nothing.
+ * block's fields each carry their own. Renders nothing, wrapper included, when no
+ * guide targets the block: an empty wrapper would still count for the
+ * `:last-of-type` rule that drops the bottom margin of a block's closing group.
  *
  * Nothing inside the field picker either. The picker renders a block's own
  * fields to attach field targets to them, and this surface is about the
@@ -25,14 +27,16 @@ export type WikiBlockHelpProps = {
  */
 export const WikiBlockHelp = ({ blockSlug }: WikiBlockHelpProps) => {
 	const picker = useWikiFieldPicker()
+	const { entriesFor } = useWikiTargets()
+	const targetKey = blockTargetKey(blockSlug)
 
-	if (picker) {
+	if (picker || entriesFor(targetKey).length === 0) {
 		return null
 	}
 
 	return (
 		<div className="wiki-block-help">
-			<WikiTargetHelp showWriteAffordance={false} targetKey={blockTargetKey(blockSlug)} />
+			<WikiTargetHelp showWriteAffordance={false} targetKey={targetKey} />
 		</div>
 	)
 }

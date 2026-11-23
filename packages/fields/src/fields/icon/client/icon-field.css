@@ -337,6 +337,9 @@
 .tenx-icon-drawer__grid {
 	flex-grow: 1;
 	min-width: 0;
+	/* Columns are sized from clientWidth; hidden x overflow keeps a rounding pixel from
+	   bringing a horizontal scrollbar back. */
+	overflow-x: hidden;
 	overflow-y: auto;
 	/* Promote the scroller to its own compositor layer so the virtualizer's
 	   translateY rows repaint on the GPU during fast scrolls. */
