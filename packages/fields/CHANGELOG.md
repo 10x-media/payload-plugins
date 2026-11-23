@@ -1,5 +1,11 @@
 # @10x-media/fields
 
+## 4.0.0-alpha.4
+
+### Patch Changes
+
+- The icon picker sizes its columns from the grid's width without the vertical scrollbar. At some widths, common in a nested drawer, it counted one column too many, so the last column was cut off and the grid scrolled sideways.
+
 ## 4.0.0-alpha.3
 
 ### Patch Changes
