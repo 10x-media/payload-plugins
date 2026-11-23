@@ -101,9 +101,12 @@ const IconDrawerContent: React.FC<IconDrawerContentProps> = ({
 	useEffect(() => {
 		const element = gridRef.current
 		if (!element) return
-		const observer = new ResizeObserver(() => setGridWidth(element.offsetWidth))
+		// clientWidth, not offsetWidth: the rows lay out beside the vertical scrollbar, so counting
+		// it would size one column too many whenever the box sits just above a multiple of CELL_SIZE.
+		const measure = () => setGridWidth(element.clientWidth)
+		const observer = new ResizeObserver(measure)
 		observer.observe(element)
-		setGridWidth(element.offsetWidth)
+		measure()
 		return () => observer.disconnect()
 	}, [])
 	const columns = Math.max(3, Math.floor(gridWidth / CELL_SIZE))
