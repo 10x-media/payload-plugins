@@ -1,5 +1,12 @@
 # @10x-media/fields-dev
 
+## 0.0.1-alpha.13
+
+### Patch Changes
+
+- Updated dependencies:
+  - @10x-media/fields@4.0.0-alpha.4
+
 ## 0.0.1-alpha.12
 
 ### Patch Changes
